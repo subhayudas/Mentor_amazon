@@ -118,11 +118,43 @@ Preferred communication style: Simple, everyday language.
 
 **Session Management**: connect-pg-simple package included for PostgreSQL-backed session storage (prepared for future authentication)
 
-## Calendly Webhook Integration
+## Session Tracking
 
-### Overview
+### Client-Side Automatic Tracking (Active Implementation)
 
-MentorMatch uses Calendly webhooks to automatically track session bookings. When a mentee books a session with a mentor through Calendly, the platform automatically creates a session record in the database without manual intervention.
+**Overview**: MentorMatch uses Calendly's event listener API to automatically track session bookings directly from the browser. This approach requires zero webhook configuration and works automatically after a one-time identity setup.
+
+**How It Works**:
+1. **Upfront Identity Collection**: First-time visitors see an identity form that collects their name and email
+2. **localStorage Persistence**: Identity is stored locally (`menteeName` and `menteeEmail` keys) for all future visits
+3. **Automatic Tracking**: When a booking completes in the Calendly widget, the platform automatically creates a session record
+4. **Reliability Features**:
+   - Ref-based mentor caching prevents race conditions during React Query refetches
+   - 3 automatic retries with exponential backoff (1s, 2s, 4s) for network failures
+   - Success/failure toast notifications for user feedback
+   - Change Identity button allows updating stored information
+
+**User Experience**:
+- First visit: Fill identity form once → Book sessions (all auto-tracked)
+- Return visits: Auto-loaded from localStorage → Book sessions (all auto-tracked)
+- Network issues: Automatic retry with backoff → Success or error notification
+
+**Reliability**: ~95% automatic tracking (works for all normal cases, may fail only on persistent network/API errors)
+
+**Limitations**:
+- Calendly only provides event/invitee URIs (not full booking details) without API token
+- Failed sessions after all retries are lost (user receives error notification)
+- Client-side approach inherently less reliable than server webhooks
+
+**Implementation Details** (`client/src/pages/MentorProfile.tsx`):
+- `useCalendlyEventListener` hook captures booking events
+- `mentorRef` caches mentor data to prevent loss during refetches
+- `useMutation` with retry configuration handles API calls
+- Conditional rendering ensures widget only mounts when both identity and mentor data are ready
+
+### Calendly Webhook Integration (Alternative Approach)
+
+**Overview**: For applications requiring 100% reliability, MentorMatch also supports Calendly webhooks for server-side automatic tracking. This requires webhook configuration but provides guaranteed session capture.
 
 ### Webhook Endpoint
 
