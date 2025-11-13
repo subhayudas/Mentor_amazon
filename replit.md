@@ -34,9 +34,10 @@ Preferred communication style: Simple, everyday language.
 **Routing**: Wouter for lightweight client-side routing
 
 **Key Pages**:
-- Home: Mentor discovery with grid layout of mentor cards
-- Mentor Profile: Detailed mentor view with embedded Calendly scheduling widget
-- Analytics: Dashboard with session metrics and reporting
+- Home: Mentor discovery with grid layout of mentor cards, search and filtering by name/expertise
+- Mentor Profile: Detailed mentor view with embedded Calendly scheduling widget and favorite button
+- Analytics: Dashboard with session metrics, time-series charts, and mentor performance analytics
+- My Bookings: Mentee booking history showing upcoming and past sessions with mentor details
 - 404: Custom not-found page
 
 ### Backend Architecture
@@ -44,11 +45,17 @@ Preferred communication style: Simple, everyday language.
 **Framework**: Express.js with TypeScript running on Node.js
 
 **API Design**: RESTful endpoints under `/api` namespace
-- `GET /api/mentors` - List all mentors
+- `GET /api/mentors` - List all mentors (supports ?search and ?expertise query params)
 - `GET /api/mentors/:id` - Get single mentor details
 - `GET /api/sessions` - List all booked sessions
-- `POST /api/sessions` - Create new session booking
+- `POST /api/sessions` - Create new session booking (auto-creates mentee if doesn't exist)
 - `POST /api/webhooks/calendly` - Calendly webhook for automatic session tracking
+- `GET /api/mentees/:email` - Get mentee profile
+- `POST /api/mentees` - Create mentee profile
+- `GET /api/mentees/:email/sessions` - Get mentee's booking history
+- `GET /api/mentees/:email/favorites` - Get mentee's favorite mentors
+- `POST /api/mentees/:email/favorites` - Add mentor to favorites
+- `DELETE /api/mentees/:email/favorites/:mentorId` - Remove mentor from favorites
 
 **Data Validation**: Zod schemas shared between client and server via `@shared` directory for type safety
 
@@ -63,17 +70,22 @@ Preferred communication style: Simple, everyday language.
 
 **Database Schema**:
 - `mentors` table: Stores mentor profiles with id, name, title, bio, expertise array, calendlyUrl, avatarUrl
-- `sessions` table: Tracks booked sessions with id, mentorId, menteeName, menteeEmail, bookedAt timestamp
+- `sessions` table: Tracks booked sessions with id, mentorId (FK), menteeName, menteeEmail, bookedAt timestamp
+- `mentees` table: Stores mentee profiles with id, name, email (unique), avatarUrl, createdAt
+- `favorites` table: Tracks favorite mentors with id, menteeEmail, mentorId (FK), createdAt
 
-**Current Implementation**: In-memory storage with seeded mentor data for development
-- MemStorage class implements IStorage interface
+**Current Implementation**: PostgreSQL database with Drizzle ORM (fully migrated)
+- DatabaseStorage class implements IStorage interface
+- All data persists across server restarts
+- Foreign key constraints enforce referential integrity
 - Includes pre-populated mentor profiles with diverse expertise areas
-- Prepared for PostgreSQL migration with Drizzle schema definitions
+- Automatic mentee creation when sessions are booked
 
-**Migration Strategy**: 
+**Database Setup**: 
 - Drizzle Kit configured for schema migrations (`drizzle.config.ts`)
 - Schema definitions in `shared/schema.ts` using Drizzle's pg-core
-- Database URL expected via `DATABASE_URL` environment variable
+- Database URL configured via `DATABASE_URL` environment variable
+- Migrations applied with `npm run db:push`
 
 ### External Dependencies
 
