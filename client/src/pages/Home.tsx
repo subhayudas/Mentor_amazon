@@ -1,0 +1,95 @@
+import { useQuery } from "@tanstack/react-query";
+import { Mentor } from "@shared/schema";
+import { MentorCard } from "@/components/MentorCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
+import { Sparkles, Target, Zap } from "lucide-react";
+
+export default function Home() {
+  const { data: mentors, isLoading } = useQuery<Mentor[]>({
+    queryKey: ["/api/mentors"],
+  });
+
+  return (
+    <div className="min-h-screen">
+      <section className="relative py-20 md:py-32 bg-gradient-to-br from-primary/5 via-background to-accent/5">
+        <div className="max-w-7xl mx-auto px-4 md:px-8">
+          <div className="max-w-3xl mx-auto text-center space-y-8">
+            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
+              Connect with{" "}
+              <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                Expert Mentors
+              </span>
+            </h1>
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
+              Transform your career with personalized guidance from industry professionals. Book one-on-one sessions and accelerate your growth.
+            </p>
+            <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span>500+ mentees</span>
+              </div>
+              <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+              <div className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-primary" />
+                <span>Expert guidance</span>
+              </div>
+              <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-primary" />
+                <span>Flexible scheduling</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-12 md:py-20">
+        <div className="max-w-7xl mx-auto px-4 md:px-8">
+          <div className="space-y-8">
+            <div className="text-center md:text-left">
+              <h2 className="text-3xl font-bold mb-2">Featured Mentors</h2>
+              <p className="text-muted-foreground">
+                Browse our curated list of experienced professionals
+              </p>
+            </div>
+
+            {isLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <Card key={i} className="p-8">
+                    <div className="flex flex-col items-center gap-4">
+                      <Skeleton className="w-24 h-24 rounded-full" />
+                      <div className="space-y-2 w-full">
+                        <Skeleton className="h-6 w-3/4 mx-auto" />
+                        <Skeleton className="h-4 w-1/2 mx-auto" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-5/6 mx-auto" />
+                      </div>
+                      <div className="flex gap-2">
+                        <Skeleton className="h-6 w-16" />
+                        <Skeleton className="h-6 w-20" />
+                        <Skeleton className="h-6 w-16" />
+                      </div>
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            ) : mentors && mentors.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" data-testid="mentor-grid">
+                {mentors.map((mentor) => (
+                  <MentorCard key={mentor.id} mentor={mentor} />
+                ))}
+              </div>
+            ) : (
+              <Card className="p-12 text-center">
+                <p className="text-muted-foreground">No mentors available at the moment.</p>
+              </Card>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
