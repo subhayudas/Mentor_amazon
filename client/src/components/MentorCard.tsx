@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar } from "lucide-react";
+import { FavoriteButton } from "@/components/FavoriteButton";
 
 interface MentorCardProps {
   mentor: Mentor;
@@ -19,7 +20,11 @@ export function MentorCard({ mentor }: MentorCardProps) {
 
   return (
     <Card className="p-8 hover-elevate transition-transform duration-200 hover:-translate-y-1" data-testid={`card-mentor-${mentor.id}`}>
-      <div className="flex flex-col items-center text-center gap-4">
+      <div className="flex flex-col items-center text-center gap-4 relative">
+        <div className="absolute top-0 right-0">
+          <FavoriteButton mentorId={mentor.id} mentorName={mentor.name} />
+        </div>
+
         <Avatar className="w-24 h-24">
           <AvatarImage src={mentor.avatarUrl || undefined} alt={mentor.name} />
           <AvatarFallback className="text-lg font-semibold bg-primary/10 text-primary">

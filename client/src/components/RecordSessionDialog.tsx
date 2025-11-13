@@ -57,8 +57,10 @@ export function RecordSessionDialog({ mentorId, mentorName }: RecordSessionDialo
         menteeEmail: data.menteeEmail,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      localStorage.setItem("menteeEmail", variables.menteeEmail);
       queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mentees", variables.menteeEmail, "sessions"] });
       toast({
         title: "Session Recorded!",
         description: `Your session with ${mentorName} has been recorded successfully.`,

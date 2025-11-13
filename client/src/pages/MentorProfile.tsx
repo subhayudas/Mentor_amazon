@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { RecordSessionDialog } from "@/components/RecordSessionDialog";
+import { FavoriteButton } from "@/components/FavoriteButton";
 
 export default function MentorProfile() {
   const [, params] = useRoute("/mentor/:id");
@@ -134,6 +135,13 @@ export default function MentorProfile() {
                 <Separator />
 
                 <div className="space-y-2">
+                  <FavoriteButton 
+                    mentorId={mentor.id} 
+                    mentorName={mentor.name}
+                    variant="outline"
+                    size="default"
+                    showLabel
+                  />
                   <p className="text-sm text-muted-foreground text-center">
                     After booking your session via Calendly, record it here for tracking
                   </p>

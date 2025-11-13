@@ -48,6 +48,7 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/mentors/:id` - Get single mentor details
 - `GET /api/sessions` - List all booked sessions
 - `POST /api/sessions` - Create new session booking
+- `POST /api/webhooks/calendly` - Calendly webhook for automatic session tracking
 
 **Data Validation**: Zod schemas shared between client and server via `@shared` directory for type safety
 
@@ -104,3 +105,132 @@ Preferred communication style: Simple, everyday language.
 **Database Driver**: @neondatabase/serverless for PostgreSQL connections (configured but not yet active)
 
 **Session Management**: connect-pg-simple package included for PostgreSQL-backed session storage (prepared for future authentication)
+
+## Calendly Webhook Integration
+
+### Overview
+
+MentorMatch uses Calendly webhooks to automatically track session bookings. When a mentee books a session with a mentor through Calendly, the platform automatically creates a session record in the database without manual intervention.
+
+### Webhook Endpoint
+
+**URL**: `POST /api/webhooks/calendly`
+
+This endpoint accepts webhook events from Calendly and processes them to create session records.
+
+### Payload Formats
+
+The webhook endpoint supports two payload formats:
+
+#### 1. Full Calendly Webhook Format (Production)
+
+When configured in the Calendly dashboard, Calendly will send webhook events in this format:
+
+```json
+{
+  "event": "invitee.created",
+  "payload": {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "scheduled_event": {
+      "start_time": "2025-01-15T10:00:00Z"
+    },
+    "questions_and_answers": [
+      {
+        "question": "Mentor ID",
+        "answer": "mentor-uuid-here"
+      }
+    ]
+  }
+}
+```
+
+**Required Fields**:
+- `event`: Must be "invitee.created"
+- `payload.name`: Mentee's full name
+- `payload.email`: Mentee's email address
+- `payload.questions_and_answers`: Array containing mentor ID in custom question
+
+#### 2. Simplified Format (Development/Testing)
+
+For local testing and development, the endpoint also accepts a simplified format:
+
+```json
+{
+  "mentorId": "mentor-uuid",
+  "menteeName": "John Doe",
+  "menteeEmail": "john@example.com"
+}
+```
+
+This allows you to test the webhook locally using tools like curl or Postman without needing actual Calendly webhooks.
+
+### Calendly Dashboard Configuration
+
+To set up the webhook in your Calendly account:
+
+1. **Log in to Calendly** and navigate to Account Settings
+2. **Go to Integrations** → **Webhooks**
+3. **Add Webhook** with the following settings:
+   - **Webhook URL**: `https://your-replit-app-url/api/webhooks/calendly`
+   - **Events to Subscribe**: Select "Invitee Created"
+   - **Status**: Active
+
+4. **Add Custom Question to Event Types**:
+   - For each mentor's Calendly event type, add a custom question
+   - Question: "Mentor ID" (exactly as shown)
+   - Type: Text input or Hidden field
+   - Default value: The mentor's UUID from the database
+   - This allows the webhook to identify which mentor the session is booked with
+
+### Important Notes
+
+- The webhook endpoint validates all incoming data using Zod schemas
+- It verifies that the mentor exists in the database before creating a session
+- Returns proper HTTP status codes:
+  - `200 OK`: Session created successfully
+  - `400 Bad Request`: Invalid payload or missing required fields
+  - `404 Not Found`: Mentor ID doesn't exist in database
+  - `500 Internal Server Error`: Server-side error during processing
+- All webhook processing errors are logged to the console for debugging
+
+### Testing the Webhook Locally
+
+You can test the webhook endpoint locally using curl:
+
+```bash
+# Using simplified format
+curl -X POST http://localhost:5000/api/webhooks/calendly \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mentorId": "your-mentor-uuid",
+    "menteeName": "Test User",
+    "menteeEmail": "test@example.com"
+  }'
+
+# Using full Calendly format
+curl -X POST http://localhost:5000/api/webhooks/calendly \
+  -H "Content-Type: application/json" \
+  -d '{
+    "event": "invitee.created",
+    "payload": {
+      "name": "Test User",
+      "email": "test@example.com",
+      "scheduled_event": {
+        "start_time": "2025-01-15T10:00:00Z"
+      },
+      "questions_and_answers": [
+        {
+          "question": "Mentor ID",
+          "answer": "your-mentor-uuid"
+        }
+      ]
+    }
+  }'
+```
+
+### Security Considerations
+
+- In production, consider implementing webhook signature verification to ensure requests are genuinely from Calendly
+- Rate limiting should be added to prevent webhook spam
+- Consider implementing idempotency to handle duplicate webhook deliveries

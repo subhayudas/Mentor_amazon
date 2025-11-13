@@ -1,14 +1,46 @@
+import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Mentor } from "@shared/schema";
 import { MentorCard } from "@/components/MentorCard";
+import { SearchAndFilter } from "@/components/SearchAndFilter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Sparkles, Target, Zap } from "lucide-react";
 
 export default function Home() {
-  const { data: mentors, isLoading } = useQuery<Mentor[]>({
+  const [filters, setFilters] = useState({ search: "", expertise: "" });
+
+  const { data: allMentors } = useQuery<Mentor[]>({
     queryKey: ["/api/mentors"],
   });
+
+  const buildQueryString = () => {
+    const params = new URLSearchParams();
+    if (filters.search) params.append("search", filters.search);
+    if (filters.expertise && filters.expertise !== "all") params.append("expertise", filters.expertise);
+    const queryString = params.toString();
+    return queryString ? `?${queryString}` : "";
+  };
+
+  const { data: mentors, isLoading } = useQuery<Mentor[]>({
+    queryKey: ["/api/mentors", filters.search, filters.expertise],
+    queryFn: async () => {
+      const queryString = buildQueryString();
+      const response = await fetch(`/api/mentors${queryString}`);
+      if (!response.ok) throw new Error("Failed to fetch mentors");
+      return response.json();
+    },
+  });
+
+  const handleFilterChange = useCallback((newFilters: { search: string; expertise: string }) => {
+    setFilters(newFilters);
+  }, []);
+
+  const activeFilterCount = [
+    filters.search,
+    filters.expertise && filters.expertise !== "all"
+  ].filter(Boolean).length;
 
   return (
     <div className="min-h-screen">
@@ -47,12 +79,28 @@ export default function Home() {
       <section className="py-12 md:py-20">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="space-y-8">
-            <div className="text-center md:text-left">
-              <h2 className="text-3xl font-bold mb-2">Featured Mentors</h2>
-              <p className="text-muted-foreground">
-                Browse our curated list of experienced professionals
-              </p>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="text-center md:text-left">
+                <h2 className="text-3xl font-bold mb-2">
+                  Featured Mentors
+                  {activeFilterCount > 0 && (
+                    <Badge variant="secondary" className="ml-3 align-middle">
+                      {activeFilterCount} {activeFilterCount === 1 ? "filter" : "filters"} active
+                    </Badge>
+                  )}
+                </h2>
+                <p className="text-muted-foreground">
+                  Browse our curated list of experienced professionals
+                </p>
+              </div>
             </div>
+
+            {allMentors && (
+              <SearchAndFilter 
+                mentors={allMentors} 
+                onFilterChange={handleFilterChange}
+              />
+            )}
 
             {isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -84,7 +132,11 @@ export default function Home() {
               </div>
             ) : (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No mentors available at the moment.</p>
+                <p className="text-muted-foreground" data-testid="text-no-results">
+                  {activeFilterCount > 0 
+                    ? "No mentors found matching your filters. Try adjusting your search criteria."
+                    : "No mentors available at the moment."}
+                </p>
               </Card>
             )}
           </div>

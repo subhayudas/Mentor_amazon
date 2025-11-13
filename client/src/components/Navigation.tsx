@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { Users, BarChart3 } from "lucide-react";
+import { Users, BarChart3, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function Navigation() {
@@ -18,6 +18,12 @@ export function Navigation() {
             <Link href="/" data-testid="link-browse">
               <Button variant="ghost" data-testid="button-browse">
                 Browse Mentors
+              </Button>
+            </Link>
+            <Link href="/my-bookings" data-testid="link-my-bookings">
+              <Button variant="ghost" data-testid="button-my-bookings">
+                <Calendar className="w-4 h-4 mr-2" />
+                My Bookings
               </Button>
             </Link>
             <Link href="/analytics" data-testid="link-analytics">
