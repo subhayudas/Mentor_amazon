@@ -73,7 +73,11 @@ export class MemStorage implements IStorage {
 
     seedData.forEach((data) => {
       const id = randomUUID();
-      const mentor: Mentor = { ...data, id };
+      const mentor: Mentor = { 
+        ...data, 
+        id,
+        avatarUrl: data.avatarUrl ?? null 
+      };
       this.mentors.set(id, mentor);
     });
   }
@@ -88,7 +92,11 @@ export class MemStorage implements IStorage {
 
   async createMentor(insertMentor: InsertMentor): Promise<Mentor> {
     const id = randomUUID();
-    const mentor: Mentor = { ...insertMentor, id };
+    const mentor: Mentor = { 
+      ...insertMentor, 
+      id,
+      avatarUrl: insertMentor.avatarUrl ?? null 
+    };
     this.mentors.set(id, mentor);
     return mentor;
   }
