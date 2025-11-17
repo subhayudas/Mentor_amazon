@@ -1,0 +1,470 @@
+# MentorConnect MVP - Complete Development Specification
+
+## Project Overview
+Build a white-labeled mentor-student booking platform called **MentorConnect** for Amazon Egypt. This is an MVP focused on core booking functionality with analytics, to be demonstrated in 1 week.
+
+## Critical Constraints
+- **DO NOT hardcode data** - all mentor/student data must come from database
+- **Build on existing Replit codebase** - preserve current structure, enhance functionality
+- **Calendly integration must be flawless** - no errors, handles all edge cases
+- **Skip authentication for MVP** - simple email-based access, full auth comes later
+- **English-first** - Arabic support added before full rollout
+- **Amazon branding** - follow brand guidelines (dark navy #232F3E, orange #FF9900, proper logo spacing)
+
+---
+
+## Tech Stack Recommendations
+- **Frontend**: React with Tailwind CSS (Amazon color palette)
+- **Backend**: Node.js/Express or Next.js API routes
+- **Database**: PostgreSQL or MongoDB (flexible schema for mentor/mentee fields)
+- **Analytics**: Mixpanel or custom event tracking with PostgreSQL
+- **Calendly**: Webhooks for booking events + embedded widget
+
+---
+
+## Database Schema
+
+### Mentors Table
+```sql
+- id (UUID, primary key)
+- name (string, required)
+- email (string, required, unique, NEVER displayed in UI)
+- company (string)
+- position (string)
+- timezone (string, auto-detect + manual override)
+- photo_url (string)
+- bio (text, min 150 chars)
+- linkedin_url (string)
+- calendly_link (string, validated)
+- expertise (array, max 3 selections)
+- industries (array, max 2 selections)
+- languages_spoken (array, with flag icons)
+- comms_owner (enum: 'exec', 'assistant')
+- average_rating (decimal, computed)
+- total_ratings (integer)
+- created_at (timestamp)
+- updated_at (timestamp)
+```
+
+### Mentees Table
+```sql
+- id (UUID, primary key)
+- name (string, required)
+- email (string, required, unique)
+- user_type (enum: 'individual', 'organization')
+- organization_name (string, conditional on user_type)
+- timezone (string)
+- photo_url (string, optional)
+- bio (text)
+- linkedin_url (string)
+- languages_spoken (array)
+- areas_exploring (array)
+- created_at (timestamp)
+```
+
+### Bookings Table
+```sql
+- id (UUID, primary key)
+- mentor_id (UUID, foreign key)
+- mentee_id (UUID, foreign key)
+- calendly_event_uri (string, unique)
+- status (enum: 'clicked', 'scheduled', 'completed', 'canceled')
+- scheduled_at (timestamp, from Calendly)
+- clicked_at (timestamp, when "Book Meeting" clicked)
+- completed_at (timestamp)
+- canceled_at (timestamp)
+- mentee_rating (integer, 1-5, nullable)
+- mentee_feedback (text, nullable)
+- created_at (timestamp)
+```
+
+### Analytics Events Table (Optional for granular tracking)
+```sql
+- id (UUID, primary key)
+- event_type (enum: 'mentor_view', 'book_click', 'booking_scheduled', etc.)
+- mentor_id (UUID, nullable)
+- mentee_id (UUID, nullable)
+- metadata (jsonb)
+- created_at (timestamp)
+```
+
+---
+
+## Core Features Implementation
+
+### 1. Mentor Discovery Page
+**Route**: `/mentors`
+
+**UI Components**:
+- Search bar (free-text, searches name/bio)
+- Filter sidebar:
+  - Specialization (multi-select dropdown)
+  - Industry (multi-select)
+  - Languages (multi-select with flags)
+  - Timezone ranges (grouped: Americas, Europe, Asia, etc.)
+- Mentor grid (3 columns on desktop, 1 on mobile)
+
+**Mentor Card Design**:
+```
+┌─────────────────────────────┐
+│  [Photo - 120x120 circle]   │
+│                              │
+│  Name (h3)                   │
+│  Position @ Company (p)      │
+│  UTC+4 - Dubai/Baku          │
+│                              │
+│  [Industry Badge] [Badge]    │
+│  [Skill Badge] [Badge]       │
+│                              │
+│  ⭐⭐⭐⭐⭐ (4.8/5 - 24 reviews)│
+│                              │
+│  [🗣 EN][🗣 AR] Languages    │
+│                              │
+│  📞 Book a Meeting (button)  │
+└─────────────────────────────┘
+```
+
+**Tracking**:
+- Log `mentor_view` event when card enters viewport (Intersection Observer)
+- Log `book_click` event when button clicked (before Calendly opens)
+
+**State Management**:
+- Fetch mentors from `/api/mentors?search=&specialization[]=&industry[]=`
+- Loading skeleton for cards
+- Empty state with illustration if no results
+
+---
+
+### 2. Booking Flow
+
+**Step 1: Click "Book Meeting"**
+- Create booking record with `status: 'clicked'`, `clicked_at: NOW()`
+- Open modal with embedded Calendly widget OR redirect to Calendly page
+
+**Calendly Embedding (Preferred)**:
+```jsx
+import { InlineWidget } from "react-calendly";
+
+<Modal>
+  <InlineWidget
+    url={mentor.calendly_link}
+    prefill={{
+      name: mentee.name,
+      email: mentee.email,
+      customAnswers: {
+        a1: mentee.timezone,
+        a2: mentee.linkedin_url
+      }
+    }}
+    utm={{
+      utmSource: 'mentorconnect',
+      utmMedium: 'platform',
+      utmCampaign: mentor.id
+    }}
+  />
+</Modal>
+```
+
+**Privacy Settings**:
+- In Calendly: Enable "Hide event type owner's name and email"
+- Set invitee email as primary recipient
+- Custom confirmation message: "Your meeting with [Mentor Name] is confirmed! Check your email for details."
+
+**Step 2: Calendly Webhook Handling**
+- Endpoint: `POST /api/webhooks/calendly`
+- Verify webhook signature
+- Handle events:
+  - `invitee.created`: Update booking to `status: 'scheduled'`, store `calendly_event_uri`, `scheduled_at`
+  - `invitee.canceled`: Update to `status: 'canceled'`, `canceled_at`
+
+**Step 3: Post-Meeting Rating**
+- 24 hours after `scheduled_at`, send email: "How was your session with [Mentor Name]?"
+- Link to `/rate/[booking_id]` page with 1-5 star selector + optional text feedback
+- On submit: Update booking record + recalculate mentor's `average_rating`
+
+---
+
+### 3. Onboarding Forms
+
+**Mentor Onboarding** (`/onboard/mentor`)
+
+**Form Structure** (single page with sections):
+1. **Basic Info**
+   - Name (text, required)
+   - Email (email, required, hidden from students)
+   - Company (text)
+   - Position (text)
+
+2. **Communication Preference** (NEW)
+   - Radio buttons (required):
+     - ○ I (Exec/VP) will handle all emails and invites
+     - ○ My assistant will handle all emails and invites
+
+3. **Professional Details**
+   - Timezone (dropdown with auto-detect, required)
+   - LinkedIn Profile (URL, validated)
+   - Calendly Link (URL, validated with regex: `https://calendly.com/...`)
+   - Expertise (multi-select, max 3, options: AI & Machine Learning, FinTech, Web3, PropTech, etc.)
+   - Industries (multi-select, max 2, options: Consumer Goods, Financial Services, Entertainment, Gaming, etc.)
+   - Languages Spoken (multi-select with flags: 🇬🇧 English, 🇦🇪 Arabic, etc.)
+
+4. **Profile Content**
+   - Photo Upload (file input, 2MB max, image crop UI)
+   - Bio (textarea, 150 char minimum, show counter)
+
+**Validation**:
+- Client-side: All required fields filled, URL formats correct, bio length
+- Server-side: Email uniqueness, Calendly link format, image file size
+
+**Submit**:
+- POST `/api/mentors` with multipart/form-data
+- Upload photo to cloud storage (Cloudinary/S3), store URL
+- Return mentor ID, show success message
+
+---
+
+**Mentee Registration** (`/onboard/mentee`)
+
+**Form Fields**:
+1. **User Type** (required radio)
+   - ○ Individual
+   - ○ Organization
+   - [Conditional: If Organization → Show "Organization Name" text field]
+
+2. **Basic Info**
+   - Name (text, required)
+   - Email (email, required)
+   - LinkedIn Profile (URL)
+   - Timezone (dropdown with auto-detect)
+
+3. **Profile Details**
+   - Photo (optional, same upload flow as mentor)
+   - Bio (textarea, 100 char minimum)
+   - Languages Spoken (multi-select)
+   - Areas Exploring Mentorship (multi-select: Career Development, Technical Skills, Entrepreneurship, etc.)
+
+**Submit**:
+- POST `/api/mentees`
+- Return mentee ID, redirect to `/mentors`
+
+---
+
+### 4. Analytics Dashboard
+
+**Route**: `/admin/analytics` (no auth for MVP, add basic password later)
+
+**Filters** (top of page):
+- Date range picker (last 7/30/90 days, custom)
+- Mentor dropdown (all mentors)
+- Mentee type (Individual/Organization/All)
+- Language filter
+- Specialization filter
+
+**KPI Cards** (4 across):
+1. **Total Bookings** (clicked + scheduled + completed)
+2. **Completed Meetings** (status: completed)
+3. **Unique Mentees** (distinct mentee_id count)
+4. **Avg Conversion Rate** (bookings scheduled / book_click events)
+
+**Charts**:
+1. **Bookings Over Time** (line chart, daily/weekly grouping)
+2. **Top Mentors by Bookings** (horizontal bar chart, top 10)
+3. **Specialization Distribution** (pie chart)
+4. **Ratings Summary** (average per mentor, sortable table)
+
+**Detailed Table**:
+- Columns: Mentor Name | Mentee Name | Date Clicked | Date Scheduled | Status | Rating
+- Sortable, paginated (50 per page)
+- Export to CSV button
+
+**API Endpoint**: `GET /api/analytics`
+Query params: `?start_date=&end_date=&mentor_id=&mentee_type=&language=&specialization=`
+
+**Response Example**:
+```json
+{
+  "kpis": {
+    "total_bookings": 127,
+    "completed_meetings": 89,
+    "unique_mentees": 64,
+    "conversion_rate": 0.72
+  },
+  "bookings_over_time": [
+    {"date": "2024-11-10", "count": 12},
+    {"date": "2024-11-11", "count": 15}
+  ],
+  "top_mentors": [
+    {"mentor_name": "Salim Akil", "booking_count": 23}
+  ],
+  "ratings_summary": [
+    {"mentor_name": "Giovanni Everduin", "avg_rating": 4.8, "total_ratings": 15}
+  ],
+  "bookings_detail": [
+    {
+      "mentor_name": "Tugrul Karakas",
+      "mentee_name": "Ahmed Hassan",
+      "clicked_at": "2024-11-12T10:30:00Z",
+      "scheduled_at": "2024-11-14T14:00:00Z",
+      "status": "scheduled",
+      "rating": null
+    }
+  ]
+}
+```
+
+---
+
+## Amazon Branding Guidelines
+
+**Colors**:
+- Primary: `#232F3E` (dark navy)
+- Accent: `#FF9900` (orange, use for CTAs)
+- Background: `#FFFFFF`
+- Text: `#0F1111`
+- Borders: `#D5D9D9`
+
+**Logo Usage**:
+- Place in top-left corner (navigation bar)
+- Minimum clear space: 1.5x the height of the smile arrow
+- Never distort or change colors
+- Use SVG format for scalability
+
+**Typography**:
+- Headings: Amazon Ember Bold
+- Body: Amazon Ember Regular
+- Fallback: system-ui, -apple-system, sans-serif
+
+**Buttons**:
+- Primary: Orange background (#FF9900), white text, rounded-md
+- Secondary: White background, navy border, navy text
+
+---
+
+## Mobile Responsiveness
+- Mentor grid: 3 cols (lg) → 2 cols (md) → 1 col (sm)
+- Filters: Drawer/modal on mobile (not sidebar)
+- Calendly widget: Full-screen modal on mobile
+- Analytics: Stack KPI cards, horizontal scroll for table
+
+---
+
+## Accessibility (WCAG 2.1 AA)
+- All images have `alt` text
+- Form labels properly associated
+- Focus indicators visible (orange outline)
+- Color contrast ratios meet 4.5:1 minimum
+- Keyboard navigation works for all interactive elements
+
+---
+
+## Error Handling
+
+**Calendly Integration**:
+- If `calendly_link` is invalid: Show fallback UI with error message + contact admin
+- If webhook fails: Retry 3 times with exponential backoff, log to error table
+- If user closes modal before booking: Update booking status to `clicked_abandoned`
+
+**Form Validation**:
+- Show inline errors below fields (red text)
+- Disable submit until all required fields valid
+- Success message with auto-redirect after 2 seconds
+
+**API Errors**:
+- 4xx: Show user-friendly message ("Invalid input, please check...")
+- 5xx: Show generic error + log to monitoring tool ("Something went wrong, our team has been notified")
+
+---
+
+## MVP Scope (For Next Week's Demo)
+
+**Must Have**:
+✅ Mentor discovery page with search/filters (data from database, not hardcoded)
+✅ Mentor cards with all fields displayed
+✅ Embedded Calendly widget in modal
+✅ Click tracking for "Book Meeting" button
+✅ Mentor + mentee onboarding forms (functional, saves to DB)
+✅ Basic analytics dashboard (KPIs + simple charts)
+✅ Amazon branding applied (logo, colors, fonts)
+✅ Mobile-responsive layout
+
+**Nice to Have** (if time):
+- Calendly webhook handling (scheduled/canceled events)
+- Rating system post-meeting
+- Advanced filters (timezone ranges, multi-select logic)
+- Export analytics to CSV
+
+**Explicitly Out of Scope**:
+- Full authentication system (add after MVP)
+- Arabic language support (add before full rollout)
+- Admin approval workflow for mentors
+- Email notifications (beyond Calendly's built-in)
+- Video tutorial for Calendly setup
+
+---
+
+## API Endpoints Summary
+
+**Mentors**:
+- `GET /api/mentors` - List/search mentors with filters
+- `POST /api/mentors` - Create mentor (onboarding)
+- `GET /api/mentors/:id` - Get single mentor details
+
+**Mentees**:
+- `POST /api/mentees` - Create mentee (registration)
+
+**Bookings**:
+- `POST /api/bookings` - Create booking record (on button click)
+- `POST /api/webhooks/calendly` - Handle Calendly events
+
+**Analytics**:
+- `GET /api/analytics` - Fetch dashboard data with filters
+
+**Ratings**:
+- `POST /api/bookings/:id/rate` - Submit rating + feedback
+
+---
+
+## Environment Variables
+```
+DATABASE_URL=postgresql://...
+CALENDLY_WEBHOOK_SECRET=your_webhook_secret
+CLOUDINARY_API_KEY=... (for photo uploads)
+CLOUDINARY_API_SECRET=...
+MIXPANEL_TOKEN=... (if using Mixpanel)
+```
+
+---
+
+## Testing Checklist
+- [ ] Search mentors by name (case-insensitive)
+- [ ] Filter by specialization + industry (multi-select works)
+- [ ] Click "Book Meeting" → modal opens with Calendly widget
+- [ ] Calendly prefills mentee name/email
+- [ ] Mentor email never visible in Calendly UI or invites
+- [ ] Booking record created with `status: 'clicked'`
+- [ ] Submit mentor onboarding form → data saves to DB
+- [ ] Submit mentee registration → data saves to DB
+- [ ] Analytics dashboard loads with real data (no hardcoded numbers)
+- [ ] Mobile: All pages render correctly, no horizontal scroll
+- [ ] Accessibility: Tab through forms, screen reader announces labels
+
+---
+
+## Launch Plan (Beyond MVP)
+1. **Week 1**: MVP demo to Amazon (English, basic analytics)
+2. **Week 2-3**: Add Calendly webhooks, rating system, CSV export
+3. **Week 4**: Arabic translations + RTL layout
+4. **Week 5**: Full authentication (OAuth or magic links)
+5. **Week 6**: Admin panel (approve mentors, edit profiles)
+6. **Week 7**: Production deployment + user testing
+
+---
+
+## Final Notes
+- **No hardcoding**: Every mentor, mentee, booking must come from database
+- **Calendly privacy**: Triple-check mentor email is hidden in all scenarios
+- **Amazon branding**: Use exact colors, follow logo spacing rules
+- **Analytics focus**: This is a key differentiator, make it polished
+- **Mobile-first**: Test on iPhone/Android before demo
+
+**Platform Name**: MentorConnect (use in all UI copy, page titles, meta tags)
