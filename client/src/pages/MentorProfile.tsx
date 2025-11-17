@@ -220,6 +220,30 @@ export default function MentorProfile() {
   };
 
   const calendlyUrl = mentor ? (mentor[`calendly_${selectedDuration}min` as keyof Mentor] as string || mentor.calendly_link) : "";
+  
+  // Determine available durations based on unique Calendly URLs
+  const availableDurations = mentor ? (() => {
+    const urls = {
+      15: mentor.calendly_15min || mentor.calendly_link,
+      30: mentor.calendly_30min || mentor.calendly_link,
+      60: mentor.calendly_60min || mentor.calendly_link,
+    };
+    
+    // If all URLs are the same, only show one option (60 min by default)
+    if (urls[15] === urls[30] && urls[30] === urls[60]) {
+      return [60];
+    }
+    
+    // Otherwise show all unique durations
+    return [15, 30, 60];
+  })() : [15, 30, 60];
+
+  // Update selected duration if it's not in available durations
+  useEffect(() => {
+    if (mentor && !availableDurations.includes(selectedDuration)) {
+      setSelectedDuration(availableDurations[0] as 15 | 30 | 60);
+    }
+  }, [mentor, availableDurations, selectedDuration]);
 
   return (
     <div className="min-h-screen py-12">
@@ -368,22 +392,31 @@ export default function MentorProfile() {
                 </div>
               ) : (
                 <>
-                  <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
-                    <p className="text-sm font-semibold mb-3">Select Session Duration</p>
-                    <div className="flex gap-3">
-                      {[15, 30, 60].map((duration) => (
-                        <Button
-                          key={duration}
-                          onClick={() => setSelectedDuration(duration as 15 | 30 | 60)}
-                          variant={selectedDuration === duration ? "default" : "outline"}
-                          className="flex-1"
-                          data-testid={`button-duration-${duration}`}
-                        >
-                          {duration} Minutes
-                        </Button>
-                      ))}
+                  {availableDurations.length > 1 && (
+                    <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
+                      <p className="text-sm font-semibold mb-3">Select Session Duration</p>
+                      <div className="flex gap-3">
+                        {availableDurations.map((duration) => (
+                          <Button
+                            key={duration}
+                            onClick={() => setSelectedDuration(duration as 15 | 30 | 60)}
+                            variant={selectedDuration === duration ? "default" : "outline"}
+                            className="flex-1"
+                            data-testid={`button-duration-${duration}`}
+                          >
+                            {duration} Minutes
+                          </Button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  {availableDurations.length === 1 && (
+                    <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
+                      <p className="text-sm text-muted-foreground text-center">
+                        {availableDurations[0]}-minute mentorship session
+                      </p>
+                    </div>
+                  )}
                   <div className="rounded-lg overflow-hidden" data-testid="calendly-widget">
                     <InlineWidget
                       url={calendlyUrl}

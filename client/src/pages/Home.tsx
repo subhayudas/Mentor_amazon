@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Target, Zap, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
-import heroImage from "@assets/image_1763385295124.png";
+import heroImage from "@assets/image_1763386556976.png";
 
 export default function Home() {
   const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
@@ -54,27 +54,27 @@ export default function Home() {
       <section 
         className="relative py-24 md:py-32 lg:py-40 overflow-hidden"
         style={{
-          backgroundImage: `linear-gradient(to bottom, rgba(35, 47, 62, 0.85), rgba(35, 47, 62, 0.95)), url(${heroImage})`,
+          backgroundImage: `linear-gradient(to bottom, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.75)), url(${heroImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat'
         }}
       >
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/20 via-transparent to-background/60" />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-background/40" />
         
         <div className="relative max-w-7xl mx-auto px-4 md:px-8">
           <div className="max-w-3xl mx-auto text-center space-y-8">
             <div className="space-y-4">
-              <Badge variant="outline" className="bg-white/10 text-white border-white/20 backdrop-blur-sm">
+              <Badge variant="outline" className="bg-primary text-white border-primary/20">
                 Amazon Egypt Mentorship Program
               </Badge>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white">
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-primary">
                 Connect with{" "}
                 <span className="text-orange-500">
                   Expert Mentors
                 </span>
               </h1>
-              <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
+              <p className="text-lg md:text-xl text-primary/80 max-w-2xl mx-auto leading-relaxed">
                 Access personalized guidance from Amazon's experienced professionals. Book one-on-one mentorship sessions and accelerate your career growth in Egypt and beyond.
               </p>
             </div>
@@ -94,7 +94,7 @@ export default function Home() {
                 <Button 
                   size="lg" 
                   variant="outline" 
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-sm px-8 py-6 text-lg"
+                  className="bg-primary hover:bg-primary/90 text-white border-primary px-8 py-6 text-lg"
                   data-testid="button-browse-mentors"
                 >
                   Browse Mentors
@@ -102,19 +102,19 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-white/80 pt-8">
+            <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-primary/70 pt-8">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-orange-400" />
+                <Sparkles className="w-5 h-5 text-orange-500" />
                 <span>Trusted Mentorship</span>
               </div>
-              <div className="w-1 h-1 rounded-full bg-white/50" />
+              <div className="w-1 h-1 rounded-full bg-primary/50" />
               <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-orange-400" />
+                <Target className="w-5 h-5 text-orange-500" />
                 <span>Expert Guidance</span>
               </div>
-              <div className="w-1 h-1 rounded-full bg-white/50" />
+              <div className="w-1 h-1 rounded-full bg-primary/50" />
               <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-orange-400" />
+                <Zap className="w-5 h-5 text-orange-500" />
                 <span>Flexible Scheduling</span>
               </div>
             </div>
