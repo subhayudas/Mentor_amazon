@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Sparkles, Target, Zap } from "lucide-react";
 
 export default function Home() {
-  const [filters, setFilters] = useState({ search: "", expertise: "" });
+  const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
 
   const { data: allMentors } = useQuery<Mentor[]>({
     queryKey: ["/api/mentors"],
@@ -19,12 +19,14 @@ export default function Home() {
     const params = new URLSearchParams();
     if (filters.search) params.append("search", filters.search);
     if (filters.expertise && filters.expertise !== "all") params.append("expertise", filters.expertise);
+    if (filters.industry && filters.industry !== "all") params.append("industry", filters.industry);
+    if (filters.language && filters.language !== "all") params.append("language", filters.language);
     const queryString = params.toString();
     return queryString ? `?${queryString}` : "";
   };
 
   const { data: mentors, isLoading } = useQuery<Mentor[]>({
-    queryKey: ["/api/mentors", filters.search, filters.expertise],
+    queryKey: ["/api/mentors", filters.search, filters.expertise, filters.industry, filters.language],
     queryFn: async () => {
       const queryString = buildQueryString();
       const response = await fetch(`/api/mentors${queryString}`);
@@ -33,13 +35,15 @@ export default function Home() {
     },
   });
 
-  const handleFilterChange = useCallback((newFilters: { search: string; expertise: string }) => {
+  const handleFilterChange = useCallback((newFilters: { search: string; expertise: string; industry: string; language: string }) => {
     setFilters(newFilters);
   }, []);
 
   const activeFilterCount = [
     filters.search,
-    filters.expertise && filters.expertise !== "all"
+    filters.expertise && filters.expertise !== "all",
+    filters.industry && filters.industry !== "all",
+    filters.language && filters.language !== "all"
   ].filter(Boolean).length;
 
   return (

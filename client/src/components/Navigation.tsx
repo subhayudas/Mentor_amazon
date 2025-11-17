@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import amazonLogo from "@assets/image_1763381789450.png";
 
 export function Navigation() {
   return (
@@ -9,10 +10,14 @@ export function Navigation() {
         <div className="flex items-center justify-between h-16">
           <Link href="/" data-testid="link-home">
             <div className="flex items-center gap-4 hover-elevate active-elevate-2 px-3 py-2 rounded-md transition-colors">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded bg-primary flex items-center justify-center font-bold text-white text-lg">
-                  A
-                </div>
+              <div className="flex items-center gap-3">
+                <img 
+                  src={amazonLogo} 
+                  alt="Amazon" 
+                  className="h-7 w-auto"
+                  data-testid="img-amazon-logo"
+                />
+                <div className="h-8 w-px bg-primary-foreground/20"></div>
                 <div className="flex flex-col">
                   <span className="text-lg font-bold text-primary-foreground">MentorConnect</span>
                   <span className="text-[10px] text-primary-foreground/60 font-medium -mt-1">Amazon Egypt</span>

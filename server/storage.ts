@@ -4,7 +4,7 @@ import { eq, ilike, or, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
-  getMentors(filters?: { search?: string; expertise?: string }): Promise<Mentor[]>;
+  getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<Mentor[]>;
   getMentor(id: string): Promise<Mentor | undefined>;
   createMentor(mentor: InsertMentor): Promise<Mentor>;
   getBookings(): Promise<Booking[]>;
@@ -151,10 +151,10 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getMentors(filters?: { search?: string; expertise?: string }): Promise<Mentor[]> {
+  async getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<Mentor[]> {
     await this.seedPromise;
     
-    if (!filters || (!filters.search && !filters.expertise)) {
+    if (!filters || (!filters.search && !filters.expertise && !filters.industry && !filters.language)) {
       return await db.select().from(mentors);
     }
 
@@ -166,6 +166,7 @@ export class DatabaseStorage implements IStorage {
         or(
           ilike(mentors.name, searchPattern),
           ilike(mentors.position, searchPattern),
+          ilike(mentors.company, searchPattern),
           ilike(mentors.bio, searchPattern)
         )
       );
@@ -174,6 +175,18 @@ export class DatabaseStorage implements IStorage {
     if (filters.expertise) {
       conditions.push(
         sql`${mentors.expertise} @> ARRAY[${filters.expertise}]::text[]`
+      );
+    }
+
+    if (filters.industry) {
+      conditions.push(
+        sql`${mentors.industries} @> ARRAY[${filters.industry}]::text[]`
+      );
+    }
+
+    if (filters.language) {
+      conditions.push(
+        sql`${mentors.languages_spoken} @> ARRAY[${filters.language}]::text[]`
       );
     }
 

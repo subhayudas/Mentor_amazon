@@ -9,10 +9,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const search = req.query.search as string | undefined;
       const expertise = req.query.expertise as string | undefined;
+      const industry = req.query.industry as string | undefined;
+      const language = req.query.language as string | undefined;
       
       const filters = {
         search: search || undefined,
         expertise: expertise || undefined,
+        industry: industry || undefined,
+        language: language || undefined,
       };
       
       const mentors = await storage.getMentors(filters);

@@ -9,9 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Clock, Globe, Star, Briefcase, MapPin } from "lucide-react";
 import { Link } from "wouter";
-import { FavoriteButton } from "@/components/FavoriteButton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
@@ -78,23 +77,23 @@ export default function MentorProfile() {
     },
   });
 
-  const createSessionMutation = useMutation({
-    mutationFn: async (data: { mentorId: string; menteeName: string; menteeEmail: string }) => {
-      return await apiRequest("POST", "/api/sessions", data);
+  const createBookingMutation = useMutation({
+    mutationFn: async (data: { mentor_id: string; mentee_name: string; mentee_email: string }) => {
+      return await apiRequest("POST", "/api/bookings", data);
     },
-    retry: 3, // Automatically retry failed requests up to 3 times
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       toast({
-        title: "Session Recorded",
+        title: "Booking Recorded",
         description: "Your mentorship session has been tracked successfully.",
       });
     },
     onError: () => {
       toast({
         title: "Recording Failed",
-        description: "We couldn't save your session after multiple attempts. Please contact support.",
+        description: "We couldn't save your booking after multiple attempts. Please contact support.",
         variant: "destructive",
       });
     },
@@ -102,17 +101,15 @@ export default function MentorProfile() {
 
   useCalendlyEventListener({
     onEventScheduled: (e) => {
-      // Use mentorRef.current to ensure mentor data is available even during React Query refetches
-      // menteeInfo is guaranteed to exist because InlineWidget only renders when menteeInfo is set
       const currentMentor = mentorRef.current;
       if (menteeInfo && currentMentor) {
         const payload = e?.data?.payload;
-        console.log("[Calendly Event]", payload); // Log for debugging/analytics
+        console.log("[Calendly Event]", payload);
         
-        createSessionMutation.mutate({
-          mentorId: currentMentor.id,
-          menteeName: menteeInfo.name,
-          menteeEmail: menteeInfo.email,
+        createBookingMutation.mutate({
+          mentor_id: currentMentor.id,
+          mentee_name: menteeInfo.name,
+          mentee_email: menteeInfo.email,
         });
       }
     },
@@ -183,6 +180,44 @@ export default function MentorProfile() {
     .join("")
     .toUpperCase();
 
+  const averageRating = mentor.average_rating ? parseFloat(mentor.average_rating.toString()) : 0;
+  const totalRatings = mentor.total_ratings || 0;
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }).map((_, index) => (
+      <Star
+        key={index}
+        className={`w-4 h-4 ${
+          index < Math.round(rating)
+            ? "fill-primary text-primary"
+            : "fill-muted text-muted"
+        }`}
+      />
+    ));
+  };
+
+  const timezoneToUTC = (ianaTimeZone: string): string => {
+    try {
+      const date = new Date();
+      const toTimeZone = (z: string) => new Date(
+        date.toLocaleString('sv', { timeZone: z }).replace(' ', 'T')
+      );
+      
+      const offsetMinutes = (toTimeZone(ianaTimeZone).getTime() - toTimeZone('UTC').getTime()) / 60000;
+      
+      const sign = offsetMinutes >= 0 ? '+' : '-';
+      const absMinutes = Math.abs(offsetMinutes);
+      const hours = Math.floor(absMinutes / 60);
+      const minutes = absMinutes % 60;
+      
+      return minutes === 0 
+        ? `UTC${sign}${hours}`
+        : `UTC${sign}${hours}:${String(minutes).padStart(2, '0')}`;
+    } catch {
+      return ianaTimeZone.split('/').pop() || ianaTimeZone;
+    }
+  };
+
   return (
     <div className="min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
@@ -196,24 +231,50 @@ export default function MentorProfile() {
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
           <div className="lg:col-span-2">
             <Card className="p-8 sticky top-24">
-              <div className="space-y-8">
+              <div className="space-y-6">
                 <div className="flex flex-col items-center text-center gap-4">
                   <Avatar className="w-32 h-32">
-                    <AvatarImage src={mentor.avatarUrl || undefined} alt={mentor.name} />
+                    <AvatarImage src={mentor.photo_url || undefined} alt={mentor.name} />
                     <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
                       {initials}
                     </AvatarFallback>
                   </Avatar>
 
-                  <div className="space-y-2">
+                  <div className="space-y-2 w-full">
                     <h1 className="text-3xl font-bold" data-testid="text-mentor-name">
                       {mentor.name}
                     </h1>
-                    <p className="text-lg text-muted-foreground font-medium" data-testid="text-mentor-title">
-                      {mentor.title}
+                    <p className="text-lg text-muted-foreground font-medium" data-testid="text-mentor-position">
+                      {mentor.position}{mentor.company && ` @ ${mentor.company}`}
                     </p>
+                    
+                    <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+                      {mentor.timezone && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          <span>{timezoneToUTC(mentor.timezone)}</span>
+                        </div>
+                      )}
+                      {mentor.languages_spoken && mentor.languages_spoken.length > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Globe className="w-4 h-4" />
+                          <span>{mentor.languages_spoken.join(", ")}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {totalRatings > 0 && (
+                      <div className="flex items-center justify-center gap-2 pt-2">
+                        <div className="flex gap-0.5">{renderStars(averageRating)}</div>
+                        <span className="text-sm font-medium">
+                          {averageRating.toFixed(1)} ({totalRatings} {totalRatings === 1 ? "review" : "reviews"})
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                <Separator />
 
                 <div className="space-y-4">
                   <div>
@@ -225,13 +286,28 @@ export default function MentorProfile() {
                     </p>
                   </div>
 
+                  {mentor.industries && mentor.industries.length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                        Industries
+                      </h3>
+                      <div className="flex flex-wrap gap-2">
+                        {mentor.industries.map((industry) => (
+                          <Badge key={industry} variant="outline" className="bg-muted">
+                            {industry}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                       Expertise
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {mentor.expertise.map((skill) => (
-                        <Badge key={skill} variant="secondary">
+                        <Badge key={skill} className="bg-primary/10 text-primary border-primary/20">
                           {skill}
                         </Badge>
                       ))}
@@ -242,17 +318,10 @@ export default function MentorProfile() {
                 <Separator />
 
                 <div className="space-y-2">
-                  <FavoriteButton 
-                    mentorId={mentor.id} 
-                    mentorName={mentor.name}
-                    variant="outline"
-                    size="default"
-                    showLabel
-                  />
                   {menteeInfo ? (
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground text-center">
-                        Sessions are automatically tracked for {menteeInfo.name}
+                        Bookings are automatically tracked for {menteeInfo.name}
                       </p>
                       <Button
                         variant="ghost"
@@ -266,7 +335,7 @@ export default function MentorProfile() {
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center">
-                      Enter your details above to enable automatic session tracking
+                      Enter your details to enable automatic booking tracking
                     </p>
                   )}
                 </div>
@@ -297,7 +366,7 @@ export default function MentorProfile() {
               ) : (
                 <div className="rounded-lg overflow-hidden" data-testid="calendly-widget">
                   <InlineWidget
-                    url={mentor.calendlyUrl}
+                    url={mentor.calendly_link}
                     styles={{
                       height: "700px",
                       minWidth: "100%",
