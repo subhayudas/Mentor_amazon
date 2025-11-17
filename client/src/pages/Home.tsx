@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Target, Zap, ArrowRight } from "lucide-react";
 import { Link } from "wouter";
-import amazonEgyptOffice from "@assets/image_1763387550909.png";
+import amazonUaeOffice from "@assets/image_1763393258786.png";
 
 export default function Home() {
   const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
@@ -55,8 +55,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
           <div className="max-w-5xl mx-auto relative">
             <img 
-              src={amazonEgyptOffice} 
-              alt="Amazon Egypt Office - Mentorship and Collaboration"
+              src={amazonUaeOffice} 
+              alt="Amazon UAE Office - Mentorship and Collaboration"
               className="w-full h-auto rounded-xl shadow-xl"
               data-testid="hero-illustration"
             />
