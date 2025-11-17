@@ -39,7 +39,7 @@ import {
 } from "recharts";
 import { 
   Users, Calendar, TrendingUp, CheckCircle2, XCircle, 
-  Clock, BarChart3, Activity, Filter 
+  Clock, BarChart3, Activity, Filter, PieChart as PieChartIcon, Globe, User
 } from "lucide-react";
 import {
   format,
@@ -52,6 +52,7 @@ import {
   eachWeekOfInterval,
   eachMonthOfInterval,
 } from "date-fns";
+import { MOCK_ANALYTICS_DATA } from "@/data/mockAnalytics";
 
 type DateRange = "7" | "30" | "90" | "all";
 type BookingStatus = "clicked" | "scheduled" | "completed" | "canceled" | "all";
@@ -195,6 +196,8 @@ export default function Analytics() {
 
   const isLoading = bookingsLoading || mentorsLoading || menteesLoading;
 
+  const useMockData = !bookings || bookings.length < 5;
+
   const filterOptions = useMemo(() => {
     if (!bookings || !mentors || !mentees) {
       return { languages: [], expertises: [] };
@@ -269,10 +272,33 @@ export default function Analytics() {
   }, [bookings, mentors, mentees, selectedMentor, selectedMenteeType, selectedLanguage, selectedExpertise, dateRange]);
 
   const timeSeries = useMemo(() => {
+    if (useMockData) {
+      return MOCK_ANALYTICS_DATA.bookings_over_time.map(item => ({
+        date: item.week,
+        bookings: item.bookings,
+        scheduled: item.bookings - item.completed - item.canceled,
+        completed: item.completed,
+        canceled: item.canceled,
+      }));
+    }
     return aggregateBookingsByDate(filteredBookings, dateRange);
-  }, [filteredBookings, dateRange]);
+  }, [useMockData, filteredBookings, dateRange]);
 
   const statusBreakdown = useMemo(() => {
+    if (useMockData) {
+      const scheduled = MOCK_ANALYTICS_DATA.kpis.upcoming_meetings;
+      const completed = MOCK_ANALYTICS_DATA.kpis.completed_meetings;
+      const canceled = MOCK_ANALYTICS_DATA.kpis.canceled_meetings;
+      const clicked = MOCK_ANALYTICS_DATA.kpis.total_bookings - scheduled - completed - canceled;
+      
+      return [
+        { name: "Clicked", value: clicked, color: STATUS_COLORS.clicked },
+        { name: "Scheduled", value: scheduled, color: STATUS_COLORS.scheduled },
+        { name: "Completed", value: completed, color: STATUS_COLORS.completed },
+        { name: "Canceled", value: canceled, color: STATUS_COLORS.canceled },
+      ].filter((item) => item.value > 0);
+    }
+    
     if (!filteredBookings) return [];
     
     const counts = {
@@ -292,9 +318,17 @@ export default function Analytics() {
       { name: "Completed", value: counts.completed, color: STATUS_COLORS.completed },
       { name: "Canceled", value: counts.canceled, color: STATUS_COLORS.canceled },
     ].filter((item) => item.value > 0);
-  }, [filteredBookings]);
+  }, [useMockData, filteredBookings]);
 
   const mentorPerformance = useMemo(() => {
+    if (useMockData) {
+      return MOCK_ANALYTICS_DATA.top_mentors.map(mentor => ({
+        name: mentor.mentor_name,
+        bookings: mentor.booking_count,
+        completed: Math.floor(mentor.booking_count * 0.75),
+      }));
+    }
+
     if (!filteredBookings || !mentors) return [];
 
     const mentorCounts: Record<string, { bookings: number; completed: number }> = {};
@@ -317,15 +351,15 @@ export default function Analytics() {
       .filter((m) => m.bookings > 0)
       .sort((a, b) => b.bookings - a.bookings)
       .slice(0, 10);
-  }, [filteredBookings, mentors]);
+  }, [useMockData, filteredBookings, mentors]);
 
-  const totalBookings = filteredBookings.length;
-  const scheduledCount = filteredBookings.filter((b) => b.status === "scheduled").length;
-  const completedCount = filteredBookings.filter((b) => b.status === "completed").length;
-  const canceledCount = filteredBookings.filter((b) => b.status === "canceled").length;
-  const uniqueMentees = new Set(filteredBookings.map((b) => b.mentee_id)).size;
+  const totalBookings = useMockData ? MOCK_ANALYTICS_DATA.kpis.total_bookings : filteredBookings.length;
+  const scheduledCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.upcoming_meetings : filteredBookings.filter((b) => b.status === "scheduled").length;
+  const completedCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.completed_meetings : filteredBookings.filter((b) => b.status === "completed").length;
+  const canceledCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.canceled_meetings : filteredBookings.filter((b) => b.status === "canceled").length;
+  const uniqueMentees = useMockData ? MOCK_ANALYTICS_DATA.kpis.unique_mentees : new Set(filteredBookings.map((b) => b.mentee_id)).size;
 
-  const recentBookings = filteredBookings
+  const recentBookings = useMockData ? MOCK_ANALYTICS_DATA.recent_bookings : filteredBookings
     .sort((a, b) => new Date(b.clicked_at).getTime() - new Date(a.clicked_at).getTime())
     .slice(0, 10);
 
@@ -344,7 +378,14 @@ export default function Analytics() {
     <div className="min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-8">
         <div>
-          <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-4xl font-bold">Analytics Dashboard</h1>
+            {useMockData && (
+              <Badge variant="outline" className="text-sm" data-testid="badge-demo-data">
+                Demo Data
+              </Badge>
+            )}
+          </div>
           <p className="text-muted-foreground">
             Comprehensive insights into your mentorship program's performance
           </p>
@@ -650,6 +691,112 @@ export default function Analytics() {
           )}
         </div>
 
+        {useMockData && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <PieChartIcon className="w-5 h-5 text-primary" />
+                <h2 className="text-2xl font-bold">Specialization Distribution</h2>
+              </div>
+              <Card className="p-8" data-testid="chart-specialization-distribution">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={MOCK_ANALYTICS_DATA.specialization_distribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {MOCK_ANALYTICS_DATA.specialization_distribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Globe className="w-5 h-5 text-primary" />
+                <h2 className="text-2xl font-bold">Language Distribution</h2>
+              </div>
+              <Card className="p-8" data-testid="chart-language-distribution">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={MOCK_ANALYTICS_DATA.language_distribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {MOCK_ANALYTICS_DATA.language_distribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                <h2 className="text-2xl font-bold">Mentee Type Distribution</h2>
+              </div>
+              <Card className="p-8" data-testid="chart-mentee-type-distribution">
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={MOCK_ANALYTICS_DATA.mentee_type_distribution}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {MOCK_ANALYTICS_DATA.mentee_type_distribution.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+          </div>
+        )}
+
         <div>
           <h2 className="text-2xl font-bold mb-4">Recent Bookings</h2>
           {isLoading ? (
@@ -669,7 +816,34 @@ export default function Analytics() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {recentBookings.map((booking) => {
+                  {recentBookings.map((booking: any) => {
+                    if (useMockData) {
+                      return (
+                        <TableRow key={booking.id} data-testid={`row-booking-${booking.id}`}>
+                          <TableCell className="font-medium" data-testid={`text-mentor-${booking.id}`}>
+                            {booking.mentor_name}
+                          </TableCell>
+                          <TableCell data-testid={`text-mentee-${booking.id}`}>
+                            <div>
+                              <div>{booking.mentee_name}</div>
+                              <div className="text-xs text-muted-foreground">{booking.expertise}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell data-testid={`status-${booking.id}`}>
+                            {getStatusBadge(booking.status)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {format(new Date(booking.booked_at), "MMM d, h:mm a")}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {booking.status === "scheduled" 
+                              ? format(new Date(booking.booked_at), "MMM d, h:mm a")
+                              : "-"}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+                    
                     const mentor = mentors?.find((m) => m.id === booking.mentor_id);
                     const mentee = mentees?.find((m) => m.id === booking.mentee_id);
                     return (
