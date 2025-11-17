@@ -6,7 +6,10 @@ import { SearchAndFilter } from "@/components/SearchAndFilter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Sparkles, Target, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sparkles, Target, Zap, ArrowRight } from "lucide-react";
+import { Link } from "wouter";
+import heroImage from "@assets/image_1763385295124.png";
 
 export default function Home() {
   const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
@@ -48,40 +51,78 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <section className="relative py-16 md:py-24 bg-gradient-to-br from-muted via-background to-muted/50">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="max-w-3xl mx-auto text-center space-y-6">
-            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-secondary">
-              Connect with{" "}
-              <span className="text-primary">
-                Expert Mentors
-              </span>
-              {" "}at Amazon Egypt
-            </h1>
-            <p className="text-lg md:text-xl text-foreground max-w-2xl mx-auto">
-              Access personalized guidance from Amazon's experienced professionals. Book one-on-one mentorship sessions and accelerate your career growth.
-            </p>
-            <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
+      <section 
+        className="relative py-24 md:py-32 lg:py-40 overflow-hidden"
+        style={{
+          backgroundImage: `linear-gradient(to bottom, rgba(35, 47, 62, 0.85), rgba(35, 47, 62, 0.95)), url(${heroImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat'
+        }}
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/20 via-transparent to-background/60" />
+        
+        <div className="relative max-w-7xl mx-auto px-4 md:px-8">
+          <div className="max-w-3xl mx-auto text-center space-y-8">
+            <div className="space-y-4">
+              <Badge variant="outline" className="bg-white/10 text-white border-white/20 backdrop-blur-sm">
+                Amazon Egypt Mentorship Program
+              </Badge>
+              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white">
+                Connect with{" "}
+                <span className="text-orange-500">
+                  Expert Mentors
+                </span>
+              </h1>
+              <p className="text-lg md:text-xl text-white/90 max-w-2xl mx-auto leading-relaxed">
+                Access personalized guidance from Amazon's experienced professionals. Book one-on-one mentorship sessions and accelerate your career growth in Egypt and beyond.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <Link href="/mentee-registration">
+                <Button 
+                  size="lg" 
+                  className="bg-orange-500 hover:bg-orange-600 text-white border-0 px-8 py-6 text-lg"
+                  data-testid="button-get-started"
+                >
+                  Get Started
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
+              <Link href="#mentors">
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 backdrop-blur-sm px-8 py-6 text-lg"
+                  data-testid="button-browse-mentors"
+                >
+                  Browse Mentors
+                </Button>
+              </Link>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-white/80 pt-8">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span>Trusted mentorship</span>
+                <Sparkles className="w-5 h-5 text-orange-400" />
+                <span>Trusted Mentorship</span>
               </div>
-              <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+              <div className="w-1 h-1 rounded-full bg-white/50" />
               <div className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-primary" />
-                <span>Expert guidance</span>
+                <Target className="w-5 h-5 text-orange-400" />
+                <span>Expert Guidance</span>
               </div>
-              <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+              <div className="w-1 h-1 rounded-full bg-white/50" />
               <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-primary" />
-                <span>Flexible scheduling</span>
+                <Zap className="w-5 h-5 text-orange-400" />
+                <span>Flexible Scheduling</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="py-12 md:py-20">
+      <section id="mentors" className="py-12 md:py-20 bg-gradient-to-b from-background via-muted/30 to-background">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="space-y-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
