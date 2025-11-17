@@ -53,7 +53,16 @@ export default function Home() {
     <div className="min-h-screen">
       <section className="relative py-16 md:py-20 overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="text-center space-y-8 mb-12">
+          <div className="max-w-5xl mx-auto mb-12">
+            <img 
+              src={amazonEgyptOffice} 
+              alt="Amazon Egypt Office - Mentorship and Collaboration"
+              className="w-full h-auto rounded-xl shadow-xl"
+              data-testid="hero-illustration"
+            />
+          </div>
+
+          <div className="text-center space-y-8">
             <div className="space-y-4">
               <Badge variant="outline" className="bg-primary text-white border-primary/20">
                 Amazon Egypt Mentorship Program
@@ -65,31 +74,8 @@ export default function Home() {
                 </span>
               </h1>
               <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Access personalized guidance from Amazon's experienced professionals. Book one-on-one mentorship sessions and accelerate your career growth in Egypt and beyond.
+                Book one-on-one mentorship sessions with Amazon professionals.
               </p>
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
-              <Link href="/mentee-registration">
-                <Button 
-                  size="lg" 
-                  className="bg-orange-500 hover:bg-orange-600 text-white border-0 px-8 py-6 text-lg"
-                  data-testid="button-get-started"
-                >
-                  Get Started
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-              </Link>
-              <Link href="#mentors">
-                <Button 
-                  size="lg" 
-                  variant="outline" 
-                  className="bg-primary hover:bg-primary/90 text-white border-primary px-8 py-6 text-lg"
-                  data-testid="button-browse-mentors"
-                >
-                  Browse Mentors
-                </Button>
-              </Link>
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-8">
@@ -108,15 +94,6 @@ export default function Home() {
                 <span>Flexible Scheduling</span>
               </div>
             </div>
-          </div>
-
-          <div className="max-w-5xl mx-auto">
-            <img 
-              src={amazonEgyptOffice} 
-              alt="Amazon Egypt Office - Mentorship and Collaboration"
-              className="w-full h-auto rounded-xl shadow-xl"
-              data-testid="hero-illustration"
-            />
           </div>
         </div>
       </section>
