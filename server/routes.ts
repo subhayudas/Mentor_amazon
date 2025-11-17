@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertBookingSchema, insertMenteeSchema } from "@shared/schema";
+import { insertBookingSchema, insertMenteeSchema, insertMentorSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -38,6 +38,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(mentor);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch mentor" });
+    }
+  });
+
+  app.post("/api/mentors", async (req, res) => {
+    try {
+      const result = insertMentorSchema.safeParse(req.body);
+      
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid mentor data",
+          errors: result.error.errors 
+        });
+      }
+
+      const mentor = await storage.createMentor(result.data);
+      res.status(201).json(mentor);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create mentor" });
     }
   });
 

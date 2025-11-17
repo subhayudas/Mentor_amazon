@@ -7,6 +7,8 @@ import { Navigation } from "@/components/Navigation";
 import Home from "@/pages/Home";
 import MentorProfile from "@/pages/MentorProfile";
 import Analytics from "@/pages/Analytics";
+import MentorOnboarding from "@/pages/MentorOnboarding";
+import MenteeRegistration from "@/pages/MenteeRegistration";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -15,6 +17,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/mentor/:id" component={MentorProfile} />
       <Route path="/analytics" component={Analytics} />
+      <Route path="/mentor-onboarding" component={MentorOnboarding} />
+      <Route path="/mentee-registration" component={MenteeRegistration} />
       <Route component={NotFound} />
     </Switch>
   );

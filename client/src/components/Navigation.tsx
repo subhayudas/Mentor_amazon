@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import amazonLogo from "@assets/image_1763381789450.png";
 
@@ -36,6 +36,18 @@ export function Navigation() {
               <Button variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-analytics">
                 <BarChart3 className="w-4 h-4 mr-2" />
                 Analytics
+              </Button>
+            </Link>
+            <Link href="/mentor-onboarding" data-testid="link-mentor-onboarding">
+              <Button variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-mentor-onboarding">
+                <Users className="w-4 h-4 mr-2" />
+                Become a Mentor
+              </Button>
+            </Link>
+            <Link href="/mentee-registration" data-testid="link-mentee-registration">
+              <Button variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-mentee-registration">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Join as Mentee
               </Button>
             </Link>
           </div>
