@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
-import { Session, Mentor } from "@shared/schema";
+import { Booking, Mentor, Mentee } from "@shared/schema";
 import { MetricCard } from "@/components/MetricCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -32,8 +33,14 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
-import { Users, Calendar, TrendingUp, Award, BarChart3, Activity } from "lucide-react";
+import { 
+  Users, Calendar, TrendingUp, CheckCircle2, XCircle, 
+  Clock, BarChart3, Activity, Filter 
+} from "lucide-react";
 import {
   format,
   startOfDay,
@@ -41,31 +48,41 @@ import {
   startOfMonth,
   subDays,
   isAfter,
-  isBefore,
   eachDayOfInterval,
   eachWeekOfInterval,
   eachMonthOfInterval,
 } from "date-fns";
 
 type DateRange = "7" | "30" | "90" | "all";
+type BookingStatus = "clicked" | "scheduled" | "completed" | "canceled" | "all";
 
 interface TimeSeriesData {
   date: string;
-  sessions: number;
-  cumulative?: number;
+  bookings: number;
+  scheduled?: number;
+  completed?: number;
+  canceled?: number;
 }
 
-interface MentorPerformanceData {
+interface StatusData {
   name: string;
-  sessions: number;
+  value: number;
+  color: string;
 }
 
-function aggregateSessionsByDate(
-  sessions: Session[],
+const STATUS_COLORS = {
+  clicked: "hsl(var(--chart-1))",
+  scheduled: "hsl(var(--chart-2))",
+  completed: "hsl(var(--chart-3))",
+  canceled: "hsl(var(--chart-4))",
+};
+
+function aggregateBookingsByDate(
+  bookings: Booking[],
   dateRange: DateRange
-): { timeSeries: TimeSeriesData[]; cumulative: TimeSeriesData[] } {
-  if (!sessions || sessions.length === 0) {
-    return { timeSeries: [], cumulative: [] };
+): TimeSeriesData[] {
+  if (!bookings || bookings.length === 0) {
+    return [];
   }
 
   const now = new Date();
@@ -86,11 +103,11 @@ function aggregateSessionsByDate(
       groupBy = "week";
       break;
     case "all":
-      const oldestSession = sessions.reduce((oldest, session) => {
-        const sessionDate = new Date(session.bookedAt);
-        return sessionDate < oldest ? sessionDate : oldest;
+      const oldestBooking = bookings.reduce((oldest, booking) => {
+        const bookingDate = new Date(booking.clicked_at);
+        return bookingDate < oldest ? bookingDate : oldest;
       }, new Date());
-      startDate = startOfMonth(oldestSession);
+      startDate = startOfMonth(oldestBooking);
       groupBy = "month";
       break;
     default:
@@ -98,26 +115,33 @@ function aggregateSessionsByDate(
       groupBy = "day";
   }
 
-  const filteredSessions = sessions.filter((session) => {
-    const sessionDate = new Date(session.bookedAt);
-    return isAfter(sessionDate, startDate) || sessionDate.getTime() === startDate.getTime();
+  const filteredBookings = bookings.filter((booking) => {
+    const bookingDate = new Date(booking.clicked_at);
+    return isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime();
   });
 
-  const sessionCounts: Record<string, number> = {};
+  const bookingsByDate: Record<string, { total: number; scheduled: number; completed: number; canceled: number }> = {};
 
-  filteredSessions.forEach((session) => {
-    const sessionDate = new Date(session.bookedAt);
+  filteredBookings.forEach((booking) => {
+    const bookingDate = new Date(booking.clicked_at);
     let key: string;
 
     if (groupBy === "day") {
-      key = format(startOfDay(sessionDate), "MMM d");
+      key = format(startOfDay(bookingDate), "MMM d");
     } else if (groupBy === "week") {
-      key = format(startOfWeek(sessionDate), "MMM d");
+      key = format(startOfWeek(bookingDate), "MMM d");
     } else {
-      key = format(startOfMonth(sessionDate), "MMM yyyy");
+      key = format(startOfMonth(bookingDate), "MMM yyyy");
     }
 
-    sessionCounts[key] = (sessionCounts[key] || 0) + 1;
+    if (!bookingsByDate[key]) {
+      bookingsByDate[key] = { total: 0, scheduled: 0, completed: 0, canceled: 0 };
+    }
+
+    bookingsByDate[key].total += 1;
+    if (booking.status === "scheduled") bookingsByDate[key].scheduled += 1;
+    if (booking.status === "completed") bookingsByDate[key].completed += 1;
+    if (booking.status === "canceled") bookingsByDate[key].canceled += 1;
   });
 
   let intervals: Date[];
@@ -129,7 +153,7 @@ function aggregateSessionsByDate(
     intervals = eachMonthOfInterval({ start: startDate, end: now });
   }
 
-  const timeSeriesData: TimeSeriesData[] = intervals.map((date) => {
+  return intervals.map((date) => {
     let key: string;
     if (groupBy === "day") {
       key = format(startOfDay(date), "MMM d");
@@ -139,45 +163,63 @@ function aggregateSessionsByDate(
       key = format(startOfMonth(date), "MMM yyyy");
     }
 
+    const data = bookingsByDate[key] || { total: 0, scheduled: 0, completed: 0, canceled: 0 };
     return {
       date: key,
-      sessions: sessionCounts[key] || 0,
+      bookings: data.total,
+      scheduled: data.scheduled,
+      completed: data.completed,
+      canceled: data.canceled,
     };
   });
-
-  let cumulativeTotal = 0;
-  const cumulativeData: TimeSeriesData[] = timeSeriesData.map((item) => {
-    cumulativeTotal += item.sessions;
-    return {
-      date: item.date,
-      sessions: item.sessions,
-      cumulative: cumulativeTotal,
-    };
-  });
-
-  return { timeSeries: timeSeriesData, cumulative: cumulativeData };
 }
 
 export default function Analytics() {
   const [dateRange, setDateRange] = useState<DateRange>("30");
+  const [selectedMentor, setSelectedMentor] = useState<string>("all");
+  const [selectedMenteeType, setSelectedMenteeType] = useState<string>("all");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
+  const [selectedExpertise, setSelectedExpertise] = useState<string>("all");
 
-  const { data: sessions, isLoading: sessionsLoading } = useQuery<Session[]>({
-    queryKey: ["/api/sessions"],
+  const { data: bookings, isLoading: bookingsLoading } = useQuery<Booking[]>({
+    queryKey: ["/api/bookings"],
   });
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<Mentor[]>({
     queryKey: ["/api/mentors"],
   });
 
-  const isLoading = sessionsLoading || mentorsLoading;
+  const { data: mentees, isLoading: menteesLoading } = useQuery<Mentee[]>({
+    queryKey: ["/api/mentees"],
+  });
 
-  const { timeSeries, cumulative } = useMemo(() => {
-    if (!sessions) return { timeSeries: [], cumulative: [] };
-    return aggregateSessionsByDate(sessions, dateRange);
-  }, [sessions, dateRange]);
+  const isLoading = bookingsLoading || mentorsLoading || menteesLoading;
 
-  const mentorPerformanceData = useMemo(() => {
-    if (!sessions || !mentors) return [];
+  const filterOptions = useMemo(() => {
+    if (!bookings || !mentors || !mentees) {
+      return { languages: [], expertises: [] };
+    }
+
+    const languagesSet = new Set<string>();
+    const expertisesSet = new Set<string>();
+
+    mentors.forEach((mentor) => {
+      mentor.languages_spoken?.forEach((lang) => languagesSet.add(lang));
+      mentor.expertise?.forEach((exp) => expertisesSet.add(exp));
+    });
+
+    mentees.forEach((mentee) => {
+      mentee.languages_spoken?.forEach((lang) => languagesSet.add(lang));
+    });
+
+    return {
+      languages: Array.from(languagesSet).sort(),
+      expertises: Array.from(expertisesSet).sort(),
+    };
+  }, [bookings, mentors, mentees]);
+
+  const filteredBookings = useMemo(() => {
+    if (!bookings || !mentors || !mentees) return [];
 
     const now = new Date();
     let startDate: Date;
@@ -199,107 +241,242 @@ export default function Analytics() {
         startDate = subDays(now, 30);
     }
 
-    const filteredSessions = sessions.filter((session) => {
-      const sessionDate = new Date(session.bookedAt);
-      return isAfter(sessionDate, startDate) || sessionDate.getTime() === startDate.getTime();
+    return bookings.filter((booking) => {
+      const bookingDate = new Date(booking.clicked_at);
+      if (!(isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime())) {
+        return false;
+      }
+
+      if (selectedMentor !== "all" && booking.mentor_id !== selectedMentor) return false;
+
+      const mentee = mentees.find((m) => m.id === booking.mentee_id);
+      if (selectedMenteeType !== "all" && mentee?.user_type !== selectedMenteeType) return false;
+
+      const mentor = mentors.find((m) => m.id === booking.mentor_id);
+      if (selectedLanguage !== "all") {
+        const hasLanguage =
+          mentor?.languages_spoken?.includes(selectedLanguage) ||
+          mentee?.languages_spoken?.includes(selectedLanguage);
+        if (!hasLanguage) return false;
+      }
+
+      if (selectedExpertise !== "all" && !mentor?.expertise?.includes(selectedExpertise)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [bookings, mentors, mentees, selectedMentor, selectedMenteeType, selectedLanguage, selectedExpertise, dateRange]);
+
+  const timeSeries = useMemo(() => {
+    return aggregateBookingsByDate(filteredBookings, dateRange);
+  }, [filteredBookings, dateRange]);
+
+  const statusBreakdown = useMemo(() => {
+    if (!filteredBookings) return [];
+    
+    const counts = {
+      clicked: 0,
+      scheduled: 0,
+      completed: 0,
+      canceled: 0,
+    };
+
+    filteredBookings.forEach((booking) => {
+      counts[booking.status] = (counts[booking.status] || 0) + 1;
     });
 
-    const mentorCounts: Record<string, number> = {};
-    filteredSessions.forEach((session) => {
-      mentorCounts[session.mentorId] = (mentorCounts[session.mentorId] || 0) + 1;
+    return [
+      { name: "Clicked", value: counts.clicked, color: STATUS_COLORS.clicked },
+      { name: "Scheduled", value: counts.scheduled, color: STATUS_COLORS.scheduled },
+      { name: "Completed", value: counts.completed, color: STATUS_COLORS.completed },
+      { name: "Canceled", value: counts.canceled, color: STATUS_COLORS.canceled },
+    ].filter((item) => item.value > 0);
+  }, [filteredBookings]);
+
+  const mentorPerformance = useMemo(() => {
+    if (!filteredBookings || !mentors) return [];
+
+    const mentorCounts: Record<string, { bookings: number; completed: number }> = {};
+    filteredBookings.forEach((booking) => {
+      if (!mentorCounts[booking.mentor_id]) {
+        mentorCounts[booking.mentor_id] = { bookings: 0, completed: 0 };
+      }
+      mentorCounts[booking.mentor_id].bookings += 1;
+      if (booking.status === "completed") {
+        mentorCounts[booking.mentor_id].completed += 1;
+      }
     });
 
     return mentors
       .map((mentor) => ({
         name: mentor.name,
-        sessions: mentorCounts[mentor.id] || 0,
+        bookings: mentorCounts[mentor.id]?.bookings || 0,
+        completed: mentorCounts[mentor.id]?.completed || 0,
       }))
-      .sort((a, b) => b.sessions - a.sessions);
-  }, [sessions, mentors, dateRange]);
+      .filter((m) => m.bookings > 0)
+      .sort((a, b) => b.bookings - a.bookings)
+      .slice(0, 10);
+  }, [filteredBookings, mentors]);
 
-  const totalSessions = sessions?.length || 0;
-  const activeMentors = mentors?.length || 0;
+  const totalBookings = filteredBookings.length;
+  const scheduledCount = filteredBookings.filter((b) => b.status === "scheduled").length;
+  const completedCount = filteredBookings.filter((b) => b.status === "completed").length;
+  const canceledCount = filteredBookings.filter((b) => b.status === "canceled").length;
+  const uniqueMentees = new Set(filteredBookings.map((b) => b.mentee_id)).size;
 
-  const currentMonth = new Date().getMonth();
-  const sessionsThisMonth =
-    sessions?.filter((s) => new Date(s.bookedAt).getMonth() === currentMonth).length || 0;
+  const recentBookings = filteredBookings
+    .sort((a, b) => new Date(b.clicked_at).getTime() - new Date(a.clicked_at).getTime())
+    .slice(0, 10);
 
-  const mentorSessionCounts =
-    sessions?.reduce(
-      (acc, session) => {
-        acc[session.mentorId] = (acc[session.mentorId] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    ) || {};
-
-  const topMentorId = Object.entries(mentorSessionCounts).sort(
-    ([, a], [, b]) => b - a
-  )[0]?.[0];
-
-  const recentSessions = sessions
-    ?.sort((a, b) => new Date(b.bookedAt).getTime() - new Date(a.bookedAt).getTime())
-    .slice(0, 10) || [];
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, { variant: "default" | "secondary" | "outline", label: string }> = {
+      clicked: { variant: "outline", label: "Clicked" },
+      scheduled: { variant: "default", label: "Scheduled" },
+      completed: { variant: "secondary", label: "Completed" },
+      canceled: { variant: "outline", label: "Canceled" },
+    };
+    const config = variants[status] || variants.clicked;
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
 
   return (
     <div className="min-h-screen py-12">
-      <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-12">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
-            <p className="text-muted-foreground">
-              Track your mentorship program's performance and engagement
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">Date Range:</span>
-            <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRange)}>
-              <SelectTrigger className="w-[180px]" data-testid="select-date-range">
-                <SelectValue placeholder="Select range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7">Last 7 days</SelectItem>
-                <SelectItem value="30">Last 30 days</SelectItem>
-                <SelectItem value="90">Last 90 days</SelectItem>
-                <SelectItem value="all">All time</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-8">
+        <div>
+          <h1 className="text-4xl font-bold mb-2">Analytics Dashboard</h1>
+          <p className="text-muted-foreground">
+            Comprehensive insights into your mentorship program's performance
+          </p>
         </div>
 
+        <Card className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Filter className="w-5 h-5 text-primary" />
+            <h2 className="text-lg font-semibold">Filters</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Date Range</label>
+              <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRange)}>
+                <SelectTrigger data-testid="select-date-range">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                  <SelectItem value="all">All time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mentor</label>
+              <Select value={selectedMentor} onValueChange={setSelectedMentor}>
+                <SelectTrigger data-testid="select-mentor">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Mentors</SelectItem>
+                  {mentors?.map((mentor) => (
+                    <SelectItem key={mentor.id} value={mentor.id}>
+                      {mentor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Mentee Type</label>
+              <Select value={selectedMenteeType} onValueChange={setSelectedMenteeType}>
+                <SelectTrigger data-testid="select-mentee-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="individual">Individual</SelectItem>
+                  <SelectItem value="organization">Organization</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Language</label>
+              <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                <SelectTrigger data-testid="select-language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Languages</SelectItem>
+                  {filterOptions.languages.map((lang) => (
+                    <SelectItem key={lang} value={lang}>
+                      {lang}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Expertise</label>
+              <Select value={selectedExpertise} onValueChange={setSelectedExpertise}>
+                <SelectTrigger data-testid="select-expertise">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Expertise</SelectItem>
+                  {filterOptions.expertises.map((exp) => (
+                    <SelectItem key={exp} value={exp}>
+                      {exp}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </Card>
+
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {[1, 2, 3, 4, 5].map((i) => (
               <Card key={i} className="p-8">
                 <Skeleton className="h-20 w-full" />
               </Card>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <MetricCard
-              title="Total Sessions"
-              value={totalSessions}
+              title="Total Bookings"
+              value={totalBookings}
               icon={Calendar}
-              testId="metric-total-sessions"
+              testId="metric-total-bookings"
             />
             <MetricCard
-              title="Active Mentors"
-              value={activeMentors}
+              title="Scheduled"
+              value={scheduledCount}
+              icon={Clock}
+              testId="metric-scheduled"
+            />
+            <MetricCard
+              title="Completed"
+              value={completedCount}
+              icon={CheckCircle2}
+              testId="metric-completed"
+            />
+            <MetricCard
+              title="Canceled"
+              value={canceledCount}
+              icon={XCircle}
+              testId="metric-canceled"
+            />
+            <MetricCard
+              title="Unique Mentees"
+              value={uniqueMentees}
               icon={Users}
-              testId="metric-active-mentors"
-            />
-            <MetricCard
-              title="Sessions This Month"
-              value={sessionsThisMonth}
-              icon={TrendingUp}
-              testId="metric-sessions-month"
-            />
-            <MetricCard
-              title="Top Mentor Sessions"
-              value={topMentorId ? mentorSessionCounts[topMentorId] : 0}
-              icon={Award}
-              testId="metric-top-mentor"
+              testId="metric-unique-mentees"
             />
           </div>
         )}
@@ -308,14 +485,14 @@ export default function Analytics() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
-              <h2 className="text-2xl font-bold">Sessions Over Time</h2>
+              <h2 className="text-2xl font-bold">Bookings Over Time</h2>
             </div>
             {isLoading ? (
               <Card className="p-8">
                 <Skeleton className="h-[350px] w-full" />
               </Card>
             ) : timeSeries.length > 0 ? (
-              <Card className="p-8" data-testid="chart-sessions-over-time">
+              <Card className="p-8" data-testid="chart-bookings-over-time">
                 <ResponsiveContainer width="100%" height={350}>
                   <LineChart data={timeSeries}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -338,19 +515,35 @@ export default function Analytics() {
                     <Legend />
                     <Line
                       type="monotone"
-                      dataKey="sessions"
+                      dataKey="bookings"
                       stroke="hsl(var(--primary))"
                       strokeWidth={2}
                       dot={{ fill: "hsl(var(--primary))", r: 4 }}
                       activeDot={{ r: 6 }}
-                      name="Sessions"
+                      name="Total Bookings"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="scheduled"
+                      stroke={STATUS_COLORS.scheduled}
+                      strokeWidth={2}
+                      dot={{ fill: STATUS_COLORS.scheduled, r: 3 }}
+                      name="Scheduled"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="completed"
+                      stroke={STATUS_COLORS.completed}
+                      strokeWidth={2}
+                      dot={{ fill: STATUS_COLORS.completed, r: 3 }}
+                      name="Completed"
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </Card>
             ) : (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No session data available for this period</p>
+                <p className="text-muted-foreground">No booking data available for this period</p>
               </Card>
             )}
           </div>
@@ -358,26 +551,30 @@ export default function Analytics() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
-              <h2 className="text-2xl font-bold">Cumulative Sessions</h2>
+              <h2 className="text-2xl font-bold">Status Breakdown</h2>
             </div>
             {isLoading ? (
               <Card className="p-8">
                 <Skeleton className="h-[350px] w-full" />
               </Card>
-            ) : cumulative.length > 0 ? (
-              <Card className="p-8">
+            ) : statusBreakdown.length > 0 ? (
+              <Card className="p-8" data-testid="chart-status-breakdown">
                 <ResponsiveContainer width="100%" height={350}>
-                  <AreaChart data={cumulative}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis
-                      dataKey="date"
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                    />
-                    <YAxis
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                    />
+                  <PieChart>
+                    <Pie
+                      data={statusBreakdown}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {statusBreakdown.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
                     <Tooltip
                       contentStyle={{
                         backgroundColor: "hsl(var(--card))",
@@ -386,21 +583,12 @@ export default function Analytics() {
                       }}
                     />
                     <Legend />
-                    <Area
-                      type="monotone"
-                      dataKey="cumulative"
-                      stroke="hsl(var(--chart-1))"
-                      fill="hsl(var(--chart-1))"
-                      fillOpacity={0.6}
-                      strokeWidth={2}
-                      name="Total Sessions"
-                    />
-                  </AreaChart>
+                  </PieChart>
                 </ResponsiveContainer>
               </Card>
             ) : (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No session data available for this period</p>
+                <p className="text-muted-foreground">No booking data available</p>
               </Card>
             )}
           </div>
@@ -409,16 +597,16 @@ export default function Analytics() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            <h2 className="text-2xl font-bold">Mentor Performance</h2>
+            <h2 className="text-2xl font-bold">Top Mentor Performance</h2>
           </div>
           {isLoading ? (
             <Card className="p-8">
               <Skeleton className="h-[400px] w-full" />
             </Card>
-          ) : mentorPerformanceData.length > 0 ? (
+          ) : mentorPerformance.length > 0 ? (
             <Card className="p-8" data-testid="chart-mentor-performance">
               <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={mentorPerformanceData}>
+                <BarChart data={mentorPerformance}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis
                     dataKey="name"
@@ -441,10 +629,16 @@ export default function Analytics() {
                   />
                   <Legend />
                   <Bar
-                    dataKey="sessions"
+                    dataKey="bookings"
                     fill="hsl(var(--chart-2))"
                     radius={[8, 8, 0, 0]}
-                    name="Sessions"
+                    name="Total Bookings"
+                  />
+                  <Bar
+                    dataKey="completed"
+                    fill={STATUS_COLORS.completed}
+                    radius={[8, 8, 0, 0]}
+                    name="Completed"
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -456,93 +650,61 @@ export default function Analytics() {
           )}
         </div>
 
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Sessions by Mentor</h2>
-            {isLoading ? (
-              <Card className="p-8">
-                <Skeleton className="h-64 w-full" />
-              </Card>
-            ) : mentors && mentors.length > 0 ? (
-              <Card className="p-8">
-                <div className="space-y-4">
-                  {mentors.map((mentor) => {
-                    const sessionCount = mentorSessionCounts[mentor.id] || 0;
-                    const maxSessions = Math.max(...Object.values(mentorSessionCounts), 1);
-                    const percentage = (sessionCount / maxSessions) * 100;
-
+        <div>
+          <h2 className="text-2xl font-bold mb-4">Recent Bookings</h2>
+          {isLoading ? (
+            <Card className="p-8">
+              <Skeleton className="h-96 w-full" />
+            </Card>
+          ) : recentBookings.length > 0 ? (
+            <Card>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mentor</TableHead>
+                    <TableHead>Mentee</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Clicked At</TableHead>
+                    <TableHead>Scheduled At</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentBookings.map((booking) => {
+                    const mentor = mentors?.find((m) => m.id === booking.mentor_id);
+                    const mentee = mentees?.find((m) => m.id === booking.mentee_id);
                     return (
-                      <div key={mentor.id} className="space-y-2" data-testid={`mentor-stats-${mentor.id}`}>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium">{mentor.name}</span>
-                          <span className="text-muted-foreground" data-testid={`text-sessions-${mentor.id}`}>
-                            {sessionCount} {sessionCount === 1 ? "session" : "sessions"}
-                          </span>
-                        </div>
-                        <div className="h-3 bg-muted rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-primary rounded-full transition-all duration-500"
-                            style={{ width: `${percentage}%` }}
-                          />
-                        </div>
-                      </div>
+                      <TableRow key={booking.id} data-testid={`row-booking-${booking.id}`}>
+                        <TableCell className="font-medium" data-testid={`text-mentor-${booking.id}`}>
+                          {mentor?.name || "Unknown"}
+                        </TableCell>
+                        <TableCell data-testid={`text-mentee-${booking.id}`}>
+                          <div>
+                            <div>{mentee?.name || "Unknown"}</div>
+                            <div className="text-xs text-muted-foreground">{mentee?.email}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell data-testid={`status-${booking.id}`}>
+                          {getStatusBadge(booking.status)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {format(new Date(booking.clicked_at), "MMM d, h:mm a")}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {booking.scheduled_at 
+                            ? format(new Date(booking.scheduled_at), "MMM d, h:mm a")
+                            : "-"}
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
-                </div>
-              </Card>
-            ) : (
-              <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No mentor data available</p>
-              </Card>
-            )}
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-bold mb-4">Recent Sessions</h2>
-            {isLoading ? (
-              <Card className="p-8">
-                <Skeleton className="h-96 w-full" />
-              </Card>
-            ) : recentSessions.length > 0 ? (
-              <Card>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Mentor</TableHead>
-                      <TableHead>Mentee</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Booked Date</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {recentSessions.map((session) => {
-                      const mentor = mentors?.find((m) => m.id === session.mentorId);
-                      return (
-                        <TableRow key={session.id} data-testid={`row-session-${session.id}`}>
-                          <TableCell className="font-medium" data-testid={`text-mentor-${session.id}`}>
-                            {mentor?.name || "Unknown"}
-                          </TableCell>
-                          <TableCell data-testid={`text-mentee-${session.id}`}>
-                            {session.menteeName}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {session.menteeEmail}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {format(new Date(session.bookedAt), "MMM d, yyyy 'at' h:mm a")}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </Card>
-            ) : (
-              <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No sessions booked yet</p>
-              </Card>
-            )}
-          </div>
+                </TableBody>
+              </Table>
+            </Card>
+          ) : (
+            <Card className="p-12 text-center">
+              <p className="text-muted-foreground">No bookings yet</p>
+            </Card>
+          )}
         </div>
       </div>
     </div>
