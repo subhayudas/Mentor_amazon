@@ -64,7 +64,7 @@ export default function Home() {
             <div className="absolute top-0 left-0 right-0 pt-4 md:pt-6 lg:pt-8 px-4 md:px-8 text-center">
               <div className="space-y-1 md:space-y-2">
                 <Badge variant="outline" className="bg-orange-500 text-white border-orange-500/20 text-xs md:text-sm">
-                  Amazon Egypt Mentorship Program
+                  Amazon UAE Mentorship Program
                 </Badge>
               </div>
             </div>

@@ -1,8 +1,8 @@
-# MentorMatch - Mentor Booking Platform
+# MentorConnect - White-Labeled Mentor Booking Platform for Amazon UAE
 
 ## Overview
 
-MentorMatch is a professional mentor discovery and booking platform that connects mentees with expert mentors across various fields. The application enables users to browse mentor profiles, view their expertise and credentials, and book mentorship sessions through integrated scheduling. The platform features a clean, professional interface inspired by LinkedIn's profile presentation, Calendly's booking experience, and specialized mentorship platforms like ADPList.
+MentorConnect is a professional mentor discovery and booking platform white-labeled for Amazon UAE. The application connects mentees with expert mentors, enabling users to browse mentor profiles, view expertise and credentials, and book mentorship sessions through integrated Calendly scheduling. The platform features Amazon UAE branding with navy (#232F3E) and orange (#FF9900) color scheme, clean professional interface, and an Amazon UAE office illustration hero section.
 
 ## User Preferences
 

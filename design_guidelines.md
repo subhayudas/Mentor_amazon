@@ -1,9 +1,9 @@
-# Design Guidelines: MentorConnect for Amazon Egypt
+# Design Guidelines: MentorConnect for Amazon UAE
 
 ## Brand Identity
 
 **Platform Name**: MentorConnect
-**Client**: Amazon Egypt
+**Client**: Amazon UAE
 **Design Philosophy**: Professional, trustworthy, and accessible mentor-student booking platform that reflects Amazon's brand values
 
 ## Amazon Brand Guidelines
