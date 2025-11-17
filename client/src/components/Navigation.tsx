@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { BarChart3, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import amazonLogo from "@assets/image_1763381789450.png";
+import amazonLogoWhite from "@assets/stock_images/amazon_logo_white_tr_9c83c892.jpg";
 
 export function Navigation() {
   return (
@@ -12,9 +12,9 @@ export function Navigation() {
             <div className="flex items-center gap-4 hover-elevate active-elevate-2 px-3 py-2 rounded-md transition-colors">
               <div className="flex items-center gap-3">
                 <img 
-                  src={amazonLogo} 
+                  src={amazonLogoWhite} 
                   alt="Amazon" 
-                  className="h-7 w-auto"
+                  className="h-8 w-auto brightness-0 invert"
                   data-testid="img-amazon-logo"
                 />
                 <div className="h-8 w-px bg-primary-foreground/20"></div>
