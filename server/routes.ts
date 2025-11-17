@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSessionSchema, insertMenteeSchema, insertFavoriteSchema } from "@shared/schema";
+import { insertBookingSchema, insertMenteeSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -37,35 +37,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/sessions", async (_req, res) => {
+  app.get("/api/bookings", async (_req, res) => {
     try {
-      const sessions = await storage.getSessions();
-      res.json(sessions);
+      const bookings = await storage.getBookings();
+      res.json(bookings);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch sessions" });
+      res.status(500).json({ message: "Failed to fetch bookings" });
     }
   });
 
-  app.post("/api/sessions", async (req, res) => {
+  app.post("/api/bookings", async (req, res) => {
     try {
-      const result = insertSessionSchema.safeParse(req.body);
+      const result = insertBookingSchema.safeParse(req.body);
       
       if (!result.success) {
         return res.status(400).json({ 
-          message: "Invalid session data",
+          message: "Invalid booking data",
           errors: result.error.errors 
         });
       }
 
-      const mentor = await storage.getMentor(result.data.mentorId);
+      const mentor = await storage.getMentor(result.data.mentor_id);
       if (!mentor) {
         return res.status(404).json({ message: "Mentor not found" });
       }
 
-      const session = await storage.createSession(result.data);
-      res.status(201).json(session);
+      const booking = await storage.createBooking(result.data);
+      res.status(201).json(booking);
     } catch (error) {
-      res.status(500).json({ message: "Failed to create session" });
+      res.status(500).json({ message: "Failed to create booking" });
     }
   });
 
@@ -107,7 +107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/mentees/:email/sessions", async (req, res) => {
+  app.get("/api/mentees/:email/bookings", async (req, res) => {
     try {
       const { email } = req.params;
       
@@ -116,72 +116,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Mentee not found" });
       }
 
-      const sessions = await storage.getMenteeSessions(email);
-      res.json(sessions);
+      const bookings = await storage.getMenteeBookings(mentee.id);
+      res.json(bookings);
     } catch (error) {
-      res.status(500).json({ message: "Failed to fetch mentee sessions" });
-    }
-  });
-
-  app.get("/api/mentees/:email/favorites", async (req, res) => {
-    try {
-      const { email } = req.params;
-      
-      const mentee = await storage.getMenteeByEmail(email);
-      if (!mentee) {
-        return res.status(404).json({ message: "Mentee not found" });
-      }
-
-      const favorites = await storage.getFavorites(email);
-      res.json(favorites);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to fetch favorites" });
-    }
-  });
-
-  app.post("/api/mentees/:email/favorites", async (req, res) => {
-    try {
-      const { email } = req.params;
-      const bodySchema = z.object({ mentorId: z.string() });
-      const bodyResult = bodySchema.safeParse(req.body);
-      
-      if (!bodyResult.success) {
-        return res.status(400).json({ 
-          message: "Invalid request body",
-          errors: bodyResult.error.errors 
-        });
-      }
-
-      const mentee = await storage.getMenteeByEmail(email);
-      if (!mentee) {
-        return res.status(404).json({ message: "Mentee not found" });
-      }
-
-      const mentor = await storage.getMentor(bodyResult.data.mentorId);
-      if (!mentor) {
-        return res.status(404).json({ message: "Mentor not found" });
-      }
-
-      const favorite = await storage.addFavorite(email, bodyResult.data.mentorId);
-      res.status(201).json(favorite);
-    } catch (error) {
-      res.status(500).json({ message: "Failed to add favorite" });
-    }
-  });
-
-  app.delete("/api/mentees/:email/favorites/:mentorId", async (req, res) => {
-    try {
-      const { email, mentorId } = req.params;
-      
-      const mentee = await storage.getMenteeByEmail(email);
-      if (!mentee) {
-        return res.status(404).json({ message: "Mentee not found" });
-      }
-
-      await storage.removeFavorite(email, mentorId);
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Failed to remove favorite" });
+      res.status(500).json({ message: "Failed to fetch mentee bookings" });
     }
   });
 
@@ -193,14 +131,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid webhook payload" });
       }
 
-      let sessionData;
+      let mentorId: string | undefined;
+      let menteeName: string | undefined;
+      let menteeEmail: string | undefined;
+      let calendlyEventUri: string | undefined;
+      let scheduledAt: string | undefined;
 
       if (payload.event === "invitee.created" && payload.payload) {
         const calendlyPayload = payload.payload;
         
-        const menteeName = calendlyPayload.name;
-        const menteeEmail = calendlyPayload.email;
-        const bookedAt = calendlyPayload.scheduled_event?.start_time;
+        menteeName = calendlyPayload.name;
+        menteeEmail = calendlyPayload.email;
+        scheduledAt = calendlyPayload.scheduled_event?.start_time;
+        calendlyEventUri = calendlyPayload.uri;
 
         if (!menteeName || !menteeEmail) {
           return res.status(400).json({ 
@@ -208,7 +151,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        let mentorId: string | undefined;
         if (calendlyPayload.questions_and_answers && Array.isArray(calendlyPayload.questions_and_answers)) {
           const mentorIdQuestion = calendlyPayload.questions_and_answers.find(
             (qa: any) => qa.question === "Mentor ID" || qa.question === "MentorID"
@@ -221,43 +163,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
             message: "Mentor ID not found in webhook payload" 
           });
         }
+      } else if (payload.mentor_id && payload.mentee_id) {
+        const bookingData = {
+          mentor_id: payload.mentor_id,
+          mentee_id: payload.mentee_id,
+          calendly_event_uri: payload.calendly_event_uri,
+          status: payload.status || "clicked",
+          scheduled_at: payload.scheduled_at,
+        };
 
-        sessionData = {
-          mentorId,
-          menteeName,
-          menteeEmail,
-        };
-      } else if (payload.mentorId && payload.menteeName && payload.menteeEmail) {
-        sessionData = {
-          mentorId: payload.mentorId,
-          menteeName: payload.menteeName,
-          menteeEmail: payload.menteeEmail,
-        };
+        const result = insertBookingSchema.safeParse(bookingData);
+        
+        if (!result.success) {
+          return res.status(400).json({ 
+            message: "Invalid booking data",
+            errors: result.error.errors 
+          });
+        }
+
+        const booking = await storage.createBooking(result.data);
+        
+        return res.status(200).json({ 
+          message: "Booking created successfully",
+          booking 
+        });
       } else {
         return res.status(400).json({ 
-          message: "Invalid payload format. Expected either Calendly webhook or simplified format." 
+          message: "Invalid payload format. Expected either Calendly webhook or booking data with mentor_id and mentee_id." 
         });
       }
 
-      const result = insertSessionSchema.safeParse(sessionData);
-      
-      if (!result.success) {
-        return res.status(400).json({ 
-          message: "Invalid session data",
-          errors: result.error.errors 
-        });
-      }
-
-      const mentor = await storage.getMentor(result.data.mentorId);
+      const mentor = await storage.getMentor(mentorId);
       if (!mentor) {
         return res.status(404).json({ message: "Mentor not found" });
       }
 
-      const session = await storage.createSession(result.data);
+      let mentee = await storage.getMenteeByEmail(menteeEmail);
+      if (!mentee) {
+        mentee = await storage.createMentee({
+          name: menteeName,
+          email: menteeEmail,
+          user_type: "individual",
+          timezone: "Africa/Cairo",
+          languages_spoken: ["English"],
+          areas_exploring: ["Career Development"],
+        });
+      }
+
+      const booking = await storage.createBooking({
+        mentor_id: mentorId,
+        mentee_id: mentee.id,
+        calendly_event_uri: calendlyEventUri,
+        status: "scheduled",
+        scheduled_at: scheduledAt,
+      });
       
       res.status(200).json({ 
-        message: "Session created successfully",
-        session 
+        message: "Booking created successfully",
+        booking 
       });
     } catch (error) {
       console.error("Webhook processing error:", error);

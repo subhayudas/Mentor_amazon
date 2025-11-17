@@ -1,4 +1,4 @@
-import { type Mentor, type InsertMentor, type Session, type InsertSession, type Mentee, type InsertMentee, type Favorite, type InsertFavorite, mentors, sessions, mentees, favorites } from "@shared/schema";
+import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, mentors, bookings, mentees } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -7,14 +7,12 @@ export interface IStorage {
   getMentors(filters?: { search?: string; expertise?: string }): Promise<Mentor[]>;
   getMentor(id: string): Promise<Mentor | undefined>;
   createMentor(mentor: InsertMentor): Promise<Mentor>;
-  getSessions(): Promise<Session[]>;
-  createSession(session: InsertSession): Promise<Session>;
+  getBookings(): Promise<Booking[]>;
+  createBooking(booking: InsertBooking): Promise<Booking>;
+  getMentees(): Promise<Mentee[]>;
   getMenteeByEmail(email: string): Promise<Mentee | undefined>;
   createMentee(mentee: InsertMentee): Promise<Mentee>;
-  getMenteeSessions(email: string): Promise<Session[]>;
-  addFavorite(menteeEmail: string, mentorId: string): Promise<Favorite>;
-  removeFavorite(menteeEmail: string, mentorId: string): Promise<void>;
-  getFavorites(menteeEmail: string): Promise<Favorite[]>;
+  getMenteeBookings(menteeId: string): Promise<Booking[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -29,62 +27,122 @@ export class DatabaseStorage implements IStorage {
       const existingMentors = await db.select().from(mentors);
       
       if (existingMentors.length === 0) {
-      const seedData: InsertMentor[] = [
-        {
-          name: "Sarah Chen",
-          title: "Senior Product Manager at Google",
-          bio: "10+ years building products that millions love. Passionate about helping aspiring PMs break into tech and level up their product thinking.",
-          expertise: ["Product Management", "Product Strategy", "User Research", "Roadmapping", "Stakeholder Management"],
-          calendlyUrl: "https://calendly.com/sarahchen",
-          avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-        },
-        {
-          name: "Marcus Rodriguez",
-          title: "Engineering Lead at Stripe",
-          bio: "Building scalable systems and leading high-performing engineering teams. I mentor engineers on technical growth, system design, and career advancement.",
-          expertise: ["System Design", "Leadership", "Backend Engineering", "Distributed Systems", "Team Building"],
-          calendlyUrl: "https://calendly.com/marcusrodriguez",
-          avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Marcus",
-        },
-        {
-          name: "Aisha Patel",
-          title: "UX Design Director at Airbnb",
-          bio: "Creating delightful user experiences for global audiences. I help designers develop their craft, build portfolios, and navigate design careers.",
-          expertise: ["UX Design", "Design Systems", "User Research", "Interaction Design", "Design Leadership"],
-          calendlyUrl: "https://calendly.com/aishapatel",
-          avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Aisha",
-        },
-        {
-          name: "James Kim",
-          title: "VP of Marketing at Notion",
-          bio: "Growth marketing expert with experience scaling startups from 0 to millions of users. Let's talk growth strategies, content, and brand building.",
-          expertise: ["Growth Marketing", "Content Strategy", "Brand Building", "SEO", "Analytics"],
-          calendlyUrl: "https://calendly.com/jameskim",
-          avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=James",
-        },
-        {
-          name: "Elena Volkov",
-          title: "Data Science Manager at Netflix",
-          bio: "Turning data into actionable insights. I mentor data professionals on machine learning, analytics, and building data-driven products.",
-          expertise: ["Machine Learning", "Data Science", "Analytics", "Python", "AI/ML Strategy"],
-          calendlyUrl: "https://calendly.com/elenavolkov",
-          avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Elena",
-        },
-        {
-          name: "David Thompson",
-          title: "Startup Founder & CEO",
-          bio: "Serial entrepreneur with 2 successful exits. I help founders navigate the startup journey, fundraising, and building winning teams.",
-          expertise: ["Entrepreneurship", "Fundraising", "Business Strategy", "Sales", "Leadership"],
-          calendlyUrl: "https://calendly.com/davidthompson",
-          avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=David",
-        },
-      ];
+        const seedData: InsertMentor[] = [
+          {
+            name: "Ahmed Hassan",
+            email: "ahmed.hassan@amazon.com",
+            company: "Amazon",
+            position: "Senior Product Manager",
+            timezone: "Africa/Cairo",
+            photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ahmed",
+            bio: "Leading product development for Amazon's Middle East marketplace. 8+ years of experience in e-commerce and digital transformation. Passionate about mentoring aspiring product managers in the MENA region.",
+            linkedin_url: "https://linkedin.com/in/ahmedhassan",
+            calendly_link: "https://calendly.com/ahmedhassan",
+            expertise: ["Product Management", "E-commerce", "Digital Transformation", "Agile Methodologies", "Market Strategy"],
+            industries: ["E-commerce", "Technology", "Retail"],
+            languages_spoken: ["English", "Arabic"],
+            comms_owner: "exec",
+          },
+          {
+            name: "Layla Mahmoud",
+            email: "layla.mahmoud@amazon.com",
+            company: "Amazon",
+            position: "Engineering Manager, AWS",
+            timezone: "Asia/Dubai",
+            photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Layla",
+            bio: "Building scalable cloud infrastructure for AWS customers across EMEA. 10+ years in distributed systems and team leadership. I mentor engineers on career growth, system design, and technical excellence.",
+            linkedin_url: "https://linkedin.com/in/laylamahmoud",
+            calendly_link: "https://calendly.com/laylamahmoud",
+            expertise: ["Cloud Computing", "System Design", "Engineering Leadership", "AWS Services", "DevOps"],
+            industries: ["Cloud Computing", "Technology", "Infrastructure"],
+            languages_spoken: ["English", "Arabic", "French"],
+            comms_owner: "exec",
+          },
+          {
+            name: "Omar Khalil",
+            email: "omar.khalil@amazon.com",
+            company: "Amazon",
+            position: "Senior UX Designer",
+            timezone: "Africa/Cairo",
+            photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Omar",
+            bio: "Crafting localized shopping experiences for Middle East customers. Specializing in Arabic UX, accessibility, and cross-cultural design. Happy to help designers navigate the unique challenges of regional markets.",
+            linkedin_url: "https://linkedin.com/in/omarkhalil",
+            calendly_link: "https://calendly.com/omarkhalil",
+            expertise: ["UX Design", "Localization", "Design Systems", "User Research", "Accessibility"],
+            industries: ["E-commerce", "Technology", "Design"],
+            languages_spoken: ["English", "Arabic"],
+            comms_owner: "assistant",
+          },
+          {
+            name: "Fatima Al-Rashid",
+            email: "fatima.alrashid@amazon.com",
+            company: "Amazon",
+            position: "Director of Marketing",
+            timezone: "Asia/Riyadh",
+            photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Fatima",
+            bio: "Driving brand growth and customer acquisition across the GCC region. Expert in digital marketing, brand strategy, and performance marketing. I mentor marketers on regional market dynamics and growth strategies.",
+            linkedin_url: "https://linkedin.com/in/fatimaalrashid",
+            calendly_link: "https://calendly.com/fatimaalrashid",
+            expertise: ["Digital Marketing", "Brand Strategy", "Growth Marketing", "Performance Marketing", "Regional Markets"],
+            industries: ["E-commerce", "Marketing", "Retail"],
+            languages_spoken: ["English", "Arabic"],
+            comms_owner: "assistant",
+          },
+          {
+            name: "Karim Nasser",
+            email: "karim.nasser@amazon.com",
+            company: "Amazon",
+            position: "Data Science Lead",
+            timezone: "Africa/Cairo",
+            photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Karim",
+            bio: "Building recommendation systems and predictive models for Amazon's Middle East operations. 12+ years in machine learning and analytics. I help data professionals develop ML skills and advance their careers.",
+            linkedin_url: "https://linkedin.com/in/karimnasser",
+            calendly_link: "https://calendly.com/karimnasser",
+            expertise: ["Machine Learning", "Data Science", "Predictive Analytics", "Recommendation Systems", "Python"],
+            industries: ["Technology", "E-commerce", "Data Analytics"],
+            languages_spoken: ["English", "Arabic"],
+            comms_owner: "exec",
+          },
+          {
+            name: "Nour Ibrahim",
+            email: "nour.ibrahim@amazon.com",
+            company: "Amazon",
+            position: "Operations Manager, Fulfillment",
+            timezone: "Asia/Dubai",
+            photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nour",
+            bio: "Optimizing logistics and supply chain operations across Middle East fulfillment centers. Expert in operational excellence, process improvement, and team management. Mentoring operations professionals on leadership and efficiency.",
+            linkedin_url: "https://linkedin.com/in/nouribrahim",
+            calendly_link: "https://calendly.com/nouribrahim",
+            expertise: ["Operations Management", "Supply Chain", "Logistics", "Process Improvement", "Leadership"],
+            industries: ["E-commerce", "Logistics", "Operations"],
+            languages_spoken: ["English", "Arabic"],
+            comms_owner: "assistant",
+          },
+          {
+            name: "Youssef Fahmy",
+            email: "youssef.fahmy@amazon.com",
+            company: "Amazon",
+            position: "Senior Business Analyst",
+            timezone: "Africa/Cairo",
+            photo_url: "https://api.dicebear.com/7.x/avataaars/svg?seed=Youssef",
+            bio: "Transforming data into strategic insights for retail operations. Specialized in business intelligence, SQL, and data visualization. I mentor analysts on technical skills and business acumen.",
+            linkedin_url: "https://linkedin.com/in/yousseffahmy",
+            calendly_link: "https://calendly.com/yousseffahmy",
+            expertise: ["Business Analysis", "Data Analytics", "SQL", "Business Intelligence", "Data Visualization"],
+            industries: ["E-commerce", "Retail", "Analytics"],
+            languages_spoken: ["English", "Arabic"],
+            comms_owner: "exec",
+          },
+        ];
 
+        const now = new Date().toISOString();
         for (const data of seedData) {
           const id = randomUUID();
           await db.insert(mentors).values({
             ...data,
             id,
+            created_at: now,
+            updated_at: now,
           });
         }
       }
@@ -107,7 +165,7 @@ export class DatabaseStorage implements IStorage {
       conditions.push(
         or(
           ilike(mentors.name, searchPattern),
-          ilike(mentors.title, searchPattern),
+          ilike(mentors.position, searchPattern),
           ilike(mentors.bio, searchPattern)
         )
       );
@@ -133,36 +191,37 @@ export class DatabaseStorage implements IStorage {
   async createMentor(insertMentor: InsertMentor): Promise<Mentor> {
     await this.seedPromise;
     const id = randomUUID();
+    const now = new Date().toISOString();
     const result = await db.insert(mentors).values({
       ...insertMentor,
       id,
+      created_at: now,
+      updated_at: now,
     }).returning();
     return result[0];
   }
 
-  async getSessions(): Promise<Session[]> {
+  async getBookings(): Promise<Booking[]> {
     await this.seedPromise;
-    return await db.select().from(sessions);
+    return await db.select().from(bookings);
   }
 
-  async createSession(insertSession: InsertSession): Promise<Session> {
+  async createBooking(insertBooking: InsertBooking): Promise<Booking> {
     await this.seedPromise;
-    
-    const existingMentee = await this.getMenteeByEmail(insertSession.menteeEmail);
-    if (!existingMentee) {
-      await this.createMentee({
-        name: insertSession.menteeName,
-        email: insertSession.menteeEmail,
-      });
-    }
-    
     const id = randomUUID();
-    const result = await db.insert(sessions).values({
-      ...insertSession,
+    const now = new Date().toISOString();
+    const result = await db.insert(bookings).values({
+      ...insertBooking,
       id,
-      bookedAt: new Date().toISOString(),
+      clicked_at: now,
+      created_at: now,
     }).returning();
     return result[0];
+  }
+
+  async getMentees(): Promise<Mentee[]> {
+    await this.seedPromise;
+    return await db.select().from(mentees);
   }
 
   async getMenteeByEmail(email: string): Promise<Mentee | undefined> {
@@ -174,44 +233,18 @@ export class DatabaseStorage implements IStorage {
   async createMentee(insertMentee: InsertMentee): Promise<Mentee> {
     await this.seedPromise;
     const id = randomUUID();
+    const now = new Date().toISOString();
     const result = await db.insert(mentees).values({
       ...insertMentee,
       id,
-      createdAt: new Date().toISOString(),
+      created_at: now,
     }).returning();
     return result[0];
   }
 
-  async getMenteeSessions(email: string): Promise<Session[]> {
+  async getMenteeBookings(menteeId: string): Promise<Booking[]> {
     await this.seedPromise;
-    return await db.select().from(sessions).where(eq(sessions.menteeEmail, email));
-  }
-
-  async addFavorite(menteeEmail: string, mentorId: string): Promise<Favorite> {
-    await this.seedPromise;
-    const id = randomUUID();
-    const result = await db.insert(favorites).values({
-      id,
-      menteeEmail,
-      mentorId,
-      createdAt: new Date().toISOString(),
-    }).returning();
-    return result[0];
-  }
-
-  async removeFavorite(menteeEmail: string, mentorId: string): Promise<void> {
-    await this.seedPromise;
-    await db.delete(favorites).where(
-      and(
-        eq(favorites.menteeEmail, menteeEmail),
-        eq(favorites.mentorId, mentorId)
-      )
-    );
-  }
-
-  async getFavorites(menteeEmail: string): Promise<Favorite[]> {
-    await this.seedPromise;
-    return await db.select().from(favorites).where(eq(favorites.menteeEmail, menteeEmail));
+    return await db.select().from(bookings).where(eq(bookings.mentee_id, menteeId));
   }
 }
 
