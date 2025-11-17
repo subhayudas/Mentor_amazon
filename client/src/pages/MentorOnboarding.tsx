@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { insertMentorSchema, type InsertMentor } from "@shared/schema";
+import { insertMentorSchema, type InsertMentor, type Mentor } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -118,17 +118,27 @@ export default function MentorOnboarding() {
     },
   });
 
-  const createMentorMutation = useMutation({
+  const createMentorMutation = useMutation<Mentor, Error, InsertMentor>({
     mutationFn: async (data: InsertMentor) => {
-      return await apiRequest("POST", "/api/mentors", data);
+      const response = await apiRequest("POST", "/api/mentors", data);
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newMentor: Mentor) => {
       queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
       toast({
-        title: "Success!",
+        title: "Welcome to the Mentor Community!",
         description: "Your mentor profile has been created successfully.",
       });
-      setLocation("/");
+      if (newMentor?.id) {
+        setLocation(`/profile/mentor/${newMentor.id}`);
+      } else {
+        toast({
+          title: "Redirect Failed",
+          description: "Profile created but couldn't navigate to it. Please check your profile from the home page.",
+          variant: "destructive",
+        });
+        setLocation("/");
+      }
     },
     onError: (error: Error) => {
       toast({

@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { insertMenteeSchema, type InsertMentee } from "@shared/schema";
+import { insertMenteeSchema, type InsertMentee, type Mentee } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -106,17 +106,27 @@ export default function MenteeRegistration() {
     }
   };
 
-  const createMenteeMutation = useMutation({
+  const createMenteeMutation = useMutation<Mentee, Error, InsertMentee>({
     mutationFn: async (data: InsertMentee) => {
-      return await apiRequest("POST", "/api/mentees", data);
+      const response = await apiRequest("POST", "/api/mentees", data);
+      return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newMentee: Mentee) => {
       queryClient.invalidateQueries({ queryKey: ["/api/mentees"] });
       toast({
-        title: "Success!",
+        title: "Welcome to MentorConnect!",
         description: "Your profile has been created successfully.",
       });
-      setLocation("/");
+      if (newMentee?.id) {
+        setLocation(`/profile/mentee/${newMentee.id}`);
+      } else {
+        toast({
+          title: "Redirect Failed",
+          description: "Profile created but couldn't navigate to it. Please check your profile from the home page.",
+          variant: "destructive",
+        });
+        setLocation("/");
+      }
     },
     onError: (error: Error) => {
       toast({
