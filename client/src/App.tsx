@@ -7,7 +7,6 @@ import { Navigation } from "@/components/Navigation";
 import Home from "@/pages/Home";
 import MentorProfile from "@/pages/MentorProfile";
 import Analytics from "@/pages/Analytics";
-import MyBookings from "@/pages/MyBookings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,7 +15,6 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/mentor/:id" component={MentorProfile} />
       <Route path="/analytics" component={Analytics} />
-      <Route path="/my-bookings" component={MyBookings} />
       <Route component={NotFound} />
     </Switch>
   );

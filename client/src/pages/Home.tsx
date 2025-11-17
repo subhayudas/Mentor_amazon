@@ -44,22 +44,23 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <section className="relative py-20 md:py-32 bg-gradient-to-br from-primary/5 via-background to-accent/5">
+      <section className="relative py-16 md:py-24 bg-gradient-to-br from-muted via-background to-muted/50">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="max-w-3xl mx-auto text-center space-y-8">
-            <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight">
+          <div className="max-w-3xl mx-auto text-center space-y-6">
+            <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-secondary">
               Connect with{" "}
-              <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+              <span className="text-primary">
                 Expert Mentors
               </span>
+              {" "}at Amazon Egypt
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Transform your career with personalized guidance from industry professionals. Book one-on-one sessions and accelerate your growth.
+            <p className="text-lg md:text-xl text-foreground max-w-2xl mx-auto">
+              Access personalized guidance from Amazon's experienced professionals. Book one-on-one mentorship sessions and accelerate your career growth.
             </p>
             <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <span>500+ mentees</span>
+                <span>Trusted mentorship</span>
               </div>
               <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
               <div className="flex items-center gap-2">
