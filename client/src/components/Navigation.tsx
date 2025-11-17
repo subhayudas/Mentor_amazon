@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { BarChart3, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import amazonLogo from "@assets/image_1763389032582.png";
+import amazonLogo from "@assets/image_1763389062519.png";
 
 export function Navigation() {
   return (
