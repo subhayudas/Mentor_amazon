@@ -66,12 +66,6 @@ export default function Home() {
                 <Badge variant="outline" className="bg-orange-500 text-white border-orange-500/20 text-xs md:text-sm">
                   Amazon Egypt Mentorship Program
                 </Badge>
-                <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-primary">
-                  Connect with <span className="text-orange-500">Expert Mentors</span>
-                </h1>
-                <p className="text-sm md:text-base text-foreground/80 max-w-xl mx-auto">
-                  Book one-on-one mentorship sessions with top professionals
-                </p>
               </div>
             </div>
           </div>
