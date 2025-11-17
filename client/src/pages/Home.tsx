@@ -51,48 +51,48 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <section className="relative py-16 md:py-20 overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="max-w-5xl mx-auto mb-12">
+      <section className="relative overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
+          <div className="max-w-5xl mx-auto relative">
             <img 
               src={amazonEgyptOffice} 
               alt="Amazon Egypt Office - Mentorship and Collaboration"
               className="w-full h-auto rounded-xl shadow-xl"
               data-testid="hero-illustration"
             />
+            
+            <div className="absolute top-0 left-0 right-0 pt-8 md:pt-12 lg:pt-16 px-4 md:px-8 text-center">
+              <div className="space-y-3 md:space-y-4">
+                <Badge variant="outline" className="bg-primary text-white border-primary/20">
+                  Amazon Egypt Mentorship Program
+                </Badge>
+                <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight text-primary">
+                  Connect with{" "}
+                  <span className="text-orange-500">
+                    Expert Mentors
+                  </span>
+                </h1>
+                <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
+                  Book one-on-one mentorship sessions with Amazon professionals.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="text-center space-y-8">
-            <div className="space-y-4">
-              <Badge variant="outline" className="bg-primary text-white border-primary/20">
-                Amazon Egypt Mentorship Program
-              </Badge>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-primary">
-                Connect with{" "}
-                <span className="text-orange-500">
-                  Expert Mentors
-                </span>
-              </h1>
-              <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                Book one-on-one mentorship sessions with Amazon professionals.
-              </p>
+          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-8 mt-8">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-orange-500" />
+              <span>Trusted Mentorship</span>
             </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-8">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-orange-500" />
-                <span>Trusted Mentorship</span>
-              </div>
-              <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-              <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-orange-500" />
-                <span>Expert Guidance</span>
-              </div>
-              <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-              <div className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-orange-500" />
-                <span>Flexible Scheduling</span>
-              </div>
+            <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+            <div className="flex items-center gap-2">
+              <Target className="w-5 h-5 text-orange-500" />
+              <span>Expert Guidance</span>
+            </div>
+            <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
+            <div className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              <span>Flexible Scheduling</span>
             </div>
           </div>
         </div>
