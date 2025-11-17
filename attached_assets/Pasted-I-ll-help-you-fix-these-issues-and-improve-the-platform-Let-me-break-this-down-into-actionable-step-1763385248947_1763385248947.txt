@@ -1,0 +1,443 @@
+I'll help you fix these issues and improve the platform. Let me break this down into actionable steps:
+
+## 🚨 Critical Fixes Needed
+
+### 1. **Calendly Integration Issues**
+The problem is likely one of these:
+- **Calendar permissions not granted** in Calendly account settings
+- **Incorrect Calendly URL format** (needs to be exact event type URL)
+- **CORS/iframe blocking** if embedding
+
+**Solutions to implement:**
+```javascript
+// Option A: Use Calendly's React library with proper error handling
+import { InlineWidget } from "react-calendly";
+
+<InlineWidget
+  url={`${mentor.calendly_link}?hide_gdpr_banner=1`}
+  prefill={{
+    name: mentee.name,
+    email: mentee.email,
+  }}
+  pageSettings={{
+    backgroundColor: 'ffffff',
+    hideEventTypeDetails: false,
+    hideLandingPageDetails: false,
+    primaryColor: 'ff9900',
+    textColor: '232f3e'
+  }}
+  onScheduled={(e) => {
+    console.log('Meeting scheduled!', e);
+    trackBooking(mentor.id, mentee.id, e.data.payload);
+  }}
+/>
+
+// Option B: Add calendar connection check
+// Before showing Calendly, verify mentor has connected their calendar:
+// GET https://api.calendly.com/users/me/calendar_connections
+```
+
+**For 15/30/60 min meetings:**
+Create 3 separate Calendly event types per mentor:
+- `https://calendly.com/mentor-name/15min`
+- `https://calendly.com/mentor-name/30min`
+- `https://calendly.com/mentor-name/60min`
+
+Then in the UI, add duration selector before showing Calendly widget.
+
+---
+
+### 2. **Logo Replacement**
+Replace the black Amazon logo with white version in the navbar:
+
+```jsx
+// In your Header/Navbar component
+<img 
+  src="/assets/amazon-logo-white.svg" 
+  alt="Amazon" 
+  className="h-8 w-auto"
+/>
+```
+
+Make sure the navbar has the dark navy background (#232F3E) so white logo stands out.
+
+---
+
+### 3. **Analytics Dashboard - Add Sample Data**
+
+Here's hardcoded data structure to populate your dashboard:
+
+```javascript
+// src/data/mockAnalytics.js
+export const MOCK_ANALYTICS_DATA = {
+  kpis: {
+    total_bookings: 127,
+    completed_meetings: 89,
+    unique_mentees: 64,
+    conversion_rate: 0.72,
+    avg_rating: 4.6
+  },
+  
+  bookings_over_time: [
+    { date: '2024-11-11', count: 12 },
+    { date: '2024-11-12', count: 15 },
+    { date: '2024-11-13', count: 8 },
+    { date: '2024-11-14', count: 18 },
+    { date: '2024-11-15', count: 22 },
+    { date: '2024-11-16', count: 19 },
+    { date: '2024-11-17', count: 14 }
+  ],
+  
+  top_mentors: [
+    { mentor_name: 'Sarah Al-Mansoori', booking_count: 23, avatar: '👩‍💼' },
+    { mentor_name: 'Ahmed Hassan', booking_count: 19, avatar: '👨‍💻' },
+    { mentor_name: 'Layla Mahmoud', booking_count: 17, avatar: '👩‍🔬' },
+    { mentor_name: 'Omar Khalil', booking_count: 15, avatar: '👨‍🎨' },
+    { mentor_name: 'Fatima Nour', booking_count: 12, avatar: '👩‍🏫' }
+  ],
+  
+  specialization_distribution: [
+    { name: 'AI & Machine Learning', value: 35, color: '#5B6EE1' },
+    { name: 'Cloud Computing', value: 25, color: '#26B5A8' },
+    { name: 'Product Management', value: 20, color: '#FF9900' },
+    { name: 'UX Design', value: 12, color: '#EF4444' },
+    { name: 'Engineering Leadership', value: 8, color: '#8B5CF6' }
+  ],
+  
+  ratings_summary: [
+    { mentor_name: 'Sarah Al-Mansoori', avg_rating: 4.9, total_ratings: 18 },
+    { mentor_name: 'Ahmed Hassan', avg_rating: 4.8, total_ratings: 15 },
+    { mentor_name: 'Layla Mahmoud', avg_rating: 4.7, total_ratings: 14 },
+    { mentor_name: 'Omar Khalil', avg_rating: 4.6, total_ratings: 12 }
+  ]
+};
+```
+
+Use **Recharts** for graphs (similar to Image 5):
+```jsx
+import { LineChart, Line, PieChart, Pie, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+
+// Line chart for bookings over time
+<LineChart data={bookings_over_time}>
+  <Line type="monotone" dataKey="count" stroke="#FF9900" strokeWidth={3} />
+  <XAxis dataKey="date" />
+  <YAxis />
+  <Tooltip />
+</LineChart>
+
+// Donut chart for specializations
+<PieChart>
+  <Pie data={specialization_distribution} innerRadius={60} outerRadius={100} />
+</PieChart>
+```
+
+---
+
+### 4. **Replace Cartoon Avatars with Real People**
+
+Use professional stock photos or AI-generated headshots:
+- **Unsplash API**: `https://api.unsplash.com/photos/random?query=professional+portrait`
+- **This Person Does Not Exist**: `https://thispersondoesnotexist.com/`
+- Or manually curate from Pexels/Unsplash
+
+Update mentor cards:
+```jsx
+<img 
+  src={mentor.photo_url || '/assets/default-avatar.jpg'} 
+  alt={mentor.name}
+  className="w-32 h-32 rounded-full object-cover border-4 border-white shadow-lg"
+/>
+```
+
+---
+
+### 5. **Profile Pages - Show Stored Data**
+
+After onboarding, redirect to profile view:
+
+```jsx
+// For Mentors: /profile/mentor/:id
+function MentorProfile({ mentorId }) {
+  const mentor = useMentor(mentorId); // Fetch from DB
+  
+  return (
+    <div className="max-w-4xl mx-auto p-8">
+      <div className="bg-white rounded-lg shadow-lg p-8">
+        <div className="flex items-center gap-6 mb-6">
+          <img src={mentor.photo_url} className="w-32 h-32 rounded-full" />
+          <div>
+            <h1 className="text-3xl font-bold">{mentor.name}</h1>
+            <p className="text-gray-600">{mentor.position} @ {mentor.company}</p>
+            <p className="text-sm text-gray-500">🌍 {mentor.timezone}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div>
+            <h3 className="font-semibold mb-2">Expertise</h3>
+            <div className="flex flex-wrap gap-2">
+              {mentor.expertise.map(skill => (
+                <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
+                  {skill}
+                </span>
+              ))}
+            </div>
+          </div>
+          
+          <div>
+            <h3 className="font-semibold mb-2">Languages</h3>
+            <p>🇬🇧 English, 🇦🇪 Arabic</p>
+          </div>
+        </div>
+        
+        <div className="mb-6">
+          <h3 className="font-semibold mb-2">Bio</h3>
+          <p className="text-gray-700">{mentor.bio}</p>
+        </div>
+        
+        <button className="w-full bg-[#FF9900] text-white py-3 rounded-lg font-semibold">
+          Edit Profile
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+Same structure for mentees at `/profile/mentee/:id`.
+
+---
+
+### 6. **Mentee Onboarding - Make it the Landing Experience**
+
+Instead of navbar link, make onboarding the first-run experience:
+
+```jsx
+// src/App.jsx
+function App() {
+  const [hasProfile, setHasProfile] = useState(false);
+  
+  useEffect(() => {
+    // Check if user has completed onboarding
+    const profile = localStorage.getItem('mentee_profile');
+    setHasProfile(!!profile);
+  }, []);
+  
+  if (!hasProfile) {
+    return <MenteeOnboarding onComplete={() => setHasProfile(true)} />;
+  }
+  
+  return <MainApp />; // Show mentor browse page
+}
+```
+
+Onboarding flow:
+1. **Welcome Screen** → "Join MentorConnect to grow your career"
+2. **Account Type** → Individual vs Organization
+3. **Profile Setup** → Name, email, timezone, etc.
+4. **Areas of Interest** → Select specializations
+5. **Completion** → "You're all set! Browse mentors below"
+
+---
+
+### 7. **Hero Section with Egypt Illustration**
+
+Based on your PhonePe reference, create a custom Egypt-themed illustration:
+
+```jsx
+// Hero section on landing page
+<section className="relative h-[600px] bg-gradient-to-br from-[#232F3E] to-[#1a2332] overflow-hidden">
+  <img 
+    src="/assets/egypt-mentorship-illustration.svg" 
+    alt="Amazon Egypt Mentorship"
+    className="absolute inset-0 w-full h-full object-cover opacity-90"
+  />
+  
+  <div className="relative z-10 max-w-7xl mx-auto px-8 pt-32">
+    <h1 className="text-6xl font-bold text-white mb-6">
+      Connect with <span className="text-[#FF9900]">Expert Mentors</span><br />
+      at Amazon Egypt
+    </h1>
+    <p className="text-xl text-gray-200 mb-8 max-w-2xl">
+      Access personalized guidance from Amazon's experienced professionals. 
+      Book one-on-one mentorship sessions and accelerate your career growth.
+    </p>
+    
+    <div className="flex gap-4 items-center text-white">
+      <span className="flex items-center gap-2">
+        ✨ Trusted mentorship
+      </span>
+      <span>•</span>
+      <span className="flex items-center gap-2">
+        🎯 Expert guidance
+      </span>
+      <span>•</span>
+      <span className="flex items-center gap-2">
+        ⚡ Flexible scheduling
+      </span>
+    </div>
+  </div>
+</section>
+```
+
+**For the illustration**, hire a designer on Fiverr ($30-50) to create an Egypt-specific version showing:
+- Pyramids in background (subtle)
+- Modern Cairo skyline
+- Amazon building with "MENTORSHIP" sign
+- Diverse professionals collaborating
+- Orange accents matching Amazon brand
+
+---
+
+## 🎨 Additional UI Improvements
+
+### 1. **Smooth Image Backgrounds**
+Use CSS filters to blend hero images seamlessly:
+
+```css
+.hero-image {
+  background: linear-gradient(135deg, #232F3E 0%, #1a2332 100%);
+  position: relative;
+}
+
+.hero-image::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: url('/assets/egypt-illustration.svg') center/cover;
+  opacity: 0.15;
+  mix-blend-mode: overlay;
+}
+```
+
+### 2. **Mentor Card Hover Effects**
+```css
+.mentor-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.mentor-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 20px 40px rgba(35, 47, 62, 0.15);
+}
+```
+
+### 3. **Loading States**
+Add skeleton loaders while fetching mentors:
+
+```jsx
+function MentorCardSkeleton() {
+  return (
+    <div className="animate-pulse bg-white rounded-lg p-6">
+      <div className="w-32 h-32 bg-gray-200 rounded-full mx-auto mb-4" />
+      <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto mb-2" />
+      <div className="h-4 bg-gray-200 rounded w-full mb-4" />
+      <div className="flex gap-2 justify-center">
+        <div className="h-8 w-24 bg-gray-200 rounded-full" />
+        <div className="h-8 w-24 bg-gray-200 rounded-full" />
+      </div>
+    </div>
+  );
+}
+```
+
+### 4. **Empty States**
+When no mentors match filters:
+
+```jsx
+<div className="text-center py-16">
+  <div className="text-6xl mb-4">🔍</div>
+  <h3 className="text-2xl font-bold text-gray-700 mb-2">No mentors found</h3>
+  <p className="text-gray-500 mb-6">Try adjusting your filters</p>
+  <button onClick={resetFilters} className="px-6 py-3 bg-[#FF9900] text-white rounded-lg">
+    Clear All Filters
+  </button>
+</div>
+```
+
+### 5. **Success Notifications**
+After booking/onboarding:
+
+```jsx
+import { toast } from 'react-hot-toast';
+
+toast.success('Meeting booked! Check your email for details.', {
+  icon: '📅',
+  style: {
+    background: '#232F3E',
+    color: '#fff',
+  }
+});
+```
+
+---
+
+## 📋 Execution Checklist
+
+**Phase 1: Critical Fixes (Do Today)**
+- [ ] Fix Calendly integration (test with your own Calendly account first)
+- [ ] Replace Amazon logo with white version
+- [ ] Add 15/30/60 min duration selector
+- [ ] Populate analytics with mock data
+- [ ] Replace cartoon avatars with real photos
+
+**Phase 2: UX Improvements (Do Tomorrow)**
+- [ ] Create mentor/mentee profile view pages
+- [ ] Redirect after onboarding to profile page
+- [ ] Make mentee onboarding the first-run experience
+- [ ] Add Egypt-themed hero illustration
+- [ ] Implement smooth background blending
+
+**Phase 3: Polish (Before Demo)**
+- [ ] Add loading skeletons
+- [ ] Add empty states
+- [ ] Add success notifications
+- [ ] Test mobile responsiveness
+- [ ] Check all colors match Amazon brand (#232F3E, #FF9900)
+
+---
+
+## 🛠️ Quick Fixes for Replit
+
+Add this to your Replit prompt to fix the immediate issues:
+
+```
+URGENT FIXES NEEDED:
+
+1. Calendly Integration:
+- Replace any broken Calendly embeds with this code:
+  <InlineWidget url={mentor.calendly_link} prefill={{name: mentee.name, email: mentee.email}} />
+- Add duration selector: 15min, 30min, 60min buttons that change the Calendly URL
+- Add error boundary: if Calendly fails to load, show "Please visit [calendly_link] directly"
+
+2. Logo:
+- Change navbar logo from black to white Amazon SVG
+- Ensure navbar background is #232F3E so logo is visible
+
+3. Analytics:
+- Import the MOCK_ANALYTICS_DATA object I provided above
+- Use Recharts library to create:
+  * Line chart for bookings over time
+  * Donut chart for specialization distribution
+  * Horizontal bar chart for top mentors
+- Show hardcoded data for now, we'll connect real DB later
+
+4. Profile Pages:
+- After mentor/mentee submits onboarding form, redirect to `/profile/mentor/[id]` or `/profile/mentee/[id]`
+- Fetch the data from database and display all fields (photo, name, bio, expertise, etc.)
+- Add "Edit Profile" button at bottom
+
+5. Real Photos:
+- Replace all cartoon avatars with these Unsplash URLs:
+  * https://images.unsplash.com/photo-1560250097-0b93528c311a
+  * https://images.unsplash.com/photo-1573496359142-b8d87734a5a2
+  * https://images.unsplash.com/photo-1519085360753-af0119f7cbe7
+- Use professional headshots with neutral backgrounds
+
+6. Hero Section:
+- Add Egypt-themed illustration as background (use gradient overlay for now)
+- Text: "Connect with Expert Mentors at Amazon Egypt"
+- Accent color: #FF9900 for highlighted text
+```
+
+Would you like me to create the actual code files for any of these fixes, or help you debug the Calendly integration specifically?
