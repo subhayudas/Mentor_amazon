@@ -1,7 +1,7 @@
 import { Link } from "wouter";
 import { BarChart3, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import amazonLogo from "@assets/image_1763388139524.png";
+import amazonLogo from "@assets/image_1763389032582.png";
 
 export function Navigation() {
   return (
@@ -14,7 +14,7 @@ export function Navigation() {
                 <img 
                   src={amazonLogo} 
                   alt="Amazon" 
-                  className="h-6 w-auto"
+                  className="h-8 w-auto"
                   data-testid="img-amazon-logo"
                 />
                 <div className="h-8 w-px bg-primary-foreground/20"></div>

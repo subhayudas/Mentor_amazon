@@ -1,0 +1,451 @@
+Returns all Event Types associated with a specified User. Use:
+
+organization to look up all Event Types that belong to the organization
+user to look up a user's Event Types in an organization
+Either organization or user are required query params when using this endpoint.
+
+Request
+Security: OAuth 2.0
+Security: Bearer Auth
+Query Parameters
+admin_managed
+boolean
+Return only admin managed event types if true, exclude admin managed event types if false, or include all event types if this parameter is omitted.
+
+organization
+string
+<uri>
+View available personal, team, and organization event types associated with the organization's URI.
+
+user
+string
+<uri>
+View available personal, team, and organization event types associated with the user's URI.
+
+user_availability_schedule
+string
+<uri>
+Used in conjunction with user parameter, returns a filtered list of Event Types that use the given primary availability schedule.
+
+active
+boolean
+Return only active event types if true, only inactive if false, or all event types if this parameter is omitted.
+
+count
+number
+The number of rows to return
+
+>= 1
+<= 100
+Default:
+20
+page_token
+string
+The token to pass to get the next or previous portion of the collection
+
+sort
+string
+Order results by the specified field and direction. Accepts comma-separated list of {field}:{direction} values.Supported fields are: name, position, created_at, updated_at. Sort direction is specified as: asc, desc.
+
+Default:
+name:asc
+Example:
+name
+Responses
+200
+400
+401
+403
+404
+500
+OK
+
+Body
+
+application/json
+
+application/json
+responses
+/
+200
+Service response
+
+collection
+array[Event Type]
+required
+uri
+string
+<uri>
+required
+Canonical reference (unique identifier) for the event type
+
+Example:
+https://api.calendly.com/event_types/AAAAAAAAAAAAAAAA
+name
+string or null
+required
+The event type name (in human-readable format)
+
+Example:
+15 Minute Meeting
+active
+boolean
+required
+Indicates if the event is active or not.
+
+slug
+string or null
+required
+The portion of the event type's URL that identifies a specific web page (in a human-readable format)
+
+Example:
+acmesales
+scheduling_url
+string
+<uri>
+required
+The URL of the user’s scheduling site where invitees book this event type
+
+Example:
+https://calendly.com/acmesales
+duration
+number
+required
+The length of sessions booked with this event type
+
+Example:
+15
+duration_options
+array[integer] or null
+required
+Array of duration options. Always null for adhoc event types.
+
+Example:
+[1,13,15,720]
+kind
+string
+required
+Indicates if the event type is "solo" (belongs to an individual user) or "group"
+
+Allowed values:
+solo
+group
+pooling_type
+string or null
+required
+Indicates if the event type is "round robin" (alternates between hosts) or "collective" (invitees pick a time when all participants are available) or “multi-pool” (considers availability delineated by pools of participants) or "null" (the event type doesn’t consider the availability of a group participants)
+
+Allowed values:
+round_robin
+collective
+multi_pool
+null
+type
+string
+required
+Indicates if the event type is "AdhocEventType" (ad hoc event) or "StandardEventType" (standard event type)
+
+Allowed values:
+StandardEventType
+AdhocEventType
+color
+string
+required
+The hexadecimal color value of the event type's scheduling page
+
+Example:
+#fff200
+Match pattern:
+^#[a-f\d]{6}$
+created_at
+string
+<date-time>
+required
+The moment the event type was created (e.g. "2020-01-02T03:04:05.678123Z")
+
+Example:
+2019-01-02T03:04:05.678123Z
+updated_at
+string
+<date-time>
+required
+The moment the event type was last updated (e.g. "2020-01-02T03:04:05.678123Z")
+
+Example:
+2019-08-07T06:05:04.321123Z
+internal_note
+string or null
+required
+Contents of a note that may be associated with the event type
+
+Example:
+Internal note
+description_plain
+string or null
+required
+The event type's description (in non formatted text)
+
+Example:
+15 Minute Meeting
+description_html
+string or null
+required
+The event type's description (formatted with HTML)
+
+Example:
+<p>15 Minute Meeting</p>
+profile
+Profile or null
+required
+The publicly visible profile of a User or a Team that's associated with the Event Type (note: some Event Types don't have profiles)
+
+secret
+boolean
+required
+Indicates if the event type is hidden on the owner's main scheduling page
+
+booking_method
+string
+required
+Indicates if the event type is for a poll or an instant booking
+
+Allowed values:
+instant
+poll
+Example:
+poll
+custom_questions
+array[EventTypeCustomQuestion]
+required
+deleted_at
+string<date-time> or null
+required
+The moment the event type was deleted (e.g. "2020-01-02T03:04:05.678123Z"). Since event types can be deleted but their scheduled events remain it's useful to fetch a deleted event type when you still require event type data for a scheduled event.
+
+Example:
+2019-01-02T03:04:05.678123Z
+admin_managed
+boolean
+required
+Indicates if this event type is managed by an organization admin
+
+locations
+array[LocationConfiguration] or null
+required
+Configuration information for each possible location for this Event Type
+
+position
+integer
+required
+Position order of Event Type, starting with 0 (for display purposes)
+
+locale
+string
+required
+The locale on the event type, used to determine the language of the event type's scheduling page
+
+Allowed values:
+en
+fr
+es
+de
+nl
+pt
+it
+uk
+Example:
+de
+pagination
+Pagination
+required
+count
+integer
+required
+The number of rows to return
+
+>= 0
+<= 100
+Example:
+20
+next_page
+string<uri> or null
+required
+URI to return the next page of an ordered list ("null" indicates no additional results are available)
+
+Example:
+https://api.calendly.com/event_types?count=1&page_token=sNjq4TvMDfUHEl7zHRR0k0E1PCEJWvdi
+previous_page
+string<uri> or null
+required
+URI to return the previous page of an ordered list ("null" indicates no additional results are available)
+
+Example:
+https://api.calendly.com/event_types?count=1&page_token=VJs2rfDYeY8ahZpq0QI1O114LJkNjd7H
+next_page_token
+string or null
+required
+Token to return the next page of an ordered list ("null" indicates no additional results are available)
+
+Example:
+sNjq4TvMDfUHEl7zHRR0k0E1PCEJWvdi
+previous_page_token
+string or null
+required
+Token to return the previous page of an ordered list ("null" indicates no additional results are available)
+
+Example:
+VJs2rfDYeY8ahZpq0QI1O114LJkNjd7H
+Auth
+OAuth 2.0
+Token
+:
+Bearer 123
+Parameters
+active
+:
+Not SetFalseTrue
+
+select an option
+admin_managed
+:
+Not SetFalseTrue
+
+select an option
+count
+:
+defaults to: 20
+organization
+:
+string
+page_token
+:
+string
+sort
+:
+defaults to: name:asc
+user
+:
+string
+user_availability_schedule
+:
+string
+Send API Request
+
+Live Server
+Request Sample: Shell / cURL
+
+curl --request GET \
+  --url https://api.calendly.com/event_types \
+  --header 'Authorization: ' \
+  --header 'Content-Type: application/json'
+Response Example
+
+{
+  "collection": [
+    {
+      "uri": "https://api.calendly.com/event_types/AAAAAAAAAAAAAAAA",
+      "name": "15 Minute Meeting",
+      "active": true,
+      "booking_method": "instant",
+      "slug": "acmesales",
+      "scheduling_url": "https://calendly.com/acmesales",
+      "duration": 15,
+      "duration_options": [
+        1,
+        13,
+        15,
+        720
+      ],
+      "kind": "solo",
+      "pooling_type": "round_robin",
+      "type": "StandardEventType",
+      "color": "#fff200",
+      "created_at": "2019-01-02T03:04:05.678123Z",
+      "updated_at": "2019-08-07T06:05:04.321123Z",
+      "internal_note": "Internal note",
+      "description_plain": "15 Minute Meeting",
+      "description_html": "<p>15 Minute Meeting</p>",
+      "profile": {
+        "type": "User",
+        "name": "Tamara Jones",
+        "owner": "https://api.calendly.com/users/AAAAAAAAAAAAAAAA"
+      },
+      "secret": true,
+      "deleted_at": null,
+      "admin_managed": false,
+      "locations": [
+        {
+          "kind": "inbound_call",
+          "phone_number": "+ 380934567654",
+          "additional_info": "Additional information about location"
+        }
+      ],
+      "position": 0,
+      "custom_questions": [
+        {
+          "name": "Company Name",
+          "type": "string",
+          "position": 0,
+          "enabled": true,
+          "required": true,
+          "answer_choices": [],
+          "include_other": false
+        },
+        {
+          "name": "What would you like to discuss?",
+          "type": "text",
+          "position": 0,
+          "enabled": true,
+          "required": true,
+          "answer_choices": [],
+          "include_other": false
+        },
+        {
+          "name": "Number of employees",
+          "answer_choices": [
+            "1",
+            "2-10",
+            "11-20",
+            "20+"
+          ],
+          "enabled": true,
+          "include_other": true,
+          "position": 2,
+          "required": false,
+          "type": "single_select"
+        },
+        {
+          "name": "Multi-Select Question",
+          "answer_choices": [
+            "Answer 1",
+            "Answer 2",
+            "Answer 3",
+            "Answer 4"
+          ],
+          "enabled": true,
+          "include_other": true,
+          "position": 2,
+          "required": false,
+          "type": "multi_select"
+        },
+        {
+          "name": "Phone Number",
+          "type": "phone_number",
+          "position": 0,
+          "enabled": true,
+          "required": true,
+          "answer_choices": [],
+          "include_other": false
+        }
+      ],
+      "locale": "en"
+    }
+  ],
+  "pagination": {
+    "count": 20,
+    "next_page": "https://api.calendly.com/event_types?count=1&page_token=sNjq4TvMDfUHEl7zHRR0k0E1PCEJWvdi",
+    "previous_page": "https://api.calendly.com/event_types?count=1&page_token=VJs2rfDYeY8ahZpq0QI1O114LJkNjd7H",
+    "next_page_token": "sNjq4TvMDfUHEl7zHRR0k0E1PCEJWvdi",
+    "previous_page_token": "VJs2rfDYeY8ahZpq0QI1O114LJkNjd7H"
+  }
+}

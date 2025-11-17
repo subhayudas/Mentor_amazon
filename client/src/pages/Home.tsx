@@ -61,19 +61,16 @@ export default function Home() {
               data-testid="hero-illustration"
             />
             
-            <div className="absolute top-0 left-0 right-0 pt-8 md:pt-12 lg:pt-16 px-4 md:px-8 text-center">
-              <div className="space-y-3 md:space-y-4">
-                <Badge variant="outline" className="bg-primary text-white border-primary/20">
+            <div className="absolute top-0 left-0 right-0 pt-6 md:pt-10 px-4 md:px-8 text-center">
+              <div className="space-y-2 md:space-y-3">
+                <Badge variant="outline" className="bg-orange-500 text-white border-orange-500/20 text-xs md:text-sm">
                   Amazon Egypt Mentorship Program
                 </Badge>
-                <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold tracking-tight text-primary">
-                  Connect with{" "}
-                  <span className="text-orange-500">
-                    Expert Mentors
-                  </span>
+                <h1 className="text-2xl md:text-4xl lg:text-5xl font-bold tracking-tight text-primary">
+                  Connect with <span className="text-orange-500">Expert Mentors</span>
                 </h1>
-                <p className="text-base md:text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-                  Book one-on-one mentorship sessions with Amazon professionals.
+                <p className="text-sm md:text-base text-foreground/80 max-w-xl mx-auto">
+                  Book one-on-one mentorship sessions with top professionals
                 </p>
               </div>
             </div>
