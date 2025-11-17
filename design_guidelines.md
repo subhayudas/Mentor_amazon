@@ -1,113 +1,276 @@
-# Design Guidelines: Mentor Matching Platform
+# Design Guidelines: MentorConnect for Amazon Egypt
 
-## Design Approach
+## Brand Identity
 
-**Reference-Based Approach** drawing from professional networking and booking platforms:
-- **LinkedIn**: Professional profile presentation and trust-building elements
-- **Calendly**: Clean booking interface and scheduling UX patterns
-- **ADPList/MentorCruise**: Mentor discovery and matching interfaces
+**Platform Name**: MentorConnect
+**Client**: Amazon Egypt
+**Design Philosophy**: Professional, trustworthy, and accessible mentor-student booking platform that reflects Amazon's brand values
 
-**Core Principle**: Visually impressive through clean execution, strong hierarchy, and professional polish—not through complexity or excessive ornamentation.
+## Amazon Brand Guidelines
 
-## Typography System
+### Color Palette
 
-**Font Families** (via Google Fonts):
-- **Primary**: Inter (400, 500, 600, 700) - for UI, body text, and data
-- **Accent**: Cabinet Grotesk or similar geometric sans (700, 800) - for hero headlines only
+**Primary Colors**:
+- **Amazon Navy**: #232F3E (Primary background, headers, dark text)
+- **Amazon Orange**: #FF9900 (CTAs, links, active states, accent)
+
+**Supporting Colors**:
+- **Background**: #FFFFFF (White, primary background)
+- **Text Primary**: #0F1111 (Nearly black, body text)
+- **Text Secondary**: #565959 (Gray, metadata, labels)
+- **Borders**: #D5D9D9 (Light gray, dividers, card borders)
+- **Success**: #067D62 (Green, confirmations)
+- **Error**: #C40000 (Red, errors, warnings)
+
+### Typography System
+
+**Font Families** (Amazon Ember with fallbacks):
+- **Primary**: Amazon Ember Regular (body text, inputs)
+- **Bold**: Amazon Ember Bold (headings, buttons)
+- **Fallback**: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
 
 **Hierarchy**:
-- Hero Headlines: 3xl to 5xl, font-weight-800
+- Hero Headlines: 3xl to 5xl, font-weight-700 (Amazon Ember Bold)
 - Section Headers: 2xl to 3xl, font-weight-700
 - Card Titles: lg to xl, font-weight-600
 - Body Text: base, font-weight-400
-- Metadata/Labels: sm, font-weight-500, uppercase tracking
+- Metadata/Labels: sm, font-weight-500
+
+**Logo Usage**:
+- Place Amazon logo in top-left corner of navigation
+- Minimum clear space: 1.5x the height of the smile arrow
+- Never distort, recolor, or modify the logo
+- Use SVG format for scalability
 
 ## Layout System
 
-**Spacing Primitives**: Use Tailwind units of **2, 4, 8, 12, 16** (as in p-4, gap-8, space-y-12, mb-16)
+**Spacing Primitives**: Use Tailwind units of **2, 4, 6, 8, 12, 16**
 
 **Grid System**:
 - Max container width: `max-w-7xl mx-auto px-4 md:px-8`
-- Mentor cards: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8`
+- Mentor cards: `grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6`
 - Analytics cards: `grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4`
 
-**Section Padding**: py-12 (mobile) to py-20 (desktop)
+**Responsive Breakpoints**:
+- Mobile: < 768px (1 column)
+- Tablet: 768px - 1024px (2 columns)
+- Desktop: > 1024px (3 columns)
 
 ## Component Library
 
 ### Navigation
-- Fixed top navigation with logo left, navigation center, user profile/CTA right
-- Clean, minimal nav with subtle border bottom
-- Mobile: Hamburger menu with slide-out drawer
+- Fixed top navigation with Amazon logo left, navigation center
+- Height: h-16
+- Background: Amazon Navy (#232F3E)
+- Text color: White
+- Border bottom: subtle 1px border
+- Mobile: Drawer/sidebar on mobile
 
-### Hero Section
-- 70vh height with strong typographic headline
-- Two-column layout: Left (headline + subtext + CTA), Right (hero image)
-- CTA: Primary button with backdrop-blur on image backgrounds
-- Include trust indicator: "Trusted by 500+ mentees" or similar
+### Buttons
+
+**Primary Button** (CTAs, main actions):
+- Background: Amazon Orange (#FF9900)
+- Text: White
+- Padding: px-6 py-3
+- Border radius: rounded-md
+- Hover: Slightly darker orange
+- Font: font-semibold
+
+**Secondary Button** (alternative actions):
+- Background: White
+- Text: Amazon Navy (#232F3E)
+- Border: 1px solid Amazon Navy
+- Padding: px-6 py-3
+- Border radius: rounded-md
+- Hover: Light gray background
 
 ### Mentor Cards
-- Clean card with subtle border, no heavy shadows
-- Card structure: Mentor photo (top, square or circular), Name, Title/Expertise, Bio snippet (2 lines), Specialties (3-4 tags), "Book Session" CTA
-- Hover state: Subtle lift (translate-y-1) and border emphasis
-- Photo: Use circular avatars (w-20 h-20 or w-24 h-24) positioned top-center or top-left
+- Clean card with border (1px, #D5D9D9)
+- Border radius: rounded-lg
+- Padding: p-6
+- Background: White
+- Card structure:
+  - Mentor photo (circular, 96x96px or 120x120px)
+  - Name (text-xl font-bold, Amazon Navy)
+  - Position @ Company (text-base, Text Secondary)
+  - Timezone (text-sm, with icon)
+  - Industry badges (2-3 max, small pills)
+  - Expertise badges (3-4 max, smaller pills)
+  - Rating (stars + average + count)
+  - Languages (flags + text)
+  - "Book a Meeting" button (Primary button style)
+- Hover state: Subtle elevation (shadow-md), no transform
 
-### Mentor Profile Page
-- Two-column layout: Left (sticky) - Mentor details, expertise, bio; Right - Calendly widget embed
-- Full mentor bio with expertise tags, experience, and ratings/reviews if applicable
-- Calendly widget in clean iframe with proper spacing (min-h-[700px])
+### Forms
 
-### Analytics Dashboard
-- Four-column metric cards showing: Total Sessions, Active Mentors, Sessions This Month, Avg. Rating
-- Each card: Large number (text-4xl font-bold), Label below (text-sm), Icon accent
-- Recent sessions table: Clean, striped rows, columns for Mentor, Mentee, Date, Status
-- Use simple bar chart for "Sessions per Mentor" using div-based bars, not canvas
+**Input Fields**:
+- Border: 1px solid #D5D9D9
+- Border radius: rounded-md
+- Padding: px-4 py-3
+- Focus: 2px Amazon Orange border
+- Font size: text-base
+- Background: White
 
-### Form Elements
-- Consistent input styling: border, rounded-lg, px-4 py-3
-- Focus states: ring-2 with accent ring
-- Labels: text-sm font-medium mb-2
-- Buttons: rounded-lg px-6 py-3, font-semibold
+**Labels**:
+- Font size: text-sm
+- Font weight: font-medium
+- Color: #0F1111
+- Margin bottom: mb-2
 
-## Images
+**Validation**:
+- Error messages in red (#C40000) below fields
+- Success indicators in green (#067D62)
+- Inline validation on blur
 
-**Hero Section**: 
-- Large hero image on right side showing professional mentorship scene (modern office, video call, or professional collaboration)
-- Image should convey trust, professionalism, and connection
-- Dimensions: Approximately 600x500px, high quality
+### Badges/Tags
 
-**Mentor Avatars**:
-- Professional headshots, circular format
-- Consistent sizing across all cards (96x96px or 128x128px)
-- Placeholder: Use gradient circles with initials if no photo
+**Industry Badges**:
+- Background: Light gray (#F3F3F3)
+- Text: Amazon Navy
+- Border radius: rounded-full
+- Padding: px-3 py-1
+- Font size: text-xs
+- Font weight: font-medium
 
-**No additional decorative images needed** - keep focus on mentor profiles and functionality
-
-## Animations
-
-**Minimal, purposeful only**:
-- Card hover: `transition-transform duration-200 hover:-translate-y-1`
-- Button hover: Built-in states only
-- Page transitions: None
-- Loading states: Simple spinner for Calendly widget loading
+**Expertise Tags**:
+- Background: Very light orange (#FFF5E6)
+- Text: Dark orange (#CC7A00)
+- Border radius: rounded-md
+- Padding: px-2 py-1
+- Font size: text-xs
 
 ## Page Structure
 
-### Browse/Home Page
-1. Hero (headline, description, search/filter CTA)
-2. Featured Mentors section (3-column grid, 6-9 mentors)
-3. Stats/Social Proof (centered, 4-column metrics)
-4. How It Works (3 steps with icons)
-5. All Mentors grid (filterable)
+### Mentor Discovery Page (Home)
+1. **Hero Section**:
+   - Background: Light gradient (white to very light gray)
+   - Headline: "Connect with Expert Mentors at Amazon"
+   - Subtext: Brief value proposition
+   - Search bar (prominent, full width on mobile)
+
+2. **Filter Sidebar** (Desktop) / Filter Drawer (Mobile):
+   - Specialization (multi-select dropdown)
+   - Industry (multi-select)
+   - Languages (multi-select with flags)
+   - Timezone (grouped dropdown)
+
+3. **Mentor Grid**:
+   - 3 columns on desktop, 2 on tablet, 1 on mobile
+   - Cards show all mentor info per spec
+   - Gap: gap-6
 
 ### Mentor Profile Page
-1. Back navigation
-2. Two-column: Mentor details + Calendly embed
-3. Sessions booked count display
+- Two-column layout:
+  - **Left Column** (40%): Mentor details, bio, expertise, ratings
+  - **Right Column** (60%): Calendly embed
+- Mobile: Stack vertically (details first, then Calendly)
 
-### Analytics Dashboard (Admin/User)
-1. Metrics overview (4 cards)
-2. Recent sessions table
-3. Sessions per mentor chart
+### Analytics Dashboard
+1. **Filter Row**:
+   - Date range picker
+   - Mentor dropdown
+   - Mentee type filter
+   - Language filter
+   - Specialization filter
 
-**Key Design Note**: Maintain generous whitespace, avoid clutter. Every element should have clear purpose. Professional, trustworthy aesthetic prioritized over flashy effects.
+2. **KPI Cards** (4 across):
+   - Large number (text-4xl font-bold, Amazon Navy)
+   - Label (text-sm, Text Secondary)
+   - Icon (Amazon Orange)
+   - Background: White with border
+
+3. **Charts**:
+   - Bookings over time (line chart)
+   - Top mentors (horizontal bar chart)
+   - Specialization distribution (pie chart)
+   - Ratings table (sortable)
+
+4. **Detailed Table**:
+   - Striped rows
+   - Sortable columns
+   - Pagination (50 per page)
+   - Export to CSV button (secondary style)
+
+### Onboarding Forms
+
+**Mentor Onboarding**:
+- Single-page form with sections
+- Progress indicator at top
+- Clear section headers
+- All inputs follow Amazon form guidelines
+- Communication preference radio buttons
+- Photo upload with preview
+- Calendly link validation
+- Submit button: Primary (Amazon Orange)
+
+**Mentee Registration**:
+- Shorter form (less fields)
+- User type toggle (Individual/Organization)
+- Conditional organization name field
+- Photo upload optional
+- Areas exploring multi-select
+- Submit button: Primary (Amazon Orange)
+
+## Accessibility (WCAG 2.1 AA)
+- All images have `alt` text
+- Form labels properly associated
+- Focus indicators: 2px Amazon Orange outline
+- Color contrast ratios meet 4.5:1 minimum
+- Keyboard navigation for all interactive elements
+- ARIA labels for icon-only buttons
+
+## Images
+
+**Mentor Avatars**:
+- Circular format (rounded-full)
+- Consistent sizing (96x96px cards, 120x120px profile)
+- Professional headshots
+- Fallback: Gradient with initials if no photo
+
+**Amazon Logo**:
+- Use official Amazon logo SVG
+- Place in top-left of navigation
+- Clear space around logo (1.5x smile height)
+- Never modify or recolor
+
+## Animations
+
+**Minimal and purposeful**:
+- Button hover: Subtle background color change
+- Card hover: shadow-md (no transform)
+- Page transitions: None
+- Loading states: Amazon-style spinner (orange)
+- Form validation: Fade in error messages
+
+## Mobile Responsiveness
+
+**Breakpoint Strategy**:
+- Mobile-first approach
+- Filters in drawer/modal on mobile
+- Mentor grid: 1 column mobile, 2 tablet, 3 desktop
+- Navigation: Hamburger menu on mobile
+- Calendly widget: Full-screen modal on mobile
+- Analytics: Stack KPI cards, horizontal scroll for tables
+
+## Internationalization (Future)
+
+**Arabic Support** (add before full rollout):
+- RTL layout support
+- Arabic font (Amazon Ember Arabic)
+- Translated UI strings
+- Date/time localization
+- Number formatting
+
+**Current MVP**: English-first, Arabic placeholder ready
+
+## Brand Voice
+
+**Tone**: Professional, supportive, accessible
+**Writing Style**: Clear, concise, action-oriented
+**Example CTAs**:
+- "Book a Meeting"
+- "Find Your Mentor"
+- "Get Started"
+- "View Profile"
+
+**Key Design Note**: Maintain Amazon's clean, trustworthy aesthetic. Every element serves a purpose. Professional polish over flashy effects. User trust is paramount.

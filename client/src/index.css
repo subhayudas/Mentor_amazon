@@ -2,63 +2,92 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE */
+/* AMAZON MENTORCONNECT - LIGHT MODE */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
   --opaque-button-border-intensity: -8;
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
-  --background: 0 0% 100%;
-  --foreground: 210 25% 7.8431%;
-  --border: 201.4286 30.4348% 90.9804%;
-  --card: 180 6.6667% 97.0588%;
-  --card-foreground: 210 25% 7.8431%;
-  --card-border: 205 25% 90.5882%;
-  --sidebar: 180 6.6667% 97.0588%;
-  --sidebar-foreground: 210 25% 7.8431%;
-  --sidebar-border: 205.0000 25.0000% 90.5882%;
-  --sidebar-primary: 203.8863 88.2845% 53.1373%;
+  
+  /* Amazon Brand Colors */
+  --background: 0 0% 100%; /* White */
+  --foreground: 210 12% 6%; /* #0F1111 - Nearly black text */
+  --border: 210 7% 85%; /* #D5D9D9 - Light gray borders */
+  
+  /* Card System */
+  --card: 0 0% 100%; /* White cards */
+  --card-foreground: 210 12% 6%; /* Dark text on cards */
+  --card-border: 210 7% 85%; /* Light border on cards */
+  
+  /* Sidebar (not used in MVP but keeping for consistency) */
+  --sidebar: 209 60% 15%; /* Amazon Navy */
+  --sidebar-foreground: 0 0% 100%; /* White text */
+  --sidebar-border: 210 50% 20%; /* Slightly lighter navy */
+  --sidebar-primary: 36 100% 50%; /* Amazon Orange */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 211.5789 51.3514% 92.7451%;
-  --sidebar-accent-foreground: 203.8863 88.2845% 53.1373%;
-  --sidebar-ring: 202.8169 89.1213% 53.1373%;
+  --sidebar-accent: 210 7% 92%; /* Very light gray */
+  --sidebar-accent-foreground: 210 12% 6%;
+  --sidebar-ring: 36 100% 50%;
+  
+  /* Popovers/Dropdowns */
   --popover: 0 0% 100%;
-  --popover-foreground: 210 25% 7.8431%;
-  --popover-border: 200 23% 94%;
-  --primary: 10.05deg 86.38% 53.92%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 210 25% 7.8431%;
-  --secondary-foreground: 0 0% 100%;
-  --muted: 210deg 4.17% 90.59%;
-  --muted-foreground: 210 25% 7.8431%;
-  --accent: 210deg 4.17% 90.59%;
-  --accent-foreground: 233.2deg 44.7% 42.55%;
-  --destructive: 356.3033 90.5579% 54.3137%;
+  --popover-foreground: 210 12% 6%;
+  --popover-border: 210 7% 85%;
+  
+  /* Primary = Amazon Orange */
+  --primary: 36 100% 50%; /* #FF9900 */
+  --primary-foreground: 0 0% 100%; /* White text on orange */
+  
+  /* Secondary = Amazon Navy */
+  --secondary: 209 60% 15%; /* #232F3E */
+  --secondary-foreground: 0 0% 100%; /* White text on navy */
+  
+  /* Muted = Light backgrounds */
+  --muted: 210 7% 96%; /* Very light gray for backgrounds */
+  --muted-foreground: 210 10% 35%; /* #565959 - Gray for secondary text */
+  
+  /* Accent = Light gray for hover states */
+  --accent: 210 7% 92%;
+  --accent-foreground: 210 12% 6%;
+  
+  /* Destructive = Amazon error red */
+  --destructive: 0 100% 39%; /* #C40000 */
   --destructive-foreground: 0 0% 100%;
-  --input: 200 23.0769% 97.4510%;
-  --ring: 10.05deg 86.38% 53.92%;
-  --chart-1: 10.05deg 86.38% 53.92%;
-  --chart-2: 233.2deg 44.7% 42.55%;
-  --chart-3: 42.0290 92.8251% 56.2745%;
-  --chart-4: 147.1429 78.5047% 41.9608%;
-  --chart-5: 341.4894 75.2000% 50.9804%;
-  --font-sans: Open Sans, sans-serif;
+  
+  /* Form inputs */
+  --input: 210 7% 85%; /* Same as border */
+  --ring: 36 100% 50%; /* Orange focus rings */
+  
+  /* Charts - Amazon color scheme */
+  --chart-1: 36 100% 50%; /* Orange */
+  --chart-2: 209 60% 15%; /* Navy */
+  --chart-3: 162 72% 41%; /* #067D62 - Success green */
+  --chart-4: 210 10% 35%; /* Gray */
+  --chart-5: 200 80% 45%; /* Light blue */
+  
+  /* Typography */
+  --font-sans: 'Amazon Ember', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
-  --radius: 1.3rem;
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --tracking-normal: 0em;
+  
+  /* Spacing */
+  --radius: 0.5rem; /* Reduced for Amazon's clean aesthetic */
   --spacing: 0.25rem;
+  
+  /* Shadows - Subtle Amazon style */
+  --shadow-2xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  --shadow-xs: 0px 1px 3px 0px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0px 2px 4px 0px rgba(0, 0, 0, 0.06), 0px 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.06), 0px 1px 2px -1px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0px 4px 6px -1px rgba(0, 0, 0, 0.1), 0px 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0px 10px 15px -3px rgba(0, 0, 0, 0.1), 0px 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0px 20px 25px -5px rgba(0, 0, 0, 0.1), 0px 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-2xl: 0px 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  --tracking-normal: 0em;
 
-/* Fallback for older browsers */
+  /* Fallback for older browsers */
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 
@@ -93,50 +122,63 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
-  --background: 0 0% 0%;
-  --foreground: 200 6.6667% 91.1765%;
-  --border: 210 5.2632% 14.9020%;
-  --card: 228 9.8039% 10%;
-  --card-foreground: 0 0% 85.0980%;
-  --card-border: 205.7143 15.7895% 26.0784%;
-  --sidebar: 228 9.8039% 10%;
-  --sidebar-foreground: 0 0% 85.0980%;
-  --sidebar-border: 205.7143 15.7895% 26.0784%;
-  --sidebar-primary: 202.8169 89.1213% 53.1373%;
+  
+  /* Dark mode - darker Amazon Navy base */
+  --background: 210 60% 8%; /* Very dark navy */
+  --foreground: 0 0% 92%; /* Light gray text */
+  --border: 210 20% 20%; /* Medium dark border */
+  
+  --card: 210 50% 12%; /* Dark navy cards */
+  --card-foreground: 0 0% 85%;
+  --card-border: 210 30% 22%;
+  
+  --sidebar: 210 50% 12%;
+  --sidebar-foreground: 0 0% 85%;
+  --sidebar-border: 210 30% 22%;
+  --sidebar-primary: 36 100% 50%; /* Orange stays same */
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 205.7143 70% 7.8431%;
-  --sidebar-accent-foreground: 203.7736 87.6033% 52.5490%;
-  --sidebar-ring: 202.8169 89.1213% 53.1373%;
-  --popover: 0 0% 0%;
-  --popover-foreground: 200 6.6667% 91.1765%;
-  --popover-border: 207.6923 27.6596% 18.4314%;
-  --primary: 203.7736 87.6033% 52.5490%;
+  --sidebar-accent: 210 40% 18%;
+  --sidebar-accent-foreground: 36 100% 50%;
+  --sidebar-ring: 36 100% 50%;
+  
+  --popover: 210 50% 12%;
+  --popover-foreground: 0 0% 92%;
+  --popover-border: 210 30% 22%;
+  
+  --primary: 36 100% 50%; /* Orange */
   --primary-foreground: 0 0% 100%;
-  --secondary: 195.0000 15.3846% 94.9020%;
-  --secondary-foreground: 210 25% 7.8431%;
-  --muted: 0 0% 9.4118%;
-  --muted-foreground: 210 3.3898% 46.2745%;
-  --accent: 205.7143 70% 7.8431%;
-  --accent-foreground: 203.7736 87.6033% 52.5490%;
-  --destructive: 356.3033 90.5579% 54.3137%;
+  
+  --secondary: 0 0% 95%; /* Light for dark mode */
+  --secondary-foreground: 210 12% 6%;
+  
+  --muted: 210 40% 15%;
+  --muted-foreground: 210 10% 60%;
+  
+  --accent: 210 40% 18%;
+  --accent-foreground: 36 100% 50%;
+  
+  --destructive: 0 100% 39%;
   --destructive-foreground: 0 0% 100%;
-  --input: 207.6923 27.6596% 18.4314%;
-  --ring: 202.8169 89.1213% 53.1373%;
-  --chart-1: 203.8863 88.2845% 53.1373%;
-  --chart-2: 159.7826 100% 36.0784%;
-  --chart-3: 42.0290 92.8251% 56.2745%;
-  --chart-4: 147.1429 78.5047% 41.9608%;
-  --chart-5: 341.4894 75.2000% 50.9804%;
-  --shadow-2xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xs: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-sm: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 1px 2px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-md: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 2px 4px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-lg: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 4px 6px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00), 0px 8px 10px -1px hsl(202.8169 89.1213% 53.1373% / 0.00);
-  --shadow-2xl: 0px 2px 0px 0px hsl(202.8169 89.1213% 53.1373% / 0.00);
+  
+  --input: 210 30% 22%;
+  --ring: 36 100% 50%;
+  
+  --chart-1: 36 100% 50%;
+  --chart-2: 200 80% 60%;
+  --chart-3: 162 72% 50%;
+  --chart-4: 210 30% 50%;
+  --chart-5: 270 60% 60%;
+  
+  --shadow-2xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.3);
+  --shadow-xs: 0px 1px 3px 0px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0px 2px 4px 0px rgba(0, 0, 0, 0.3), 0px 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --shadow: 0px 2px 4px 0px rgba(0, 0, 0, 0.3), 0px 1px 2px -1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0px 4px 6px -1px rgba(0, 0, 0, 0.4), 0px 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0px 10px 15px -3px rgba(0, 0, 0, 0.4), 0px 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0px 20px 25px -5px rgba(0, 0, 0, 0.4), 0px 10px 10px -5px rgba(0, 0, 0, 0.3);
+  --shadow-2xl: 0px 25px 50px -12px rgba(0, 0, 0, 0.5);
 
-/* Fallback for older browsers */
+  /* Fallback for older browsers */
   --sidebar-primary-border: hsl(var(--sidebar-primary));
   --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
 
@@ -163,10 +205,11 @@
   /* Fallback for older browsers */
   --destructive-border: hsl(var(--destructive));
   --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l + var(--opaque-button-border-intensity)) / alpha);
-  --radius: 1.3rem;
+  
+  --radius: 0.5rem;
   --spacing: 0.25rem;
   --font-mono: Menlo, monospace;
-  --font-sans: Open Sans, sans-serif;
+  --font-sans: 'Amazon Ember', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-serif: Georgia, serif;
   --tracking-normal: 0em;
 }
