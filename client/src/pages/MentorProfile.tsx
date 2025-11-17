@@ -52,6 +52,7 @@ export default function MentorProfile() {
     return savedEmail && savedName ? { name: savedName, email: savedEmail } : null;
   });
   const [showIdentityForm, setShowIdentityForm] = useState(!menteeInfo);
+  const [selectedDuration, setSelectedDuration] = useState<15 | 30 | 60>(30);
   
   // Cache mentor data in a ref to ensure it's always available during Calendly events
   // even if React Query refetches and temporarily sets mentor to undefined
@@ -218,6 +219,8 @@ export default function MentorProfile() {
     }
   };
 
+  const calendlyUrl = mentor ? (mentor[`calendly_${selectedDuration}min` as keyof Mentor] as string || mentor.calendly_link) : "";
+
   return (
     <div className="min-h-screen py-12">
       <div className="max-w-7xl mx-auto px-4 md:px-8">
@@ -364,15 +367,33 @@ export default function MentorProfile() {
                   <Skeleton className="h-[700px] w-full" />
                 </div>
               ) : (
-                <div className="rounded-lg overflow-hidden" data-testid="calendly-widget">
-                  <InlineWidget
-                    url={mentor.calendly_link}
-                    styles={{
-                      height: "700px",
-                      minWidth: "100%",
-                    }}
-                  />
-                </div>
+                <>
+                  <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
+                    <p className="text-sm font-semibold mb-3">Select Session Duration</p>
+                    <div className="flex gap-3">
+                      {[15, 30, 60].map((duration) => (
+                        <Button
+                          key={duration}
+                          onClick={() => setSelectedDuration(duration as 15 | 30 | 60)}
+                          variant={selectedDuration === duration ? "default" : "outline"}
+                          className="flex-1"
+                          data-testid={`button-duration-${duration}`}
+                        >
+                          {duration} Minutes
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-lg overflow-hidden" data-testid="calendly-widget">
+                    <InlineWidget
+                      url={calendlyUrl}
+                      styles={{
+                        height: "700px",
+                        minWidth: "100%",
+                      }}
+                    />
+                  </div>
+                </>
               )}
             </Card>
           </div>
