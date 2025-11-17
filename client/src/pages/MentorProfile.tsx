@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { InlineWidget, useCalendlyEventListener } from "react-calendly";
 import { Mentor } from "@shared/schema";
 import { Card } from "@/components/ui/card";
@@ -127,6 +127,34 @@ export default function MentorProfile() {
     });
   };
 
+  // Determine available durations based on unique Calendly URLs
+  // IMPORTANT: This must be before any early returns to maintain hook order
+  const availableDurations = useMemo(() => {
+    if (!mentor) return [15, 30, 60];
+    
+    const urls = {
+      15: mentor.calendly_15min || mentor.calendly_link,
+      30: mentor.calendly_30min || mentor.calendly_link,
+      60: mentor.calendly_60min || mentor.calendly_link,
+    };
+    
+    // If all URLs are the same, only show one option (60 min by default)
+    if (urls[15] === urls[30] && urls[30] === urls[60]) {
+      return [60];
+    }
+    
+    // Otherwise show all unique durations
+    return [15, 30, 60];
+  }, [mentor]);
+
+  // Update selected duration if it's not in available durations
+  // IMPORTANT: This must be before any early returns to maintain hook order
+  useEffect(() => {
+    if (mentor && !availableDurations.includes(selectedDuration)) {
+      setSelectedDuration(availableDurations[0] as 15 | 30 | 60);
+    }
+  }, [mentor, availableDurations, selectedDuration]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen py-12">
@@ -220,30 +248,6 @@ export default function MentorProfile() {
   };
 
   const calendlyUrl = mentor ? (mentor[`calendly_${selectedDuration}min` as keyof Mentor] as string || mentor.calendly_link) : "";
-  
-  // Determine available durations based on unique Calendly URLs
-  const availableDurations = mentor ? (() => {
-    const urls = {
-      15: mentor.calendly_15min || mentor.calendly_link,
-      30: mentor.calendly_30min || mentor.calendly_link,
-      60: mentor.calendly_60min || mentor.calendly_link,
-    };
-    
-    // If all URLs are the same, only show one option (60 min by default)
-    if (urls[15] === urls[30] && urls[30] === urls[60]) {
-      return [60];
-    }
-    
-    // Otherwise show all unique durations
-    return [15, 30, 60];
-  })() : [15, 30, 60];
-
-  // Update selected duration if it's not in available durations
-  useEffect(() => {
-    if (mentor && !availableDurations.includes(selectedDuration)) {
-      setSelectedDuration(availableDurations[0] as 15 | 30 | 60);
-    }
-  }, [mentor, availableDurations, selectedDuration]);
 
   return (
     <div className="min-h-screen py-12">
