@@ -480,15 +480,15 @@ export default function Analytics() {
         </Card>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            {[1, 2, 3, 4, 5].map((i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
               <Card key={i} className="p-8">
                 <Skeleton className="h-20 w-full" />
               </Card>
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <MetricCard
               title="Total Bookings"
               value={totalBookings}
@@ -506,18 +506,6 @@ export default function Analytics() {
               value={completedCount}
               icon={CheckCircle2}
               testId="metric-completed"
-            />
-            <MetricCard
-              title="Canceled"
-              value={canceledCount}
-              icon={XCircle}
-              testId="metric-canceled"
-            />
-            <MetricCard
-              title="Unique Mentees"
-              value={uniqueMentees}
-              icon={Users}
-              testId="metric-unique-mentees"
             />
           </div>
         )}
