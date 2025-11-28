@@ -197,8 +197,13 @@
     "tryAgain": "Please try again",
     "notFound": "Page not found",
     "goHome": "Go to Home",
+    "loadFailed": "Failed to load mentors. Please try again.",
     "invalidCalendlyUrl": "Please enter a valid Calendly URL (e.g., https://calendly.com/your-link)",
     "organizationNameRequired": "Organization name is required for organization accounts"
+  },
+  "actions": {
+    "retry": "Retry",
+    "refresh": "Refresh"
   },
   "sectors": {
     "technology": "Technology",

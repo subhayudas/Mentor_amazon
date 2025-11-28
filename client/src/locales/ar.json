@@ -197,8 +197,13 @@
     "tryAgain": "يرجى المحاولة مرة أخرى",
     "notFound": "الصفحة غير موجودة",
     "goHome": "الذهاب للرئيسية",
+    "loadFailed": "فشل في تحميل المرشدين. يرجى المحاولة مرة أخرى.",
     "invalidCalendlyUrl": "يرجى إدخال رابط كالندلي صالح (مثال: https://calendly.com/your-link)",
     "organizationNameRequired": "اسم المنظمة مطلوب لحسابات المنظمات"
+  },
+  "actions": {
+    "retry": "إعادة المحاولة",
+    "refresh": "تحديث"
   },
   "sectors": {
     "technology": "التكنولوجيا",
