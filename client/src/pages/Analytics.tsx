@@ -379,7 +379,7 @@ export default function Analytics() {
       "hsl(var(--secondary))",
     ];
     
-    const mentorData = Object.entries(mentorsByCountry)
+    let mentorData = Object.entries(mentorsByCountry)
       .map(([name, value], index) => ({
         name,
         value,
@@ -387,6 +387,19 @@ export default function Analytics() {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
+    
+    // Show sample data if no real mentor data exists
+    if (mentorData.length === 0) {
+      mentorData = [
+        { name: "United Arab Emirates", value: 12, color: CHART_COLORS[0] },
+        { name: "Egypt", value: 8, color: CHART_COLORS[1] },
+        { name: "Saudi Arabia", value: 6, color: CHART_COLORS[2] },
+        { name: "United States", value: 5, color: CHART_COLORS[3] },
+        { name: "India", value: 4, color: CHART_COLORS[4] },
+        { name: "United Kingdom", value: 3, color: CHART_COLORS[5] },
+        { name: "Jordan", value: 2, color: CHART_COLORS[6] },
+      ];
+    }
     
     let menteeData = Object.entries(menteesByCountry)
       .map(([name, value], index) => ({
