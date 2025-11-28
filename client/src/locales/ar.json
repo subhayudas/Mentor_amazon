@@ -229,5 +229,39 @@
   "contextualInfo": {
     "mentorTitle": "ماذا تتوقع كمرشد",
     "menteeTitle": "ماذا تتوقع كمتدرب"
+  },
+  "filters": {
+    "searchPlaceholder": "ابحث عن المرشدين بالاسم أو المنصب أو الشركة...",
+    "expertise": "الخبرة",
+    "industry": "الصناعة",
+    "language": "اللغة",
+    "allExpertise": "جميع الخبرات",
+    "allIndustries": "جميع الصناعات",
+    "allLanguages": "جميع اللغات"
+  },
+  "identity": {
+    "enterDetails": "أدخل بياناتك",
+    "enterDetailsDescription": "لتمكين تتبع الجلسات تلقائياً، يرجى إدخال اسمك وبريدك الإلكتروني. سيتم حفظ هذه البيانات واستخدامها لجميع الحجوزات المستقبلية.",
+    "enterDetailsPrompt": "أدخل بياناتك لتمكين تتبع الحجوزات تلقائياً",
+    "pleaseEnterDetails": "يرجى إدخال بياناتك لبدء حجز الجلسات",
+    "yourName": "اسمك",
+    "namePlaceholder": "أحمد محمد",
+    "yourEmail": "بريدك الإلكتروني",
+    "emailPlaceholder": "ahmed@example.com",
+    "saveAndContinue": "حفظ والمتابعة",
+    "changeIdentity": "تغيير الهوية",
+    "trackingFor": "يتم تتبع الحجوزات تلقائياً لـ",
+    "identitySaved": "تم حفظ الهوية",
+    "identitySavedDescription": "أنت جاهز! سيتم تتبع جلساتك المستقبلية تلقائياً."
+  },
+  "session": {
+    "bookSession": "حجز جلسة",
+    "selectDuration": "اختر مدة الجلسة",
+    "minutes": "دقيقة",
+    "minuteSession": "دقيقة جلسة إرشادية",
+    "bookingRecorded": "تم تسجيل الحجز",
+    "bookingRecordedDescription": "تم تتبع جلسة الإرشاد الخاصة بك بنجاح.",
+    "recordingFailed": "فشل التسجيل",
+    "recordingFailedDescription": "لم نتمكن من حفظ حجزك بعد عدة محاولات. يرجى التواصل مع الدعم."
   }
 }

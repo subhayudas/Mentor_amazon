@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Mentor } from "@shared/schema";
+import { useTranslation } from "react-i18next";
 
 interface SearchAndFilterProps {
   mentors: Mentor[];
@@ -17,6 +18,8 @@ interface SearchAndFilterProps {
 }
 
 export function SearchAndFilter({ mentors, onFilterChange }: SearchAndFilterProps) {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const [search, setSearch] = useState("");
   const [expertise, setExpertise] = useState("");
   const [industry, setIndustry] = useState("");
@@ -26,18 +29,20 @@ export function SearchAndFilter({ mentors, onFilterChange }: SearchAndFilterProp
   const uniqueExpertise = useMemo(() => {
     const expertiseSet = new Set<string>();
     mentors.forEach((mentor) => {
-      mentor.expertise.forEach((exp) => expertiseSet.add(exp));
+      const expertise = isArabic && mentor.expertise_ar ? mentor.expertise_ar : mentor.expertise;
+      expertise.forEach((exp) => expertiseSet.add(exp));
     });
     return Array.from(expertiseSet).sort();
-  }, [mentors]);
+  }, [mentors, isArabic]);
 
   const uniqueIndustries = useMemo(() => {
     const industriesSet = new Set<string>();
     mentors.forEach((mentor) => {
-      mentor.industries?.forEach((ind) => industriesSet.add(ind));
+      const industries = isArabic && mentor.industries_ar ? mentor.industries_ar : mentor.industries;
+      industries?.forEach((ind) => industriesSet.add(ind));
     });
     return Array.from(industriesSet).sort();
-  }, [mentors]);
+  }, [mentors, isArabic]);
 
   const uniqueLanguages = useMemo(() => {
     const languagesSet = new Set<string>();
@@ -72,23 +77,23 @@ export function SearchAndFilter({ mentors, onFilterChange }: SearchAndFilterProp
     <div className="space-y-4">
       <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className={`absolute ${isArabic ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground`} />
           <Input
             data-testid="input-search-mentors"
             type="text"
-            placeholder="Search mentors by name, position, or company..."
+            placeholder={t('filters.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className={isArabic ? 'pr-9' : 'pl-9'}
           />
         </div>
 
         <Select value={expertise} onValueChange={setExpertise}>
           <SelectTrigger data-testid="select-expertise-filter" className="w-full md:w-48">
-            <SelectValue placeholder="Expertise" />
+            <SelectValue placeholder={t('filters.expertise')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Expertise</SelectItem>
+            <SelectItem value="all">{t('filters.allExpertise')}</SelectItem>
             {uniqueExpertise.map((exp) => (
               <SelectItem key={exp} value={exp}>
                 {exp}
@@ -99,10 +104,10 @@ export function SearchAndFilter({ mentors, onFilterChange }: SearchAndFilterProp
 
         <Select value={industry} onValueChange={setIndustry}>
           <SelectTrigger data-testid="select-industry-filter" className="w-full md:w-48">
-            <SelectValue placeholder="Industry" />
+            <SelectValue placeholder={t('filters.industry')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Industries</SelectItem>
+            <SelectItem value="all">{t('filters.allIndustries')}</SelectItem>
             {uniqueIndustries.map((ind) => (
               <SelectItem key={ind} value={ind}>
                 {ind}
@@ -113,10 +118,10 @@ export function SearchAndFilter({ mentors, onFilterChange }: SearchAndFilterProp
 
         <Select value={language} onValueChange={setLanguage}>
           <SelectTrigger data-testid="select-language-filter" className="w-full md:w-48">
-            <SelectValue placeholder="Language" />
+            <SelectValue placeholder={t('filters.language')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Languages</SelectItem>
+            <SelectItem value="all">{t('filters.allLanguages')}</SelectItem>
             {uniqueLanguages.map((lang) => (
               <SelectItem key={lang} value={lang}>
                 {lang}
@@ -132,8 +137,8 @@ export function SearchAndFilter({ mentors, onFilterChange }: SearchAndFilterProp
             onClick={handleClearFilters}
             className="w-full md:w-auto"
           >
-            <X className="w-4 h-4 mr-2" />
-            Clear
+            <X className={`w-4 h-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
+            {t('common.clear')}
           </Button>
         )}
       </div>

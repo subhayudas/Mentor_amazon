@@ -90,14 +90,14 @@ export default function MentorProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       toast({
-        title: "Booking Recorded",
-        description: "Your mentorship session has been tracked successfully.",
+        title: t('session.bookingRecorded'),
+        description: t('session.bookingRecordedDescription'),
       });
     },
     onError: () => {
       toast({
-        title: "Recording Failed",
-        description: "We couldn't save your booking after multiple attempts. Please contact support.",
+        title: t('session.recordingFailed'),
+        description: t('session.recordingFailedDescription'),
         variant: "destructive",
       });
     },
@@ -125,8 +125,8 @@ export default function MentorProfile() {
     setMenteeInfo({ name: data.name, email: data.email });
     setShowIdentityForm(false);
     toast({
-      title: "Identity Saved",
-      description: "You're all set! Your future sessions will be tracked automatically.",
+      title: t('identity.identitySaved'),
+      description: t('identity.identitySavedDescription'),
     });
   };
 
@@ -362,7 +362,7 @@ export default function MentorProfile() {
                   {menteeInfo ? (
                     <div className="space-y-1">
                       <p className="text-sm text-muted-foreground text-center">
-                        Bookings are automatically tracked for {menteeInfo.name}
+                        {t('identity.trackingFor')} {menteeInfo.name}
                       </p>
                       <Button
                         variant="ghost"
@@ -371,12 +371,12 @@ export default function MentorProfile() {
                         className="w-full text-xs"
                         data-testid="button-change-identity"
                       >
-                        Change Identity
+                        {t('identity.changeIdentity')}
                       </Button>
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center">
-                      Enter your details to enable automatic booking tracking
+                      {t('identity.enterDetailsPrompt')}
                     </p>
                   )}
                 </div>
@@ -386,18 +386,18 @@ export default function MentorProfile() {
 
           <div className="lg:col-span-3">
             <Card className="p-4">
-              <h2 className="text-2xl font-bold mb-4 px-4">Book a Session</h2>
+              <h2 className="text-2xl font-bold mb-4 px-4">{t('session.bookSession')}</h2>
               {!menteeInfo ? (
                 <div className="p-12 text-center space-y-4" data-testid="calendly-locked">
                   <p className="text-lg text-muted-foreground">
-                    Please enter your details to start booking sessions
+                    {t('identity.pleaseEnterDetails')}
                   </p>
                   <Button
                     onClick={() => setShowIdentityForm(true)}
                     size="lg"
                     data-testid="button-enter-details"
                   >
-                    Enter Your Details
+                    {t('identity.enterDetails')}
                   </Button>
                 </div>
               ) : isLoading ? (
@@ -408,7 +408,7 @@ export default function MentorProfile() {
                 <>
                   {availableDurations.length > 1 && (
                     <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
-                      <p className="text-sm font-semibold mb-3">Select Session Duration</p>
+                      <p className="text-sm font-semibold mb-3">{t('session.selectDuration')}</p>
                       <div className="flex gap-3">
                         {availableDurations.map((duration) => (
                           <Button
@@ -418,7 +418,7 @@ export default function MentorProfile() {
                             className="flex-1"
                             data-testid={`button-duration-${duration}`}
                           >
-                            {duration} Minutes
+                            {duration} {t('session.minutes')}
                           </Button>
                         ))}
                       </div>
@@ -427,7 +427,7 @@ export default function MentorProfile() {
                   {availableDurations.length === 1 && (
                     <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
                       <p className="text-sm text-muted-foreground text-center">
-                        {availableDurations[0]}-minute mentorship session
+                        {availableDurations[0]} {t('session.minuteSession')}
                       </p>
                     </div>
                   )}
@@ -449,9 +449,9 @@ export default function MentorProfile() {
         <Dialog open={showIdentityForm} onOpenChange={setShowIdentityForm}>
           <DialogContent data-testid="dialog-enter-identity">
             <DialogHeader>
-              <DialogTitle>Enter Your Details</DialogTitle>
+              <DialogTitle>{t('identity.enterDetails')}</DialogTitle>
               <DialogDescription>
-                To enable automatic session tracking, please provide your name and email. This will be saved and used for all future bookings.
+                {t('identity.enterDetailsDescription')}
               </DialogDescription>
             </DialogHeader>
 
@@ -462,11 +462,11 @@ export default function MentorProfile() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Your Name</FormLabel>
+                      <FormLabel>{t('identity.yourName')}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder="John Doe"
+                          placeholder={t('identity.namePlaceholder')}
                           data-testid="input-identity-name"
                         />
                       </FormControl>
@@ -480,12 +480,12 @@ export default function MentorProfile() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Your Email</FormLabel>
+                      <FormLabel>{t('identity.yourEmail')}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="email"
-                          placeholder="john@example.com"
+                          placeholder={t('identity.emailPlaceholder')}
                           data-testid="input-identity-email"
                         />
                       </FormControl>
@@ -501,13 +501,13 @@ export default function MentorProfile() {
                     onClick={() => setShowIdentityForm(false)}
                     data-testid="button-cancel-identity"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     type="submit"
                     data-testid="button-submit-identity"
                   >
-                    Save & Continue
+                    {t('identity.saveAndContinue')}
                   </Button>
                 </DialogFooter>
               </form>

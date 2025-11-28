@@ -229,5 +229,39 @@
   "contextualInfo": {
     "mentorTitle": "What to Expect as a Mentor",
     "menteeTitle": "What to Expect as a Mentee"
+  },
+  "filters": {
+    "searchPlaceholder": "Search mentors by name, position, or company...",
+    "expertise": "Expertise",
+    "industry": "Industry",
+    "language": "Language",
+    "allExpertise": "All Expertise",
+    "allIndustries": "All Industries",
+    "allLanguages": "All Languages"
+  },
+  "identity": {
+    "enterDetails": "Enter Your Details",
+    "enterDetailsDescription": "To enable automatic session tracking, please provide your name and email. This will be saved and used for all future bookings.",
+    "enterDetailsPrompt": "Enter your details to enable automatic booking tracking",
+    "pleaseEnterDetails": "Please enter your details to start booking sessions",
+    "yourName": "Your Name",
+    "namePlaceholder": "John Doe",
+    "yourEmail": "Your Email",
+    "emailPlaceholder": "john@example.com",
+    "saveAndContinue": "Save & Continue",
+    "changeIdentity": "Change Identity",
+    "trackingFor": "Bookings are automatically tracked for",
+    "identitySaved": "Identity Saved",
+    "identitySavedDescription": "You're all set! Your future sessions will be tracked automatically."
+  },
+  "session": {
+    "bookSession": "Book a Session",
+    "selectDuration": "Select Session Duration",
+    "minutes": "Minutes",
+    "minuteSession": "minute mentorship session",
+    "bookingRecorded": "Booking Recorded",
+    "bookingRecordedDescription": "Your mentorship session has been tracked successfully.",
+    "recordingFailed": "Recording Failed",
+    "recordingFailedDescription": "We couldn't save your booking after multiple attempts. Please contact support."
   }
 }
