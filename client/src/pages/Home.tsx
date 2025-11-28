@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { Mentor } from "@shared/schema";
@@ -16,11 +16,7 @@ export default function Home() {
   const { t } = useTranslation();
   const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
 
-  const { data: allMentors } = useQuery<Mentor[]>({
-    queryKey: ["/api/mentors"],
-  });
-
-  const buildQueryString = () => {
+  const buildQueryString = useCallback(() => {
     const params = new URLSearchParams();
     if (filters.search) params.append("search", filters.search);
     if (filters.expertise && filters.expertise !== "all") params.append("expertise", filters.expertise);
@@ -28,17 +24,27 @@ export default function Home() {
     if (filters.language && filters.language !== "all") params.append("language", filters.language);
     const queryString = params.toString();
     return queryString ? `?${queryString}` : "";
-  };
+  }, [filters]);
 
-  const { data: mentors, isLoading } = useQuery<Mentor[]>({
+  const { data: mentors, isLoading, error } = useQuery<Mentor[]>({
     queryKey: ["/api/mentors", filters.search, filters.expertise, filters.industry, filters.language],
     queryFn: async () => {
       const queryString = buildQueryString();
-      const response = await fetch(`/api/mentors${queryString}`);
+      const response = await fetch(`/api/mentors${queryString}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       if (!response.ok) throw new Error("Failed to fetch mentors");
-      return response.json();
+      const data = await response.json();
+      return data;
     },
+    staleTime: 0,
+    refetchOnMount: true,
   });
+
+  const allMentors = mentors;
 
   const handleFilterChange = useCallback((newFilters: { search: string; expertise: string; industry: string; language: string }) => {
     setFilters(newFilters);
@@ -139,6 +145,20 @@ export default function Home() {
                   </Card>
                 ))}
               </div>
+            ) : error ? (
+              <Card className="p-12 text-center">
+                <p className="text-destructive" data-testid="text-error">
+                  {t('errors.loadFailed')}
+                </p>
+                <Button 
+                  variant="outline" 
+                  className="mt-4"
+                  onClick={() => window.location.reload()}
+                  data-testid="button-retry"
+                >
+                  {t('actions.retry')}
+                </Button>
+              </Card>
             ) : mentors && mentors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" data-testid="mentor-grid">
                 {mentors.map((mentor) => (

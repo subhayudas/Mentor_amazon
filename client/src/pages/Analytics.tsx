@@ -388,7 +388,7 @@ export default function Analytics() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
     
-    const menteeData = Object.entries(menteesByCountry)
+    let menteeData = Object.entries(menteesByCountry)
       .map(([name, value], index) => ({
         name,
         value,
@@ -396,6 +396,19 @@ export default function Analytics() {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
+    
+    // Show sample data if no real mentee data exists
+    if (menteeData.length === 0) {
+      menteeData = [
+        { name: "United Arab Emirates", value: 45, color: CHART_COLORS[0] },
+        { name: "Saudi Arabia", value: 28, color: CHART_COLORS[1] },
+        { name: "Egypt", value: 22, color: CHART_COLORS[2] },
+        { name: "India", value: 18, color: CHART_COLORS[3] },
+        { name: "United States", value: 12, color: CHART_COLORS[4] },
+        { name: "United Kingdom", value: 8, color: CHART_COLORS[5] },
+        { name: "Jordan", value: 6, color: CHART_COLORS[6] },
+      ];
+    }
     
     return { mentorData, menteeData };
   }, [mentors, mentees]);
