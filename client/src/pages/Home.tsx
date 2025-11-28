@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Mentor } from "@shared/schema";
 import { MentorCard } from "@/components/MentorCard";
 import { SearchAndFilter } from "@/components/SearchAndFilter";
@@ -12,6 +13,7 @@ import { Link } from "wouter";
 import amazonUaeOffice from "@assets/image_1763393258786.png";
 
 export default function Home() {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
 
   const { data: allMentors } = useQuery<Mentor[]>({
@@ -64,7 +66,7 @@ export default function Home() {
             <div className="absolute top-0 left-0 right-0 pt-4 md:pt-6 lg:pt-8 px-4 md:px-8 text-center">
               <div className="space-y-1 md:space-y-2">
                 <Badge variant="outline" className="bg-orange-500 text-white border-orange-500/20 text-xs md:text-sm">
-                  Amazon UAE Mentorship Program
+                  {t('hero.badge')}
                 </Badge>
               </div>
             </div>
@@ -73,17 +75,17 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-8 mt-8">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-orange-500" />
-              <span>Trusted Mentorship</span>
+              <span>{t('hero.trustedMentorship')}</span>
             </div>
             <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
             <div className="flex items-center gap-2">
               <Target className="w-5 h-5 text-orange-500" />
-              <span>Expert Guidance</span>
+              <span>{t('hero.expertGuidance')}</span>
             </div>
             <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-orange-500" />
-              <span>Flexible Scheduling</span>
+              <span>{t('hero.flexibleScheduling')}</span>
             </div>
           </div>
         </div>
@@ -95,15 +97,15 @@ export default function Home() {
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div className="text-center md:text-left">
                 <h2 className="text-3xl font-bold mb-2">
-                  Featured Mentors
+                  {t('mentors.featured')}
                   {activeFilterCount > 0 && (
                     <Badge variant="secondary" className="ml-3 align-middle">
-                      {activeFilterCount} {activeFilterCount === 1 ? "filter" : "filters"} active
+                      {activeFilterCount} {t('mentors.filtersActive', { count: activeFilterCount })}
                     </Badge>
                   )}
                 </h2>
                 <p className="text-muted-foreground">
-                  Browse our curated list of experienced professionals
+                  {t('mentors.browseDescription')}
                 </p>
               </div>
             </div>
@@ -147,8 +149,8 @@ export default function Home() {
               <Card className="p-12 text-center">
                 <p className="text-muted-foreground" data-testid="text-no-results">
                   {activeFilterCount > 0 
-                    ? "No mentors found matching your filters. Try adjusting your search criteria."
-                    : "No mentors available at the moment."}
+                    ? t('mentors.noResultsFilter')
+                    : t('mentors.noResults')}
                 </p>
               </Card>
             )}

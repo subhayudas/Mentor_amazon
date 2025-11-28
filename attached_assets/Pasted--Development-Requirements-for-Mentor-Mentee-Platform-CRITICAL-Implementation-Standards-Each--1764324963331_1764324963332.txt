@@ -1,0 +1,195 @@
+# Development Requirements for Mentor-Mentee Platform
+
+## CRITICAL: Implementation Standards
+- Each feature below must be fully functional with robust error handling
+- Test all user flows thoroughly before marking as complete
+- Implement data validation on both frontend and backend
+- Ensure responsive design works across all devices
+- Add loading states and user feedback for all actions
+
+---
+
+## 1. Analytics Dashboard - Geographic Statistics
+
+**Requirements:**
+- Add country-based statistics displaying the geographic distribution of mentors and mentees
+- Show data in two separate views/sections:
+  - Mentor locations by country (with counts)
+  - Mentee locations by country (with counts)
+- Include visual representation (charts/maps recommended)
+- Ensure data updates in real-time as new users register
+
+**Technical Notes:**
+- Store country data during user registration
+- Implement data aggregation queries efficiently
+- Consider using a library like Chart.js or Recharts for visualization
+
+---
+
+## 2. Mentor Signup Form - Mentorship Preference
+
+**Requirements:**
+- Add a new required field asking mentors to select their preferred mentorship model:
+  - Option 1: "Ongoing mentorship with one mentee" (long-term commitment)
+  - Option 2: "Different mentees each session" (flexible, rotating mentees)
+- Make this a clear radio button or dropdown selection
+- Store this preference in the mentor's profile
+- Use this data in the matching algorithm
+
+**Validation:**
+- Field must be required (cannot submit without selection)
+- Display clear descriptions for each option so mentors understand the commitment
+
+---
+
+## 3. Mentee Signup Form - Organizational Information
+
+**Requirements:**
+- Research Taproot+ platform (taproot.org or similar mentorship platforms) to understand what organizational information they collect
+- Add comprehensive fields for mentee organizations including:
+  - Organization name
+  - Organization type/sector
+  - Mission statement or description
+  - Current challenges/goals for mentorship
+  - Team size
+  - Website/social media links
+  - Any other relevant fields found in Taproot's model
+
+**Action Item:**
+- Before implementing, share the proposed fields list for review
+- Ensure all fields have proper validation and help text
+
+---
+
+## 4. Bilingual Support - English/Arabic Toggle
+
+**Requirements:**
+- Implement complete bilingual support for the entire platform
+- Add a language toggle switch (visible on all pages):
+  - English ⇄ Arabic switching
+  - Placed in header/navigation for easy access
+  - Persist language preference in user session/cookies
+- All UI elements, forms, buttons, labels, navigation, and content must be translatable
+- Use a proper internationalization (i18n) framework:
+  - Recommended: react-i18next for React or similar for your stack
+  - Create separate translation files (en.json, ar.json)
+- Handle right-to-left (RTL) layout for Arabic:
+  - Text alignment
+  - Layout mirroring where appropriate
+  - Maintain proper spacing and formatting
+
+**Critical:**
+- Every piece of text on the platform must have translations
+- Test thoroughly in both languages
+- Ensure form validations work in both languages
+
+---
+
+## 5. Contextual Information Above Signup Forms
+
+**Implementation Note:**
+- Leave placeholder sections above both mentor and mentee signup forms
+- These sections should be easily editable (consider using a CMS or admin panel)
+- Will add content describing expectations, benefits, and process
+- Make the layout flexible to accommodate text, lists, and potentially images
+
+**Structure:**
+- Clear heading: "What to Expect"
+- Expandable/collapsible sections if content is lengthy
+- Must be visible on both English and Arabic versions
+
+---
+
+## 6. Mentor Session Approval System (High Priority, Complex)
+
+**Requirements:**
+- Implement a session request workflow:
+  1. Mentee requests a session with a mentor
+  2. Mentor receives notification of the request
+  3. Mentor can view session details (date, time, mentee info, topic)
+  4. Mentor has options to:
+     - **Accept** - Session is confirmed and added to both calendars
+     - **Reject** - Mentee is notified, session not scheduled
+     - **Propose alternative time** (optional enhancement)
+  5. Only after mentor acceptance does the session appear on calendars
+
+**Technical Implementation:**
+- Create a "Pending Sessions" view for mentors
+- Add notification system (email/in-app) when new session requested
+- Implement session status tracking (pending/accepted/rejected)
+- Update calendar integration only after acceptance
+- Send confirmation notifications to both parties
+- Handle timeout scenarios (if mentor doesn't respond within X days)
+
+**User Experience:**
+- Clear notification badges for pending requests
+- Easy-to-use accept/reject interface
+- Show all relevant session information before decision
+- Provide feedback messages after each action
+
+**Fallback Plan:**
+- If too complex initially, document the feature clearly for Phase 2
+- At minimum, implement email notifications to mentors about new bookings with session details
+
+---
+
+## Testing Checklist
+
+Before considering any feature complete, verify:
+- [ ] Works in both English and Arabic
+- [ ] Mobile responsive
+- [ ] All form validations work
+- [ ] Database properly stores all data
+- [ ] Error states handled gracefully
+- [ ] User receives appropriate feedback
+- [ ] No console errors
+- [ ] Tested with real-world data scenarios
+
+---
+
+## Priority Order
+
+1. **HIGH:** Bilingual toggle (foundation for all other features)
+2. **HIGH:** Mentor signup preference field (simple, critical for matching)
+3. **MEDIUM:** Analytics geographic statistics
+4. **MEDIUM:** Enhanced mentee signup form
+5. **MEDIUM:** Mentor session approval system
+6. **LOW:** Contextual information sections (content pending)
+
+---
+
+## CRITICAL: Implementation Constraints
+
+**NON-NEGOTIABLE REQUIREMENTS:**
+
+1. **DO NOT break existing functionality** - All current features must continue working exactly as they do now
+2. **DO NOT change the core architecture** - Keep the existing tech stack and structure
+3. **Make minimal, surgical changes** - Add new features without refactoring existing code
+4. **Test existing features after each change** - Ensure nothing breaks
+5. **Keep the app runnable at all times** - Never leave it in a non-functional state
+
+## Technical Decisions - Use Existing Solutions
+
+For any unknowns, **use whatever is already in the codebase**:
+
+- **Country list**: Use a standard library (like country-list npm package) or simple dropdown with major countries
+- **Calendar system**: If calendar integration exists, extend it. If not, start with a simple database-stored schedule
+- **Notifications**: If email is set up, use that. If nothing exists, start with in-app notifications only (simplest)
+- **i18n implementation**: Use the most popular library for your framework (react-i18next for React, vue-i18n for Vue, etc.)
+- **Admin content editing**: For now, just hardcode the contextual text in a separate config file that can be easily edited later
+
+## Development Approach
+
+1. **Analyze the existing codebase first** - Understand what's already there before adding anything
+2. **Add features incrementally** - One at a time, test, commit, then move to next
+3. **Use feature flags if possible** - So new features can be turned off if they cause issues
+4. **Keep backups/commits frequent** - So you can roll back if something breaks
+5. **Default to the simplest working solution** - Don't over-engineer
+
+## If You Hit a Blocker
+
+- **Don't guess** - Ask for clarification if something is unclear about existing code
+- **Don't break things to add features** - If a feature would require major changes, flag it and suggest a simpler alternative
+- **Provide options** - If you're unsure about implementation approach, present 2-3 options with pros/cons
+
+The goal is **new features that integrate smoothly**, not a rewrite. Preserve what works, add what's needed.

@@ -34,6 +34,7 @@ export class DatabaseStorage implements IStorage {
             company: "Amazon",
             position: "Senior Product Manager",
             timezone: "Asia/Dubai",
+            country: "United Arab Emirates",
             photo_url: "/attached_assets/image_1763386758212.png",
             bio: "Leading product development for Amazon's Middle East marketplace. 8+ years of experience in e-commerce and digital transformation. Passionate about mentoring aspiring product managers in the MENA region.",
             linkedin_url: "https://linkedin.com/in/vatsshah",
@@ -45,6 +46,7 @@ export class DatabaseStorage implements IStorage {
             industries: ["E-commerce", "Technology", "Retail"],
             languages_spoken: ["English", "Hindi"],
             comms_owner: "exec",
+            mentorship_preference: "rotating",
           },
           {
             name: "Layla Mahmoud",
@@ -52,6 +54,7 @@ export class DatabaseStorage implements IStorage {
             company: "Amazon",
             position: "Engineering Manager, AWS",
             timezone: "Asia/Dubai",
+            country: "United Arab Emirates",
             photo_url: "/attached_assets/image_1763386693493.png",
             bio: "Building scalable cloud infrastructure for AWS customers across EMEA. 10+ years in distributed systems and team leadership. I mentor engineers on career growth, system design, and technical excellence.",
             linkedin_url: "https://linkedin.com/in/laylamahmoud",
@@ -63,6 +66,7 @@ export class DatabaseStorage implements IStorage {
             industries: ["Cloud Computing", "Technology", "Infrastructure"],
             languages_spoken: ["English", "Arabic", "French"],
             comms_owner: "exec",
+            mentorship_preference: "ongoing",
           },
           {
             name: "Omar Khalil",
@@ -70,6 +74,7 @@ export class DatabaseStorage implements IStorage {
             company: "Amazon",
             position: "Senior UX Designer",
             timezone: "Africa/Cairo",
+            country: "Egypt",
             photo_url: "/attached_assets/image_1763386720221.png",
             bio: "Crafting localized shopping experiences for Middle East customers. Specializing in Arabic UX, accessibility, and cross-cultural design. Happy to help designers navigate the unique challenges of regional markets.",
             linkedin_url: "https://linkedin.com/in/omarkhalil",
@@ -81,6 +86,7 @@ export class DatabaseStorage implements IStorage {
             industries: ["E-commerce", "Technology", "Design"],
             languages_spoken: ["English", "Arabic"],
             comms_owner: "assistant",
+            mentorship_preference: "rotating",
           },
           {
             name: "Levi Lewandowski",
@@ -88,6 +94,7 @@ export class DatabaseStorage implements IStorage {
             company: "Amazon",
             position: "Strategic Partnerships Lead",
             timezone: "America/New_York",
+            country: "United States",
             photo_url: "/attached_assets/image_1763387494054.png",
             bio: "Building strategic partnerships and accelerating growth initiatives for Amazon's innovation programs. Expert in startup ecosystems, venture partnerships, and business development. I mentor entrepreneurs and partnership professionals on scaling strategies.",
             linkedin_url: "https://linkedin.com/in/levilewandowski",
@@ -99,6 +106,7 @@ export class DatabaseStorage implements IStorage {
             industries: ["Technology", "Startups", "Innovation"],
             languages_spoken: ["English"],
             comms_owner: "exec",
+            mentorship_preference: "rotating",
           },
           {
             name: "Karim Nasser",
@@ -106,6 +114,7 @@ export class DatabaseStorage implements IStorage {
             company: "Amazon",
             position: "Data Science Lead",
             timezone: "Africa/Cairo",
+            country: "Egypt",
             photo_url: "/attached_assets/image_1763386661657.png",
             bio: "Building recommendation systems and predictive models for Amazon's Middle East operations. 12+ years in machine learning and analytics. I help data professionals develop ML skills and advance their careers.",
             linkedin_url: "https://linkedin.com/in/karimnasser",
@@ -117,6 +126,7 @@ export class DatabaseStorage implements IStorage {
             industries: ["Technology", "E-commerce", "Data Analytics"],
             languages_spoken: ["English", "Arabic"],
             comms_owner: "exec",
+            mentorship_preference: "ongoing",
           },
           {
             name: "Nour Ibrahim",
@@ -124,6 +134,7 @@ export class DatabaseStorage implements IStorage {
             company: "Amazon",
             position: "Operations Manager, Fulfillment",
             timezone: "Asia/Dubai",
+            country: "United Arab Emirates",
             photo_url: "/attached_assets/image_1763386772495.png",
             bio: "Optimizing logistics and supply chain operations across Middle East fulfillment centers. Expert in operational excellence, process improvement, and team management. Mentoring operations professionals on leadership and efficiency.",
             linkedin_url: "https://linkedin.com/in/nouribrahim",
@@ -135,6 +146,7 @@ export class DatabaseStorage implements IStorage {
             industries: ["E-commerce", "Logistics", "Operations"],
             languages_spoken: ["English", "Arabic"],
             comms_owner: "assistant",
+            mentorship_preference: "rotating",
           },
           {
             name: "Youssef Fahmy",
@@ -142,6 +154,7 @@ export class DatabaseStorage implements IStorage {
             company: "Amazon",
             position: "Senior Business Analyst",
             timezone: "Africa/Cairo",
+            country: "Egypt",
             photo_url: "/attached_assets/image_1763386732789.png",
             bio: "Transforming data into strategic insights for retail operations. Specialized in business intelligence, SQL, and data visualization. I mentor analysts on technical skills and business acumen.",
             linkedin_url: "https://linkedin.com/in/yousseffahmy",
@@ -153,6 +166,7 @@ export class DatabaseStorage implements IStorage {
             industries: ["E-commerce", "Retail", "Analytics"],
             languages_spoken: ["English", "Arabic"],
             comms_owner: "exec",
+            mentorship_preference: "ongoing",
           },
         ];
 

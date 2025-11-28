@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Booking, Mentor, Mentee } from "@shared/schema";
 import { MetricCard } from "@/components/MetricCard";
 import { Card } from "@/components/ui/card";
@@ -176,6 +177,7 @@ function aggregateBookingsByDate(
 }
 
 export default function Analytics() {
+  const { t } = useTranslation();
   const [dateRange, setDateRange] = useState<DateRange>("30");
   const [selectedMentor, setSelectedMentor] = useState<string>("all");
   const [selectedMenteeType, setSelectedMenteeType] = useState<string>("all");
@@ -353,6 +355,51 @@ export default function Analytics() {
       .slice(0, 10);
   }, [useMockData, filteredBookings, mentors]);
 
+  const geographicDistribution = useMemo(() => {
+    const mentorsByCountry: Record<string, number> = {};
+    const menteesByCountry: Record<string, number> = {};
+    
+    mentors?.forEach((mentor) => {
+      const country = mentor.country || "Not specified";
+      mentorsByCountry[country] = (mentorsByCountry[country] || 0) + 1;
+    });
+    
+    mentees?.forEach((mentee) => {
+      const country = mentee.country || "Not specified";
+      menteesByCountry[country] = (menteesByCountry[country] || 0) + 1;
+    });
+    
+    const CHART_COLORS = [
+      "hsl(var(--chart-1))",
+      "hsl(var(--chart-2))",
+      "hsl(var(--chart-3))",
+      "hsl(var(--chart-4))",
+      "hsl(var(--chart-5))",
+      "hsl(var(--primary))",
+      "hsl(var(--secondary))",
+    ];
+    
+    const mentorData = Object.entries(mentorsByCountry)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 7);
+    
+    const menteeData = Object.entries(menteesByCountry)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 7);
+    
+    return { mentorData, menteeData };
+  }, [mentors, mentees]);
+
   const totalBookings = useMockData ? MOCK_ANALYTICS_DATA.kpis.total_bookings : filteredBookings.length;
   const scheduledCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.upcoming_meetings : filteredBookings.filter((b) => b.status === "scheduled").length;
   const completedCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.completed_meetings : filteredBookings.filter((b) => b.status === "completed").length;
@@ -379,47 +426,47 @@ export default function Analytics() {
       <div className="max-w-7xl mx-auto px-4 md:px-8 space-y-8">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-4xl font-bold">Analytics Dashboard</h1>
+            <h1 className="text-4xl font-bold">{t('analytics.title')}</h1>
             {useMockData && (
               <Badge variant="outline" className="text-sm" data-testid="badge-demo-data">
-                Demo Data
+                {t('analytics.demoData')}
               </Badge>
             )}
           </div>
           <p className="text-muted-foreground">
-            Comprehensive insights into your mentorship program's performance
+            {t('analytics.subtitle')}
           </p>
         </div>
 
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">
             <Filter className="w-5 h-5 text-primary" />
-            <h2 className="text-lg font-semibold">Filters</h2>
+            <h2 className="text-lg font-semibold">{t('analytics.filters')}</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Date Range</label>
+              <label className="text-sm font-medium">{t('analytics.dateRange')}</label>
               <Select value={dateRange} onValueChange={(value) => setDateRange(value as DateRange)}>
                 <SelectTrigger data-testid="select-date-range">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                  <SelectItem value="all">All time</SelectItem>
+                  <SelectItem value="7">{t('analytics.last7Days')}</SelectItem>
+                  <SelectItem value="30">{t('analytics.last30Days')}</SelectItem>
+                  <SelectItem value="90">{t('analytics.last90Days')}</SelectItem>
+                  <SelectItem value="all">{t('analytics.allTime')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Mentor</label>
+              <label className="text-sm font-medium">{t('analytics.mentor')}</label>
               <Select value={selectedMentor} onValueChange={setSelectedMentor}>
                 <SelectTrigger data-testid="select-mentor">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Mentors</SelectItem>
+                  <SelectItem value="all">{t('analytics.allMentors')}</SelectItem>
                   {mentors?.map((mentor) => (
                     <SelectItem key={mentor.id} value={mentor.id}>
                       {mentor.name}
@@ -430,27 +477,27 @@ export default function Analytics() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Mentee Type</label>
+              <label className="text-sm font-medium">{t('analytics.menteeType')}</label>
               <Select value={selectedMenteeType} onValueChange={setSelectedMenteeType}>
                 <SelectTrigger data-testid="select-mentee-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="individual">Individual</SelectItem>
-                  <SelectItem value="organization">Organization</SelectItem>
+                  <SelectItem value="all">{t('analytics.allTypes')}</SelectItem>
+                  <SelectItem value="individual">{t('menteeRegistration.individual')}</SelectItem>
+                  <SelectItem value="organization">{t('menteeRegistration.organization')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Language</label>
+              <label className="text-sm font-medium">{t('analytics.language')}</label>
               <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
                 <SelectTrigger data-testid="select-language">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Languages</SelectItem>
+                  <SelectItem value="all">{t('analytics.allLanguages')}</SelectItem>
                   {filterOptions.languages.map((lang) => (
                     <SelectItem key={lang} value={lang}>
                       {lang}
@@ -461,13 +508,13 @@ export default function Analytics() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Expertise</label>
+              <label className="text-sm font-medium">{t('analytics.expertise')}</label>
               <Select value={selectedExpertise} onValueChange={setSelectedExpertise}>
                 <SelectTrigger data-testid="select-expertise">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Expertise</SelectItem>
+                  <SelectItem value="all">{t('analytics.allExpertise')}</SelectItem>
                   {filterOptions.expertises.map((exp) => (
                     <SelectItem key={exp} value={exp}>
                       {exp}
@@ -514,7 +561,7 @@ export default function Analytics() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5 text-primary" />
-              <h2 className="text-2xl font-bold">Bookings Over Time</h2>
+              <h2 className="text-2xl font-bold">{t('analytics.bookingsOverTime')}</h2>
             </div>
             {isLoading ? (
               <Card className="p-8">
@@ -580,7 +627,7 @@ export default function Analytics() {
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
-              <h2 className="text-2xl font-bold">Status Breakdown</h2>
+              <h2 className="text-2xl font-bold">{t('analytics.statusBreakdown')}</h2>
             </div>
             {isLoading ? (
               <Card className="p-8">
@@ -626,7 +673,7 @@ export default function Analytics() {
         <div className="space-y-4">
           <div className="flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-primary" />
-            <h2 className="text-2xl font-bold">Top Mentor Performance</h2>
+            <h2 className="text-2xl font-bold">{t('analytics.topMentorPerformance')}</h2>
           </div>
           {isLoading ? (
             <Card className="p-8">
@@ -677,6 +724,114 @@ export default function Analytics() {
               <p className="text-muted-foreground">No mentor performance data available</p>
             </Card>
           )}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-primary" />
+              <h2 className="text-2xl font-bold">{t('analytics.mentorsByCountry')}</h2>
+            </div>
+            {isLoading ? (
+              <Card className="p-8">
+                <Skeleton className="h-[300px] w-full" />
+              </Card>
+            ) : geographicDistribution.mentorData.length > 0 ? (
+              <Card className="p-8" data-testid="chart-mentors-by-country">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={geographicDistribution.mentorData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis
+                      type="number"
+                      className="text-xs"
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      className="text-xs"
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                      width={100}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      fill="hsl(var(--chart-2))"
+                      radius={[0, 4, 4, 0]}
+                      name="Mentors"
+                    >
+                      {geographicDistribution.mentorData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            ) : (
+              <Card className="p-12 text-center">
+                <p className="text-muted-foreground">No mentor geographic data available</p>
+              </Card>
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Globe className="w-5 h-5 text-primary" />
+              <h2 className="text-2xl font-bold">{t('analytics.menteesByCountry')}</h2>
+            </div>
+            {isLoading ? (
+              <Card className="p-8">
+                <Skeleton className="h-[300px] w-full" />
+              </Card>
+            ) : geographicDistribution.menteeData.length > 0 ? (
+              <Card className="p-8" data-testid="chart-mentees-by-country">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={geographicDistribution.menteeData} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis
+                      type="number"
+                      className="text-xs"
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      className="text-xs"
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                      width={100}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Bar
+                      dataKey="value"
+                      fill="hsl(var(--chart-3))"
+                      radius={[0, 4, 4, 0]}
+                      name="Mentees"
+                    >
+                      {geographicDistribution.menteeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            ) : (
+              <Card className="p-12 text-center">
+                <p className="text-muted-foreground">No mentee geographic data available</p>
+              </Card>
+            )}
+          </div>
         </div>
 
         {useMockData && (
@@ -786,7 +941,7 @@ export default function Analytics() {
         )}
 
         <div>
-          <h2 className="text-2xl font-bold mb-4">Recent Bookings</h2>
+          <h2 className="text-2xl font-bold mb-4">{t('analytics.recentBookings')}</h2>
           {isLoading ? (
             <Card className="p-8">
               <Skeleton className="h-96 w-full" />

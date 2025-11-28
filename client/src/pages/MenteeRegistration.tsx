@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { insertMenteeSchema, type InsertMentee, type Mentee } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +28,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { X, BookOpen, Users, Target, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 const TIMEZONES = [
@@ -64,7 +65,58 @@ const AREAS_EXPLORING_OPTIONS = [
   "Digital Marketing",
 ];
 
+const COUNTRY_OPTIONS = [
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Egypt",
+  "Kuwait",
+  "Qatar",
+  "Bahrain",
+  "Oman",
+  "Jordan",
+  "Lebanon",
+  "Morocco",
+  "Tunisia",
+  "Algeria",
+  "Iraq",
+  "Syria",
+  "Palestine",
+  "Turkey",
+  "Pakistan",
+  "India",
+  "Bangladesh",
+  "United Kingdom",
+  "United States",
+  "Germany",
+  "France",
+  "Other",
+];
+
+const SECTOR_OPTIONS = [
+  "technology",
+  "healthcare",
+  "education",
+  "finance",
+  "nonprofit",
+  "government",
+  "retail",
+  "manufacturing",
+  "media",
+  "consulting",
+  "other",
+];
+
+const ORG_SIZE_OPTIONS = [
+  "1-10",
+  "11-50",
+  "51-200",
+  "201-500",
+  "501-1000",
+  "1000+",
+];
+
 export default function MenteeRegistration() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -87,7 +139,13 @@ export default function MenteeRegistration() {
       email: "",
       user_type: "individual",
       organization_name: "",
-      timezone: "Africa/Cairo",
+      organization_website: "",
+      organization_sector: "",
+      organization_size: "",
+      organization_mission: "",
+      organization_needs: "",
+      country: "",
+      timezone: "Asia/Dubai",
       photo_url: "",
       bio: "",
       linkedin_url: "",
@@ -102,6 +160,11 @@ export default function MenteeRegistration() {
     form.setValue("user_type", value);
     if (value === "individual") {
       form.setValue("organization_name", "");
+      form.setValue("organization_website", "");
+      form.setValue("organization_sector", "");
+      form.setValue("organization_size", "");
+      form.setValue("organization_mission", "");
+      form.setValue("organization_needs", "");
       form.clearErrors("organization_name");
     }
   };
@@ -114,15 +177,15 @@ export default function MenteeRegistration() {
     onSuccess: (newMentee: Mentee) => {
       queryClient.invalidateQueries({ queryKey: ["/api/mentees"] });
       toast({
-        title: "Welcome to MentorConnect!",
-        description: "Your profile has been created successfully.",
+        title: t('menteeRegistration.successTitle'),
+        description: t('menteeRegistration.successMessage'),
       });
       if (newMentee?.id) {
         setLocation(`/profile/mentee/${newMentee.id}`);
       } else {
         toast({
-          title: "Redirect Failed",
-          description: "Profile created but couldn't navigate to it. Please check your profile from the home page.",
+          title: t('common.error'),
+          description: t('errors.somethingWentWrong'),
           variant: "destructive",
         });
         setLocation("/");
@@ -130,8 +193,8 @@ export default function MenteeRegistration() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create profile",
+        title: t('common.error'),
+        description: error.message || t('errors.somethingWentWrong'),
         variant: "destructive",
       });
     },
@@ -147,12 +210,49 @@ export default function MenteeRegistration() {
 
   return (
     <div className="min-h-screen bg-background py-12 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-primary" />
+              {t('menteeRegistration.contextTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              {t('menteeRegistration.contextDescription')}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-background/50">
+                <Users className="w-5 h-5 text-primary mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-sm">{t('menteeRegistration.benefit1Title')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('menteeRegistration.benefit1Desc')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-background/50">
+                <Target className="w-5 h-5 text-primary mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-sm">{t('menteeRegistration.benefit2Title')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('menteeRegistration.benefit2Desc')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-background/50">
+                <BookOpen className="w-5 h-5 text-primary mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-sm">{t('menteeRegistration.benefit3Title')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('menteeRegistration.benefit3Desc')}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-3xl">Join MentorConnect</CardTitle>
+            <CardTitle className="text-3xl">{t('menteeRegistration.title')}</CardTitle>
             <CardDescription>
-              Connect with expert mentors from Amazon and beyond
+              {t('menteeRegistration.description')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -163,7 +263,7 @@ export default function MenteeRegistration() {
                   name="user_type"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Account Type *</FormLabel>
+                      <FormLabel>{t('menteeRegistration.accountType')} *</FormLabel>
                       <FormControl>
                         <RadioGroup
                           onValueChange={(value) => handleUserTypeChange(value as "individual" | "organization")}
@@ -175,7 +275,7 @@ export default function MenteeRegistration() {
                               <RadioGroupItem value="individual" data-testid="radio-individual" />
                             </FormControl>
                             <FormLabel className="font-normal">
-                              Individual (Personal account)
+                              {t('menteeRegistration.individual')} ({t('menteeRegistration.individualDesc')})
                             </FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-3 space-y-0">
@@ -183,7 +283,7 @@ export default function MenteeRegistration() {
                               <RadioGroupItem value="organization" data-testid="radio-organization" />
                             </FormControl>
                             <FormLabel className="font-normal">
-                              Organization (Company or team account)
+                              {t('menteeRegistration.organization')} ({t('menteeRegistration.organizationDesc')})
                             </FormLabel>
                           </FormItem>
                         </RadioGroup>
@@ -198,7 +298,7 @@ export default function MenteeRegistration() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name *</FormLabel>
+                      <FormLabel>{t('menteeRegistration.fullName')} *</FormLabel>
                       <FormControl>
                         <Input placeholder="Jane Smith" {...field} data-testid="input-name" />
                       </FormControl>
@@ -212,7 +312,7 @@ export default function MenteeRegistration() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email *</FormLabel>
+                      <FormLabel>{t('menteeRegistration.email')} *</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="jane@example.com" {...field} data-testid="input-email" />
                       </FormControl>
@@ -222,55 +322,192 @@ export default function MenteeRegistration() {
                 />
 
                 {userType === "organization" && (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <h3 className="font-medium">{t('menteeRegistration.organizationInfo')}</h3>
+                    
+                    <FormField
+                      control={form.control}
+                      name="organization_name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('menteeRegistration.organizationName')} *</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Acme Corp" {...field} value={field.value || ""} data-testid="input-organization" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="organization_website"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('menteeRegistration.organizationWebsite')}</FormLabel>
+                          <FormControl>
+                            <Input placeholder="https://example.com" {...field} value={field.value || ""} data-testid="input-org-website" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="organization_sector"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('menteeRegistration.organizationSector')}</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-sector">
+                                  <SelectValue placeholder={t('menteeRegistration.selectSector')} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {SECTOR_OPTIONS.map((sector) => (
+                                  <SelectItem key={sector} value={sector}>
+                                    {t(`sectors.${sector}`)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="organization_size"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('menteeRegistration.organizationSize')}</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value || ""}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-size">
+                                  <SelectValue placeholder={t('menteeRegistration.selectSize')} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {ORG_SIZE_OPTIONS.map((size) => (
+                                  <SelectItem key={size} value={size}>
+                                    {t(`orgSizes.${size}`)}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="organization_mission"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('menteeRegistration.organizationMission')}</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder={t('menteeRegistration.missionPlaceholder')}
+                              className="min-h-20"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-org-mission"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="organization_needs"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('menteeRegistration.organizationNeeds')}</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder={t('menteeRegistration.needsPlaceholder')}
+                              className="min-h-20"
+                              {...field}
+                              value={field.value || ""}
+                              data-testid="input-org-needs"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="organization_name"
+                    name="timezone"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Organization Name *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Acme Corp" {...field} value={field.value || ""} data-testid="input-organization" />
-                        </FormControl>
+                        <FormLabel>{t('menteeRegistration.timezone')} *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-timezone">
+                              <SelectValue placeholder="Select your timezone" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TIMEZONES.map((tz) => (
+                              <SelectItem key={tz} value={tz}>
+                                {tz}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
 
-                <FormField
-                  control={form.control}
-                  name="timezone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Timezone *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-timezone">
-                            <SelectValue placeholder="Select your timezone" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {TIMEZONES.map((tz) => (
-                            <SelectItem key={tz} value={tz}>
-                              {tz}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('menteeRegistration.country')}</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-country">
+                              <SelectValue placeholder={t('menteeRegistration.selectCountry')} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {COUNTRY_OPTIONS.map((country) => (
+                              <SelectItem key={country} value={country}>
+                                {country}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
                   name="bio"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bio</FormLabel>
+                      <FormLabel>{t('menteeRegistration.bio')}</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Tell us about yourself and what you're looking to learn..."
+                          placeholder={t('menteeRegistration.bioPlaceholder')}
                           className="min-h-24"
                           {...field}
                           value={field.value || ""}
@@ -288,7 +525,7 @@ export default function MenteeRegistration() {
                     name="linkedin_url"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>LinkedIn URL</FormLabel>
+                        <FormLabel>{t('menteeRegistration.linkedinUrl')}</FormLabel>
                         <FormControl>
                           <Input placeholder="https://linkedin.com/in/..." {...field} value={field.value || ""} data-testid="input-linkedin" />
                         </FormControl>
@@ -302,7 +539,7 @@ export default function MenteeRegistration() {
                     name="photo_url"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Photo URL</FormLabel>
+                        <FormLabel>{t('menteeRegistration.photoUrl')}</FormLabel>
                         <FormControl>
                           <Input placeholder="https://..." {...field} value={field.value || ""} data-testid="input-photo" />
                         </FormControl>
@@ -317,7 +554,7 @@ export default function MenteeRegistration() {
                   name="languages_spoken"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Languages Spoken *</FormLabel>
+                      <FormLabel>{t('menteeRegistration.languagesSpoken')} *</FormLabel>
                       <Select
                         onValueChange={(value) => {
                           const currentValue = field.value || [];
@@ -328,7 +565,7 @@ export default function MenteeRegistration() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-languages">
-                            <SelectValue placeholder="Add languages" />
+                            <SelectValue placeholder={t('menteeRegistration.addLanguages')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -366,7 +603,7 @@ export default function MenteeRegistration() {
                   name="areas_exploring"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Areas You're Exploring *</FormLabel>
+                      <FormLabel>{t('menteeRegistration.areasExploring')} *</FormLabel>
                       <Select
                         onValueChange={(value) => {
                           const currentValue = field.value || [];
@@ -377,7 +614,7 @@ export default function MenteeRegistration() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-areas">
-                            <SelectValue placeholder="Add areas of interest" />
+                            <SelectValue placeholder={t('menteeRegistration.addAreas')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -406,7 +643,7 @@ export default function MenteeRegistration() {
                         ))}
                       </div>
                       <FormDescription>
-                        Select the skills and areas you want to learn more about
+                        {t('menteeRegistration.areasExploringHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -420,7 +657,7 @@ export default function MenteeRegistration() {
                     onClick={() => setLocation("/")}
                     data-testid="button-cancel"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     type="submit"
@@ -428,7 +665,7 @@ export default function MenteeRegistration() {
                     disabled={createMenteeMutation.isPending}
                     data-testid="button-submit"
                   >
-                    {createMenteeMutation.isPending ? "Creating Profile..." : "Create Profile"}
+                    {createMenteeMutation.isPending ? t('menteeRegistration.creating') : t('menteeRegistration.createProfile')}
                   </Button>
                 </div>
               </form>

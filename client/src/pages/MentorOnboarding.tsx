@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 import { insertMentorSchema, type InsertMentor, type Mentor } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -27,7 +28,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
+import { X, Users, Clock, Award, Globe } from "lucide-react";
 import { useState } from "react";
 
 const TIMEZONES = [
@@ -77,7 +78,35 @@ const LANGUAGE_OPTIONS = [
   "Turkish",
 ];
 
+const COUNTRY_OPTIONS = [
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Egypt",
+  "Kuwait",
+  "Qatar",
+  "Bahrain",
+  "Oman",
+  "Jordan",
+  "Lebanon",
+  "Morocco",
+  "Tunisia",
+  "Algeria",
+  "Iraq",
+  "Syria",
+  "Palestine",
+  "Turkey",
+  "Pakistan",
+  "India",
+  "Bangladesh",
+  "United Kingdom",
+  "United States",
+  "Germany",
+  "France",
+  "Other",
+];
+
 export default function MentorOnboarding() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
 
@@ -106,7 +135,8 @@ export default function MentorOnboarding() {
       email: "",
       company: "",
       position: "",
-      timezone: "Africa/Cairo",
+      timezone: "Asia/Dubai",
+      country: "",
       photo_url: "",
       bio: "",
       linkedin_url: "",
@@ -115,6 +145,7 @@ export default function MentorOnboarding() {
       industries: [],
       languages_spoken: [],
       comms_owner: "exec",
+      mentorship_preference: "rotating",
     },
   });
 
@@ -126,15 +157,15 @@ export default function MentorOnboarding() {
     onSuccess: (newMentor: Mentor) => {
       queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
       toast({
-        title: "Welcome to the Mentor Community!",
-        description: "Your mentor profile has been created successfully.",
+        title: t('mentorOnboarding.successTitle'),
+        description: t('mentorOnboarding.successMessage'),
       });
       if (newMentor?.id) {
         setLocation(`/profile/mentor/${newMentor.id}`);
       } else {
         toast({
-          title: "Redirect Failed",
-          description: "Profile created but couldn't navigate to it. Please check your profile from the home page.",
+          title: t('common.error'),
+          description: t('errors.somethingWentWrong'),
           variant: "destructive",
         });
         setLocation("/");
@@ -142,8 +173,8 @@ export default function MentorOnboarding() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: error.message || "Failed to create mentor profile",
+        title: t('common.error'),
+        description: error.message || t('errors.somethingWentWrong'),
         variant: "destructive",
       });
     },
@@ -159,12 +190,49 @@ export default function MentorOnboarding() {
 
   return (
     <div className="min-h-screen bg-background py-12 px-4">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto space-y-8">
+        <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+          <CardHeader>
+            <CardTitle className="text-2xl flex items-center gap-2">
+              <Award className="w-6 h-6 text-primary" />
+              {t('mentorOnboarding.contextTitle')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              {t('mentorOnboarding.contextDescription')}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-background/50">
+                <Users className="w-5 h-5 text-primary mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-sm">{t('mentorOnboarding.benefit1Title')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('mentorOnboarding.benefit1Desc')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-background/50">
+                <Clock className="w-5 h-5 text-primary mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-sm">{t('mentorOnboarding.benefit2Title')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('mentorOnboarding.benefit2Desc')}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 p-3 rounded-lg bg-background/50">
+                <Globe className="w-5 h-5 text-primary mt-0.5" />
+                <div>
+                  <h4 className="font-medium text-sm">{t('mentorOnboarding.benefit3Title')}</h4>
+                  <p className="text-xs text-muted-foreground">{t('mentorOnboarding.benefit3Desc')}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
-            <CardTitle className="text-3xl">Become a Mentor</CardTitle>
+            <CardTitle className="text-3xl">{t('mentorOnboarding.title')}</CardTitle>
             <CardDescription>
-              Join MentorConnect and share your expertise with Amazon employees and the wider community
+              {t('mentorOnboarding.description')}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -175,7 +243,7 @@ export default function MentorOnboarding() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Full Name *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.fullName')} *</FormLabel>
                       <FormControl>
                         <Input placeholder="John Doe" {...field} data-testid="input-name" />
                       </FormControl>
@@ -189,7 +257,7 @@ export default function MentorOnboarding() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.email')} *</FormLabel>
                       <FormControl>
                         <Input type="email" placeholder="john@example.com" {...field} data-testid="input-email" />
                       </FormControl>
@@ -204,7 +272,7 @@ export default function MentorOnboarding() {
                     name="company"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company</FormLabel>
+                        <FormLabel>{t('mentorOnboarding.company')}</FormLabel>
                         <FormControl>
                           <Input placeholder="Amazon" {...field} value={field.value || ""} data-testid="input-company" />
                         </FormControl>
@@ -218,7 +286,7 @@ export default function MentorOnboarding() {
                     name="position"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Position</FormLabel>
+                        <FormLabel>{t('mentorOnboarding.position')}</FormLabel>
                         <FormControl>
                           <Input placeholder="Senior Product Manager" {...field} value={field.value || ""} data-testid="input-position" />
                         </FormControl>
@@ -228,40 +296,67 @@ export default function MentorOnboarding() {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="timezone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Timezone *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-timezone">
-                            <SelectValue placeholder="Select your timezone" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {TIMEZONES.map((tz) => (
-                            <SelectItem key={tz} value={tz}>
-                              {tz}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="timezone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('mentorOnboarding.timezone')} *</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-timezone">
+                              <SelectValue placeholder="Select your timezone" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TIMEZONES.map((tz) => (
+                              <SelectItem key={tz} value={tz}>
+                                {tz}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="country"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('menteeRegistration.country')}</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-country">
+                              <SelectValue placeholder={t('menteeRegistration.selectCountry')} />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {COUNTRY_OPTIONS.map((country) => (
+                              <SelectItem key={country} value={country}>
+                                {country}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 <FormField
                   control={form.control}
                   name="bio"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Bio *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.bio')} *</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Tell us about yourself, your experience, and what you can help with..."
+                          placeholder={t('mentorOnboarding.bioPlaceholder')}
                           className="min-h-32"
                           {...field}
                           data-testid="input-bio"
@@ -278,7 +373,7 @@ export default function MentorOnboarding() {
                     name="linkedin_url"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>LinkedIn URL</FormLabel>
+                        <FormLabel>{t('mentorOnboarding.linkedinUrl')}</FormLabel>
                         <FormControl>
                           <Input placeholder="https://linkedin.com/in/..." {...field} value={field.value || ""} data-testid="input-linkedin" />
                         </FormControl>
@@ -292,7 +387,7 @@ export default function MentorOnboarding() {
                     name="photo_url"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Photo URL</FormLabel>
+                        <FormLabel>{t('mentorOnboarding.photoUrl')}</FormLabel>
                         <FormControl>
                           <Input placeholder="https://..." {...field} value={field.value || ""} data-testid="input-photo" />
                         </FormControl>
@@ -307,12 +402,12 @@ export default function MentorOnboarding() {
                   name="calendly_link"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Calendly Link *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.calendlyLink')} *</FormLabel>
                       <FormControl>
                         <Input placeholder="https://calendly.com/your-link" {...field} data-testid="input-calendly" />
                       </FormControl>
                       <FormDescription>
-                        Your personal Calendly scheduling link where mentees can book sessions
+                        {t('mentorOnboarding.calendlyHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -324,7 +419,7 @@ export default function MentorOnboarding() {
                   name="expertise"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Areas of Expertise *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.expertise')} *</FormLabel>
                       <Select
                         onValueChange={(value) => {
                           const currentValue = field.value || [];
@@ -335,7 +430,7 @@ export default function MentorOnboarding() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-expertise">
-                            <SelectValue placeholder="Add expertise areas" />
+                            <SelectValue placeholder={t('mentorOnboarding.addExpertise')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -373,7 +468,7 @@ export default function MentorOnboarding() {
                   name="industries"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Industries *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.industries')} *</FormLabel>
                       <Select
                         onValueChange={(value) => {
                           const currentValue = field.value || [];
@@ -384,7 +479,7 @@ export default function MentorOnboarding() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-industries">
-                            <SelectValue placeholder="Add industries" />
+                            <SelectValue placeholder={t('mentorOnboarding.addIndustries')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -422,7 +517,7 @@ export default function MentorOnboarding() {
                   name="languages_spoken"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Languages Spoken *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.languagesSpoken')} *</FormLabel>
                       <Select
                         onValueChange={(value) => {
                           const currentValue = field.value || [];
@@ -433,7 +528,7 @@ export default function MentorOnboarding() {
                       >
                         <FormControl>
                           <SelectTrigger data-testid="select-languages">
-                            <SelectValue placeholder="Add languages" />
+                            <SelectValue placeholder={t('mentorOnboarding.addLanguages')} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -471,7 +566,7 @@ export default function MentorOnboarding() {
                   name="comms_owner"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Communication Owner *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.commsOwner')} *</FormLabel>
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
@@ -483,7 +578,7 @@ export default function MentorOnboarding() {
                               <RadioGroupItem value="exec" data-testid="radio-exec" />
                             </FormControl>
                             <FormLabel className="font-normal">
-                              Executive (I manage my own calendar)
+                              {t('mentorOnboarding.commsExec')}
                             </FormLabel>
                           </FormItem>
                           <FormItem className="flex items-center space-x-3 space-y-0">
@@ -491,8 +586,54 @@ export default function MentorOnboarding() {
                               <RadioGroupItem value="assistant" data-testid="radio-assistant" />
                             </FormControl>
                             <FormLabel className="font-normal">
-                              Assistant (My assistant manages my calendar)
+                              {t('mentorOnboarding.commsAssistant')}
                             </FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="mentorship_preference"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('mentorOnboarding.mentorshipPreference')}</FormLabel>
+                      <FormDescription>{t('mentorOnboarding.mentorshipPreferenceHelp')}</FormDescription>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value || "rotating"}
+                          className="flex flex-col space-y-3 mt-2"
+                        >
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="ongoing" data-testid="radio-ongoing" />
+                            </FormControl>
+                            <div className="flex flex-col">
+                              <FormLabel className="font-medium">
+                                {t('mentorOnboarding.ongoingMentorship')}
+                              </FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                {t('mentorOnboarding.ongoingMentorshipDesc')}
+                              </p>
+                            </div>
+                          </FormItem>
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="rotating" data-testid="radio-rotating" />
+                            </FormControl>
+                            <div className="flex flex-col">
+                              <FormLabel className="font-medium">
+                                {t('mentorOnboarding.rotatingMentees')}
+                              </FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                {t('mentorOnboarding.rotatingMenteesDesc')}
+                              </p>
+                            </div>
                           </FormItem>
                         </RadioGroup>
                       </FormControl>
@@ -508,7 +649,7 @@ export default function MentorOnboarding() {
                     onClick={() => setLocation("/")}
                     data-testid="button-cancel"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </Button>
                   <Button
                     type="submit"
@@ -516,7 +657,7 @@ export default function MentorOnboarding() {
                     disabled={createMentorMutation.isPending}
                     data-testid="button-submit"
                   >
-                    {createMentorMutation.isPending ? "Creating Profile..." : "Create Mentor Profile"}
+                    {createMentorMutation.isPending ? t('mentorOnboarding.creating') : t('mentorOnboarding.createProfile')}
                   </Button>
                 </div>
               </form>
