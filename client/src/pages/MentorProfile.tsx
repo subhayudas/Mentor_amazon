@@ -13,6 +13,7 @@ import { ArrowLeft, Clock, Globe, Star, Briefcase, MapPin } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useTranslation } from "react-i18next";
 import {
   Dialog,
   DialogContent,
@@ -43,6 +44,8 @@ const confirmationSchema = z.object({
 type ConfirmationFormData = z.infer<typeof confirmationSchema>;
 
 export default function MentorProfile() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const [, params] = useRoute("/mentor/:id");
   const mentorId = params?.id;
   const { toast } = useToast();
@@ -196,12 +199,19 @@ export default function MentorProfile() {
       <div className="min-h-screen py-12">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <Card className="p-12 text-center">
-            <p className="text-muted-foreground">Mentor not found</p>
+            <p className="text-muted-foreground">{t('errors.notFound')}</p>
           </Card>
         </div>
       </div>
     );
   }
+
+  const displayName = isArabic && mentor.name_ar ? mentor.name_ar : mentor.name;
+  const displayPosition = isArabic && mentor.position_ar ? mentor.position_ar : mentor.position;
+  const displayCompany = isArabic && mentor.company_ar ? mentor.company_ar : mentor.company;
+  const displayBio = isArabic && mentor.bio_ar ? mentor.bio_ar : mentor.bio;
+  const displayExpertise = isArabic && mentor.expertise_ar ? mentor.expertise_ar : mentor.expertise;
+  const displayIndustries = isArabic && mentor.industries_ar ? mentor.industries_ar : mentor.industries;
 
   const initials = mentor.name
     .split(" ")
@@ -254,8 +264,8 @@ export default function MentorProfile() {
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         <Link href="/" data-testid="link-back">
           <Button variant="ghost" className="mb-8" data-testid="button-back">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Mentors
+            <ArrowLeft className={`w-4 h-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
+            {isArabic ? 'العودة إلى المرشدين' : 'Back to Mentors'}
           </Button>
         </Link>
 
@@ -265,7 +275,7 @@ export default function MentorProfile() {
               <div className="space-y-6">
                 <div className="flex flex-col items-center text-center gap-4">
                   <Avatar className="w-32 h-32">
-                    <AvatarImage src={mentor.photo_url || undefined} alt={mentor.name} />
+                    <AvatarImage src={mentor.photo_url || undefined} alt={displayName} />
                     <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
                       {initials}
                     </AvatarFallback>
@@ -273,10 +283,10 @@ export default function MentorProfile() {
 
                   <div className="space-y-2 w-full">
                     <h1 className="text-3xl font-bold" data-testid="text-mentor-name">
-                      {mentor.name}
+                      {displayName}
                     </h1>
                     <p className="text-lg text-muted-foreground font-medium" data-testid="text-mentor-position">
-                      {mentor.position}{mentor.company && ` @ ${mentor.company}`}
+                      {displayPosition}{displayCompany && ` @ ${displayCompany}`}
                     </p>
                     
                     <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
@@ -310,21 +320,21 @@ export default function MentorProfile() {
                 <div className="space-y-4">
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                      About
+                      {isArabic ? 'نبذة' : 'About'}
                     </h3>
                     <p className="text-muted-foreground leading-relaxed" data-testid="text-mentor-bio">
-                      {mentor.bio}
+                      {displayBio}
                     </p>
                   </div>
 
-                  {mentor.industries && mentor.industries.length > 0 && (
+                  {displayIndustries && displayIndustries.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                        Industries
+                        {t('profile.industries')}
                       </h3>
                       <div className="flex flex-wrap gap-2">
-                        {mentor.industries.map((industry) => (
-                          <Badge key={industry} variant="outline" className="bg-muted">
+                        {displayIndustries.map((industry, index) => (
+                          <Badge key={index} variant="outline" className="bg-muted">
                             {industry}
                           </Badge>
                         ))}
@@ -334,11 +344,11 @@ export default function MentorProfile() {
 
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                      Expertise
+                      {t('profile.expertise')}
                     </h3>
                     <div className="flex flex-wrap gap-2">
-                      {mentor.expertise.map((skill) => (
-                        <Badge key={skill} className="bg-primary/10 text-primary border-primary/20">
+                      {displayExpertise.map((skill, index) => (
+                        <Badge key={index} className="bg-primary/10 text-primary border-primary/20">
                           {skill}
                         </Badge>
                       ))}

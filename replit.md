@@ -69,10 +69,16 @@ Preferred communication style: Simple, everyday language.
 **ORM**: Drizzle ORM configured for PostgreSQL
 
 **Database Schema**:
-- `mentors` table: Stores mentor profiles with id, name, title, bio, expertise array, calendlyUrl, avatarUrl
+- `mentors` table: Stores mentor profiles with id, name, name_ar, position, position_ar, company, company_ar, bio, bio_ar, expertise array, expertise_ar array, industries array, industries_ar array, calendly URLs, country, mentorship_preference
 - `sessions` table: Tracks booked sessions with id, mentorId (FK), menteeName, menteeEmail, bookedAt timestamp
-- `mentees` table: Stores mentee profiles with id, name, email (unique), avatarUrl, createdAt
+- `mentees` table: Stores mentee profiles with id, name, email (unique), country, timezone, user_type, organization fields, avatarUrl, createdAt
 - `favorites` table: Tracks favorite mentors with id, menteeEmail, mentorId (FK), createdAt
+- `bookings` table: Tracks all bookings with mentor_id, mentee_id, status, scheduled_at, ratings
+
+**Bilingual Support (English/Arabic)**:
+- All mentor profiles include Arabic translations (name_ar, position_ar, company_ar, bio_ar, expertise_ar, industries_ar)
+- Frontend components detect language and display appropriate content
+- Full RTL support when Arabic is selected
 
 **Current Implementation**: PostgreSQL database with Drizzle ORM (fully migrated)
 - DatabaseStorage class implements IStorage interface

@@ -7,8 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, Mail, Briefcase, Globe, Calendar, MapPin, Languages, Award } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export default function MentorProfileView() {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const [, params] = useRoute("/profile/mentor/:id");
   const mentorId = params?.id;
 
@@ -41,14 +44,14 @@ export default function MentorProfileView() {
       <div className="min-h-screen flex items-center justify-center">
         <Card className="max-w-md w-full">
           <CardHeader>
-            <CardTitle>Mentor Not Found</CardTitle>
-            <CardDescription>The mentor profile you're looking for doesn't exist.</CardDescription>
+            <CardTitle>{t('errors.notFound')}</CardTitle>
+            <CardDescription>{isArabic ? 'الملف الشخصي للمرشد غير موجود.' : "The mentor profile you're looking for doesn't exist."}</CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/">
               <Button variant="outline" className="w-full">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Browse Mentors
+                <ArrowLeft className={`w-4 h-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
+                {t('mentors.title')}
               </Button>
             </Link>
           </CardContent>
@@ -56,6 +59,13 @@ export default function MentorProfileView() {
       </div>
     );
   }
+
+  const displayName = isArabic && mentor.name_ar ? mentor.name_ar : mentor.name;
+  const displayPosition = isArabic && mentor.position_ar ? mentor.position_ar : mentor.position;
+  const displayCompany = isArabic && mentor.company_ar ? mentor.company_ar : mentor.company;
+  const displayBio = isArabic && mentor.bio_ar ? mentor.bio_ar : mentor.bio;
+  const displayExpertise = isArabic && mentor.expertise_ar ? mentor.expertise_ar : mentor.expertise;
+  const displayIndustries = isArabic && mentor.industries_ar ? mentor.industries_ar : mentor.industries;
 
   const initials = mentor.name
     .split(" ")
@@ -69,8 +79,8 @@ export default function MentorProfileView() {
         <div className="flex items-center gap-4">
           <Link href="/">
             <Button variant="ghost" data-testid="button-back">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Mentors
+              <ArrowLeft className={`w-4 h-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
+              {isArabic ? 'العودة إلى المرشدين' : 'Back to Mentors'}
             </Button>
           </Link>
         </div>
@@ -79,19 +89,19 @@ export default function MentorProfileView() {
           <CardHeader className="text-center pb-8">
             <div className="flex flex-col items-center gap-4">
               <Avatar className="w-32 h-32 border-4 border-background shadow-lg">
-                <AvatarImage src={mentor.photo_url || undefined} alt={mentor.name} />
+                <AvatarImage src={mentor.photo_url || undefined} alt={displayName} />
                 <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
                   {initials}
                 </AvatarFallback>
               </Avatar>
               <div>
-                <CardTitle className="text-3xl font-bold" data-testid="text-mentor-name">{mentor.name}</CardTitle>
+                <CardTitle className="text-3xl font-bold" data-testid="text-mentor-name">{displayName}</CardTitle>
                 <CardDescription className="text-lg mt-2" data-testid="text-mentor-position">
-                  {mentor.position} @ {mentor.company}
+                  {displayPosition} @ {displayCompany}
                 </CardDescription>
               </div>
               <Badge variant="default" className="bg-green-600 hover:bg-green-700" data-testid="badge-profile-status">
-                ✓ Profile Active
+                {isArabic ? 'الملف نشط' : 'Profile Active'}
               </Badge>
             </div>
           </CardHeader>
@@ -102,12 +112,12 @@ export default function MentorProfileView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Briefcase className="w-5 h-5 text-primary" />
-                Expertise
+                {t('profile.expertise')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {mentor.expertise.map((skill, index) => (
+                {displayExpertise.map((skill, index) => (
                   <Badge key={index} variant="secondary" data-testid={`badge-expertise-${index}`}>
                     {skill}
                   </Badge>
@@ -120,12 +130,12 @@ export default function MentorProfileView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Award className="w-5 h-5 text-primary" />
-                Industries
+                {t('profile.industries')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {mentor.industries.map((industry, index) => (
+                {displayIndustries.map((industry, index) => (
                   <Badge key={index} variant="outline" data-testid={`badge-industry-${index}`}>
                     {industry}
                   </Badge>
@@ -137,18 +147,18 @@ export default function MentorProfileView() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Professional Bio</CardTitle>
+            <CardTitle>{isArabic ? 'نبذة مهنية' : 'Professional Bio'}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground leading-relaxed" data-testid="text-mentor-bio">
-              {mentor.bio}
+              {displayBio}
             </p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Contact & Availability</CardTitle>
+            <CardTitle>{isArabic ? 'التواصل والتوفر' : 'Contact & Availability'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">

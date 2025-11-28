@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Calendar, Clock, Star, Globe } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 interface MentorCardProps {
   mentor: Mentor;
@@ -33,6 +34,15 @@ const timezoneToUTC = (ianaTimeZone: string): string => {
 };
 
 export function MentorCard({ mentor }: MentorCardProps) {
+  const { i18n, t } = useTranslation();
+  const isArabic = i18n.language === 'ar';
+  
+  const displayName = isArabic && mentor.name_ar ? mentor.name_ar : mentor.name;
+  const displayPosition = isArabic && mentor.position_ar ? mentor.position_ar : mentor.position;
+  const displayCompany = isArabic && mentor.company_ar ? mentor.company_ar : mentor.company;
+  const displayExpertise = isArabic && mentor.expertise_ar ? mentor.expertise_ar : mentor.expertise;
+  const displayIndustries = isArabic && mentor.industries_ar ? mentor.industries_ar : mentor.industries;
+  
   const initials = mentor.name
     .split(" ")
     .map((n) => n[0])
@@ -67,10 +77,10 @@ export function MentorCard({ mentor }: MentorCardProps) {
 
         <div className="space-y-2 w-full">
           <h3 className="text-xl font-bold text-secondary" data-testid={`text-mentor-name-${mentor.id}`}>
-            {mentor.name}
+            {displayName}
           </h3>
           <p className="text-sm text-muted-foreground font-medium">
-            {mentor.position}{mentor.company && ` @ ${mentor.company}`}
+            {displayPosition}{displayCompany && ` @ ${displayCompany}`}
           </p>
           
           {mentor.timezone && (
@@ -81,14 +91,14 @@ export function MentorCard({ mentor }: MentorCardProps) {
           )}
         </div>
 
-        {mentor.industries && mentor.industries.length > 0 && (
+        {displayIndustries && displayIndustries.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-center w-full">
-            {mentor.industries.slice(0, 2).map((industry) => (
+            {displayIndustries.slice(0, 2).map((industry, index) => (
               <Badge
-                key={industry}
+                key={index}
                 variant="outline"
                 className="text-xs bg-muted"
-                data-testid={`badge-industry-${industry}`}
+                data-testid={`badge-industry-${index}`}
               >
                 {industry}
               </Badge>
@@ -97,11 +107,11 @@ export function MentorCard({ mentor }: MentorCardProps) {
         )}
 
         <div className="flex flex-wrap gap-2 justify-center w-full">
-          {mentor.expertise.slice(0, 4).map((skill) => (
+          {displayExpertise.slice(0, 4).map((skill, index) => (
             <Badge
-              key={skill}
+              key={index}
               className="text-xs bg-primary/10 text-primary border-primary/20"
-              data-testid={`badge-expertise-${skill}`}
+              data-testid={`badge-expertise-${index}`}
             >
               {skill}
             </Badge>
@@ -129,8 +139,8 @@ export function MentorCard({ mentor }: MentorCardProps) {
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground" 
             data-testid={`button-book-${mentor.id}`}
           >
-            <Calendar className="w-4 h-4 mr-2" />
-            Book a Meeting
+            <Calendar className={`w-4 h-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
+            {t('mentors.bookSession')}
           </Button>
         </Link>
       </div>
