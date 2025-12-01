@@ -165,14 +165,40 @@
     "totalBookings": "إجمالي الحجوزات",
     "scheduled": "مجدولة",
     "completed": "مكتملة",
+    "canceled": "ملغاة",
+    "clicked": "نقرات",
     "bookingsOverTime": "الحجوزات عبر الزمن",
     "statusBreakdown": "تفصيل الحالة",
     "topMentorPerformance": "أداء أفضل المرشدين",
     "recentBookings": "الحجوزات الأخيرة",
     "noDataAvailable": "لا توجد بيانات متاحة",
+    "noBookingData": "لا توجد بيانات حجوزات لهذه الفترة",
+    "noMentorData": "لا توجد بيانات أداء للمرشدين",
+    "noMentorGeoData": "لا توجد بيانات جغرافية للمرشدين",
+    "noMenteeGeoData": "لا توجد بيانات جغرافية للمتدربين",
+    "noBookingsYet": "لا توجد حجوزات بعد",
     "geographicDistribution": "التوزيع الجغرافي",
     "mentorsByCountry": "المرشدون حسب البلد",
-    "menteesByCountry": "المتدربون حسب البلد"
+    "menteesByCountry": "المتدربون حسب البلد",
+    "specializationDistribution": "توزيع التخصصات",
+    "languageDistribution": "توزيع اللغات",
+    "menteeTypeDistribution": "توزيع أنواع المتدربين",
+    "tableHeaders": {
+      "mentor": "المرشد",
+      "mentee": "المتدرب",
+      "status": "الحالة",
+      "clickedAt": "وقت النقر",
+      "scheduledAt": "موعد الجلسة"
+    },
+    "chartLabels": {
+      "totalBookings": "إجمالي الحجوزات",
+      "scheduled": "مجدولة",
+      "completed": "مكتملة",
+      "canceled": "ملغاة",
+      "clicked": "نقرات",
+      "mentors": "المرشدون",
+      "mentees": "المتدربين"
+    }
   },
   "booking": {
     "bookSession": "حجز جلسة",

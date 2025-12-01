@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
+import { isRTL } from "@/lib/i18n";
 import { Booking, Mentor, Mentee } from "@shared/schema";
 import { MetricCard } from "@/components/MetricCard";
 import { Card } from "@/components/ui/card";
@@ -287,6 +288,8 @@ export default function Analytics() {
   }, [useMockData, filteredBookings, dateRange]);
 
   const statusBreakdown = useMemo(() => {
+    const getStatusLabel = (key: string) => t(`analytics.chartLabels.${key}`);
+    
     if (useMockData) {
       const scheduled = MOCK_ANALYTICS_DATA.kpis.upcoming_meetings;
       const completed = MOCK_ANALYTICS_DATA.kpis.completed_meetings;
@@ -294,10 +297,10 @@ export default function Analytics() {
       const clicked = MOCK_ANALYTICS_DATA.kpis.total_bookings - scheduled - completed - canceled;
       
       return [
-        { name: "Clicked", value: clicked, color: STATUS_COLORS.clicked },
-        { name: "Scheduled", value: scheduled, color: STATUS_COLORS.scheduled },
-        { name: "Completed", value: completed, color: STATUS_COLORS.completed },
-        { name: "Canceled", value: canceled, color: STATUS_COLORS.canceled },
+        { name: getStatusLabel('clicked'), value: clicked, color: STATUS_COLORS.clicked },
+        { name: getStatusLabel('scheduled'), value: scheduled, color: STATUS_COLORS.scheduled },
+        { name: getStatusLabel('completed'), value: completed, color: STATUS_COLORS.completed },
+        { name: getStatusLabel('canceled'), value: canceled, color: STATUS_COLORS.canceled },
       ].filter((item) => item.value > 0);
     }
     
@@ -315,12 +318,12 @@ export default function Analytics() {
     });
 
     return [
-      { name: "Clicked", value: counts.clicked, color: STATUS_COLORS.clicked },
-      { name: "Scheduled", value: counts.scheduled, color: STATUS_COLORS.scheduled },
-      { name: "Completed", value: counts.completed, color: STATUS_COLORS.completed },
-      { name: "Canceled", value: counts.canceled, color: STATUS_COLORS.canceled },
+      { name: getStatusLabel('clicked'), value: counts.clicked, color: STATUS_COLORS.clicked },
+      { name: getStatusLabel('scheduled'), value: counts.scheduled, color: STATUS_COLORS.scheduled },
+      { name: getStatusLabel('completed'), value: counts.completed, color: STATUS_COLORS.completed },
+      { name: getStatusLabel('canceled'), value: counts.canceled, color: STATUS_COLORS.canceled },
     ].filter((item) => item.value > 0);
-  }, [useMockData, filteredBookings]);
+  }, [useMockData, filteredBookings, t]);
 
   const mentorPerformance = useMemo(() => {
     if (useMockData) {
@@ -437,14 +440,14 @@ export default function Analytics() {
     .slice(0, 10);
 
   const getStatusBadge = (status: string) => {
-    const variants: Record<string, { variant: "default" | "secondary" | "outline", label: string }> = {
-      clicked: { variant: "outline", label: "Clicked" },
-      scheduled: { variant: "default", label: "Scheduled" },
-      completed: { variant: "secondary", label: "Completed" },
-      canceled: { variant: "outline", label: "Canceled" },
+    const variants: Record<string, { variant: "default" | "secondary" | "outline", labelKey: string }> = {
+      clicked: { variant: "outline", labelKey: "clicked" },
+      scheduled: { variant: "default", labelKey: "scheduled" },
+      completed: { variant: "secondary", labelKey: "completed" },
+      canceled: { variant: "outline", labelKey: "canceled" },
     };
     const config = variants[status] || variants.clicked;
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    return <Badge variant={config.variant}>{t(`analytics.chartLabels.${config.labelKey}`)}</Badge>;
   };
 
   return (
@@ -563,19 +566,19 @@ export default function Analytics() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <MetricCard
-              title="Total Bookings"
+              title={t('analytics.totalBookings')}
               value={totalBookings}
               icon={Calendar}
               testId="metric-total-bookings"
             />
             <MetricCard
-              title="Scheduled"
+              title={t('analytics.scheduled')}
               value={scheduledCount}
               icon={Clock}
               testId="metric-scheduled"
             />
             <MetricCard
-              title="Completed"
+              title={t('analytics.completed')}
               value={completedCount}
               icon={CheckCircle2}
               testId="metric-completed"
@@ -595,57 +598,60 @@ export default function Analytics() {
               </Card>
             ) : timeSeries.length > 0 ? (
               <Card className="p-8" data-testid="chart-bookings-over-time">
-                <ResponsiveContainer width="100%" height={350}>
-                  <LineChart data={timeSeries}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis
-                      dataKey="date"
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                    />
-                    <YAxis
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="bookings"
-                      stroke="hsl(var(--primary))"
-                      strokeWidth={2}
-                      dot={{ fill: "hsl(var(--primary))", r: 4 }}
-                      activeDot={{ r: 6 }}
-                      name="Total Bookings"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="scheduled"
-                      stroke={STATUS_COLORS.scheduled}
-                      strokeWidth={2}
-                      dot={{ fill: STATUS_COLORS.scheduled, r: 3 }}
-                      name="Scheduled"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="completed"
-                      stroke={STATUS_COLORS.completed}
-                      strokeWidth={2}
-                      dot={{ fill: STATUS_COLORS.completed, r: 3 }}
-                      name="Completed"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={350}>
+                    <LineChart data={timeSeries}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis
+                        dataKey="date"
+                        className="text-xs"
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                      />
+                      <YAxis
+                        className="text-xs"
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                        orientation={isRTL() ? "right" : "left"}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="bookings"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={2}
+                        dot={{ fill: "hsl(var(--primary))", r: 4 }}
+                        activeDot={{ r: 6 }}
+                        name={t('analytics.chartLabels.totalBookings')}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="scheduled"
+                        stroke={STATUS_COLORS.scheduled}
+                        strokeWidth={2}
+                        dot={{ fill: STATUS_COLORS.scheduled, r: 3 }}
+                        name={t('analytics.chartLabels.scheduled')}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="completed"
+                        stroke={STATUS_COLORS.completed}
+                        strokeWidth={2}
+                        dot={{ fill: STATUS_COLORS.completed, r: 3 }}
+                        name={t('analytics.chartLabels.completed')}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             ) : (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No booking data available for this period</p>
+                <p className="text-muted-foreground">{t('analytics.noBookingData')}</p>
               </Card>
             )}
           </div>
@@ -661,36 +667,38 @@ export default function Analytics() {
               </Card>
             ) : statusBreakdown.length > 0 ? (
               <Card className="p-8" data-testid="chart-status-breakdown">
-                <ResponsiveContainer width="100%" height={350}>
-                  <PieChart>
-                    <Pie
-                      data={statusBreakdown}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={100}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {statusBreakdown.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={350}>
+                    <PieChart>
+                      <Pie
+                        data={statusBreakdown}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {statusBreakdown.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             ) : (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No booking data available</p>
+                <p className="text-muted-foreground">{t('analytics.noDataAvailable')}</p>
               </Card>
             )}
           </div>
@@ -707,47 +715,50 @@ export default function Analytics() {
             </Card>
           ) : mentorPerformance.length > 0 ? (
             <Card className="p-8" data-testid="chart-mentor-performance">
-              <ResponsiveContainer width="100%" height={400}>
-                <BarChart data={mentorPerformance}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis
-                    dataKey="name"
-                    className="text-xs"
-                    tick={{ fill: "hsl(var(--muted-foreground))" }}
-                    angle={-45}
-                    textAnchor="end"
-                    height={100}
-                  />
-                  <YAxis
-                    className="text-xs"
-                    tick={{ fill: "hsl(var(--muted-foreground))" }}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "8px",
-                    }}
-                  />
-                  <Legend />
-                  <Bar
-                    dataKey="bookings"
-                    fill="hsl(var(--chart-2))"
-                    radius={[8, 8, 0, 0]}
-                    name="Total Bookings"
-                  />
-                  <Bar
-                    dataKey="completed"
-                    fill={STATUS_COLORS.completed}
-                    radius={[8, 8, 0, 0]}
-                    name="Completed"
-                  />
-                </BarChart>
-              </ResponsiveContainer>
+              <div className="chart-container">
+                <ResponsiveContainer width="100%" height={400}>
+                  <BarChart data={mentorPerformance}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis
+                      dataKey="name"
+                      className="text-xs"
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                      angle={-45}
+                      textAnchor="end"
+                      height={100}
+                    />
+                    <YAxis
+                      className="text-xs"
+                      tick={{ fill: "hsl(var(--muted-foreground))" }}
+                      orientation={isRTL() ? "right" : "left"}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "8px",
+                      }}
+                    />
+                    <Legend />
+                    <Bar
+                      dataKey="bookings"
+                      fill="hsl(var(--chart-2))"
+                      radius={[8, 8, 0, 0]}
+                      name={t('analytics.chartLabels.totalBookings')}
+                    />
+                    <Bar
+                      dataKey="completed"
+                      fill={STATUS_COLORS.completed}
+                      radius={[8, 8, 0, 0]}
+                      name={t('analytics.chartLabels.completed')}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </Card>
           ) : (
             <Card className="p-12 text-center">
-              <p className="text-muted-foreground">No mentor performance data available</p>
+              <p className="text-muted-foreground">{t('analytics.noMentorData')}</p>
             </Card>
           )}
         </div>
@@ -764,44 +775,48 @@ export default function Analytics() {
               </Card>
             ) : geographicDistribution.mentorData.length > 0 ? (
               <Card className="p-8" data-testid="chart-mentors-by-country">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={geographicDistribution.mentorData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis
-                      type="number"
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                      width={100}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="value"
-                      fill="hsl(var(--chart-2))"
-                      radius={[0, 4, 4, 0]}
-                      name="Mentors"
-                    >
-                      {geographicDistribution.mentorData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={geographicDistribution.mentorData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis
+                        type="number"
+                        className="text-xs"
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                        orientation={isRTL() ? "top" : "bottom"}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        className="text-xs"
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                        width={100}
+                        orientation={isRTL() ? "right" : "left"}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Bar
+                        dataKey="value"
+                        fill="hsl(var(--chart-2))"
+                        radius={isRTL() ? [4, 0, 0, 4] : [0, 4, 4, 0]}
+                        name={t('analytics.chartLabels.mentors')}
+                      >
+                        {geographicDistribution.mentorData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             ) : (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No mentor geographic data available</p>
+                <p className="text-muted-foreground">{t('analytics.noMentorGeoData')}</p>
               </Card>
             )}
           </div>
@@ -817,44 +832,48 @@ export default function Analytics() {
               </Card>
             ) : geographicDistribution.menteeData.length > 0 ? (
               <Card className="p-8" data-testid="chart-mentees-by-country">
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={geographicDistribution.menteeData} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis
-                      type="number"
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      className="text-xs"
-                      tick={{ fill: "hsl(var(--muted-foreground))" }}
-                      width={100}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="value"
-                      fill="hsl(var(--chart-3))"
-                      radius={[0, 4, 4, 0]}
-                      name="Mentees"
-                    >
-                      {geographicDistribution.menteeData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={geographicDistribution.menteeData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis
+                        type="number"
+                        className="text-xs"
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                        orientation={isRTL() ? "top" : "bottom"}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        className="text-xs"
+                        tick={{ fill: "hsl(var(--muted-foreground))" }}
+                        width={100}
+                        orientation={isRTL() ? "right" : "left"}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                      <Bar
+                        dataKey="value"
+                        fill="hsl(var(--chart-3))"
+                        radius={isRTL() ? [4, 0, 0, 4] : [0, 4, 4, 0]}
+                        name={t('analytics.chartLabels.mentees')}
+                      >
+                        {geographicDistribution.menteeData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             ) : (
               <Card className="p-12 text-center">
-                <p className="text-muted-foreground">No mentee geographic data available</p>
+                <p className="text-muted-foreground">{t('analytics.noMenteeGeoData')}</p>
               </Card>
             )}
           </div>
@@ -865,102 +884,108 @@ export default function Analytics() {
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <PieChartIcon className="w-5 h-5 text-primary" />
-                <h2 className="text-2xl font-bold">Specialization Distribution</h2>
+                <h2 className="text-2xl font-bold">{t('analytics.specializationDistribution')}</h2>
               </div>
               <Card className="p-8" data-testid="chart-specialization-distribution">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={MOCK_ANALYTICS_DATA.specialization_distribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {MOCK_ANALYTICS_DATA.specialization_distribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={MOCK_ANALYTICS_DATA.specialization_distribution}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {MOCK_ANALYTICS_DATA.specialization_distribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Globe className="w-5 h-5 text-primary" />
-                <h2 className="text-2xl font-bold">Language Distribution</h2>
+                <h2 className="text-2xl font-bold">{t('analytics.languageDistribution')}</h2>
               </div>
               <Card className="p-8" data-testid="chart-language-distribution">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={MOCK_ANALYTICS_DATA.language_distribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {MOCK_ANALYTICS_DATA.language_distribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={MOCK_ANALYTICS_DATA.language_distribution}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {MOCK_ANALYTICS_DATA.language_distribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <User className="w-5 h-5 text-primary" />
-                <h2 className="text-2xl font-bold">Mentee Type Distribution</h2>
+                <h2 className="text-2xl font-bold">{t('analytics.menteeTypeDistribution')}</h2>
               </div>
               <Card className="p-8" data-testid="chart-mentee-type-distribution">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={MOCK_ANALYTICS_DATA.mentee_type_distribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {MOCK_ANALYTICS_DATA.mentee_type_distribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="chart-container">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={MOCK_ANALYTICS_DATA.mentee_type_distribution}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {MOCK_ANALYTICS_DATA.mentee_type_distribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
               </Card>
             </div>
           </div>
@@ -977,11 +1002,11 @@ export default function Analytics() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Mentor</TableHead>
-                    <TableHead>Mentee</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Clicked At</TableHead>
-                    <TableHead>Scheduled At</TableHead>
+                    <TableHead>{t('analytics.tableHeaders.mentor')}</TableHead>
+                    <TableHead>{t('analytics.tableHeaders.mentee')}</TableHead>
+                    <TableHead>{t('analytics.tableHeaders.status')}</TableHead>
+                    <TableHead>{t('analytics.tableHeaders.clickedAt')}</TableHead>
+                    <TableHead>{t('analytics.tableHeaders.scheduledAt')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1045,7 +1070,7 @@ export default function Analytics() {
             </Card>
           ) : (
             <Card className="p-12 text-center">
-              <p className="text-muted-foreground">No bookings yet</p>
+              <p className="text-muted-foreground">{t('analytics.noBookingsYet')}</p>
             </Card>
           )}
         </div>

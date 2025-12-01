@@ -222,6 +222,122 @@
   body {
     @apply font-sans antialiased bg-background text-foreground;
   }
+  
+  html[dir="rtl"] body {
+    text-align: right;
+  }
+  
+  html[dir="ltr"] body {
+    text-align: left;
+  }
+}
+
+/* RTL Support - Logical Properties and Direction-Aware Utilities */
+@layer utilities {
+  /* Text alignment that respects direction */
+  .text-start {
+    text-align: start;
+  }
+  
+  .text-end {
+    text-align: end;
+  }
+  
+  /* Flex direction reversing for RTL */
+  [dir="rtl"] .rtl\:flex-row-reverse {
+    flex-direction: row-reverse;
+  }
+  
+  [dir="rtl"] .rtl\:space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-x-reverse: 1;
+  }
+  
+  /* RTL-aware spacing using logical properties */
+  .ps-0 { padding-inline-start: 0; }
+  .ps-1 { padding-inline-start: 0.25rem; }
+  .ps-2 { padding-inline-start: 0.5rem; }
+  .ps-3 { padding-inline-start: 0.75rem; }
+  .ps-4 { padding-inline-start: 1rem; }
+  .ps-6 { padding-inline-start: 1.5rem; }
+  .ps-8 { padding-inline-start: 2rem; }
+  
+  .pe-0 { padding-inline-end: 0; }
+  .pe-1 { padding-inline-end: 0.25rem; }
+  .pe-2 { padding-inline-end: 0.5rem; }
+  .pe-3 { padding-inline-end: 0.75rem; }
+  .pe-4 { padding-inline-end: 1rem; }
+  .pe-6 { padding-inline-end: 1.5rem; }
+  .pe-8 { padding-inline-end: 2rem; }
+  
+  .ms-0 { margin-inline-start: 0; }
+  .ms-1 { margin-inline-start: 0.25rem; }
+  .ms-2 { margin-inline-start: 0.5rem; }
+  .ms-3 { margin-inline-start: 0.75rem; }
+  .ms-4 { margin-inline-start: 1rem; }
+  .ms-6 { margin-inline-start: 1.5rem; }
+  .ms-8 { margin-inline-start: 2rem; }
+  .ms-auto { margin-inline-start: auto; }
+  
+  .me-0 { margin-inline-end: 0; }
+  .me-1 { margin-inline-end: 0.25rem; }
+  .me-2 { margin-inline-end: 0.5rem; }
+  .me-3 { margin-inline-end: 0.75rem; }
+  .me-4 { margin-inline-end: 1rem; }
+  .me-6 { margin-inline-end: 1.5rem; }
+  .me-8 { margin-inline-end: 2rem; }
+  .me-auto { margin-inline-end: auto; }
+  
+  /* Border logical properties */
+  .border-s { border-inline-start-width: 1px; }
+  .border-e { border-inline-end-width: 1px; }
+  .border-s-2 { border-inline-start-width: 2px; }
+  .border-e-2 { border-inline-end-width: 2px; }
+  .border-s-4 { border-inline-start-width: 4px; }
+  .border-e-4 { border-inline-end-width: 4px; }
+  
+  /* Inset logical properties */
+  .start-0 { inset-inline-start: 0; }
+  .end-0 { inset-inline-end: 0; }
+  .start-1 { inset-inline-start: 0.25rem; }
+  .end-1 { inset-inline-end: 0.25rem; }
+  .start-2 { inset-inline-start: 0.5rem; }
+  .end-2 { inset-inline-end: 0.5rem; }
+  .start-4 { inset-inline-start: 1rem; }
+  .end-4 { inset-inline-end: 1rem; }
+  
+  /* Float logical properties */
+  .float-start { float: inline-start; }
+  .float-end { float: inline-end; }
+  
+  /* RTL-specific overrides */
+  [dir="rtl"] .rtl\:text-right {
+    text-align: right;
+  }
+  
+  [dir="rtl"] .rtl\:text-left {
+    text-align: left;
+  }
+  
+  /* Chart container RTL fixes - Recharts requires LTR internally for SVG coordinates
+     We force LTR on the chart while flipping Y-axis orientation via React props */
+  .chart-container {
+    direction: ltr !important;
+  }
+  
+  /* Keep legends and tooltips readable in current language */
+  [dir="rtl"] .recharts-legend-wrapper {
+    direction: rtl;
+    text-align: right;
+  }
+  
+  [dir="rtl"] .recharts-tooltip-wrapper {
+    direction: rtl;
+  }
+  
+  /* Ensure proper grid layout in RTL */
+  [dir="rtl"] .grid {
+    direction: rtl;
+  }
 }
 
 /**

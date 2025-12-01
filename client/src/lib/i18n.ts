@@ -10,6 +10,14 @@ const resources = {
   ar: { translation: ar },
 };
 
+const RTL_LANGUAGES = ['ar', 'he', 'fa', 'ur'];
+
+const updateDocumentDirection = (lng: string) => {
+  const dir = RTL_LANGUAGES.includes(lng) ? 'rtl' : 'ltr';
+  document.documentElement.dir = dir;
+  document.documentElement.lang = lng;
+};
+
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -25,5 +33,19 @@ i18n
       caches: ['localStorage'],
     },
   });
+
+i18n.on('initialized', () => {
+  updateDocumentDirection(i18n.language);
+});
+
+i18n.on('languageChanged', (lng) => {
+  updateDocumentDirection(lng);
+});
+
+if (typeof document !== 'undefined') {
+  updateDocumentDirection(i18n.language || 'en');
+}
+
+export const isRTL = () => RTL_LANGUAGES.includes(i18n.language);
 
 export default i18n;

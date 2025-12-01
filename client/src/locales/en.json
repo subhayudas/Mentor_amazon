@@ -165,14 +165,40 @@
     "totalBookings": "Total Bookings",
     "scheduled": "Scheduled",
     "completed": "Completed",
+    "canceled": "Canceled",
+    "clicked": "Clicked",
     "bookingsOverTime": "Bookings Over Time",
     "statusBreakdown": "Status Breakdown",
     "topMentorPerformance": "Top Mentor Performance",
     "recentBookings": "Recent Bookings",
     "noDataAvailable": "No data available",
+    "noBookingData": "No booking data available for this period",
+    "noMentorData": "No mentor performance data available",
+    "noMentorGeoData": "No mentor geographic data available",
+    "noMenteeGeoData": "No mentee geographic data available",
+    "noBookingsYet": "No bookings yet",
     "geographicDistribution": "Geographic Distribution",
     "mentorsByCountry": "Mentors by Country",
-    "menteesByCountry": "Mentees by Country"
+    "menteesByCountry": "Mentees by Country",
+    "specializationDistribution": "Specialization Distribution",
+    "languageDistribution": "Language Distribution",
+    "menteeTypeDistribution": "Mentee Type Distribution",
+    "tableHeaders": {
+      "mentor": "Mentor",
+      "mentee": "Mentee",
+      "status": "Status",
+      "clickedAt": "Clicked At",
+      "scheduledAt": "Scheduled At"
+    },
+    "chartLabels": {
+      "totalBookings": "Total Bookings",
+      "scheduled": "Scheduled",
+      "completed": "Completed",
+      "canceled": "Canceled",
+      "clicked": "Clicked",
+      "mentors": "Mentors",
+      "mentees": "Mentees"
+    }
   },
   "booking": {
     "bookSession": "Book a Session",
