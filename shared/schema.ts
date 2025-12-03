@@ -28,6 +28,7 @@ export const mentors = pgTable("mentors", {
   industries_ar: text("industries_ar").array(),
   languages_spoken: text("languages_spoken").array().notNull(),
   comms_owner: text("comms_owner", { enum: ["exec", "assistant"] }).notNull(),
+  assistant_email: text("assistant_email"),
   mentorship_preference: text("mentorship_preference", { enum: ["ongoing", "rotating"] }),
   average_rating: decimal("average_rating", { precision: 3, scale: 2 }).default("0"),
   total_ratings: integer("total_ratings").default(0),

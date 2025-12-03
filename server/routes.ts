@@ -1,10 +1,57 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertBookingSchema, insertMenteeSchema, insertMentorSchema } from "@shared/schema";
 import { z } from "zod";
+import multer from "multer";
+import path from "path";
+import { randomUUID } from "crypto";
+
+const uploadStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `${randomUUID()}${ext}`);
+  },
+});
+
+const upload = multer({
+  storage: uploadStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only image files are allowed"));
+    }
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  app.use("/uploads", express.static("uploads"));
+
+  app.post("/api/uploads", (req, res, next) => {
+    upload.single("file")(req, res, (err) => {
+      if (err) {
+        if (err.message === "Only image files are allowed") {
+          return res.status(400).json({ message: "Only image files are allowed" });
+        }
+        if (err.code === "LIMIT_FILE_SIZE") {
+          return res.status(400).json({ message: "File size exceeds 5MB limit" });
+        }
+        return res.status(500).json({ message: "Upload failed" });
+      }
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+      const url = `/uploads/${req.file.filename}`;
+      res.json({ url });
+    });
+  });
+
   app.get("/api/mentors", async (req, res) => {
     try {
       const search = req.query.search as string | undefined;
@@ -50,6 +97,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: "Invalid mentor data",
           errors: result.error.errors 
         });
+      }
+
+      if (result.data.comms_owner === "assistant") {
+        if (!result.data.assistant_email || result.data.assistant_email.trim() === "") {
+          return res.status(400).json({
+            message: "Assistant email is required when communication owner is 'Assistant'",
+            errors: [{ path: ["assistant_email"], message: "Assistant email is required" }]
+          });
+        }
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(result.data.assistant_email)) {
+          return res.status(400).json({
+            message: "Invalid assistant email format",
+            errors: [{ path: ["assistant_email"], message: "Invalid email format" }]
+          });
+        }
       }
 
       const mentor = await storage.createMentor(result.data);
