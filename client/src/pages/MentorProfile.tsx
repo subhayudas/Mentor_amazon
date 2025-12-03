@@ -105,7 +105,7 @@ export default function MentorProfile() {
 
   useEffect(() => {
     (async function () {
-      const cal = await getCalApi({ namespace: "mentoring" });
+      const cal = await getCalApi({ namespace: "30min" });
       cal("ui", {
         hideEventTypeDetails: false,
         layout: "month_view",
@@ -441,7 +441,7 @@ export default function MentorProfile() {
                   )}
                   <div className="rounded-lg overflow-hidden" style={{ height: "700px" }} data-testid="cal-widget">
                     <Cal
-                      namespace="mentoring"
+                      namespace="30min"
                       calLink={calLink}
                       style={{ width: "100%", height: "100%", overflow: "scroll" }}
                       config={{ layout: "month_view" }}
