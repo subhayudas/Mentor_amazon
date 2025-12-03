@@ -154,10 +154,13 @@ Preferred communication style: Simple, everyday language.
 
 **Implementation Details** (`client/src/pages/MentorProfile.tsx`):
 - Cal.com embed via `@calcom/embed-react` package
+- Namespace: "30min" with calOrigin "https://app.cal.com"
+- Config: { layout: "month_view" }
 - `getCalApi` for accessing Cal.com's JavaScript API and event listeners
 - `mentorRef` caches mentor data to prevent loss during refetches
 - `useMutation` with retry configuration handles API calls
 - Conditional rendering ensures widget only mounts when both identity and mentor data are ready
+- Vats Shah's Cal.com link: vats-s.-shah-2krirj/30min
 
 ### Cal.com Webhook Integration (Alternative Approach)
 
