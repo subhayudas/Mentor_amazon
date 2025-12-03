@@ -1,7 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { useState, useRef, useEffect, useMemo } from "react";
-import { InlineWidget, useCalendlyEventListener } from "react-calendly";
+import Cal, { getCalApi } from "@calcom/embed-react";
 import { Mentor } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +57,7 @@ export default function MentorProfile() {
   const [showIdentityForm, setShowIdentityForm] = useState(!menteeInfo);
   const [selectedDuration, setSelectedDuration] = useState<15 | 30 | 60>(30);
   
-  // Cache mentor data in a ref to ensure it's always available during Calendly events
+  // Cache mentor data in a ref to ensure it's always available during Cal.com events
   // even if React Query refetches and temporarily sets mentor to undefined
   const mentorRef = useRef<Mentor | null>(null);
 
@@ -103,21 +103,29 @@ export default function MentorProfile() {
     },
   });
 
-  useCalendlyEventListener({
-    onEventScheduled: (e) => {
-      const currentMentor = mentorRef.current;
-      if (menteeInfo && currentMentor) {
-        const payload = e?.data?.payload;
-        console.log("[Calendly Event]", payload);
-        
-        createBookingMutation.mutate({
-          mentor_id: currentMentor.id,
-          mentee_name: menteeInfo.name,
-          mentee_email: menteeInfo.email,
-        });
-      }
-    },
-  });
+  useEffect(() => {
+    (async function () {
+      const cal = await getCalApi({ namespace: "30min" });
+      cal("ui", {
+        hideEventTypeDetails: false,
+        layout: "month_view",
+      });
+      cal("on", {
+        action: "bookingSuccessful",
+        callback: (e: { detail: { data: unknown } }) => {
+          const currentMentor = mentorRef.current;
+          if (menteeInfo && currentMentor) {
+            console.log("[Cal.com Event]", e.detail.data);
+            createBookingMutation.mutate({
+              mentor_id: currentMentor.id,
+              mentee_name: menteeInfo.name,
+              mentee_email: menteeInfo.email,
+            });
+          }
+        },
+      });
+    })();
+  }, [menteeInfo, createBookingMutation]);
 
   const onSubmitIdentity = (data: ConfirmationFormData) => {
     localStorage.setItem("menteeName", data.name);
@@ -130,15 +138,15 @@ export default function MentorProfile() {
     });
   };
 
-  // Determine available durations based on unique Calendly URLs
+  // Determine available durations based on unique Cal.com URLs
   // IMPORTANT: This must be before any early returns to maintain hook order
   const availableDurations = useMemo(() => {
     if (!mentor) return [15, 30, 60];
     
     const urls = {
-      15: mentor.calendly_15min || mentor.calendly_link,
-      30: mentor.calendly_30min || mentor.calendly_link,
-      60: mentor.calendly_60min || mentor.calendly_link,
+      15: mentor.cal_15min || mentor.cal_link,
+      30: mentor.cal_30min || mentor.cal_link,
+      60: mentor.cal_60min || mentor.cal_link,
     };
     
     // If all URLs are the same, only show one option (60 min by default)
@@ -257,7 +265,7 @@ export default function MentorProfile() {
     }
   };
 
-  const calendlyUrl = mentor ? (mentor[`calendly_${selectedDuration}min` as keyof Mentor] as string || mentor.calendly_link) : "";
+  const calLink = mentor ? (mentor[`cal_${selectedDuration}min` as keyof Mentor] as string || mentor.cal_link) : "";
 
   return (
     <div className="min-h-screen py-12">
@@ -388,7 +396,7 @@ export default function MentorProfile() {
             <Card className="p-4">
               <h2 className="text-2xl font-bold mb-4 px-4">{t('session.bookSession')}</h2>
               {!menteeInfo ? (
-                <div className="p-12 text-center space-y-4" data-testid="calendly-locked">
+                <div className="p-12 text-center space-y-4" data-testid="cal-locked">
                   <p className="text-lg text-muted-foreground">
                     {t('identity.pleaseEnterDetails')}
                   </p>
@@ -431,13 +439,12 @@ export default function MentorProfile() {
                       </p>
                     </div>
                   )}
-                  <div className="rounded-lg overflow-hidden" data-testid="calendly-widget">
-                    <InlineWidget
-                      url={calendlyUrl}
-                      styles={{
-                        height: "700px",
-                        minWidth: "100%",
-                      }}
+                  <div className="rounded-lg overflow-hidden" style={{ height: "700px" }} data-testid="cal-widget">
+                    <Cal
+                      namespace="30min"
+                      calLink={calLink}
+                      style={{ width: "100%", height: "100%", overflow: "scroll" }}
+                      config={{ layout: "month_view" }}
                     />
                   </div>
                 </>

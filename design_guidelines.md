@@ -162,8 +162,8 @@
 ### Mentor Profile Page
 - Two-column layout:
   - **Left Column** (40%): Mentor details, bio, expertise, ratings
-  - **Right Column** (60%): Calendly embed
-- Mobile: Stack vertically (details first, then Calendly)
+  - **Right Column** (60%): Cal.com embed
+- Mobile: Stack vertically (details first, then Cal.com)
 
 ### Analytics Dashboard
 1. **Filter Row**:
@@ -200,7 +200,7 @@
 - All inputs follow Amazon form guidelines
 - Communication preference radio buttons
 - Photo upload with preview
-- Calendly link validation
+- Cal.com link validation
 - Submit button: Primary (Amazon Orange)
 
 **Mentee Registration**:
@@ -249,7 +249,7 @@
 - Filters in drawer/modal on mobile
 - Mentor grid: 1 column mobile, 2 tablet, 3 desktop
 - Navigation: Hamburger menu on mobile
-- Calendly widget: Full-screen modal on mobile
+- Cal.com widget: Full-screen modal on mobile
 - Analytics: Stack KPI cards, horizontal scroll for tables
 
 ## Internationalization (Future)

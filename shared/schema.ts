@@ -18,10 +18,10 @@ export const mentors = pgTable("mentors", {
   bio: text("bio").notNull(),
   bio_ar: text("bio_ar"),
   linkedin_url: text("linkedin_url"),
-  calendly_link: text("calendly_link").notNull(),
-  calendly_15min: text("calendly_15min"),
-  calendly_30min: text("calendly_30min"),
-  calendly_60min: text("calendly_60min"),
+  cal_link: text("cal_link").notNull(),
+  cal_15min: text("cal_15min"),
+  cal_30min: text("cal_30min"),
+  cal_60min: text("cal_60min"),
   expertise: text("expertise").array().notNull(),
   expertise_ar: text("expertise_ar").array(),
   industries: text("industries").array().notNull(),
@@ -60,7 +60,7 @@ export const bookings = pgTable("bookings", {
   id: varchar("id").primaryKey(),
   mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
   mentee_id: varchar("mentee_id").notNull().references(() => mentees.id),
-  calendly_event_uri: text("calendly_event_uri"),
+  cal_event_uri: text("cal_event_uri"),
   status: text("status", { 
     enum: ["clicked", "scheduled", "completed", "canceled"] 
   }).notNull().default("clicked"),

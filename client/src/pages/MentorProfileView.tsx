@@ -179,17 +179,17 @@ export default function MentorProfileView() {
                 ))}
               </div>
             </div>
-            {mentor.calendly_link && (
+            {mentor.cal_link && (
               <div className="flex items-center gap-3">
                 <Calendar className="w-5 h-5 text-muted-foreground" />
                 <a 
-                  href={mentor.calendly_link} 
+                  href={`https://cal.com/${mentor.cal_link}`} 
                   target="_blank" 
                   rel="noopener noreferrer"
                   className="text-primary hover:underline"
-                  data-testid="link-calendly"
+                  data-testid="link-calcom"
                 >
-                  View Calendly Schedule
+                  View Cal.com Schedule
                 </a>
               </div>
             )}

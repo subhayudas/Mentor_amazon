@@ -74,8 +74,8 @@
     "bio": "Bio",
     "bioPlaceholder": "Tell mentees about your experience and what you can help with...",
     "linkedinUrl": "LinkedIn URL",
-    "calendlyLink": "Calendly Link",
-    "calendlyHelp": "Your main Calendly scheduling link",
+    "calLink": "Cal.com Link",
+    "calHelp": "Your Cal.com scheduling link (e.g., username/30min)",
     "expertise": "Areas of Expertise",
     "addExpertise": "Add expertise areas",
     "industries": "Industries",
@@ -224,7 +224,7 @@
     "notFound": "Page not found",
     "goHome": "Go to Home",
     "loadFailed": "Failed to load mentors. Please try again.",
-    "invalidCalendlyUrl": "Please enter a valid Calendly URL (e.g., https://calendly.com/your-link)",
+    "invalidCalLink": "Please enter a valid Cal.com link (e.g., username/30min)",
     "organizationNameRequired": "Organization name is required for organization accounts"
   },
   "actions": {

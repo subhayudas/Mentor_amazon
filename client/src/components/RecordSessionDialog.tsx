@@ -93,7 +93,7 @@ export function RecordSessionDialog({ mentorId, mentorName }: RecordSessionDialo
         <DialogHeader>
           <DialogTitle>Record Your Session</DialogTitle>
           <DialogDescription>
-            After booking your session with {mentorName} on Calendly, please record it here for tracking purposes.
+            After booking your session with {mentorName} on Cal.com, please record it here for tracking purposes.
           </DialogDescription>
         </DialogHeader>
 

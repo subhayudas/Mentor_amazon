@@ -74,8 +74,8 @@
     "bio": "نبذة تعريفية",
     "bioPlaceholder": "أخبر المتدربين عن خبرتك وكيف يمكنك مساعدتهم...",
     "linkedinUrl": "رابط لينكد إن",
-    "calendlyLink": "رابط كالندلي",
-    "calendlyHelp": "رابط جدولة كالندلي الرئيسي الخاص بك",
+    "calLink": "رابط Cal.com",
+    "calHelp": "رابط جدولة Cal.com الخاص بك (مثال: username/30min)",
     "expertise": "مجالات الخبرة",
     "addExpertise": "إضافة مجالات خبرة",
     "industries": "الصناعات",
@@ -224,7 +224,7 @@
     "notFound": "الصفحة غير موجودة",
     "goHome": "الذهاب للرئيسية",
     "loadFailed": "فشل في تحميل المرشدين. يرجى المحاولة مرة أخرى.",
-    "invalidCalendlyUrl": "يرجى إدخال رابط كالندلي صالح (مثال: https://calendly.com/your-link)",
+    "invalidCalLink": "يرجى إدخال رابط Cal.com صالح (مثال: username/30min)",
     "organizationNameRequired": "اسم المنظمة مطلوب لحسابات المنظمات"
   },
   "actions": {

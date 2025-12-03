@@ -113,21 +113,16 @@ export default function MentorOnboarding() {
   const form = useForm<InsertMentor>({
     resolver: zodResolver(insertMentorSchema.refine(
       (data) => {
-        if (!data.calendly_link || data.calendly_link.trim() === "") {
+        if (!data.cal_link || data.cal_link.trim() === "") {
           return false;
         }
-        try {
-          const url = new URL(data.calendly_link);
-          const isHttps = url.protocol === "http:" || url.protocol === "https:";
-          const isCalendly = url.hostname === "calendly.com" || url.hostname.endsWith(".calendly.com");
-          return isHttps && isCalendly;
-        } catch {
-          return false;
-        }
+        const calLink = data.cal_link.trim();
+        const validPattern = /^[a-z0-9._-]+\/[a-z0-9._-]+$/i;
+        return validPattern.test(calLink);
       },
       {
-        message: "Please enter a valid Calendly URL (e.g., https://calendly.com/your-link)",
-        path: ["calendly_link"],
+        message: "Please enter a valid Cal.com link (e.g., username/30min)",
+        path: ["cal_link"],
       }
     )),
     defaultValues: {
@@ -140,7 +135,7 @@ export default function MentorOnboarding() {
       photo_url: "",
       bio: "",
       linkedin_url: "",
-      calendly_link: "",
+      cal_link: "",
       expertise: [],
       industries: [],
       languages_spoken: [],
@@ -183,7 +178,7 @@ export default function MentorOnboarding() {
   const onSubmit = (data: InsertMentor) => {
     const cleanedData = {
       ...data,
-      calendly_link: data.calendly_link?.trim() || "",
+      cal_link: data.cal_link?.trim() || "",
     };
     createMentorMutation.mutate(cleanedData);
   };
@@ -399,15 +394,15 @@ export default function MentorOnboarding() {
 
                 <FormField
                   control={form.control}
-                  name="calendly_link"
+                  name="cal_link"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('mentorOnboarding.calendlyLink')} *</FormLabel>
+                      <FormLabel>{t('mentorOnboarding.calLink')} *</FormLabel>
                       <FormControl>
-                        <Input placeholder="https://calendly.com/your-link" {...field} data-testid="input-calendly" />
+                        <Input placeholder="username/30min" {...field} data-testid="input-calcom" />
                       </FormControl>
                       <FormDescription>
-                        {t('mentorOnboarding.calendlyHelp')}
+                        {t('mentorOnboarding.calHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

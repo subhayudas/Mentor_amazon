@@ -145,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/webhooks/calendly", async (req, res) => {
+  app.post("/api/webhooks/calcom", async (req, res) => {
     try {
       const payload = req.body;
 
@@ -156,16 +156,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let mentorId: string | undefined;
       let menteeName: string | undefined;
       let menteeEmail: string | undefined;
-      let calendlyEventUri: string | undefined;
+      let calEventUri: string | undefined;
       let scheduledAt: string | undefined;
 
-      if (payload.event === "invitee.created" && payload.payload) {
-        const calendlyPayload = payload.payload;
+      if (payload.triggerEvent === "BOOKING_CREATED" && payload.payload) {
+        const calPayload = payload.payload;
         
-        menteeName = calendlyPayload.name;
-        menteeEmail = calendlyPayload.email;
-        scheduledAt = calendlyPayload.scheduled_event?.start_time;
-        calendlyEventUri = calendlyPayload.uri;
+        const attendee = calPayload.attendees?.[0];
+        menteeName = attendee?.name;
+        menteeEmail = attendee?.email;
+        scheduledAt = calPayload.startTime;
+        calEventUri = calPayload.uid;
 
         if (!menteeName || !menteeEmail) {
           return res.status(400).json({ 
@@ -173,11 +174,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
 
-        if (calendlyPayload.questions_and_answers && Array.isArray(calendlyPayload.questions_and_answers)) {
-          const mentorIdQuestion = calendlyPayload.questions_and_answers.find(
-            (qa: any) => qa.question === "Mentor ID" || qa.question === "MentorID"
-          );
-          mentorId = mentorIdQuestion?.answer;
+        if (calPayload.metadata && calPayload.metadata.mentorId) {
+          mentorId = calPayload.metadata.mentorId;
+        } else if (calPayload.responses?.mentor_id) {
+          mentorId = calPayload.responses.mentor_id.value;
         }
 
         if (!mentorId) {
@@ -189,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const bookingData = {
           mentor_id: payload.mentor_id,
           mentee_id: payload.mentee_id,
-          calendly_event_uri: payload.calendly_event_uri,
+          cal_event_uri: payload.cal_event_uri,
           status: payload.status || "clicked",
           scheduled_at: payload.scheduled_at,
         };
@@ -211,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       } else {
         return res.status(400).json({ 
-          message: "Invalid payload format. Expected either Calendly webhook or booking data with mentor_id and mentee_id." 
+          message: "Invalid payload format. Expected either Cal.com webhook or booking data with mentor_id and mentee_id." 
         });
       }
 
@@ -235,7 +235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const booking = await storage.createBooking({
         mentor_id: mentorId,
         mentee_id: mentee.id,
-        calendly_event_uri: calendlyEventUri,
+        cal_event_uri: calEventUri,
         status: "scheduled",
         scheduled_at: scheduledAt,
       });
