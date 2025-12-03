@@ -500,8 +500,17 @@ export default function MentorOnboarding() {
                       <FormControl>
                         <Input placeholder="username/30min" {...field} data-testid="input-calcom" />
                       </FormControl>
-                      <FormDescription>
-                        {t('mentorOnboarding.calHelp')}
+                      <FormDescription className="space-y-1">
+                        <span>{t('mentorOnboarding.calHelp')}</span>
+                        <a 
+                          href="https://cal.com/signup" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block text-primary hover:underline"
+                          data-testid="link-setup-cal"
+                        >
+                          {t('mentorOnboarding.calSetupLink')}
+                        </a>
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
