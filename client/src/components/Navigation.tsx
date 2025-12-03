@@ -24,7 +24,7 @@ export function Navigation() {
                 <div className="h-8 w-px bg-primary-foreground/20"></div>
                 <div className="flex flex-col">
                   <span className="text-lg font-bold text-primary-foreground">MentorConnect</span>
-                  <span className="text-[10px] text-primary-foreground/60 font-medium -mt-1">Amazon UAE</span>
+                  <span className="text-[10px] text-primary-foreground/60 font-medium -mt-1">Amazon</span>
                 </div>
               </div>
             </div>
