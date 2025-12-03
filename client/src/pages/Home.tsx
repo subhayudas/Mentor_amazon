@@ -48,25 +48,25 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <section className="relative overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8">
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
           <div className="max-w-5xl mx-auto relative">
-            <div className="relative h-48 md:h-64 lg:h-72 overflow-hidden rounded-xl shadow-xl">
-              <img 
-                src={amazonOfficeHero} 
-                alt="Amazon Office - Mentorship and Collaboration"
-                className="w-full h-full object-cover object-center"
-                data-testid="hero-illustration"
-              />
-            </div>
+            <img 
+              src={amazonOfficeHero} 
+              alt="Amazon Office - Mentorship and Collaboration"
+              className="w-full h-auto rounded-xl shadow-xl"
+              data-testid="hero-illustration"
+            />
             
-            <div className="absolute top-0 left-0 right-0 pt-3 md:pt-4 px-4 md:px-8 text-center">
-              <Badge variant="outline" className="bg-orange-500 text-white border-orange-500/20 text-xs md:text-sm">
-                {t('hero.badge')}
-              </Badge>
+            <div className="absolute top-0 left-0 right-0 pt-4 md:pt-6 lg:pt-8 px-4 md:px-8 text-center">
+              <div className="space-y-1 md:space-y-2">
+                <Badge variant="outline" className="bg-orange-500 text-white border-orange-500/20 text-xs md:text-sm">
+                  {t('hero.badge')}
+                </Badge>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4 md:gap-6 text-sm text-muted-foreground pt-4 mt-4">
+          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-8 mt-8">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-orange-500" />
               <span>{t('hero.trustedMentorship')}</span>
