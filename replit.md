@@ -34,8 +34,9 @@ Preferred communication style: Simple, everyday language.
 **Routing**: Wouter for lightweight client-side routing
 
 **Key Pages**:
-- Home: Mentor discovery with grid layout of mentor cards, search and filtering by name/expertise
-- Mentor Profile: Detailed mentor view with embedded Cal.com scheduling widget and favorite button
+- Home: Mentor discovery with grid layout of mentor cards, search and filtering by name/expertise, hero section with 4-line narrative and impact quote, FAQ section with accordion
+- Mentor Profile: Detailed mentor view with flexible session duration selection (15/30/60 min), embedded Cal.com scheduling widget and favorite button
+- Mentor Onboarding: Multi-step form for new mentors with mentorship preference (ongoing/rotating/either), optional "Why did you join?" testimonial field
 - Analytics: Dashboard with session metrics, time-series charts, and mentor performance analytics
 - My Bookings: Mentee booking history showing upcoming and past sessions with mentor details
 - 404: Custom not-found page
@@ -69,7 +70,7 @@ Preferred communication style: Simple, everyday language.
 **ORM**: Drizzle ORM configured for PostgreSQL
 
 **Database Schema**:
-- `mentors` table: Stores mentor profiles with id, name, name_ar, position, position_ar, company, company_ar, bio, bio_ar, expertise array, expertise_ar array, industries array, industries_ar array, Cal.com URLs (cal_link, cal_15min, cal_30min, cal_60min), country, mentorship_preference
+- `mentors` table: Stores mentor profiles with id, name, name_ar, position, position_ar, company, company_ar, bio, bio_ar, expertise array, expertise_ar array, industries array, industries_ar array, Cal.com URLs (cal_link, cal_15min, cal_30min, cal_60min), country, mentorship_preference (enum: "ongoing"/"rotating"/"either"), why_joined (optional testimonial text)
 - `sessions` table: Tracks booked sessions with id, mentorId (FK), menteeName, menteeEmail, bookedAt timestamp
 - `mentees` table: Stores mentee profiles with id, name, email (unique), country, timezone, user_type, organization fields, avatarUrl, createdAt
 - `favorites` table: Tracks favorite mentors with id, menteeEmail, mentorId (FK), createdAt
