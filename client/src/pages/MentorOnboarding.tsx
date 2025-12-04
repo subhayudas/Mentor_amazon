@@ -145,6 +145,7 @@ export default function MentorOnboarding() {
       languages_spoken: [],
       comms_owner: "exec",
       mentorship_preference: "rotating",
+      why_joined: "",
     },
   });
 
@@ -763,8 +764,44 @@ export default function MentorOnboarding() {
                               </p>
                             </div>
                           </FormItem>
+                          <FormItem className="flex items-start space-x-3 space-y-0">
+                            <FormControl>
+                              <RadioGroupItem value="either" data-testid="radio-either" />
+                            </FormControl>
+                            <div className="flex flex-col">
+                              <FormLabel className="font-medium">
+                                {t('mentorOnboarding.eitherMentorship')}
+                              </FormLabel>
+                              <p className="text-sm text-muted-foreground">
+                                {t('mentorOnboarding.eitherMentorshipDesc')}
+                              </p>
+                            </div>
+                          </FormItem>
                         </RadioGroup>
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="why_joined"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('mentorOnboarding.whyJoined')} <span className="text-muted-foreground text-sm font-normal">({t('common.optional')})</span></FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder={t('mentorOnboarding.whyJoinedPlaceholder')}
+                          className="min-h-[100px]"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="textarea-why-joined"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('mentorOnboarding.whyJoinedHelp')}
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

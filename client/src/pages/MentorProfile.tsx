@@ -138,23 +138,25 @@ export default function MentorProfile() {
     });
   };
 
-  // Determine available durations based on unique Cal.com URLs
+  // Determine available durations for flexible session scheduling
   // IMPORTANT: This must be before any early returns to maintain hook order
   const availableDurations = useMemo(() => {
     if (!mentor) return [15, 30, 60];
     
-    const urls = {
-      15: mentor.cal_15min || mentor.cal_link,
-      30: mentor.cal_30min || mentor.cal_link,
-      60: mentor.cal_60min || mentor.cal_link,
-    };
+    // Check if mentor has specific duration links configured
+    const hasSpecificLinks = mentor.cal_15min || mentor.cal_30min || mentor.cal_60min;
     
-    // If all URLs are the same, only show one option (60 min by default)
-    if (urls[15] === urls[30] && urls[30] === urls[60]) {
-      return [60];
+    if (hasSpecificLinks) {
+      // Show only durations that have specific links configured
+      const durations: number[] = [];
+      if (mentor.cal_15min) durations.push(15);
+      if (mentor.cal_30min) durations.push(30);
+      if (mentor.cal_60min) durations.push(60);
+      return durations.length > 0 ? durations : [30];
     }
     
-    // Otherwise show all unique durations
+    // When only base cal_link exists, show all durations for flexibility
+    // The Cal.com widget will use the same link for any duration selection
     return [15, 30, 60];
   }, [mentor]);
 

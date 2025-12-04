@@ -26,6 +26,10 @@
   },
   "hero": {
     "badge": "Amazon Mentorship Program",
+    "headline": "Connect. Learn. Grow Together.",
+    "narrative": "Our mentorship program brings together experienced Amazon leaders and aspiring professionals. Whether you're seeking career guidance, leadership development, or industry insights, our mentors are here to help you reach your full potential.",
+    "impactQuote": "A single conversation with the right mentor can change the trajectory of your entire career. That's the power of mentorship.",
+    "quoteAuthor": "Amazon Mentorship Program",
     "trustedMentorship": "Trusted Mentorship",
     "expertGuidance": "Expert Guidance",
     "flexibleScheduling": "Flexible Scheduling"
@@ -102,6 +106,11 @@
     "ongoingMentorshipDesc": "Long-term commitment with a single mentee for deeper relationship",
     "rotatingMentees": "Different mentees each session",
     "rotatingMenteesDesc": "Flexible scheduling with various mentees for diverse perspectives",
+    "eitherMentorship": "Open to either",
+    "eitherMentorshipDesc": "Flexible approach - happy with both ongoing and rotating mentorship styles",
+    "whyJoined": "Why did you choose to join?",
+    "whyJoinedPlaceholder": "Share what motivated you to become a mentor on this platform...",
+    "whyJoinedHelp": "Optional - Your response may be featured as a testimonial",
     "createProfile": "Create Mentor Profile",
     "creating": "Creating Profile...",
     "successTitle": "Welcome to the Mentor Community!",
@@ -300,5 +309,17 @@
     "bookingRecordedDescription": "Your mentorship session has been tracked successfully.",
     "recordingFailed": "Recording Failed",
     "recordingFailedDescription": "We couldn't save your booking after multiple attempts. Please contact support."
+  },
+  "faq": {
+    "title": "Frequently Asked Questions",
+    "subtitle": "Everything you need to know about our mentorship program",
+    "spamQuestion": "If I participate, will I be spammed with emails?",
+    "spamAnswer": "Absolutely not. We respect your inbox and privacy. You'll only receive essential communications: session confirmations, reminders 24 hours before your meetings, and occasional program updates you can opt out of anytime. We never share your email with third parties, and you have full control over your notification preferences in your profile settings.",
+    "commitmentQuestion": "What is the time commitment for mentors?",
+    "commitmentAnswer": "You're in control of your availability. Whether you can offer one session per month or several per week, our flexible scheduling adapts to your calendar. Most mentors dedicate 1-2 hours monthly, but there's no minimum requirement. You set your own pace.",
+    "matchingQuestion": "How are mentors and mentees matched?",
+    "matchingAnswer": "Mentees browse our mentor directory and choose mentors based on expertise, industry experience, and availability. This self-selection approach ensures both parties are aligned on goals and expectations from the start.",
+    "cancelQuestion": "What if I need to cancel or reschedule?",
+    "cancelAnswer": "Life happens! You can cancel or reschedule any session through your calendar link. We just ask for 24 hours notice when possible so the other party can adjust their schedule accordingly."
   }
 }

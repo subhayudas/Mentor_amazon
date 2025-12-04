@@ -8,7 +8,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Target, Zap, ArrowRight } from "lucide-react";
+import { Sparkles, Target, Zap, ArrowRight, HelpCircle } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Link } from "wouter";
 import amazonOfficeHero from "@assets/image_1764748916255.png";
 
@@ -66,7 +72,20 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-8 mt-8">
+          <div className="max-w-3xl mx-auto text-center pt-8 space-y-4">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold leading-tight" data-testid="hero-headline">
+              {t('hero.headline')}
+            </h1>
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed" data-testid="hero-narrative">
+              {t('hero.narrative')}
+            </p>
+            <blockquote className="border-l-4 border-orange-500 pl-4 py-2 my-6 text-left italic text-muted-foreground" data-testid="hero-quote">
+              <p className="text-base md:text-lg">"{t('hero.impactQuote')}"</p>
+              <footer className="text-sm mt-2 font-medium text-foreground">{t('hero.quoteAuthor')}</footer>
+            </blockquote>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-4 mt-4">
             <div className="flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-orange-500" />
               <span>{t('hero.trustedMentorship')}</span>
@@ -149,6 +168,56 @@ export default function Home() {
               </Card>
             )}
           </div>
+        </div>
+      </section>
+
+      <section className="py-12 md:py-16 bg-muted/30">
+        <div className="max-w-3xl mx-auto px-4 md:px-8">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 mb-2">
+              <HelpCircle className="w-6 h-6 text-orange-500" />
+              <h2 className="text-2xl md:text-3xl font-bold">{t('faq.title')}</h2>
+            </div>
+            <p className="text-muted-foreground">{t('faq.subtitle')}</p>
+          </div>
+          
+          <Accordion type="single" collapsible className="w-full" data-testid="faq-accordion">
+            <AccordionItem value="spam">
+              <AccordionTrigger className="text-left" data-testid="faq-spam-trigger">
+                {t('faq.spamQuestion')}
+              </AccordionTrigger>
+              <AccordionContent data-testid="faq-spam-answer">
+                {t('faq.spamAnswer')}
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="commitment">
+              <AccordionTrigger className="text-left" data-testid="faq-commitment-trigger">
+                {t('faq.commitmentQuestion')}
+              </AccordionTrigger>
+              <AccordionContent data-testid="faq-commitment-answer">
+                {t('faq.commitmentAnswer')}
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="matching">
+              <AccordionTrigger className="text-left" data-testid="faq-matching-trigger">
+                {t('faq.matchingQuestion')}
+              </AccordionTrigger>
+              <AccordionContent data-testid="faq-matching-answer">
+                {t('faq.matchingAnswer')}
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="cancel">
+              <AccordionTrigger className="text-left" data-testid="faq-cancel-trigger">
+                {t('faq.cancelQuestion')}
+              </AccordionTrigger>
+              <AccordionContent data-testid="faq-cancel-answer">
+                {t('faq.cancelAnswer')}
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </section>
     </div>
