@@ -54,18 +54,38 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <section 
-        className="relative overflow-hidden bg-gradient-to-b from-stone-100 via-orange-50/50 to-amber-100/60 dark:from-stone-900 dark:via-orange-950/20 dark:to-amber-950/30"
+        className="relative overflow-hidden min-h-[420px] md:min-h-[480px]"
+        style={{
+          backgroundImage: `url(${heroImage})`,
+          backgroundSize: '180% auto',
+          backgroundPosition: 'center bottom',
+          backgroundRepeat: 'no-repeat',
+        }}
         data-testid="hero-section"
       >
+        {/* Cream overlay for text readability - matching Composio style */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(245, 243, 240, 0.95) 0%, rgba(245, 243, 240, 0.85) 40%, rgba(245, 243, 240, 0.4) 70%, transparent 100%)',
+          }}
+        />
+        <div 
+          className="absolute inset-0 z-0 dark:block hidden"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(28, 25, 23, 0.95) 0%, rgba(28, 25, 23, 0.85) 40%, rgba(28, 25, 23, 0.4) 70%, transparent 100%)',
+          }}
+        />
+        
         {/* Text Content */}
-        <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 pt-10 md:pt-14 pb-6 text-center">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-tight mb-3" data-testid="hero-headline">
+        <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 pt-12 md:pt-16 pb-48 md:pb-56 text-center">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-stone-900 dark:text-stone-100 leading-tight mb-3" data-testid="hero-headline">
             {t('hero.headline')}
           </h1>
           <p className="text-lg md:text-xl font-medium text-[#FF9900] mb-3" data-testid="hero-tagline">
             <em>{t('hero.tagline')}</em>
           </p>
-          <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-5" data-testid="hero-narrative">
+          <p className="text-stone-600 dark:text-stone-400 text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-6" data-testid="hero-narrative">
             {t('hero.shortNarrative')}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
@@ -75,30 +95,12 @@ export default function Home() {
               </Button>
             </Link>
             <Link href="/onboarding">
-              <Button size="lg" variant="outline" className="border-[#232F3E] text-[#232F3E] hover:bg-[#232F3E]/5" data-testid="button-become-mentor">
+              <Button size="lg" variant="outline" className="border-stone-800 text-stone-800 dark:border-stone-200 dark:text-stone-200 hover:bg-stone-800/5" data-testid="button-become-mentor">
                 <ArrowRight className="w-4 h-4 mr-2 rtl:mr-0 rtl:ml-2 rtl:rotate-180" />
                 {t('nav.becomeMentor')}
               </Button>
             </Link>
           </div>
-        </div>
-        
-        {/* Decorative Image - ENLARGED, centered at bottom */}
-        <div className="relative w-full overflow-hidden" style={{ height: '280px' }}>
-          <img 
-            src={heroImage} 
-            alt="" 
-            className="absolute left-1/2 pointer-events-none select-none"
-            style={{ 
-              width: '200%',
-              maxWidth: 'none',
-              height: 'auto',
-              bottom: '-30%',
-              transform: 'translateX(-50%)',
-              objectFit: 'cover',
-              objectPosition: 'center top',
-            }}
-          />
         </div>
       </section>
 
