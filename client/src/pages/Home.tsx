@@ -16,7 +16,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Link } from "wouter";
-import heroImage from "@assets/image_1765099034045.png";
+import heroImage from "@assets/image_1765099874695.png";
 
 export default function Home() {
   const { t } = useTranslation();
@@ -54,25 +54,11 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <section 
-        className="relative overflow-hidden bg-gradient-to-br from-stone-100 via-orange-50/60 to-amber-100/80 dark:from-stone-900 dark:via-orange-950/30 dark:to-amber-950/40"
+        className="relative overflow-hidden bg-gradient-to-b from-stone-100 via-orange-50/50 to-amber-100/60 dark:from-stone-900 dark:via-orange-950/20 dark:to-amber-950/30"
         data-testid="hero-section"
       >
-        {/* Decorative Image - positioned to right */}
-        <img 
-          src={heroImage} 
-          alt="" 
-          className="absolute bottom-0 right-0 w-[90%] md:w-[70%] lg:w-[60%] pointer-events-none select-none"
-          style={{ 
-            height: 'auto',
-            maxHeight: '90%',
-            objectFit: 'contain',
-            objectPosition: 'bottom right',
-            transform: 'translateX(10%)',
-          }}
-        />
-        
         {/* Text Content */}
-        <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 pt-10 md:pt-14 pb-32 md:pb-40 text-center">
+        <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 pt-10 md:pt-14 pb-6 text-center">
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-tight mb-3" data-testid="hero-headline">
             {t('hero.headline')}
           </h1>
@@ -95,6 +81,24 @@ export default function Home() {
               </Button>
             </Link>
           </div>
+        </div>
+        
+        {/* Decorative Image - ENLARGED, centered at bottom */}
+        <div className="relative w-full overflow-hidden" style={{ height: '280px' }}>
+          <img 
+            src={heroImage} 
+            alt="" 
+            className="absolute left-1/2 pointer-events-none select-none"
+            style={{ 
+              width: '200%',
+              maxWidth: 'none',
+              height: 'auto',
+              bottom: '-30%',
+              transform: 'translateX(-50%)',
+              objectFit: 'cover',
+              objectPosition: 'center top',
+            }}
+          />
         </div>
       </section>
 
