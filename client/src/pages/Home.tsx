@@ -16,6 +16,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Link } from "wouter";
+import heroImage from "@assets/image_1765099034045.png";
 
 export default function Home() {
   const { t } = useTranslation();
@@ -54,29 +55,48 @@ export default function Home() {
     <div className="min-h-screen">
       <section 
         className="relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, #FF9900 0%, #FF6600 50%, #232F3E 100%)"
-        }}
         data-testid="hero-section"
       >
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="text-center md:text-left space-y-2 max-w-2xl">
-              <Badge variant="outline" className="bg-white/20 text-white border-white/30 backdrop-blur-sm text-xs">
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 z-0"
+          style={{
+            backgroundImage: `url(${heroImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center bottom',
+            backgroundRepeat: 'no-repeat',
+          }}
+        />
+        {/* Dark Overlay for Text Readability */}
+        <div 
+          className="absolute inset-0 z-[1]"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(35, 47, 62, 0.85) 0%, rgba(35, 47, 62, 0.7) 60%, rgba(35, 47, 62, 0.5) 100%)',
+          }}
+        />
+        
+        {/* Content */}
+        <div className="relative z-10 max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
+          <div className="flex flex-col md:flex-row rtl:md:flex-row-reverse items-center justify-between gap-6">
+            <div className="text-center md:text-start space-y-3 max-w-2xl">
+              <Badge variant="outline" className="bg-[#FF9900]/20 text-white border-[#FF9900]/50 backdrop-blur-sm">
                 {t('hero.badge')}
               </Badge>
-              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white leading-tight" data-testid="hero-headline">
+              <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight drop-shadow-lg" data-testid="hero-headline">
                 {t('hero.headline')}
               </h1>
-              <p className="text-white/90 text-xs md:text-sm leading-relaxed" data-testid="hero-narrative">
+              <p className="text-lg md:text-xl font-medium text-[#FF9900] drop-shadow-md" data-testid="hero-tagline">
+                {t('hero.tagline')}
+              </p>
+              <p className="text-white/90 text-sm md:text-base leading-relaxed drop-shadow-sm" data-testid="hero-narrative">
                 {t('hero.shortNarrative')}
               </p>
             </div>
             <div className="flex gap-3 shrink-0">
               <Link href="#mentors">
-                <Button size="default" className="bg-white text-[#232F3E] hover:bg-white/90" data-testid="button-browse-mentors">
+                <Button size="lg" className="bg-[#FF9900] text-white hover:bg-[#FF9900]/90 border-none shadow-lg" data-testid="button-browse-mentors">
                   {t('nav.browseMentors')}
-                  <ArrowRight className="w-4 h-4 ml-2" />
+                  <ArrowRight className="w-4 h-4 ml-2 rtl:ml-0 rtl:mr-2 rtl:rotate-180" />
                 </Button>
               </Link>
             </div>
