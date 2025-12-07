@@ -54,18 +54,32 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <section 
-        className="relative overflow-hidden bg-gradient-to-b from-orange-50/80 via-amber-50/50 to-background dark:from-orange-950/20 dark:via-amber-950/10 dark:to-background"
+        className="relative overflow-hidden bg-gradient-to-br from-stone-100 via-orange-50/60 to-amber-100/80 dark:from-stone-900 dark:via-orange-950/30 dark:to-amber-950/40"
         data-testid="hero-section"
       >
+        {/* Decorative Image - positioned to right */}
+        <img 
+          src={heroImage} 
+          alt="" 
+          className="absolute bottom-0 right-0 w-[90%] md:w-[70%] lg:w-[60%] pointer-events-none select-none"
+          style={{ 
+            height: 'auto',
+            maxHeight: '90%',
+            objectFit: 'contain',
+            objectPosition: 'bottom right',
+            transform: 'translateX(10%)',
+          }}
+        />
+        
         {/* Text Content */}
-        <div className="max-w-4xl mx-auto px-4 md:px-8 pt-12 md:pt-16 pb-4 text-center">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-tight mb-4" data-testid="hero-headline">
+        <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 pt-10 md:pt-14 pb-32 md:pb-40 text-center">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-foreground leading-tight mb-3" data-testid="hero-headline">
             {t('hero.headline')}
           </h1>
-          <p className="text-lg md:text-xl font-medium text-[#FF9900] mb-4" data-testid="hero-tagline">
+          <p className="text-lg md:text-xl font-medium text-[#FF9900] mb-3" data-testid="hero-tagline">
             <em>{t('hero.tagline')}</em>
           </p>
-          <p className="text-muted-foreground text-base md:text-lg leading-relaxed max-w-2xl mx-auto mb-6" data-testid="hero-narrative">
+          <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-5" data-testid="hero-narrative">
             {t('hero.shortNarrative')}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
@@ -81,16 +95,6 @@ export default function Home() {
               </Button>
             </Link>
           </div>
-        </div>
-        
-        {/* Decorative Image */}
-        <div className="relative w-full overflow-hidden" style={{ height: '200px' }}>
-          <img 
-            src={heroImage} 
-            alt="" 
-            className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full max-w-3xl object-contain object-bottom"
-            style={{ height: '280px' }}
-          />
         </div>
       </section>
 
