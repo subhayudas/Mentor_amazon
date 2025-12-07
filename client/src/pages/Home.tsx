@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sparkles, Target, Zap, ArrowRight, HelpCircle } from "lucide-react";
+import { Users, Calendar, Globe, TrendingUp, HelpCircle, ArrowRight } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -16,7 +16,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Link } from "wouter";
-import amazonOfficeHero from "@assets/image_1764748916255.png";
 
 export default function Home() {
   const { t } = useTranslation();
@@ -53,58 +52,39 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
-      <section className="relative overflow-hidden bg-gradient-to-b from-background via-muted/20 to-background">
-        <div className="max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-12">
-          <div className="max-w-5xl mx-auto relative">
-            <img 
-              src={amazonOfficeHero} 
-              alt="Amazon Office - Mentorship and Collaboration"
-              className="w-full h-auto rounded-xl shadow-xl"
-              data-testid="hero-illustration"
-            />
-            
-            <div className="absolute top-0 left-0 right-0 pt-4 md:pt-6 lg:pt-8 px-4 md:px-8 text-center">
-              <div className="space-y-1 md:space-y-2">
-                <Badge variant="outline" className="bg-orange-500 text-white border-orange-500/20 text-xs md:text-sm">
-                  {t('hero.badge')}
-                </Badge>
-              </div>
+      <section 
+        className="relative overflow-hidden"
+        style={{
+          background: "linear-gradient(135deg, #FF9900 0%, #FF6600 50%, #232F3E 100%)"
+        }}
+        data-testid="hero-section"
+      >
+        <div className="max-w-7xl mx-auto px-4 md:px-8 py-4 md:py-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="text-center md:text-left space-y-2 max-w-2xl">
+              <Badge variant="outline" className="bg-white/20 text-white border-white/30 backdrop-blur-sm text-xs">
+                {t('hero.badge')}
+              </Badge>
+              <h1 className="text-xl md:text-2xl lg:text-3xl font-bold text-white leading-tight" data-testid="hero-headline">
+                {t('hero.headline')}
+              </h1>
+              <p className="text-white/90 text-xs md:text-sm leading-relaxed" data-testid="hero-narrative">
+                {t('hero.shortNarrative')}
+              </p>
             </div>
-          </div>
-
-          <div className="max-w-3xl mx-auto text-center pt-8 space-y-4">
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold leading-tight" data-testid="hero-headline">
-              {t('hero.headline')}
-            </h1>
-            <p className="text-base md:text-lg text-muted-foreground leading-relaxed" data-testid="hero-narrative">
-              {t('hero.narrative')}
-            </p>
-            <blockquote className="border-l-4 border-orange-500 pl-4 py-2 my-6 text-left italic text-muted-foreground" data-testid="hero-quote">
-              <p className="text-base md:text-lg">"{t('hero.impactQuote')}"</p>
-              <footer className="text-sm mt-2 font-medium text-foreground">{t('hero.quoteAuthor')}</footer>
-            </blockquote>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8 text-sm text-muted-foreground pt-4 mt-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-orange-500" />
-              <span>{t('hero.trustedMentorship')}</span>
-            </div>
-            <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-            <div className="flex items-center gap-2">
-              <Target className="w-5 h-5 text-orange-500" />
-              <span>{t('hero.expertGuidance')}</span>
-            </div>
-            <div className="w-1 h-1 rounded-full bg-muted-foreground/50" />
-            <div className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-orange-500" />
-              <span>{t('hero.flexibleScheduling')}</span>
+            <div className="flex gap-3 shrink-0">
+              <Link href="#mentors">
+                <Button size="default" className="bg-white text-[#232F3E] hover:bg-white/90" data-testid="button-browse-mentors">
+                  {t('nav.browseMentors')}
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      <section id="mentors" className="py-12 md:py-20 bg-gradient-to-b from-background via-muted/30 to-background">
+      <section id="mentors" className="py-8 md:py-12 bg-gradient-to-b from-background via-muted/30 to-background">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="space-y-8">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -167,6 +147,44 @@ export default function Home() {
                 </p>
               </Card>
             )}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-8 md:py-10 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20">
+        <div className="max-w-7xl mx-auto px-4 md:px-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-mentors">
+              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
+                <Users className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold text-orange-600">{mentors?.length || "50"}+</div>
+              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.activeMentors')}</div>
+            </Card>
+            
+            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-sessions">
+              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
+                <Calendar className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold text-orange-600">500+</div>
+              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.sessionsBooked')}</div>
+            </Card>
+            
+            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-countries">
+              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
+                <Globe className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold text-orange-600">12+</div>
+              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.countries')}</div>
+            </Card>
+            
+            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-satisfaction">
+              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
+                <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
+              </div>
+              <div className="text-2xl md:text-3xl font-bold text-orange-600">98%</div>
+              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.satisfaction')}</div>
+            </Card>
           </div>
         </div>
       </section>

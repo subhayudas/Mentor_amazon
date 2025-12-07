@@ -27,12 +27,19 @@
   "hero": {
     "badge": "Amazon Mentorship Program",
     "headline": "Connect. Learn. Grow Together.",
+    "shortNarrative": "Connect with experienced Amazon leaders for career guidance, leadership development, and industry insights.",
     "narrative": "Our mentorship program brings together experienced Amazon leaders and aspiring professionals. Whether you're seeking career guidance, leadership development, or industry insights, our mentors are here to help you reach your full potential.",
     "impactQuote": "A single conversation with the right mentor can change the trajectory of your entire career. That's the power of mentorship.",
     "quoteAuthor": "Amazon Mentorship Program",
     "trustedMentorship": "Trusted Mentorship",
     "expertGuidance": "Expert Guidance",
     "flexibleScheduling": "Flexible Scheduling"
+  },
+  "stats": {
+    "activeMentors": "Active Mentors",
+    "sessionsBooked": "Sessions Booked",
+    "countries": "Countries",
+    "satisfaction": "Satisfaction Rate"
   },
   "mentors": {
     "title": "Featured Mentors",
