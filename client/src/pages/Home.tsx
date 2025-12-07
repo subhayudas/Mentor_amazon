@@ -89,12 +89,12 @@ export default function Home() {
             {t('hero.shortNarrative')}
           </p>
           <div className="flex flex-wrap gap-3 justify-center">
-            <Link href="#mentors">
+            <a href="#mentors">
               <Button size="lg" className="bg-[#232F3E] text-white hover:bg-[#232F3E]/90" data-testid="button-browse-mentors">
                 {t('nav.browseMentors')}
               </Button>
-            </Link>
-            <Link href="/onboarding">
+            </a>
+            <Link href="/mentor-onboarding">
               <Button size="lg" variant="outline" className="border-stone-800 text-stone-800 dark:border-stone-200 dark:text-stone-200 hover:bg-stone-800/5" data-testid="button-become-mentor">
                 <ArrowRight className="w-4 h-4 mr-2 rtl:mr-0 rtl:ml-2 rtl:rotate-180" />
                 {t('nav.becomeMentor')}
