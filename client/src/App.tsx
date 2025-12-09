@@ -12,6 +12,8 @@ import MentorOnboarding from "@/pages/MentorOnboarding";
 import MenteeRegistration from "@/pages/MenteeRegistration";
 import MentorProfileView from "@/pages/MentorProfileView";
 import MenteeProfileView from "@/pages/MenteeProfileView";
+import MyBookings from "@/pages/MyBookings";
+import MentorDashboard from "@/pages/MentorDashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -19,11 +21,14 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/mentor/:id" component={MentorProfile} />
+      <Route path="/mentors/:id" component={MentorProfile} />
       <Route path="/profile/mentor/:id" component={MentorProfileView} />
       <Route path="/profile/mentee/:id" component={MenteeProfileView} />
       <Route path="/analytics" component={Analytics} />
       <Route path="/mentor-onboarding" component={MentorOnboarding} />
       <Route path="/mentee-registration" component={MenteeRegistration} />
+      <Route path="/my-bookings" component={MyBookings} />
+      <Route path="/mentor-dashboard" component={MentorDashboard} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,4 +1,4 @@
-import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, mentors, bookings, mentees } from "@shared/schema";
+import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, type BookingNote, type InsertBookingNote, mentors, bookings, mentees, bookingNotes } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -6,13 +6,22 @@ import { randomUUID } from "crypto";
 export interface IStorage {
   getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<Mentor[]>;
   getMentor(id: string): Promise<Mentor | undefined>;
+  getMentorByEmail(email: string): Promise<Mentor | undefined>;
   createMentor(mentor: InsertMentor): Promise<Mentor>;
+  updateMentorAvailability(id: string, isAvailable: boolean): Promise<Mentor | undefined>;
   getBookings(): Promise<Booking[]>;
+  getBooking(id: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
+  getMentorBookings(mentorId: string): Promise<Booking[]>;
   getMentees(): Promise<Mentee[]>;
   getMenteeByEmail(email: string): Promise<Mentee | undefined>;
   createMentee(mentee: InsertMentee): Promise<Mentee>;
+  updateMentee(id: string, updates: Partial<InsertMentee>): Promise<Mentee | undefined>;
   getMenteeBookings(menteeId: string): Promise<Booking[]>;
+  getBookingNotes(bookingId: string): Promise<BookingNote[]>;
+  createBookingNote(note: InsertBookingNote): Promise<BookingNote>;
+  updateBookingNote(id: string, updates: Partial<InsertBookingNote>): Promise<BookingNote | undefined>;
+  deleteBookingNote(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -278,6 +287,12 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getMentorByEmail(email: string): Promise<Mentor | undefined> {
+    await this.seedPromise;
+    const result = await db.select().from(mentors).where(eq(mentors.email, email));
+    return result[0];
+  }
+
   async createMentor(insertMentor: InsertMentor): Promise<Mentor> {
     await this.seedPromise;
     const id = randomUUID();
@@ -335,6 +350,68 @@ export class DatabaseStorage implements IStorage {
   async getMenteeBookings(menteeId: string): Promise<Booking[]> {
     await this.seedPromise;
     return await db.select().from(bookings).where(eq(bookings.mentee_id, menteeId));
+  }
+
+  async getMentorBookings(mentorId: string): Promise<Booking[]> {
+    await this.seedPromise;
+    return await db.select().from(bookings).where(eq(bookings.mentor_id, mentorId));
+  }
+
+  async updateMentorAvailability(id: string, isAvailable: boolean): Promise<Mentor | undefined> {
+    await this.seedPromise;
+    const now = new Date().toISOString();
+    const result = await db.update(mentors)
+      .set({ is_available: isAvailable, updated_at: now })
+      .where(eq(mentors.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getBooking(id: string): Promise<Booking | undefined> {
+    await this.seedPromise;
+    const result = await db.select().from(bookings).where(eq(bookings.id, id));
+    return result[0];
+  }
+
+  async updateMentee(id: string, updates: Partial<InsertMentee>): Promise<Mentee | undefined> {
+    await this.seedPromise;
+    const result = await db.update(mentees)
+      .set(updates)
+      .where(eq(mentees.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async getBookingNotes(bookingId: string): Promise<BookingNote[]> {
+    await this.seedPromise;
+    return await db.select().from(bookingNotes).where(eq(bookingNotes.booking_id, bookingId));
+  }
+
+  async createBookingNote(insertNote: InsertBookingNote): Promise<BookingNote> {
+    await this.seedPromise;
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const result = await db.insert(bookingNotes).values({
+      ...insertNote,
+      id,
+      created_at: now,
+    }).returning();
+    return result[0];
+  }
+
+  async updateBookingNote(id: string, updates: Partial<InsertBookingNote>): Promise<BookingNote | undefined> {
+    await this.seedPromise;
+    const result = await db.update(bookingNotes)
+      .set(updates)
+      .where(eq(bookingNotes.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteBookingNote(id: string): Promise<boolean> {
+    await this.seedPromise;
+    const result = await db.delete(bookingNotes).where(eq(bookingNotes.id, id)).returning();
+    return result.length > 0;
   }
 }
 

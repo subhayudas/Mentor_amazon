@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertBookingSchema, insertMenteeSchema, insertMentorSchema } from "@shared/schema";
+import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -73,6 +73,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/mentors/email/:email", async (req, res) => {
+    try {
+      const { email } = req.params;
+      const mentor = await storage.getMentorByEmail(email);
+      
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      res.json(mentor);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentor" });
+    }
+  });
+
   app.get("/api/mentors/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -85,6 +100,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(mentor);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch mentor" });
+    }
+  });
+
+  app.get("/api/mentors/:id/bookings", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const mentor = await storage.getMentor(id);
+      
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+
+      const mentorBookings = await storage.getMentorBookings(id);
+      res.json(mentorBookings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentor bookings" });
     }
   });
 
@@ -310,6 +341,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Webhook processing error:", error);
       res.status(500).json({ message: "Failed to process webhook" });
+    }
+  });
+
+  // Mentor availability toggle
+  app.patch("/api/mentors/:id/availability", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { is_available } = req.body;
+      
+      if (typeof is_available !== "boolean") {
+        return res.status(400).json({ message: "is_available must be a boolean" });
+      }
+
+      const mentor = await storage.updateMentorAvailability(id, is_available);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+
+      res.json(mentor);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update mentor availability" });
+    }
+  });
+
+  // Update mentee profile
+  app.patch("/api/mentees/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const mentee = await storage.updateMentee(id, updates);
+      if (!mentee) {
+        return res.status(404).json({ message: "Mentee not found" });
+      }
+
+      res.json(mentee);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update mentee" });
+    }
+  });
+
+  // Booking notes endpoints
+  app.get("/api/bookings/:bookingId/notes", async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const notes = await storage.getBookingNotes(bookingId);
+      res.json(notes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch booking notes" });
+    }
+  });
+
+  app.post("/api/bookings/:bookingId/notes", async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const noteData = {
+        ...req.body,
+        booking_id: bookingId,
+      };
+
+      const result = insertBookingNoteSchema.safeParse(noteData);
+      if (!result.success) {
+        return res.status(400).json({ 
+          message: "Invalid note data",
+          errors: result.error.errors 
+        });
+      }
+
+      const note = await storage.createBookingNote(result.data);
+      res.status(201).json(note);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create booking note" });
+    }
+  });
+
+  app.patch("/api/bookings/:bookingId/notes/:noteId", async (req, res) => {
+    try {
+      const { noteId } = req.params;
+      const updates = req.body;
+
+      const note = await storage.updateBookingNote(noteId, updates);
+      if (!note) {
+        return res.status(404).json({ message: "Note not found" });
+      }
+
+      res.json(note);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update note" });
+    }
+  });
+
+  app.delete("/api/bookings/:bookingId/notes/:noteId", async (req, res) => {
+    try {
+      const { noteId } = req.params;
+
+      const deleted = await storage.deleteBookingNote(noteId);
+      if (!deleted) {
+        return res.status(404).json({ message: "Note not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete note" });
     }
   });
 

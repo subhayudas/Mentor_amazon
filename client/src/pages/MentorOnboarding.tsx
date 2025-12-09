@@ -871,6 +871,11 @@ export default function MentorOnboarding() {
                   )}
                 />
 
+                <div className="p-4 border rounded-lg bg-muted/30 text-sm text-muted-foreground">
+                  <p className="mb-2">{t('legal.termsAgreement')}</p>
+                  <p>{t('legal.disclaimer')}</p>
+                </div>
+
                 <div className="flex gap-4">
                   <Button
                     type="button"

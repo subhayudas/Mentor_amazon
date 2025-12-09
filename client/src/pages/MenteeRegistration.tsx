@@ -650,6 +650,34 @@ export default function MenteeRegistration() {
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="goals"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('menteeRegistration.goals')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder={t('menteeRegistration.goalsPlaceholder')}
+                          className="min-h-24"
+                          {...field}
+                          value={field.value || ""}
+                          data-testid="input-goals"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t('menteeRegistration.goalsHelp')}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="p-4 border rounded-lg bg-muted/30 text-sm text-muted-foreground">
+                  <p className="mb-2">{t('legal.termsAgreement')}</p>
+                  <p>{t('legal.privacyNotice')}</p>
+                </div>
+
                 <div className="flex gap-4">
                   <Button
                     type="button"

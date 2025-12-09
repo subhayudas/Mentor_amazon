@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, timestamp, integer, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, decimal, boolean } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -31,6 +31,7 @@ export const mentors = pgTable("mentors", {
   assistant_email: text("assistant_email"),
   mentorship_preference: text("mentorship_preference", { enum: ["ongoing", "rotating", "either"] }),
   why_joined: text("why_joined"),
+  is_available: boolean("is_available").default(true).notNull(),
   average_rating: decimal("average_rating", { precision: 3, scale: 2 }).default("0"),
   total_ratings: integer("total_ratings").default(0),
   created_at: timestamp("created_at", { mode: "string" }).notNull(),
@@ -55,6 +56,7 @@ export const mentees = pgTable("mentees", {
   linkedin_url: text("linkedin_url"),
   languages_spoken: text("languages_spoken").array().notNull(),
   areas_exploring: text("areas_exploring").array().notNull(),
+  goals: text("goals"),
   created_at: timestamp("created_at", { mode: "string" }).notNull(),
 });
 
@@ -75,6 +77,18 @@ export const bookings = pgTable("bookings", {
   created_at: timestamp("created_at", { mode: "string" }).notNull(),
 });
 
+export const bookingNotes = pgTable("booking_notes", {
+  id: varchar("id").primaryKey(),
+  booking_id: varchar("booking_id").notNull().references(() => bookings.id),
+  author_type: text("author_type", { enum: ["mentor", "mentee"] }).notNull(),
+  author_email: text("author_email").notNull(),
+  note_type: text("note_type", { enum: ["note", "task"] }).notNull().default("note"),
+  content: text("content").notNull(),
+  is_completed: boolean("is_completed").default(false),
+  due_date: timestamp("due_date", { mode: "string" }),
+  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+});
+
 export const mentorsRelations = relations(mentors, ({ many }) => ({
   bookings: many(bookings),
 }));
@@ -83,7 +97,7 @@ export const menteesRelations = relations(mentees, ({ many }) => ({
   bookings: many(bookings),
 }));
 
-export const bookingsRelations = relations(bookings, ({ one }) => ({
+export const bookingsRelations = relations(bookings, ({ one, many }) => ({
   mentor: one(mentors, {
     fields: [bookings.mentor_id],
     references: [mentors.id],
@@ -91,6 +105,14 @@ export const bookingsRelations = relations(bookings, ({ one }) => ({
   mentee: one(mentees, {
     fields: [bookings.mentee_id],
     references: [mentees.id],
+  }),
+  notes: many(bookingNotes),
+}));
+
+export const bookingNotesRelations = relations(bookingNotes, ({ one }) => ({
+  booking: one(bookings, {
+    fields: [bookingNotes.booking_id],
+    references: [bookings.id],
   }),
 }));
 
@@ -113,9 +135,16 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
   clicked_at: true,
 });
 
+export const insertBookingNoteSchema = createInsertSchema(bookingNotes).omit({
+  id: true,
+  created_at: true,
+});
+
 export type InsertMentor = z.infer<typeof insertMentorSchema>;
 export type Mentor = typeof mentors.$inferSelect;
 export type InsertMentee = z.infer<typeof insertMenteeSchema>;
 export type Mentee = typeof mentees.$inferSelect;
 export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
+export type InsertBookingNote = z.infer<typeof insertBookingNoteSchema>;
+export type BookingNote = typeof bookingNotes.$inferSelect;
