@@ -24,6 +24,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,33 +43,90 @@ const TIMEZONES = [
   "UTC",
 ];
 
-const EXPERTISE_OPTIONS = [
-  "Product Management",
-  "Engineering",
-  "Design",
-  "Marketing",
-  "Sales",
-  "Operations",
-  "Data Science",
-  "Cloud Computing",
-  "UX Design",
-  "Digital Marketing",
-  "System Design",
-  "Machine Learning",
-  "E-commerce",
-  "Leadership",
-];
+const EXPERTISE_OPTIONS = {
+  "Technical & Product": [
+    "AI/ML Model Deployment",
+    "API Design",
+    "Cloud Architecture (AWS, Azure, GCP)",
+    "Cybersecurity",
+    "Data Analysis",
+    "Data Engineering",
+    "Data Visualization",
+    "DevOps",
+    "Distributed Systems",
+    "Machine Learning",
+    "Mobile Development",
+    "Product Management",
+    "Product Strategy",
+    "Python Programming",
+    "Quality Assurance & Testing",
+    "Software Development",
+    "SQL",
+    "Technical Program Management",
+    "User Research",
+    "UX/UI Design",
+  ],
+  "Operations & Business": [
+    "Business Analysis",
+    "Business Strategy",
+    "Change Management",
+    "Customer Experience Management",
+    "Financial Analysis",
+    "Forecasting & Demand Planning",
+    "Human Resources & People Experience",
+    "Inventory Management",
+    "Lean / Six Sigma",
+    "Marketing",
+    "Marketplace Optimization",
+    "Negotiation",
+    "Operations Management",
+    "Process Improvement",
+    "Procurement",
+    "Program Management",
+    "Project Management",
+    "Public Policy",
+    "Supply Chain Management",
+    "Vendor Management",
+  ],
+  "Leadership & Core Skills": [
+    "Adaptability",
+    "Analytical Thinking",
+    "Coaching & Mentoring",
+    "Communication",
+    "Conflict Resolution",
+    "Cross-functional Collaboration",
+    "Customer Obsession",
+    "Decision-Making",
+    "Innovation & Creativity",
+    "Problem Solving",
+    "Stakeholder Management",
+    "Strategic Thinking",
+    "Team Leadership",
+    "Time Management",
+  ],
+};
 
 const INDUSTRY_OPTIONS = [
-  "Technology",
-  "E-commerce",
-  "Retail",
-  "Cloud Computing",
-  "Marketing",
-  "Design",
-  "Logistics",
-  "Operations",
-  "Data Analytics",
+  "AI, Data Science & Machine Learning",
+  "Automotive, EV & Aerospace",
+  "Cloud Computing & IT Services",
+  "Consumer Goods",
+  "Cybersecurity",
+  "E-commerce & Retail",
+  "Education & EdTech",
+  "Energy & Utilities",
+  "Finance & FinTech",
+  "Government & Public Sector",
+  "Healthcare & Life Sciences",
+  "Hospitality & Tourism",
+  "Logistics, Transportation & Supply Chain",
+  "Manufacturing & Industrial",
+  "Media, Advertising & Entertainment",
+  "Non-profit & Social Impact",
+  "Professional Services",
+  "Real Estate & Construction",
+  "Technology & Software",
+  "Telecommunications",
 ];
 
 const LANGUAGE_OPTIONS = [
@@ -537,11 +596,16 @@ export default function MentorOnboarding() {
                             <SelectValue placeholder={t('mentorOnboarding.addExpertise')} />
                           </SelectTrigger>
                         </FormControl>
-                        <SelectContent>
-                          {EXPERTISE_OPTIONS.filter(opt => !(field.value || []).includes(opt)).map((exp) => (
-                            <SelectItem key={exp} value={exp}>
-                              {exp}
-                            </SelectItem>
+                        <SelectContent className="max-h-80">
+                          {Object.entries(EXPERTISE_OPTIONS).map(([category, skills]) => (
+                            <SelectGroup key={category}>
+                              <SelectLabel className="text-primary font-semibold">{category}</SelectLabel>
+                              {skills.filter(skill => !(field.value || []).includes(skill)).map((skill) => (
+                                <SelectItem key={skill} value={skill}>
+                                  {skill}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           ))}
                         </SelectContent>
                       </Select>
