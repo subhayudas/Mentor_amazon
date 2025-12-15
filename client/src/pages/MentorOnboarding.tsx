@@ -223,6 +223,7 @@ export default function MentorOnboarding() {
         description: t('mentorOnboarding.successMessage'),
       });
       if (newMentor?.id) {
+        localStorage.setItem("mentorId", newMentor.id);
         setLocation(`/profile/mentor/${newMentor.id}`);
       } else {
         toast({

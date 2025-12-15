@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { BarChart3, UserPlus, Users } from "lucide-react";
+import { BarChart3, UserPlus, Users, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -10,12 +10,18 @@ import amazonLogo from "@assets/image_1763389700490.png";
 export function Navigation() {
   const { t } = useTranslation();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [mentorId, setMentorId] = useState<string | null>(null);
+  const [menteeId, setMenteeId] = useState<string | null>(null);
 
   useEffect(() => {
     // Check for saved mentee or mentor email
     const menteeEmail = localStorage.getItem("menteeEmail");
     const mentorEmail = localStorage.getItem("mentorEmail");
     setUserEmail(menteeEmail || mentorEmail || null);
+    
+    // Check for saved mentorId and menteeId
+    setMentorId(localStorage.getItem("mentorId"));
+    setMenteeId(localStorage.getItem("menteeId"));
   }, []);
   
   return (
@@ -64,6 +70,17 @@ export function Navigation() {
                 <span className="hidden md:inline">{t('nav.joinMentee')}</span>
               </Button>
             </Link>
+            {(mentorId || menteeId) && (
+              <Link 
+                href={mentorId ? `/profile/mentor/${mentorId}` : `/profile/mentee/${menteeId}`}
+                data-testid="link-my-profile"
+              >
+                <Button variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-my-profile">
+                  <User className="w-4 h-4 md:mr-2" />
+                  <span className="hidden md:inline">{t('nav.myProfile')}</span>
+                </Button>
+              </Link>
+            )}
             {userEmail && <NotificationBell email={userEmail} />}
             <LanguageToggle />
           </div>

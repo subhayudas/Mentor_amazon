@@ -197,6 +197,7 @@ export default function MenteeRegistration() {
         description: t('menteeRegistration.successMessage'),
       });
       if (newMentee?.id) {
+        localStorage.setItem("menteeId", newMentee.id);
         setLocation(`/profile/mentee/${newMentee.id}`);
       } else {
         toast({
