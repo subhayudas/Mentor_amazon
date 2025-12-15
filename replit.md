@@ -73,6 +73,7 @@ Preferred communication style: Simple, everyday language.
 - `mentors` table: Stores mentor profiles with id, name, name_ar, position, position_ar, company, company_ar, bio, bio_ar, expertise array, expertise_ar array, industries array, industries_ar array, Cal.com URLs (cal_link, cal_15min, cal_30min, cal_60min), country, mentorship_preference (enum: "ongoing"/"rotating"/"either"), why_joined (optional testimonial text)
 - `sessions` table: Tracks booked sessions with id, mentorId (FK), menteeName, menteeEmail, bookedAt timestamp
 - `mentees` table: Stores mentee profiles with id, name, email (unique), country, timezone, user_type, organization fields, avatarUrl, createdAt
+- `notifications` table: In-app notifications with id, recipient_email, recipient_type (mentor/mentee), type (booking_created/booking_completed/booking_canceled/reminder), title, message, booking_id (FK), is_read, created_at
 - `favorites` table: Tracks favorite mentors with id, menteeEmail, mentorId (FK), createdAt
 - `bookings` table: Tracks all bookings with mentor_id, mentee_id, status, scheduled_at, ratings
 
