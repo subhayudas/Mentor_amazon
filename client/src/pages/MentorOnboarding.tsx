@@ -179,12 +179,15 @@ export default function MentorOnboarding() {
         if (!data.cal_link || data.cal_link.trim() === "") {
           return false;
         }
-        const calLink = data.cal_link.trim();
+        let calLink = data.cal_link.trim();
+        // Strip https://cal.com/ prefix if present
+        calLink = calLink.replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
+        // Accept username/eventtype format (letters, numbers, dots, dashes, underscores)
         const validPattern = /^[a-z0-9._-]+\/[a-z0-9._-]+$/i;
         return validPattern.test(calLink);
       },
       {
-        message: "Please enter a valid Cal.com link (e.g., username/30min)",
+        message: "Please enter a valid Cal.com link (e.g., username/30min or https://cal.com/username/30min)",
         path: ["cal_link"],
       }
     )),
@@ -296,9 +299,12 @@ export default function MentorOnboarding() {
   const commsOwner = form.watch("comms_owner");
 
   const onSubmit = (data: InsertMentor) => {
+    let calLink = data.cal_link?.trim() || "";
+    // Strip https://cal.com/ prefix if present for storage
+    calLink = calLink.replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
     const cleanedData = {
       ...data,
-      cal_link: data.cal_link?.trim() || "",
+      cal_link: calLink,
     };
     createMentorMutation.mutate(cleanedData);
   };

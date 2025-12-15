@@ -15,6 +15,7 @@ export interface IStorage {
   getMentorBookings(mentorId: string): Promise<Booking[]>;
   getMentees(): Promise<Mentee[]>;
   getMenteeByEmail(email: string): Promise<Mentee | undefined>;
+  getMenteeById(id: string): Promise<Mentee | undefined>;
   createMentee(mentee: InsertMentee): Promise<Mentee>;
   updateMentee(id: string, updates: Partial<InsertMentee>): Promise<Mentee | undefined>;
   getMenteeBookings(menteeId: string): Promise<Booking[]>;
@@ -337,6 +338,12 @@ export class DatabaseStorage implements IStorage {
   async getMenteeByEmail(email: string): Promise<Mentee | undefined> {
     await this.seedPromise;
     const result = await db.select().from(mentees).where(eq(mentees.email, email));
+    return result[0];
+  }
+
+  async getMenteeById(id: string): Promise<Mentee | undefined> {
+    await this.seedPromise;
+    const result = await db.select().from(mentees).where(eq(mentees.id, id));
     return result[0];
   }
 

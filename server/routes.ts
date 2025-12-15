@@ -240,10 +240,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/mentees/:email", async (req, res) => {
+  app.get("/api/mentees/email/:email", async (req, res) => {
     try {
       const { email } = req.params;
       const mentee = await storage.getMenteeByEmail(email);
+      
+      if (!mentee) {
+        return res.status(404).json({ message: "Mentee not found" });
+      }
+      
+      res.json(mentee);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentee" });
+    }
+  });
+
+  app.get("/api/mentees/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const mentee = await storage.getMenteeById(id);
       
       if (!mentee) {
         return res.status(404).json({ message: "Mentee not found" });
