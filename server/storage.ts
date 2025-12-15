@@ -1,6 +1,6 @@
-import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, type BookingNote, type InsertBookingNote, mentors, bookings, mentees, bookingNotes } from "@shared/schema";
+import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, type BookingNote, type InsertBookingNote, type Notification, type InsertNotification, mentors, bookings, mentees, bookingNotes, notifications } from "@shared/schema";
 import { db } from "./db";
-import { eq, ilike, or, and, sql } from "drizzle-orm";
+import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -22,6 +22,11 @@ export interface IStorage {
   createBookingNote(note: InsertBookingNote): Promise<BookingNote>;
   updateBookingNote(id: string, updates: Partial<InsertBookingNote>): Promise<BookingNote | undefined>;
   deleteBookingNote(id: string): Promise<boolean>;
+  getNotifications(email: string): Promise<Notification[]>;
+  getUnreadNotificationCount(email: string): Promise<number>;
+  createNotification(notification: InsertNotification): Promise<Notification>;
+  markNotificationAsRead(id: string): Promise<Notification | undefined>;
+  markAllNotificationsAsRead(email: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -412,6 +417,51 @@ export class DatabaseStorage implements IStorage {
     await this.seedPromise;
     const result = await db.delete(bookingNotes).where(eq(bookingNotes.id, id)).returning();
     return result.length > 0;
+  }
+
+  async getNotifications(email: string): Promise<Notification[]> {
+    await this.seedPromise;
+    return await db.select().from(notifications)
+      .where(eq(notifications.recipient_email, email))
+      .orderBy(desc(notifications.created_at));
+  }
+
+  async getUnreadNotificationCount(email: string): Promise<number> {
+    await this.seedPromise;
+    const result = await db.select().from(notifications)
+      .where(and(
+        eq(notifications.recipient_email, email),
+        eq(notifications.is_read, false)
+      ));
+    return result.length;
+  }
+
+  async createNotification(insertNotification: InsertNotification): Promise<Notification> {
+    await this.seedPromise;
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const result = await db.insert(notifications).values({
+      ...insertNotification,
+      id,
+      created_at: now,
+    }).returning();
+    return result[0];
+  }
+
+  async markNotificationAsRead(id: string): Promise<Notification | undefined> {
+    await this.seedPromise;
+    const result = await db.update(notifications)
+      .set({ is_read: true })
+      .where(eq(notifications.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async markAllNotificationsAsRead(email: string): Promise<void> {
+    await this.seedPromise;
+    await db.update(notifications)
+      .set({ is_read: true })
+      .where(eq(notifications.recipient_email, email));
   }
 }
 

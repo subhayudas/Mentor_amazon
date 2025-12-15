@@ -116,6 +116,25 @@ export const bookingNotesRelations = relations(bookingNotes, ({ one }) => ({
   }),
 }));
 
+export const notifications = pgTable("notifications", {
+  id: varchar("id").primaryKey(),
+  recipient_email: text("recipient_email").notNull(),
+  recipient_type: text("recipient_type", { enum: ["mentor", "mentee"] }).notNull(),
+  type: text("type", { enum: ["booking_created", "booking_completed", "booking_canceled", "reminder"] }).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  booking_id: varchar("booking_id").references(() => bookings.id),
+  is_read: boolean("is_read").default(false).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+});
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  booking: one(bookings, {
+    fields: [notifications.booking_id],
+    references: [bookings.id],
+  }),
+}));
+
 export const insertMentorSchema = createInsertSchema(mentors).omit({
   id: true,
   created_at: true,
@@ -140,6 +159,11 @@ export const insertBookingNoteSchema = createInsertSchema(bookingNotes).omit({
   created_at: true,
 });
 
+export const insertNotificationSchema = createInsertSchema(notifications).omit({
+  id: true,
+  created_at: true,
+});
+
 export type InsertMentor = z.infer<typeof insertMentorSchema>;
 export type Mentor = typeof mentors.$inferSelect;
 export type InsertMentee = z.infer<typeof insertMenteeSchema>;
@@ -148,3 +172,5 @@ export type InsertBooking = z.infer<typeof insertBookingSchema>;
 export type Booking = typeof bookings.$inferSelect;
 export type InsertBookingNote = z.infer<typeof insertBookingNoteSchema>;
 export type BookingNote = typeof bookingNotes.$inferSelect;
+export type InsertNotification = z.infer<typeof insertNotificationSchema>;
+export type Notification = typeof notifications.$inferSelect;
