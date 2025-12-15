@@ -28,8 +28,9 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, BookOpen, Users, Target, Sparkles, Check } from "lucide-react";
-import { useState } from "react";
+import { X, BookOpen, Users, Target, Sparkles, Check, Upload, Loader2 } from "lucide-react";
+import { useState, useRef } from "react";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 const TIMEZONES = [
   "Africa/Cairo",
@@ -135,6 +136,9 @@ export default function MenteeRegistration() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<InsertMentee>({
     resolver: zodResolver(insertMenteeSchema.refine(
@@ -182,6 +186,60 @@ export default function MenteeRegistration() {
       form.setValue("organization_mission", "");
       form.setValue("organization_needs", "");
       form.clearErrors("organization_name");
+    }
+  };
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: t('common.error'),
+        description: t('mentorOnboarding.invalidImageType'),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: t('common.error'),
+        description: t('mentorOnboarding.imageTooLarge'),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/uploads", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error("Upload failed");
+      }
+
+      const result = await response.json();
+      form.setValue("photo_url", result.url);
+      setPhotoPreview(result.url);
+      toast({
+        title: t('mentorOnboarding.photoUploaded'),
+        description: t('mentorOnboarding.photoUploadSuccess'),
+      });
+    } catch (error) {
+      toast({
+        title: t('common.error'),
+        description: t('mentorOnboarding.photoUploadFailed'),
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -559,10 +617,49 @@ export default function MenteeRegistration() {
                     name="photo_url"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>{t('menteeRegistration.photoUrl')}</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://..." {...field} value={field.value || ""} data-testid="input-photo" />
-                        </FormControl>
+                        <FormLabel>{t('mentorOnboarding.profilePhoto')}</FormLabel>
+                        <div className="flex items-center gap-4">
+                          <Avatar className="h-16 w-16">
+                            {photoPreview || field.value ? (
+                              <AvatarImage src={photoPreview || field.value || ""} alt="Profile" />
+                            ) : null}
+                            <AvatarFallback>
+                              <Upload className="h-6 w-6 text-muted-foreground" />
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              ref={fileInputRef}
+                              onChange={handlePhotoUpload}
+                              className="hidden"
+                              data-testid="input-photo-file"
+                            />
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => fileInputRef.current?.click()}
+                              disabled={isUploading}
+                              data-testid="button-upload-photo"
+                            >
+                              {isUploading ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  {t('mentorOnboarding.uploading')}
+                                </>
+                              ) : (
+                                <>
+                                  <Upload className="mr-2 h-4 w-4" />
+                                  {t('mentorOnboarding.uploadPhoto')}
+                                </>
+                              )}
+                            </Button>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {t('mentorOnboarding.photoHint')}
+                            </p>
+                          </div>
+                        </div>
                         <FormMessage />
                       </FormItem>
                     )}
