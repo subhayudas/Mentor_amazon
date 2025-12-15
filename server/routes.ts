@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema } from "@shared/schema";
+import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema, insertNotificationSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -208,6 +208,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const booking = await storage.createBooking(bookingData);
+
+      // Create notifications for both mentor and mentee
+      const mentee = await storage.getMenteeByEmail(mentee_email);
+      if (mentor && mentee) {
+        // Notify mentor
+        await storage.createNotification({
+          recipient_email: mentor.email,
+          recipient_type: "mentor",
+          type: "booking_created",
+          title: "New Session Booked",
+          message: `${mentee.name} has booked a mentorship session with you.`,
+          booking_id: booking.id,
+        });
+
+        // Notify mentee
+        await storage.createNotification({
+          recipient_email: mentee.email,
+          recipient_type: "mentee",
+          type: "booking_created",
+          title: "Session Confirmed",
+          message: `Your session with ${mentor.name} has been booked successfully.`,
+          booking_id: booking.id,
+        });
+      }
+
       res.status(201).json(booking);
     } catch (error) {
       console.error("Booking creation error:", error);
@@ -486,6 +511,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Failed to delete note" });
+    }
+  });
+
+  // Notification endpoints
+  app.get("/api/notifications/:email", async (req, res) => {
+    try {
+      const { email } = req.params;
+      const notifications = await storage.getNotifications(email);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch notifications" });
+    }
+  });
+
+  app.get("/api/notifications/:email/unread-count", async (req, res) => {
+    try {
+      const { email } = req.params;
+      const count = await storage.getUnreadNotificationCount(email);
+      res.json({ count });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch unread count" });
+    }
+  });
+
+  app.patch("/api/notifications/:id/read", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const notification = await storage.markNotificationAsRead(id);
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      res.json(notification);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark notification as read" });
+    }
+  });
+
+  app.patch("/api/notifications/:email/mark-all-read", async (req, res) => {
+    try {
+      const { email } = req.params;
+      await storage.markAllNotificationsAsRead(email);
+      res.json({ message: "All notifications marked as read" });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to mark all notifications as read" });
     }
   });
 

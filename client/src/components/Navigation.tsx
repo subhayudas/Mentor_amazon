@@ -2,11 +2,21 @@ import { Link } from "wouter";
 import { BarChart3, UserPlus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useTranslation } from "react-i18next";
+import { useState, useEffect } from "react";
 import amazonLogo from "@assets/image_1763389700490.png";
 
 export function Navigation() {
   const { t } = useTranslation();
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check for saved mentee or mentor email
+    const menteeEmail = localStorage.getItem("menteeEmail");
+    const mentorEmail = localStorage.getItem("mentorEmail");
+    setUserEmail(menteeEmail || mentorEmail || null);
+  }, []);
   
   return (
     <nav className="sticky top-0 z-50 border-b bg-secondary backdrop-blur supports-[backdrop-filter]:bg-secondary/95">
@@ -54,6 +64,7 @@ export function Navigation() {
                 <span className="hidden md:inline">{t('nav.joinMentee')}</span>
               </Button>
             </Link>
+            {userEmail && <NotificationBell email={userEmail} />}
             <LanguageToggle />
           </div>
         </div>
