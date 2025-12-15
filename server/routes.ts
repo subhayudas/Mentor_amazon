@@ -164,23 +164,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/bookings", async (req, res) => {
     try {
-      const result = insertBookingSchema.safeParse(req.body);
-      
-      if (!result.success) {
-        return res.status(400).json({ 
-          message: "Invalid booking data",
-          errors: result.error.errors 
-        });
+      const { mentor_id, mentee_name, mentee_email, mentee_id } = req.body;
+
+      // Validate required fields
+      if (!mentor_id) {
+        return res.status(400).json({ message: "mentor_id is required" });
       }
 
-      const mentor = await storage.getMentor(result.data.mentor_id);
+      const mentor = await storage.getMentor(mentor_id);
       if (!mentor) {
         return res.status(404).json({ message: "Mentor not found" });
       }
 
-      const booking = await storage.createBooking(result.data);
+      let resolvedMenteeId = mentee_id;
+
+      // If mentee_id not provided, look up or create mentee by email
+      if (!resolvedMenteeId && mentee_email) {
+        let mentee = await storage.getMenteeByEmail(mentee_email);
+        if (!mentee) {
+          // Create mentee if not exists with minimal required fields
+          mentee = await storage.createMentee({
+            name: mentee_name || "Anonymous",
+            email: mentee_email,
+            user_type: "individual",
+            timezone: "UTC",
+            languages_spoken: ["English"],
+            areas_exploring: ["Career Development"],
+          });
+        }
+        resolvedMenteeId = mentee.id;
+      }
+
+      if (!resolvedMenteeId) {
+        return res.status(400).json({ message: "Either mentee_id or mentee_email is required" });
+      }
+
+      const bookingData = {
+        mentor_id,
+        mentee_id: resolvedMenteeId,
+        status: "clicked" as const,
+        clicked_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+
+      const booking = await storage.createBooking(bookingData);
       res.status(201).json(booking);
     } catch (error) {
+      console.error("Booking creation error:", error);
       res.status(500).json({ message: "Failed to create booking" });
     }
   });
