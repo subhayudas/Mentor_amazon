@@ -14,14 +14,30 @@ export function Navigation() {
   const [menteeId, setMenteeId] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check for saved mentee or mentor email
-    const menteeEmail = localStorage.getItem("menteeEmail");
-    const mentorEmail = localStorage.getItem("mentorEmail");
-    setUserEmail(menteeEmail || mentorEmail || null);
+    const updateUserInfo = () => {
+      // Check for saved mentee or mentor email
+      const menteeEmail = localStorage.getItem("menteeEmail");
+      const mentorEmail = localStorage.getItem("mentorEmail");
+      setUserEmail(menteeEmail || mentorEmail || null);
+      
+      // Check for saved mentorId and menteeId
+      setMentorId(localStorage.getItem("mentorId"));
+      setMenteeId(localStorage.getItem("menteeId"));
+    };
+
+    // Initial check
+    updateUserInfo();
+
+    // Listen for storage events (from other tabs)
+    window.addEventListener("storage", updateUserInfo);
     
-    // Check for saved mentorId and menteeId
-    setMentorId(localStorage.getItem("mentorId"));
-    setMenteeId(localStorage.getItem("menteeId"));
+    // Listen for custom event (from same tab - after registration)
+    window.addEventListener("userRegistered", updateUserInfo);
+
+    return () => {
+      window.removeEventListener("storage", updateUserInfo);
+      window.removeEventListener("userRegistered", updateUserInfo);
+    };
   }, []);
   
   return (

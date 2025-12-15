@@ -198,6 +198,9 @@ export default function MenteeRegistration() {
       });
       if (newMentee?.id) {
         localStorage.setItem("menteeId", newMentee.id);
+        localStorage.setItem("menteeEmail", newMentee.email);
+        localStorage.setItem("menteeName", newMentee.name);
+        window.dispatchEvent(new Event("userRegistered"));
         setLocation(`/profile/mentee/${newMentee.id}`);
       } else {
         toast({

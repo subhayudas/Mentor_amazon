@@ -224,6 +224,9 @@ export default function MentorOnboarding() {
       });
       if (newMentor?.id) {
         localStorage.setItem("mentorId", newMentor.id);
+        localStorage.setItem("mentorEmail", newMentor.email);
+        localStorage.setItem("mentorName", newMentor.name);
+        window.dispatchEvent(new Event("userRegistered"));
         setLocation(`/profile/mentor/${newMentor.id}`);
       } else {
         toast({
