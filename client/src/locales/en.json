@@ -247,7 +247,11 @@
     "languages": "Languages",
     "bookSession": "Book a Session",
     "addToFavorites": "Add to Favorites",
-    "removeFromFavorites": "Remove from Favorites"
+    "removeFromFavorites": "Remove from Favorites",
+    "noSlotsAvailable": "No available slots right now.",
+    "starForLater": "Star your favorites for later.",
+    "mentorUnavailable": "This mentor is currently not accepting new bookings.",
+    "skillsTip": "Need inspiration for your skills? Consult your job family."
   },
   "errors": {
     "somethingWentWrong": "Something went wrong",
@@ -403,5 +407,24 @@
     "poweredBy": "Powered by",
     "amazonMentorship": "Amazon Mentorship Program",
     "allRightsReserved": "All rights reserved."
+  },
+  "experienceAreas": {
+    "title": "What areas of experience do you need help with?",
+    "help": "Select the areas where you'd like mentorship guidance",
+    "options": {
+      "leadership": "Leadership & Management",
+      "careerGrowth": "Career Growth & Advancement",
+      "technicalSkills": "Technical Skills Development",
+      "communication": "Communication & Presentation",
+      "networking": "Networking & Relationship Building",
+      "workLifeBalance": "Work-Life Balance",
+      "projectManagement": "Project Management",
+      "teamBuilding": "Team Building & Culture",
+      "innovation": "Innovation & Creativity",
+      "strategicThinking": "Strategic Thinking",
+      "conflictResolution": "Conflict Resolution",
+      "mentoring": "Becoming a Mentor",
+      "other": "Other"
+    }
   }
 }

@@ -247,7 +247,11 @@
     "languages": "اللغات",
     "bookSession": "حجز جلسة",
     "addToFavorites": "إضافة للمفضلة",
-    "removeFromFavorites": "إزالة من المفضلة"
+    "removeFromFavorites": "إزالة من المفضلة",
+    "noSlotsAvailable": "لا تتوفر مواعيد حالياً.",
+    "starForLater": "أضف مرشديك المفضلين للمتابعة لاحقاً.",
+    "mentorUnavailable": "هذا المرشد لا يقبل حجوزات جديدة حالياً.",
+    "skillsTip": "هل تحتاج إلى إلهام لمهاراتك؟ استشر عائلة وظيفتك."
   },
   "errors": {
     "somethingWentWrong": "حدث خطأ ما",
@@ -403,5 +407,24 @@
     "poweredBy": "مدعوم من",
     "amazonMentorship": "برنامج أمازون للإرشاد",
     "allRightsReserved": "جميع الحقوق محفوظة."
+  },
+  "experienceAreas": {
+    "title": "ما هي مجالات الخبرة التي تحتاج المساعدة فيها؟",
+    "help": "اختر المجالات التي تريد التوجيه الإرشادي فيها",
+    "options": {
+      "leadership": "القيادة والإدارة",
+      "careerGrowth": "النمو الوظيفي والترقي",
+      "technicalSkills": "تطوير المهارات التقنية",
+      "communication": "التواصل والعروض التقديمية",
+      "networking": "بناء العلاقات والتواصل",
+      "workLifeBalance": "التوازن بين العمل والحياة",
+      "projectManagement": "إدارة المشاريع",
+      "teamBuilding": "بناء الفريق والثقافة",
+      "innovation": "الابتكار والإبداع",
+      "strategicThinking": "التفكير الاستراتيجي",
+      "conflictResolution": "حل النزاعات",
+      "mentoring": "أن تصبح مرشداً",
+      "other": "أخرى"
+    }
   }
 }

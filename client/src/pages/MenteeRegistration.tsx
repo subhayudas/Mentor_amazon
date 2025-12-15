@@ -28,7 +28,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, BookOpen, Users, Target, Sparkles } from "lucide-react";
+import { X, BookOpen, Users, Target, Sparkles, Check } from "lucide-react";
 import { useState } from "react";
 
 const TIMEZONES = [
@@ -114,6 +114,22 @@ const ORG_SIZE_OPTIONS = [
   "501-1000",
   "1000+",
 ];
+
+const EXPERIENCE_AREA_OPTIONS = [
+  "leadership",
+  "careerGrowth",
+  "technicalSkills",
+  "communication",
+  "networking",
+  "workLifeBalance",
+  "projectManagement",
+  "teamBuilding",
+  "innovation",
+  "strategicThinking",
+  "conflictResolution",
+  "mentoring",
+  "other",
+] as const;
 
 export default function MenteeRegistration() {
   const { t } = useTranslation();
@@ -601,76 +617,73 @@ export default function MenteeRegistration() {
                 <FormField
                   control={form.control}
                   name="areas_exploring"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('menteeRegistration.areasExploring')} *</FormLabel>
-                      <Select
-                        onValueChange={(value) => {
-                          const currentValue = field.value || [];
-                          if (value && !currentValue.includes(value)) {
-                            field.onChange([...currentValue, value]);
-                          }
-                        }}
-                      >
-                        <FormControl>
-                          <SelectTrigger data-testid="select-areas">
-                            <SelectValue placeholder={t('menteeRegistration.addAreas')} />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {AREAS_EXPLORING_OPTIONS.filter(opt => !(field.value || []).includes(opt)).map((area) => (
-                            <SelectItem key={area} value={area}>
-                              {area}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {(field.value || []).map((area) => (
-                          <Badge key={area} variant="secondary" data-testid={`badge-area-${area}`}>
-                            {area}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                field.onChange((field.value || []).filter(item => item !== area));
-                              }}
-                              className="ml-1"
-                              data-testid={`button-remove-area-${area}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <FormDescription>
-                        {t('menteeRegistration.areasExploringHelp')}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="goals"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{t('menteeRegistration.goals')}</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder={t('menteeRegistration.goalsPlaceholder')}
-                          className="min-h-24"
-                          {...field}
-                          value={field.value || ""}
-                          data-testid="input-goals"
-                        />
-                      </FormControl>
-                      <FormDescription>
-                        {t('menteeRegistration.goalsHelp')}
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                  render={({ field }) => {
+                    const selectedAreas = field.value || [];
+                    const toggleArea = (area: string) => {
+                      if (selectedAreas.includes(area)) {
+                        field.onChange(selectedAreas.filter((a: string) => a !== area));
+                      } else {
+                        field.onChange([...selectedAreas, area]);
+                      }
+                    };
+                    const hasOtherSelected = selectedAreas.includes("other");
+                    
+                    return (
+                      <FormItem>
+                        <FormLabel>{t('experienceAreas.title')} *</FormLabel>
+                        <div className="flex flex-wrap gap-2" data-testid="experience-areas-container">
+                          {EXPERIENCE_AREA_OPTIONS.map((area) => {
+                            const isSelected = selectedAreas.includes(area);
+                            return (
+                              <Badge
+                                key={area}
+                                variant={isSelected ? "default" : "outline"}
+                                className={`cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? "bg-primary text-primary-foreground" 
+                                    : "hover:bg-primary/10"
+                                }`}
+                                onClick={() => toggleArea(area)}
+                                data-testid={`badge-experience-${area}`}
+                              >
+                                {isSelected && <Check className="w-3 h-3 mr-1" />}
+                                {t(`experienceAreas.options.${area}`)}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                        <FormDescription>
+                          {t('experienceAreas.help')}
+                        </FormDescription>
+                        <FormMessage />
+                        
+                        {hasOtherSelected && (
+                          <FormField
+                            control={form.control}
+                            name="goals"
+                            render={({ field: goalsField }) => (
+                              <FormItem className="mt-4">
+                                <FormLabel>{t('menteeRegistration.goals')}</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder={t('menteeRegistration.goalsPlaceholder')}
+                                    className="min-h-24"
+                                    {...goalsField}
+                                    value={goalsField.value || ""}
+                                    data-testid="input-goals"
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  {t('menteeRegistration.goalsHelp')}
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </FormItem>
+                    );
+                  }}
                 />
 
                 <div className="p-4 border rounded-lg bg-muted/30 text-sm text-muted-foreground">

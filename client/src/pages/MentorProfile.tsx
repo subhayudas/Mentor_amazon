@@ -356,13 +356,19 @@ export default function MentorProfile() {
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
                       {t('profile.expertise')}
                     </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {displayExpertise.map((skill, index) => (
-                        <Badge key={index} className="bg-primary/10 text-primary border-primary/20">
-                          {skill}
-                        </Badge>
-                      ))}
-                    </div>
+                    {displayExpertise.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {displayExpertise.map((skill, index) => (
+                          <Badge key={index} className="bg-primary/10 text-primary border-primary/20">
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground italic" data-testid="text-skills-tip">
+                        {t('profile.skillsTip')}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -397,7 +403,17 @@ export default function MentorProfile() {
           <div className="lg:col-span-3">
             <Card className="p-4">
               <h2 className="text-2xl font-bold mb-4 px-4">{t('session.bookSession')}</h2>
-              {!menteeInfo ? (
+              {!mentor.is_available ? (
+                <div className="p-12 text-center space-y-4" data-testid="mentor-unavailable">
+                  <Star className="w-12 h-12 mx-auto text-muted-foreground" />
+                  <p className="text-lg text-muted-foreground">
+                    {t('profile.noSlotsAvailable')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {t('profile.starForLater')}
+                  </p>
+                </div>
+              ) : !menteeInfo ? (
                 <div className="p-12 text-center space-y-4" data-testid="cal-locked">
                   <p className="text-lg text-muted-foreground">
                     {t('identity.pleaseEnterDetails')}
