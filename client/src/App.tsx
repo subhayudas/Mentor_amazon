@@ -8,8 +8,6 @@ import { Navigation } from "@/components/Navigation";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
-import ForgotPassword from "@/pages/ForgotPassword";
-import ResetPassword from "@/pages/ResetPassword";
 import MentorProfile from "@/pages/MentorProfile";
 import Analytics from "@/pages/Analytics";
 import MentorOnboarding from "@/pages/MentorOnboarding";
@@ -26,8 +24,6 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/mentor/:id" component={MentorProfile} />
       <Route path="/mentors/:id" component={MentorProfile} />
       <Route path="/profile/mentor/:id" component={MentorProfileView} />

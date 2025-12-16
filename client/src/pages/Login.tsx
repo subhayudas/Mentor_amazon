@@ -136,33 +136,24 @@ export default function Login() {
                   )}
                 />
 
-                <div className="flex items-center justify-between">
-                  <FormField
-                    control={form.control}
-                    name="rememberMe"
-                    render={({ field }) => (
-                      <FormItem className="flex items-center space-x-2">
-                        <FormControl>
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                            data-testid="checkbox-remember-me"
-                          />
-                        </FormControl>
-                        <FormLabel className="text-sm font-normal cursor-pointer">
-                          {t("auth.rememberMe")}
-                        </FormLabel>
-                      </FormItem>
-                    )}
-                  />
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm text-[#FF9900] hover:underline"
-                    data-testid="link-forgot-password"
-                  >
-                    {t("auth.forgotPassword")}
-                  </Link>
-                </div>
+                <FormField
+                  control={form.control}
+                  name="rememberMe"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2">
+                      <FormControl>
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          data-testid="checkbox-remember-me"
+                        />
+                      </FormControl>
+                      <FormLabel className="text-sm font-normal cursor-pointer">
+                        {t("auth.rememberMe")}
+                      </FormLabel>
+                    </FormItem>
+                  )}
+                />
 
                 <Button
                   type="submit"
