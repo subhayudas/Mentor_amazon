@@ -1,0 +1,109 @@
+Meeting Title: Amazon MentorMatch
+Date: Dec 16
+Meeting participants: Levi Lewandowski, Amani Subhi
+
+Transcript:
+ 
+Them: Both mentors and mentees side like for example also they can take notes on these sessions themselves. For example, after the session a feedback form or will pop up or anything that they can leave notes as a feedback on the session from Amenti side and from a mentor side as well. Third thing is the whole communication process between a mentor and mnt. Previously it was said to be based on email based. Right. But since it's very sensitive Amazon employees and we don't want to share their emails, it means that the whole communication will take part of the platform itself.  
+Me: So I'll share my screen and I'll just show you what all I have done till now. So, see, I get that there were a few things which were not pushed into production. Reason being is that I first wanted to consult you guys before I'm pushing anything. Which is critical. So I'll just share my screen. I'll walk you through what I've currently built out. I want your feedback on that. As far as the task manager and things are concerned. Can you see my screen?  
+Them: Yes.  
+Me: Perfect. So now let's say that if I want to, I mean, sign up, or, for example, I'm just taking a random email.  
+Them: Okay?  
+Me: I'll just, like, log in. I'll set a password. Yes. So now I want to be a mentor, for example. I'll create the account. Yep. So, as you can see, the account has kind of been created. You are kind of filling in all the positions, so it's directly taking you to the form where.  
+Them: Exactly.  
+Me: We? Yeah. So this is exactly what I've built out right now. Instantly, like, this has been made. I just have to push it to production. I first wanted your feedback on this so that I can actually implement things which you would want.  
+Them: Okay? Okay, this one sounds awesome, to be honest. And we already reviewed both forms. For mentees and mentors. And if there are any changes, there will be very slight changes later on, but not at the moment. I think I took notes with. For a bit. Please. Because I took notes regarding the meeting today. They mentioned something related to removing some buttons. From amenti side.  
+Me: Yeah, see, that would be implemented instantly. That's not an issue. So this is how the file would look like. So once you are basically, you know, signing up as a mentor, what I've also done for the task manager, I have built out a mentor portal here.  
+Them: Okay?  
+Me: Right here. So let's say I'm clicking on this. I'm getting a proper dashboard overview of the total sessions, average rating, monthly earnings. Now, see, the thing is that since there are no calls booked or there is nothing going on right now, it's zero. But this is the overall view, right, which you would want.  
+Them: Yes.  
+Me: Total earnings is something which we can remove since, I mean, it's an internal tool, but I just added just for the sake of it.  
+Them: Yes.  
+Me: That is something which we can do.  
+Them: Okay?  
+Me: As far as the booking request is concerned, what usually happens is that all the pending requests under booking request, which would be there, they would be popping up here. That's the whole goal. Then my session. So, any upcoming meetings? All the completed sessions which are there now, by the way. Disclaimer. I am yet to try these two things out, so. Booking request and my session. So allow me some time to do that. But as far as the task and follow ups are concerned, I think I've got this jotted down. So you can add any task, right? Like, for example, Amani and Vats meeting or description Important. Priorities high. So I have added a calendar configuration where you can actually configure it throughout the year. Create the task. Now, let's say if any task is completed or done. It automatically gets shifted to the completed one. And you get pop up notification coming up that, hey, listen, the task has been updated. Another thing, which I also saw from all our meeting notes, was that they want something from an availability point of view. Calendly already has that, so this is something which they can tell you to remove tomorrow. But I've still added it so you can add like your own slot for Sunday.  
+Them: Okay?  
+Me: Changes which are there. Then if you want to change the timing. Something like that. So all these things, all these operations have been there? And again like the monthly. So all these profile views are also there. So this is something which was initially missing because there was not enough context from any of our site that he listened. This is how I want the portal to be. So I've taken the liberty a bit from my side. Plus at the same time, all from the notes which were there.  
+Them: Okay, awesome.  
+Me: What I also do is that I'm not pushing this to production yet. I'll make a small video. I'll send it on the group. If Levi is free or if you are free, just let me know what changes you guys would want there.  
+Them: Okay?  
+Me: Yeah.  
+Them: So. Please go ahead.  
+Me: Yeah. Does this sound good? Is there anything else which you would want? So this is the mentor part, which has been completed and done. If you want, we can also check out a mentee side of the platform as well.  
+Them: Okay, so can we replicate this portal on the side of the mentees as well?  
+Me: So you want this portal to be replicated on a mentee idea? Sure. That can be done. Here.  
+Them: Okay, so. Because they want them from both sides. Because I see you. When it comes to the context, it's not. It's not set from the beginning. Because every meeting, like, they have new, let's say new comments or new notes to be added. That's why the context wasn't, you know, 100% perfect from the begin, from day one. Plus, it's the first time for them to do this as well, so a lot of things are popping up. Here and there between now and then. So regarding the second question, my question is, can we merge this dashboard to be, you know, open directly whenever I go to my profile or checking my activity, rather than having two, two different pages? Because I saw that you went from the page where all of the information were there, the profile. And you clicked on Mentors Portal, right? So can we merge it in one? In one? In one page.  
+Me: Yes, that is doable. I also have one more question, by the way.  
+Them: Yeah, please go.  
+Me: For the mentee dashboard, which you want as a replica of this exact same thing.  
+Them: Yes.  
+Me: What fields would you want in the menu? That would be great, if I can have some clarity on that.  
+Them: Okay, so, for example, can we go through bookings request?  
+Me: So I'm just noting things down. So you want bookings, requests for the Mentee portal. Okay.  
+Them: No, no. I mean, we wanted to be the same, but for sure we will change the language. And also we will change. Because for them, it's very important also for them and TEA to track which mentors they've booked, what were their comments or feedback on each mentor? And this is my third question, is there is any way where we can put a methodology. Of putting feedbacks or receiving feedback or, you know, just like, putting feedbacks to be received by the people who are managing the platform itself.  
+Me: Yes. So that is basically. Okay. So for the feedback portion, I would suggest. So you basically want things to be on the platform itself. Nothing over email, if I'm not wrong.  
+Them: Nothing. Nothing. Because we've discussed this thing today with Nadean from Amazon, and she was like, I don't. I don't prefer to have any conversations over email. We do prefer everything to be set on the platform itself. So all comes between mentees and mentors, whether it's rescheduling. Whether it's communication regarding decision, whether it's, you know, booking, whether it's, you know, sending feedback, everything should be there on the portal itself.  
+Me: Just to give you a heads up, I think the communication part, which is there, that can be implemented, but that's going to be very complex when they scale. So when we scale with them.  
+Them: Complex. How?  
+Me: Okay, I'll tell you. Yeah, I'll tell you why. So usually what happens is that for every mentor or mentee, there's going to be a different chat window.  
+Them: If I may ask.  
+Me: Opening up. Plus, at the same time, you're going to have multiple conversations. So from a technical standpoint, to kind of execute that at a scale with which Amazon Egypt wants to do a pilot, That is something which I'll have to look into and make sure that it does not break, like my priority right now. I'll tell you, pictures can be added. They can be added easily, but once they reach a certain scale, things start to break. And that's bad news for us. So I don't want that to happen. So let me check if they are priorities to not have anything over mail will have to at least look for another alternative. So let me get into that. Another thing which I wanted to tell you, or inform you also, was that the Arabic translation, which was supposed to happen properly, That has also executed the last time. I still remember there were a few things which were not done properly when it comes to the translation side of things.  
+Them: Eight. Okay?  
+Me: Right now. Right now. As you can see, every single thing has been executed perfectly. So that's there. Plus, on the analytics side of things, also, you have everything sorted out.  
+Them: Amazing.  
+Me: With the days and everything like that.  
+Them: Okay? So. Can you wait, please, for a second, Vats? Because I just want to ensure that mentee is translated correctly.  
+Me: Yes. Yes, please.  
+Them: Yes. Okay? Because now the translate the current translation Amnative Arabic speaker this is why this caught my attention the current translation it can mean in Arabic the training.  
+Me: Got it.  
+Them: Which might confuse the potential mentees, if you got what I mean.  
+Me: Yes, yes. I got. Basically, there needs to be a certain nuance to these things.  
+Them: Exactly. So, basically, let me just double check if we can change it in a way or another. Because. A slight. Even the letters and everything is the same. But in Arabic, there is some, you know, some points that we are adding to each letter. Where it can change the meaning drastically. So let me just double check how we can. We can use. I mean, we can use the exact same name or same title for both mentees and mentors. We just change one point only. Between both.  
+Me: Perfect.  
+Them: So from a letter standpoint of view, it will be exactly the same word, but for the Arabic speakers, they will know that this is a different elephant word. But yeah, let me just double check on this. But we need to change it. That good news is that tomorrow there will be no Arabic speakers other than Nadine. So I don't think this is a priority, but, yeah.  
+Me: Sounds good. Sounds good. No, no, please. See, the thing is that I'm not an Arab speaker and I cannot actually read Arabic, so I've kind of, like, taken few liberties when it comes to the Google Translate side of things as well here. So I think you're the expert. There's anything which needs to be changed. Please let me know.  
+Them: Yeah. Yeah, sure thing. Sure thing. Thank you very much. Highly appreciate your support. Okay, so regarding also rescheduling, if there is any way of rescheduling, for example, last minute cancellation or asking to reschedule the meeting or anything from both. Mentees and mentors side how they can do this on the platform.  
+Me: On the platform. I'll have to check if rescheduling can be done because the thing is that we are already embedding Cal com's that link which is there, right? So I will have to check if Usually what happens is that all these communications from carl.com kind of go over the email. So if they want to reschedule it, they can directly go on to that Calm link, which is there, and then do that. So that platform stickiness which we are currently looking at, that needs to be looked into. Give me some time, I'll look into that as well.  
+Them: Okay?  
+Me: As far as the available slots and things are concerned, most of these things are already available on the calendar, embedding itself. So for the dashboard, I feel like we'll have to come up with a few new menus or bars, which will have to be kind of filled in with some more information. So what? I lose that, I'll make a proper screen recording of this. I'll send it across over the group. And we would love to just get your feedback on that.  
+Them: Okay? Okay, no worries at all. So basically, regarding the rescheduling, You are not sure whether it will be available because it depends on calm, right?  
+Me: Yes, yes.  
+Them: Okay? Okay, I have one more question. Can we just book a call with calm? Team. In order to ask them if there is any way of, you know, adding those features or it's not possible.  
+Me: With the Calm com team. I mean, sure, we can try our. Let me just surf it online. So the thing is that usually their team is quite active on Twitter, so I think if I reach out to them there, even I'll get a reply. On there, too. So let me check into that. Let's get this sorted out. Just for my understanding. Also, you have weekly calls with the Amazon team, right, where they are just giving new requirements and then that kind of adds up or how is that current flow going on?  
+Them: Okay? So, so basically, when it comes to the communication part, you will check it out because you want to ensure before, you know, giving us a green light that it won't crash the website, right? Second thing is that dashboard you will send us a screen record on WhatsApp to ensure if it is what we are looking for and then you are going to. Send it, you know you are going to make it available for all of us. This is what I got from you because tomorrow is the dryer and with Amazon team. So I want to ensure that we will be able to show them how it goes.  
+Me: Perfect. Yes. So see, my. My whole priority right now is that this has happened before also is that, you know, Lei has a call and usually a few things don't work or they are breaking, but then there's a gap in the communication where effect, things get fixed, but they get fixed, you know, a day before. That even he's having a panic attack, so I want to avoid that. So I think let's just take care of that. Other than that, let me check in with. Just a moment. Let me check in with all the menu bars, which are there. My whole reasoning right now is that I know you guys want a task manager, but what is that inside the task manager, which would be perfect for Amazon? Because I don't want to be there when they see that tomorrow. And they are lucky. Hey, listen, this is not what we want. Or this is not.  
+Them: Okay, so. I get you. I get you, Vats. But what if they said it's not what we want? Because I don't think they will say it's not what we want. They will ask some. Just for some adjustments, that's it. Because when it comes to the expectations, management. I think our main, you know, client that we need to please is the Amazon Egypt. And the Amazon Egypt representative is Mediu. So which is the lady that. We had a call with her earlier today, so I think it's all good. But when it comes to, you know, asking for some, you know, changes here and there, I think it's something expected. But also, yeah.  
+Me: Definitely.  
+Them: At the time. We just need to show them tomorrow. Because I don't want to show them a mockup. We want to see to show them the platform itself. You know? So I, I want to please to enable the login and the dashboard so we can show them how, how it will go and we receive them their comments as well. And regarding the communication part, I will, I will tell Levi about this, but and I will let him, you know, deal with it because it's only mentioned today. When we were, like, reviewing the facts. Faqs. And yeah.  
+Me: No.  
+Them: And this.  
+Me: Yeah, no. No worries about it. Absolutely. See, even if it's last minute also, I'm always here.  
+Them: Huh?  
+Me: So, like, Levi and Nikhil know that the turnaround time for me, it's just, like, I can get this done in, like, two hours, so that's not an issue at all.  
+Them: Thank.  
+Me: That's just that I just want them to, you know, not panic and at least just be like, okay, hey, listen, everything's prepared for the meeting tomorrow, so that's that.  
+Them: Yeah.  
+Me: Sort. And, yeah, just let me know how the meeting goes tomorrow. Let's do one thing, by the way.  
+Them: Thank you.  
+Me: I. I want your opinion also. I'll push these changes to production right now. I'll share the link with you guys. Tell me your feedback.  
+Them: Okay?  
+Me: As far as the Arabic translation is also concern say. I want nothing to at least, you know, see that. Okay. Hey, listen, we have got things prepared.  
+Them: Okay?  
+Me: When it comes to Arabic translation. Also, if you can send me a few notes from your end that. Hey, listen. These are a few things which need to be executed. I'll make sure that that's also happening.  
+Them: Okay, sure thing. The only thing is the mentees translation at the moment. I will send you the exact, you know, translation of it. But I don't think it's a priority at the moment. However, I'm going to tell Levi about it and we'll send the request VA group, is that sounds okay?  
+Me: Perfect, perfect. Everything sounds great. Let me push these changes immediately. And let me test in a few things also before things go live.  
+Them: Ok? Ay.  
+Me: So if any. In case anything breaks, you guys are on the group. So I'll just, like, keep you guys in loop, okay?  
+Them: Okay? Okay. Amazing. Just one more thing before going to, you know, close the meeting. This is from, you know, notes that I took from. Exactly. From directly from the meeting today with with her. So tomorrow, as she said that they want to ensure that the onboarding the mentors and onboarding the mentees process flow is flawless and It's. It's. It will go to go easily. How easy it is to book an appointment for both mentees and mentors. How easy it is for Amenti to match with possible mentors. And also regarding the legal disclaimer, it's spending from her side so she will send it later. On. So this is. These are the main elements that they want to check tomorrow.  
+Me: Perfect. Perfect. So mainly what I'm also going to do is that where we have the profile and the mentor dashboard separately, I'll just combine those two. Or I'll just get directly remove the profile and let the dashboard kind of take over. So let me fix it through that. And as far as for the mentee section, also, I'll build something out and send it across, okay?  
+Them: Okay? Thank you very much. So it will be doable before tomorrow, right?  
+Me: Yes. Is it really divisible for tomorrow? I'll send it to you in the next, like three, four hours. Give me some time.  
+Them: Amazing, amazing vlats. Thank you very much. And regarding the login, please button, please don't forget to enable it as well.  
+Me: Yes, yes. Done, done. Perfect.  
+Them: Okay?  
+Me: Yeah, sounds good.  
+Them: Thank you, vats. Thank you.  
+Me: Thank you, aman. See you.  
+Them: Enjoy the rest of the day. Of the day.  
+Me: Thank you. Thank you.  
+Them: Thank you. Bye. 

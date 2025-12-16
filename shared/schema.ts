@@ -74,6 +74,8 @@ export const bookings = pgTable("bookings", {
   canceled_at: timestamp("canceled_at", { mode: "string" }),
   mentee_rating: integer("mentee_rating"),
   mentee_feedback: text("mentee_feedback"),
+  mentor_rating: integer("mentor_rating"),
+  mentor_feedback: text("mentor_feedback"),
   created_at: timestamp("created_at", { mode: "string" }).notNull(),
 });
 

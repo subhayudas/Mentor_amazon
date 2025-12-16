@@ -23,11 +23,11 @@ export interface IStorage {
   createBooking(booking: InsertBooking): Promise<Booking>;
   getMentorBookings(mentorId: string): Promise<Booking[]>;
   getMentees(): Promise<Mentee[]>;
+  getMentee(id: string): Promise<Mentee | undefined>;
   getMenteeByEmail(email: string): Promise<Mentee | undefined>;
   getMenteeById(id: string): Promise<Mentee | undefined>;
   createMentee(mentee: InsertMentee): Promise<Mentee>;
   updateMentee(id: string, updates: Partial<InsertMentee>): Promise<Mentee | undefined>;
-  getMenteeBookings(menteeId: string): Promise<Booking[]>;
   getBookingNotes(bookingId: string): Promise<BookingNote[]>;
   createBookingNote(note: InsertBookingNote): Promise<BookingNote>;
   updateBookingNote(id: string, updates: Partial<InsertBookingNote>): Promise<BookingNote | undefined>;
@@ -57,6 +57,15 @@ export interface IStorage {
   getMentorEarnings(mentorId: string): Promise<MentorEarnings[]>;
   getMentorActivityLog(mentorId: string, limit?: number): Promise<MentorActivityLog[]>;
   createActivityLog(log: InsertMentorActivityLog): Promise<MentorActivityLog>;
+  
+  // Feedback methods
+  submitMenteeFeedback(bookingId: string, rating: number, feedback: string): Promise<Booking | undefined>;
+  submitMentorFeedback(bookingId: string, rating: number, feedback: string): Promise<Booking | undefined>;
+  updateMentorRating(mentorId: string): Promise<void>;
+  getMentorFeedback(mentorId: string): Promise<(Booking & { mentee?: Mentee })[]>;
+  getMenteeFeedback(menteeId: string): Promise<(Booking & { mentor?: Mentor })[]>;
+  getMenteeBookings(menteeId: string, status?: string): Promise<(Booking & { mentor?: Mentor })[]>;
+  getMenteeStats(menteeId: string): Promise<{ totalSessions: number; completedSessions: number; upcomingSessions: number; uniqueMentors: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -376,6 +385,10 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async getMentee(id: string): Promise<Mentee | undefined> {
+    return this.getMenteeById(id);
+  }
+
   async createMentee(insertMentee: InsertMentee): Promise<Mentee> {
     await this.seedPromise;
     const id = randomUUID();
@@ -386,11 +399,6 @@ export class DatabaseStorage implements IStorage {
       created_at: now,
     }).returning();
     return result[0];
-  }
-
-  async getMenteeBookings(menteeId: string): Promise<Booking[]> {
-    await this.seedPromise;
-    return await db.select().from(bookings).where(eq(bookings.mentee_id, menteeId));
   }
 
   async getMentorBookings(mentorId: string): Promise<Booking[]> {
@@ -718,6 +726,128 @@ export class DatabaseStorage implements IStorage {
       created_at: now,
     }).returning();
     return result[0];
+  }
+
+  // Feedback methods
+  async submitMenteeFeedback(bookingId: string, rating: number, feedback: string): Promise<Booking | undefined> {
+    await this.seedPromise;
+    const result = await db.update(bookings)
+      .set({ mentee_rating: rating, mentee_feedback: feedback })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return result[0];
+  }
+
+  async submitMentorFeedback(bookingId: string, rating: number, feedback: string): Promise<Booking | undefined> {
+    await this.seedPromise;
+    const result = await db.update(bookings)
+      .set({ mentor_rating: rating, mentor_feedback: feedback })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return result[0];
+  }
+
+  async updateMentorRating(mentorId: string): Promise<void> {
+    await this.seedPromise;
+    // Calculate average rating from all bookings with ratings
+    const mentorBookings = await db.select().from(bookings)
+      .where(and(
+        eq(bookings.mentor_id, mentorId),
+        sql`${bookings.mentee_rating} IS NOT NULL`
+      ));
+    
+    if (mentorBookings.length === 0) return;
+    
+    const totalRating = mentorBookings.reduce((sum, b) => sum + (b.mentee_rating || 0), 0);
+    const avgRating = totalRating / mentorBookings.length;
+    
+    await db.update(mentors)
+      .set({ 
+        average_rating: avgRating.toFixed(2), 
+        total_ratings: mentorBookings.length 
+      })
+      .where(eq(mentors.id, mentorId));
+  }
+
+  async getMentorFeedback(mentorId: string): Promise<(Booking & { mentee?: Mentee })[]> {
+    await this.seedPromise;
+    const feedbackBookings = await db.select().from(bookings)
+      .where(and(
+        eq(bookings.mentor_id, mentorId),
+        sql`${bookings.mentee_rating} IS NOT NULL`
+      ))
+      .orderBy(desc(bookings.created_at));
+    
+    // Get mentee details for each booking
+    const result = await Promise.all(feedbackBookings.map(async (booking) => {
+      const mentee = await this.getMentee(booking.mentee_id);
+      return { ...booking, mentee };
+    }));
+    
+    return result;
+  }
+
+  async getMenteeFeedback(menteeId: string): Promise<(Booking & { mentor?: Mentor })[]> {
+    await this.seedPromise;
+    const feedbackBookings = await db.select().from(bookings)
+      .where(and(
+        eq(bookings.mentee_id, menteeId),
+        sql`${bookings.mentor_rating} IS NOT NULL`
+      ))
+      .orderBy(desc(bookings.created_at));
+    
+    // Get mentor details for each booking
+    const result = await Promise.all(feedbackBookings.map(async (booking) => {
+      const mentor = await this.getMentor(booking.mentor_id);
+      return { ...booking, mentor };
+    }));
+    
+    return result;
+  }
+
+  async getMenteeBookings(menteeId: string, status?: string): Promise<(Booking & { mentor?: Mentor })[]> {
+    await this.seedPromise;
+    
+    let menteeBookings;
+    if (status) {
+      menteeBookings = await db.select().from(bookings)
+        .where(and(
+          eq(bookings.mentee_id, menteeId),
+          eq(bookings.status, status as "clicked" | "scheduled" | "completed" | "canceled")
+        ))
+        .orderBy(desc(bookings.created_at));
+    } else {
+      menteeBookings = await db.select().from(bookings)
+        .where(eq(bookings.mentee_id, menteeId))
+        .orderBy(desc(bookings.created_at));
+    }
+    
+    // Get mentor details for each booking
+    const result = await Promise.all(menteeBookings.map(async (booking) => {
+      const mentor = await this.getMentor(booking.mentor_id);
+      return { ...booking, mentor };
+    }));
+    
+    return result;
+  }
+
+  async getMenteeStats(menteeId: string): Promise<{ totalSessions: number; completedSessions: number; upcomingSessions: number; uniqueMentors: number }> {
+    await this.seedPromise;
+    
+    const menteeBookings = await db.select().from(bookings)
+      .where(eq(bookings.mentee_id, menteeId));
+    
+    const totalSessions = menteeBookings.length;
+    const completedSessions = menteeBookings.filter(b => b.status === "completed").length;
+    const upcomingSessions = menteeBookings.filter(b => b.status === "scheduled").length;
+    const uniqueMentors = new Set(menteeBookings.map(b => b.mentor_id)).size;
+    
+    return {
+      totalSessions,
+      completedSessions,
+      upcomingSessions,
+      uniqueMentors,
+    };
   }
 }
 

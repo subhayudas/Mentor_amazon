@@ -960,6 +960,139 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Feedback routes - mentee submitting feedback for mentor
+  app.post("/api/bookings/:bookingId/mentee-feedback", async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const { rating, feedback, menteeEmail } = req.body;
+      
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      const mentee = await storage.getMentee(booking.mentee_id);
+      if (!mentee || (menteeEmail && mentee.email !== menteeEmail)) {
+        return res.status(403).json({ message: "Not authorized to submit feedback for this booking" });
+      }
+      
+      const updatedBooking = await storage.submitMenteeFeedback(bookingId, rating, feedback || "");
+      
+      // Update mentor's average rating
+      await storage.updateMentorRating(booking.mentor_id);
+      
+      res.json(updatedBooking);
+    } catch (error) {
+      console.error("Submit mentee feedback error:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // Mentor submitting feedback for mentee
+  app.post("/api/bookings/:bookingId/mentor-feedback", async (req, res) => {
+    try {
+      const { bookingId } = req.params;
+      const { rating, feedback, mentorEmail } = req.body;
+      
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      }
+      
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      const mentor = await storage.getMentor(booking.mentor_id);
+      if (!mentor || (mentorEmail && mentor.email !== mentorEmail)) {
+        return res.status(403).json({ message: "Not authorized to submit feedback for this booking" });
+      }
+      
+      const updatedBooking = await storage.submitMentorFeedback(bookingId, rating, feedback || "");
+      res.json(updatedBooking);
+    } catch (error) {
+      console.error("Submit mentor feedback error:", error);
+      res.status(500).json({ message: "Failed to submit feedback" });
+    }
+  });
+
+  // Get all feedback received by mentor (from mentees)
+  app.get("/api/mentor/:mentorId/feedback", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const feedback = await storage.getMentorFeedback(mentorId);
+      res.json(feedback);
+    } catch (error) {
+      console.error("Get mentor feedback error:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  // Get all feedback received by mentee (from mentors)
+  app.get("/api/mentee/:menteeId/feedback", async (req, res) => {
+    try {
+      const { menteeId } = req.params;
+      
+      const mentee = await storage.getMentee(menteeId);
+      if (!mentee) {
+        return res.status(404).json({ message: "Mentee not found" });
+      }
+      
+      const feedback = await storage.getMenteeFeedback(menteeId);
+      res.json(feedback);
+    } catch (error) {
+      console.error("Get mentee feedback error:", error);
+      res.status(500).json({ message: "Failed to fetch feedback" });
+    }
+  });
+
+  // Get mentee's bookings with mentor details
+  app.get("/api/mentee/:menteeId/bookings", async (req, res) => {
+    try {
+      const { menteeId } = req.params;
+      const status = req.query.status as string | undefined;
+      
+      const mentee = await storage.getMentee(menteeId);
+      if (!mentee) {
+        return res.status(404).json({ message: "Mentee not found" });
+      }
+      
+      const bookings = await storage.getMenteeBookings(menteeId, status);
+      res.json(bookings);
+    } catch (error) {
+      console.error("Get mentee bookings error:", error);
+      res.status(500).json({ message: "Failed to fetch mentee bookings" });
+    }
+  });
+
+  // Get mentee's dashboard stats
+  app.get("/api/mentee/:menteeId/stats", async (req, res) => {
+    try {
+      const { menteeId } = req.params;
+      
+      const mentee = await storage.getMentee(menteeId);
+      if (!mentee) {
+        return res.status(404).json({ message: "Mentee not found" });
+      }
+      
+      const stats = await storage.getMenteeStats(menteeId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Get mentee stats error:", error);
+      res.status(500).json({ message: "Failed to fetch mentee stats" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
