@@ -1,12 +1,13 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema, insertNotificationSchema } from "@shared/schema";
+import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema, insertNotificationSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import { randomUUID } from "crypto";
+import bcrypt from "bcryptjs";
 
 const uploadStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -30,8 +31,180 @@ const upload = multer({
   },
 });
 
+const signupSchema = insertUserSchema.extend({
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  email: z.string().email("Invalid email address"),
+});
+
+const loginSchema = z.object({
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email("Invalid email address"),
+});
+
+const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Reset token is required"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/uploads", express.static("uploads"));
+
+  app.post("/api/auth/signup", async (req: Request, res: Response) => {
+    try {
+      const result = signupSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid signup data",
+          errors: result.error.errors,
+        });
+      }
+
+      const existingUser = await storage.getUserByEmail(result.data.email);
+      if (existingUser) {
+        return res.status(409).json({ message: "User with this email already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(result.data.password, 10);
+      const user = await storage.createUser({
+        ...result.data,
+        password: hashedPassword,
+      });
+
+      req.session.userId = user.id;
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.status(201).json(userWithoutPassword);
+    } catch (error) {
+      console.error("Signup error:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req: Request, res: Response) => {
+    try {
+      const result = loginSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid login data",
+          errors: result.error.errors,
+        });
+      }
+
+      const user = await storage.getUserByEmail(result.data.email);
+      if (!user) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      const isPasswordValid = await bcrypt.compare(result.data.password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ message: "Invalid email or password" });
+      }
+
+      req.session.userId = user.id;
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Login error:", error);
+      res.status(500).json({ message: "Failed to login" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req: Request, res: Response) => {
+    try {
+      req.session.destroy((err) => {
+        if (err) {
+          return res.status(500).json({ message: "Failed to logout" });
+        }
+        res.clearCookie("connect.sid");
+        res.json({ message: "Logged out successfully" });
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      res.status(500).json({ message: "Failed to logout" });
+    }
+  });
+
+  app.get("/api/auth/me", async (req: Request, res: Response) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+
+      const user = await storage.getUserById(req.session.userId);
+      if (!user) {
+        req.session.destroy(() => {});
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Get current user error:", error);
+      res.status(500).json({ message: "Failed to get current user" });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    try {
+      const result = forgotPasswordSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid email",
+          errors: result.error.errors,
+        });
+      }
+
+      const user = await storage.getUserByEmail(result.data.email);
+      if (!user) {
+        return res.json({ message: "If an account exists, a reset link will be sent" });
+      }
+
+      const resetToken = randomUUID();
+      const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      await storage.updateUserResetToken(user.id, resetToken, expires);
+
+      res.json({ message: "If an account exists, a reset link will be sent", token: resetToken });
+    } catch (error) {
+      console.error("Forgot password error:", error);
+      res.status(500).json({ message: "Failed to process forgot password request" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    try {
+      const result = resetPasswordSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid reset data",
+          errors: result.error.errors,
+        });
+      }
+
+      const user = await storage.getUserByResetToken(result.data.token);
+
+      if (!user || !user.reset_token_expires) {
+        return res.status(400).json({ message: "Invalid or expired reset token" });
+      }
+
+      const expires = new Date(user.reset_token_expires);
+      if (expires < new Date()) {
+        return res.status(400).json({ message: "Reset token has expired" });
+      }
+
+      const hashedPassword = await bcrypt.hash(result.data.password, 10);
+      await storage.updateUserPassword(user.id, hashedPassword);
+
+      res.json({ message: "Password reset successfully" });
+    } catch (error) {
+      console.error("Reset password error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
+  });
 
   app.post("/api/uploads", (req, res, next) => {
     upload.single("file")(req, res, (err) => {

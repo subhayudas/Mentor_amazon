@@ -1,4 +1,4 @@
-import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, type BookingNote, type InsertBookingNote, type Notification, type InsertNotification, mentors, bookings, mentees, bookingNotes, notifications } from "@shared/schema";
+import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, type BookingNote, type InsertBookingNote, type Notification, type InsertNotification, type User, type InsertUser, mentors, bookings, mentees, bookingNotes, notifications, users } from "@shared/schema";
 import { db } from "./db";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
 import { randomUUID } from "crypto";
@@ -28,6 +28,13 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   markNotificationAsRead(id: string): Promise<Notification | undefined>;
   markAllNotificationsAsRead(email: string): Promise<void>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByResetToken(token: string): Promise<User | undefined>;
+  createUser(user: InsertUser & { password: string }): Promise<User>;
+  updateUserResetToken(id: string, token: string | null, expires: string | null): Promise<void>;
+  updateUserPassword(id: string, hashedPassword: string): Promise<void>;
+  verifyUser(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -469,6 +476,57 @@ export class DatabaseStorage implements IStorage {
     await db.update(notifications)
       .set({ is_read: true })
       .where(eq(notifications.recipient_email, email));
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    await this.seedPromise;
+    const result = await db.select().from(users).where(eq(users.email, email));
+    return result[0];
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    await this.seedPromise;
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByResetToken(token: string): Promise<User | undefined> {
+    await this.seedPromise;
+    const result = await db.select().from(users).where(eq(users.reset_token, token));
+    return result[0];
+  }
+
+  async createUser(userData: InsertUser & { password: string }): Promise<User> {
+    await this.seedPromise;
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const result = await db.insert(users).values({
+      ...userData,
+      id,
+      created_at: now,
+    }).returning();
+    return result[0];
+  }
+
+  async updateUserResetToken(id: string, token: string | null, expires: string | null): Promise<void> {
+    await this.seedPromise;
+    await db.update(users)
+      .set({ reset_token: token, reset_token_expires: expires })
+      .where(eq(users.id, id));
+  }
+
+  async updateUserPassword(id: string, hashedPassword: string): Promise<void> {
+    await this.seedPromise;
+    await db.update(users)
+      .set({ password: hashedPassword, reset_token: null, reset_token_expires: null })
+      .where(eq(users.id, id));
+  }
+
+  async verifyUser(id: string): Promise<void> {
+    await this.seedPromise;
+    await db.update(users)
+      .set({ is_verified: true })
+      .where(eq(users.id, id));
   }
 }
 
