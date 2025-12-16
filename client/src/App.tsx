@@ -35,6 +35,7 @@ function Router() {
       <Route path="/mentee-registration" component={MenteeRegistration} />
       <Route path="/my-bookings" component={MyBookings} />
       <Route path="/mentor-dashboard" component={MentorDashboard} />
+      <Route path="/mentor-portal" component={MentorPortal} />
       <Route path="/mentor-portal/:rest*" component={MentorPortal} />
       <Route component={NotFound} />
     </Switch>

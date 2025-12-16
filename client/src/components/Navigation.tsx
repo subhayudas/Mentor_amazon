@@ -1,5 +1,5 @@
 import { Link } from "wouter";
-import { BarChart3, UserPlus, Users, User, LogOut, LogIn } from "lucide-react";
+import { BarChart3, UserPlus, Users, User, LogOut, LogIn, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -94,6 +94,14 @@ export function Navigation() {
                 <span className="hidden md:inline">{t('nav.joinMentee')}</span>
               </Button>
             </Link>
+            {mentorId && (
+              <Link href="/mentor-portal" data-testid="link-mentor-portal">
+                <Button variant="ghost" className="text-primary-foreground hover:bg-primary-foreground/10" data-testid="button-mentor-portal">
+                  <LayoutDashboard className="w-4 h-4 md:mr-2" />
+                  <span className="hidden md:inline">{t('nav.mentorPortal')}</span>
+                </Button>
+              </Link>
+            )}
             {(mentorId || menteeId) && (
               <Link 
                 href={mentorId ? `/profile/mentor/${mentorId}` : `/profile/mentee/${menteeId}`}
