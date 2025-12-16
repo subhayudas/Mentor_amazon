@@ -996,9 +996,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/bookings/:bookingId/mentor-feedback", async (req, res) => {
     try {
       const { bookingId } = req.params;
-      const { rating, feedback, mentorEmail } = req.body;
+      // Accept both naming conventions: mentor_rating/mentor_feedback or rating/feedback
+      const { mentor_rating, mentor_feedback, rating, feedback, mentorEmail } = req.body;
+      const actualRating = mentor_rating ?? rating;
+      const actualFeedback = mentor_feedback ?? feedback ?? "";
       
-      if (!rating || rating < 1 || rating > 5) {
+      if (!actualRating || actualRating < 1 || actualRating > 5) {
         return res.status(400).json({ message: "Rating must be between 1 and 5" });
       }
       
@@ -1012,7 +1015,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Not authorized to submit feedback for this booking" });
       }
       
-      const updatedBooking = await storage.submitMentorFeedback(bookingId, rating, feedback || "");
+      const updatedBooking = await storage.submitMentorFeedback(bookingId, actualRating, actualFeedback);
       res.json(updatedBooking);
     } catch (error) {
       console.error("Submit mentor feedback error:", error);
