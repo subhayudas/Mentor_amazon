@@ -636,6 +636,11 @@ export default function MentorOnboarding() {
                           </Badge>
                         ))}
                       </div>
+                      {(!field.value || field.value.length === 0) && (
+                        <FormDescription className="text-amber-600 dark:text-amber-400" data-testid="text-skills-tip">
+                          {t('profile.skillsTip')}
+                        </FormDescription>
+                      )}
                       <FormMessage />
                     </FormItem>
                   )}
