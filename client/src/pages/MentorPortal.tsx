@@ -28,7 +28,7 @@ import {
   Users,
   ListTodo,
   Clock,
-  DollarSign,
+  MessageSquare,
   User,
   Settings,
   LogOut,
@@ -38,7 +38,7 @@ import BookingRequests from "@/pages/mentor/BookingRequests";
 import MySessions from "@/pages/mentor/MySessions";
 import TaskManager from "@/pages/mentor/TaskManager";
 import Availability from "@/pages/mentor/Availability";
-import Earnings from "@/pages/mentor/Earnings";
+import Feedback from "@/pages/mentor/Feedback";
 import type { Mentor } from "@shared/schema";
 
 export default function MentorPortal() {
@@ -173,10 +173,10 @@ export default function MentorPortal() {
       icon: Clock,
     },
     {
-      key: "earnings",
-      title: t('mentorPortal.sidebarEarnings'),
-      url: "/mentor-portal/earnings",
-      icon: DollarSign,
+      key: "feedback",
+      title: t('mentorPortal.sidebarFeedback'),
+      url: "/mentor-portal/feedback",
+      icon: MessageSquare,
     },
   ];
 
@@ -289,8 +289,8 @@ export default function MentorPortal() {
               <Route path="/mentor-portal/availability">
                 <Availability mentorId={mentor.id} />
               </Route>
-              <Route path="/mentor-portal/earnings">
-                <Earnings mentorId={mentor.id} />
+              <Route path="/mentor-portal/feedback">
+                <Feedback mentorId={mentor.id} />
               </Route>
             </Switch>
           </main>
