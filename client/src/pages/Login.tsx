@@ -156,7 +156,7 @@ export default function Login() {
                     )}
                   />
                   <Link
-                    href="#"
+                    href="/forgot-password"
                     className="text-sm text-[#FF9900] hover:underline"
                     data-testid="link-forgot-password"
                   >

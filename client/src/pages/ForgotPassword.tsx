@@ -38,10 +38,6 @@ export default function ForgotPassword() {
   const forgotPasswordMutation = useMutation({
     mutationFn: async (data: ForgotPasswordValues) => {
       const response = await apiRequest("POST", "/api/auth/forgot-password", data);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || t("auth.forgotPasswordError"));
-      }
       return response.json();
     },
     onSuccess: (_data, variables) => {
@@ -49,9 +45,17 @@ export default function ForgotPassword() {
       setEmailSent(true);
     },
     onError: (error: Error) => {
+      let errorMessage = t("auth.forgotPasswordError");
+      try {
+        const jsonMatch = error.message.match(/\{.*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          errorMessage = parsed.message || errorMessage;
+        }
+      } catch {}
       toast({
         title: t("auth.error"),
-        description: error.message || t("auth.forgotPasswordError"),
+        description: errorMessage,
         variant: "destructive",
       });
     },

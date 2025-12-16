@@ -87,19 +87,23 @@ export default function ResetPassword() {
         token,
         password: data.password,
       });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || t("auth.resetPasswordError"));
-      }
       return response.json();
     },
     onSuccess: () => {
       setResetSuccess(true);
     },
     onError: (error: Error) => {
+      let errorMessage = t("auth.resetPasswordError");
+      try {
+        const jsonMatch = error.message.match(/\{.*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          errorMessage = parsed.message || errorMessage;
+        }
+      } catch {}
       toast({
         title: t("auth.error"),
-        description: error.message || t("auth.resetPasswordError"),
+        description: errorMessage,
         variant: "destructive",
       });
     },
