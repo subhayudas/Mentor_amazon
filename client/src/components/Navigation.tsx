@@ -120,6 +120,21 @@ export function Navigation() {
           </Button>
         </Link>
       )}
+      {menteeId && (
+        <Link href="/mentee-dashboard" data-testid="link-mentee-dashboard" onClick={() => setMobileMenuOpen(false)}>
+          <Button 
+            variant="ghost" 
+            className={mobile 
+              ? "w-full justify-start text-foreground" 
+              : "text-primary-foreground hover:bg-primary-foreground/10"
+            }
+            data-testid="button-mentee-dashboard"
+          >
+            <LayoutDashboard className="w-4 h-4 mr-2" />
+            {t('nav.menteeDashboard')}
+          </Button>
+        </Link>
+      )}
       {(mentorId || menteeId) && (
         <Link 
           href={mentorId ? `/profile/mentor/${mentorId}` : `/profile/mentee/${menteeId}`}
