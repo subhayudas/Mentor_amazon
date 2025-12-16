@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { Navigation } from "@/components/Navigation";
 import Home from "@/pages/Home";
+import Login from "@/pages/Login";
+import Signup from "@/pages/Signup";
 import MentorProfile from "@/pages/MentorProfile";
 import Analytics from "@/pages/Analytics";
 import MentorOnboarding from "@/pages/MentorOnboarding";
@@ -20,6 +22,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
+      <Route path="/signup" component={Signup} />
       <Route path="/mentor/:id" component={MentorProfile} />
       <Route path="/mentors/:id" component={MentorProfile} />
       <Route path="/profile/mentor/:id" component={MentorProfileView} />
