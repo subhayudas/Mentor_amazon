@@ -1,0 +1,349 @@
+# Authentication System - Login & Signup for Replit
+
+## Project Overview
+Build a complete authentication system with both traditional email/password and Microsoft OAuth, including login, signup, and all security features.
+
+---
+
+## 1. Authentication Methods Required
+
+### Traditional Email/Password Authentication
+Implement both signup AND login with proper validation and security.
+
+### Microsoft OAuth Integration
+Allow users to authenticate using their Microsoft accounts as an alternative to traditional login.
+
+### SSL/TLS Security
+Ensure all connections use HTTPS with proper SSL certificates configured.
+
+---
+
+## 2. Signup Page Requirements
+
+### Signup Form Fields
+- Email address (with validation)
+- Password (with strength indicator showing weak/medium/strong)
+- Confirm password (must match)
+- User type selection: Radio buttons or dropdown for "Mentor" or "Mentee"
+- Checkbox for "I agree to Terms & Conditions"
+- Submit button: "Create Account"
+
+### Password Requirements
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
+- At least one special character (!@#$%^&*)
+- Show real-time validation as user types
+
+### Microsoft Signup Option
+- Prominent "Sign up with Microsoft" button with Microsoft logo
+- Should be visually separated from traditional form (e.g., "OR" divider)
+
+### Additional Features
+- Link to login page: "Already have an account? Login here"
+- Email verification: After signup, send verification email with confirmation link
+- Show success message: "Account created! Please check your email to verify your account"
+
+---
+
+## 3. Login Page Requirements
+
+### Login Form Fields
+- Email address
+- Password (with show/hide password toggle icon)
+- "Remember me" checkbox
+- Submit button: "Login"
+
+### Microsoft Login Option
+- Prominent "Login with Microsoft" button with Microsoft logo
+- Should be visually separated from traditional form (e.g., "OR" divider)
+
+### Additional Features
+- Link to signup page: "Don't have an account? Sign up here"
+- "Forgot password?" link that opens password reset flow
+- Show appropriate error messages for:
+  - Invalid credentials
+  - Unverified email (with option to resend verification)
+  - Account locked (after too many failed attempts)
+
+---
+
+## 4. Forgot Password Flow
+
+### Request Reset Page
+- Email input field
+- Submit button: "Send Reset Link"
+- Show message: "If an account exists with this email, you'll receive a password reset link"
+
+### Reset Password Page (accessed via email link)
+- New password field (with strength indicator)
+- Confirm new password field
+- Submit button: "Reset Password"
+- Token validation: Check if reset token is valid and not expired (1 hour expiry)
+
+---
+
+## 5. Email Verification
+
+### Verification Email
+Send automated email upon signup containing:
+- Welcome message
+- Verification link with unique token
+- Token expiration time (24 hours)
+
+### Verification Page
+- When user clicks link, verify token and mark account as verified
+- Show success message and redirect to login
+- If token expired, offer "Resend verification email" option
+
+---
+
+## 6. Database Schema
+
+### Users Table
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255), -- NULL if using only Microsoft OAuth
+  user_type VARCHAR(20) NOT NULL, -- 'mentor' or 'mentee'
+  microsoft_id VARCHAR(255) UNIQUE, -- NULL if not using Microsoft auth
+  is_verified BOOLEAN DEFAULT false,
+  verification_token VARCHAR(255),
+  verification_token_expiry TIMESTAMP,
+  reset_token VARCHAR(255),
+  reset_token_expiry TIMESTAMP,
+  login_attempts INTEGER DEFAULT 0,
+  locked_until TIMESTAMP,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+---
+
+## 7. Security Implementation
+
+### Password Hashing
+- Use bcrypt with salt rounds of 12
+- Never store plain text passwords
+- Example: `bcrypt.hash(password, 12)`
+
+### JWT Token Management
+- Generate JWT token upon successful login
+- Store in httpOnly cookie (not localStorage)
+- Token expiration: 24 hours for access token
+- Implement refresh token with 7-day expiration
+
+### Rate Limiting
+- Limit login attempts: 5 attempts per 15 minutes per IP
+- Lock account for 30 minutes after 5 failed attempts
+- Clear attempts counter on successful login
+
+### CSRF Protection
+- Generate CSRF token for each session
+- Validate CSRF token on all POST/PUT/DELETE requests
+
+### Input Validation
+- Server-side validation for all inputs
+- Sanitize email addresses
+- Check password against common password lists
+- Prevent SQL injection using parameterized queries
+
+---
+
+## 8. API Endpoints
+
+### Authentication Endpoints
+```
+POST /api/auth/signup
+Body: { email, password, confirmPassword, userType }
+Response: { message, userId }
+
+POST /api/auth/login
+Body: { email, password, rememberMe }
+Response: { token, user: { id, email, userType, isVerified } }
+
+POST /api/auth/logout
+Headers: Authorization: Bearer <token>
+Response: { message }
+
+GET /api/auth/verify-email/:token
+Response: { message } or redirect to login
+
+POST /api/auth/forgot-password
+Body: { email }
+Response: { message }
+
+POST /api/auth/reset-password
+Body: { token, newPassword, confirmPassword }
+Response: { message }
+
+POST /api/auth/resend-verification
+Body: { email }
+Response: { message }
+
+GET /api/auth/me
+Headers: Authorization: Bearer <token>
+Response: { user: { id, email, userType, isVerified } }
+```
+
+### Microsoft OAuth Endpoints
+```
+GET /api/auth/microsoft
+Redirects to Microsoft login page
+
+GET /api/auth/microsoft/callback
+Query: { code }
+Response: Sets JWT cookie and redirects to dashboard
+```
+
+---
+
+## 9. Microsoft OAuth Setup
+
+### Azure Portal Configuration
+1. Go to https://portal.azure.com
+2. Navigate to "Azure Active Directory" > "App registrations"
+3. Click "New registration"
+4. Enter app name and select account types
+5. Set Redirect URI: `https://your-replit-domain.com/api/auth/microsoft/callback`
+6. Click "Register"
+7. Go to "Certificates & secrets" and create new client secret
+8. Copy the following for environment variables:
+   - Application (client) ID
+   - Directory (tenant) ID
+   - Client secret value
+
+### Required Environment Variables
+```
+MICROSOFT_CLIENT_ID=your_client_id
+MICROSOFT_CLIENT_SECRET=your_client_secret
+MICROSOFT_TENANT_ID=your_tenant_id
+MICROSOFT_REDIRECT_URI=https://your-domain.com/api/auth/microsoft/callback
+```
+
+### Implementation with MSAL
+```javascript
+// Use @azure/msal-node package
+const msal = require('@azure/msal-node');
+
+const msalConfig = {
+  auth: {
+    clientId: process.env.MICROSOFT_CLIENT_ID,
+    authority: `https://login.microsoftonline.com/${process.env.MICROSOFT_TENANT_ID}`,
+    clientSecret: process.env.MICROSOFT_CLIENT_SECRET
+  }
+};
+```
+
+---
+
+## 10. Email Service Setup
+
+### Required Environment Variables
+```
+EMAIL_SERVICE=sendgrid or smtp
+EMAIL_FROM=noreply@yourdomain.com
+EMAIL_API_KEY=your_api_key
+```
+
+### Email Templates Needed
+1. **Verification Email**: Subject: "Verify your email address"
+2. **Password Reset Email**: Subject: "Reset your password"
+3. **Welcome Email**: Subject: "Welcome to [Platform Name]"
+
+---
+
+## 11. Frontend Tech Stack
+
+### Recommended Stack
+- React or Next.js for frontend
+- Tailwind CSS for styling
+- React Hook Form for form management
+- Axios for API calls
+- React Router for navigation
+
+### UI Components Needed
+- Input fields with validation states (error, success)
+- Password strength indicator component
+- Loading spinners for async operations
+- Toast notifications for success/error messages
+- Protected route component (redirects to login if not authenticated)
+
+---
+
+## 12. User Flow Diagrams
+
+### Signup Flow
+1. User visits signup page
+2. Chooses traditional or Microsoft signup
+3. **Traditional**: Fills form → submits → receives verification email → clicks link → verified → redirects to login
+4. **Microsoft**: Clicks button → redirects to Microsoft → authorizes → redirects back → account created → goes to dashboard
+
+### Login Flow
+1. User visits login page
+2. Chooses traditional or Microsoft login
+3. **Traditional**: Enters credentials → validates → checks verification → generates JWT → redirects to dashboard
+4. **Microsoft**: Clicks button → redirects to Microsoft → authorizes → validates → generates JWT → redirects to dashboard
+
+### Password Reset Flow
+1. User clicks "Forgot password"
+2. Enters email → receives reset email
+3. Clicks link in email → enters new password
+4. Password updated → redirects to login with success message
+
+---
+
+## 13. Testing Checklist
+
+- [ ] Signup with valid email and password works
+- [ ] Signup with Microsoft account works
+- [ ] Email verification email is sent
+- [ ] Email verification link works and marks account as verified
+- [ ] Login with correct credentials works
+- [ ] Login with incorrect credentials shows error
+- [ ] Login with unverified email shows appropriate message
+- [ ] Microsoft login works and creates/links account
+- [ ] Account locks after 5 failed login attempts
+- [ ] Forgot password email is sent
+- [ ] Password reset link works and updates password
+- [ ] Reset token expires after 1 hour
+- [ ] JWT tokens are stored in httpOnly cookies
+- [ ] Protected routes redirect to login when not authenticated
+- [ ] CSRF protection works
+- [ ] Rate limiting prevents brute force attacks
+- [ ] All passwords are hashed before storage
+
+---
+
+## 14. Replit-Specific Instructions
+
+### Environment Setup
+1. Use Replit Secrets for all sensitive environment variables
+2. Configure PostgreSQL database (Replit DB or external)
+3. Set up SSL certificate (automatic with Replit deployments)
+4. Configure custom domain if needed
+
+### Database Setup
+Use Replit's PostgreSQL or connect external database:
+```bash
+# In Replit Shell
+npm install pg
+# Or for MongoDB: npm install mongoose
+```
+
+### Starting Point
+Create these files:
+- `/backend/server.js` - Main server file
+- `/backend/routes/auth.js` - Authentication routes
+- `/backend/middleware/auth.js` - JWT verification middleware
+- `/frontend/pages/Signup.jsx` - Signup page
+- `/frontend/pages/Login.jsx` - Login page
+- `/frontend/pages/ForgotPassword.jsx` - Password reset request
+- `/frontend/pages/ResetPassword.jsx` - New password form
+
+---
+
+**IMPORTANT**: Make sure to test both traditional authentication AND Microsoft OAuth thoroughly. Users should be able to seamlessly switch between methods or link their Microsoft account to an existing email/password account.

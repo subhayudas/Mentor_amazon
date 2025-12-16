@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import Cal, { getCalApi } from "@calcom/embed-react";
 import { Mentor } from "@shared/schema";
 import { Card } from "@/components/ui/card";
@@ -55,7 +55,6 @@ export default function MentorProfile() {
     return savedEmail && savedName ? { name: savedName, email: savedEmail } : null;
   });
   const [showIdentityForm, setShowIdentityForm] = useState(!menteeInfo);
-  const [selectedDuration, setSelectedDuration] = useState<15 | 30 | 60>(30);
   
   // Cache mentor data in a ref to ensure it's always available during Cal.com events
   // even if React Query refetches and temporarily sets mentor to undefined
@@ -138,35 +137,6 @@ export default function MentorProfile() {
     });
   };
 
-  // Determine available durations for flexible session scheduling
-  // IMPORTANT: This must be before any early returns to maintain hook order
-  const availableDurations = useMemo(() => {
-    if (!mentor) return [15, 30, 60];
-    
-    // Check if mentor has specific duration links configured
-    const hasSpecificLinks = mentor.cal_15min || mentor.cal_30min || mentor.cal_60min;
-    
-    if (hasSpecificLinks) {
-      // Show only durations that have specific links configured
-      const durations: number[] = [];
-      if (mentor.cal_15min) durations.push(15);
-      if (mentor.cal_30min) durations.push(30);
-      if (mentor.cal_60min) durations.push(60);
-      return durations.length > 0 ? durations : [30];
-    }
-    
-    // When only base cal_link exists, show all durations for flexibility
-    // The Cal.com widget will use the same link for any duration selection
-    return [15, 30, 60];
-  }, [mentor]);
-
-  // Update selected duration if it's not in available durations
-  // IMPORTANT: This must be before any early returns to maintain hook order
-  useEffect(() => {
-    if (mentor && !availableDurations.includes(selectedDuration)) {
-      setSelectedDuration(availableDurations[0] as 15 | 30 | 60);
-    }
-  }, [mentor, availableDurations, selectedDuration]);
 
   if (isLoading) {
     return (
@@ -267,7 +237,7 @@ export default function MentorProfile() {
     }
   };
 
-  const calLink = mentor ? (mentor[`cal_${selectedDuration}min` as keyof Mentor] as string || mentor.cal_link) : "";
+  const calLink = mentor?.cal_link || "";
 
   return (
     <div className="min-h-screen py-12">
@@ -431,42 +401,15 @@ export default function MentorProfile() {
                   <Skeleton className="h-[700px] w-full" />
                 </div>
               ) : (
-                <>
-                  {availableDurations.length > 1 && (
-                    <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
-                      <p className="text-sm font-semibold mb-3">{t('session.selectDuration')}</p>
-                      <div className="flex gap-3">
-                        {availableDurations.map((duration) => (
-                          <Button
-                            key={duration}
-                            onClick={() => setSelectedDuration(duration as 15 | 30 | 60)}
-                            variant={selectedDuration === duration ? "default" : "outline"}
-                            className="flex-1"
-                            data-testid={`button-duration-${duration}`}
-                          >
-                            {duration} {t('session.minutes')}
-                          </Button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {availableDurations.length === 1 && (
-                    <div className="mb-6 p-6 bg-muted rounded-lg mx-4">
-                      <p className="text-sm text-muted-foreground text-center">
-                        {availableDurations[0]} {t('session.minuteSession')}
-                      </p>
-                    </div>
-                  )}
-                  <div className="rounded-lg overflow-hidden" style={{ height: "700px" }} data-testid="cal-widget">
-                    <Cal
-                      namespace="30min"
-                      calLink={calLink}
-                      style={{ width: "100%", height: "100%", overflow: "scroll" }}
-                      config={{ layout: "month_view", theme: "light" }}
-                      calOrigin="https://app.cal.com"
-                    />
-                  </div>
-                </>
+                <div className="rounded-lg overflow-hidden" style={{ height: "700px" }} data-testid="cal-widget">
+                  <Cal
+                    namespace="30min"
+                    calLink={calLink}
+                    style={{ width: "100%", height: "100%", overflow: "scroll" }}
+                    config={{ layout: "month_view", theme: "light" }}
+                    calOrigin="https://app.cal.com"
+                  />
+                </div>
               )}
             </Card>
           </div>
