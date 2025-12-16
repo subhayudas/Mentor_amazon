@@ -92,7 +92,9 @@
     "invalidResetLinkDescription": "This password reset link is invalid or has expired.",
     "requestNewLink": "Request New Link",
     "resetPasswordError": "Failed to reset password. The link may have expired.",
-    "error": "Error"
+    "error": "Error",
+    "logout": "Logout",
+    "logoutSuccess": "Logged out successfully"
   },
   "nav": {
     "home": "Home",

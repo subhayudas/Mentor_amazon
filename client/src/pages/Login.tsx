@@ -4,7 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Form,
@@ -52,6 +52,7 @@ export default function Login() {
     },
     onSuccess: (data) => {
       localStorage.setItem("user", JSON.stringify(data));
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: t("auth.loginSuccess"),
         description: t("auth.welcomeBack"),
