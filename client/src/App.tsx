@@ -17,6 +17,7 @@ import MentorProfileView from "@/pages/MentorProfileView";
 import MenteeProfileView from "@/pages/MenteeProfileView";
 import MyBookings from "@/pages/MyBookings";
 import MentorDashboard from "@/pages/MentorDashboard";
+import MentorPortal from "@/pages/MentorPortal";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/mentee-registration" component={MenteeRegistration} />
       <Route path="/my-bookings" component={MyBookings} />
       <Route path="/mentor-dashboard" component={MentorDashboard} />
+      <Route path="/mentor-portal/:rest*" component={MentorPortal} />
       <Route component={NotFound} />
     </Switch>
   );
