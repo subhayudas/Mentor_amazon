@@ -1,7 +1,11 @@
 import { useState, useEffect } from "react";
 import { Route, Switch, useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useTranslation } from "react-i18next";
+import { format } from "date-fns";
 import {
   Sidebar,
   SidebarContent,
@@ -17,11 +21,28 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+  FormDescription,
+} from "@/components/ui/form";
 import {
   LayoutDashboard,
   Calendar,
@@ -30,16 +51,50 @@ import {
   User,
   Settings,
   LogOut,
+  Users,
+  CheckCircle,
+  Clock,
+  Star,
+  Save,
+  Globe,
+  Building2,
 } from "lucide-react";
-import type { Mentee } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { Mentee, Booking, Mentor } from "@shared/schema";
+
+interface MenteeStats {
+  totalSessions: number;
+  completedSessions: number;
+  upcomingSessions: number;
+  uniqueMentors: number;
+}
+
+interface BookingWithMentor extends Booking {
+  mentor?: Mentor;
+}
+
+interface FeedbackBooking extends Booking {
+  mentor?: Mentor;
+}
 
 function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   
+  const { data: stats, isLoading: statsLoading } = useQuery<MenteeStats>({
+    queryKey: ['/api/mentee', menteeId, 'stats'],
+  });
+
+  const { data: bookings } = useQuery<BookingWithMentor[]>({
+    queryKey: ['/api/mentee', menteeId, 'bookings'],
+  });
+
+  const upcomingBookings = bookings?.filter(b => b.status === 'scheduled').slice(0, 3) || [];
+  
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{t('menteePortal.dashboardTitle')}</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-mentee-dashboard-title">{t('menteePortal.dashboardTitle')}</h1>
         <p className="text-muted-foreground">{t('menteePortal.dashboardSubtitle')}</p>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -49,43 +104,84 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold" data-testid="text-total-sessions">{stats?.totalSessions || 0}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{t('menteePortal.upcomingSessions')}</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold" data-testid="text-upcoming-sessions">{stats?.upcomingSessions || 0}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('menteePortal.favoriteMentors')}</CardTitle>
-            <Heart className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">{t('menteePortal.completedSessions')}</CardTitle>
+            <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold" data-testid="text-completed-sessions">{stats?.completedSessions || 0}</div>
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{t('menteePortal.feedbackGiven')}</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">{t('menteePortal.uniqueMentors')}</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">0</div>
+            {statsLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="text-2xl font-bold" data-testid="text-unique-mentors">{stats?.uniqueMentors || 0}</div>
+            )}
           </CardContent>
         </Card>
       </div>
+      
       <Card>
         <CardHeader>
-          <CardTitle>{t('menteePortal.recentActivity')}</CardTitle>
+          <CardTitle>{t('menteePortal.upcomingSessions')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{t('menteePortal.noActivity')}</p>
+          {upcomingBookings.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noUpcomingSessions')}</p>
+          ) : (
+            <div className="space-y-4">
+              {upcomingBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={booking.mentor?.photo_url || undefined} />
+                      <AvatarFallback>
+                        <User className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : t('menteePortal.scheduled')}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary">{t('menteePortal.scheduled')}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -95,26 +191,132 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
 function MenteeBookings({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   
+  const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
+    queryKey: ['/api/mentee', menteeId, 'bookings'],
+  });
+
+  const upcomingBookings = bookings?.filter(b => b.status === 'scheduled') || [];
+  const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
+  const canceledBookings = bookings?.filter(b => b.status === 'canceled') || [];
+  
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />{t('menteePortal.scheduled')}</Badge>;
+      case 'completed':
+        return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.completed')}</Badge>;
+      case 'canceled':
+        return <Badge variant="destructive">{t('menteePortal.canceled')}</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{t('menteePortal.myBookings')}</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-bookings-title">{t('menteePortal.myBookings')}</h1>
         <p className="text-muted-foreground">{t('menteePortal.myBookingsSubtitle')}</p>
       </div>
+      
       <Card>
         <CardHeader>
-          <CardTitle>{t('menteePortal.upcoming')}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            {t('menteePortal.upcoming')}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{t('menteePortal.noUpcomingSessions')}</p>
+          {upcomingBookings.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noUpcomingSessions')}</p>
+          ) : (
+            <div className="space-y-4">
+              {upcomingBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg" data-testid={`booking-upcoming-${booking.id}`}>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={booking.mentor?.photo_url || undefined} />
+                      <AvatarFallback>
+                        <User className="h-6 w-6" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
+                      <p className="text-sm text-muted-foreground">{booking.mentor?.position}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {getStatusBadge(booking.status)}
+                    {booking.mentor && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/mentors/${booking.mentor.id}`}>{t('menteePortal.viewMentorProfile')}</Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+      
       <Card>
         <CardHeader>
-          <CardTitle>{t('menteePortal.completed')}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5" />
+            {t('menteePortal.completed')}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{t('menteePortal.noCompletedSessions')}</p>
+          {completedBookings.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noCompletedSessions')}</p>
+          ) : (
+            <div className="space-y-4">
+              {completedBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg" data-testid={`booking-completed-${booking.id}`}>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={booking.mentor?.photo_url || undefined} />
+                      <AvatarFallback>
+                        <User className="h-6 w-6" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
+                      <p className="text-sm text-muted-foreground">{booking.mentor?.position}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {booking.completed_at ? format(new Date(booking.completed_at), 'PPp') : 
+                         booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {getStatusBadge(booking.status)}
+                    {booking.mentee_rating ? (
+                      <Badge variant="outline">
+                        <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
+                        {booking.mentee_rating}/5
+                      </Badge>
+                    ) : (
+                      <Button variant="outline" size="sm">{t('menteePortal.giveFeedback')}</Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -124,18 +326,72 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
 function MenteeMentors({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   
+  const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
+    queryKey: ['/api/mentee', menteeId, 'bookings'],
+  });
+
+  const uniqueMentors = bookings
+    ?.filter(b => b.mentor)
+    .reduce((acc, booking) => {
+      if (booking.mentor && !acc.find(m => m.id === booking.mentor!.id)) {
+        acc.push(booking.mentor);
+      }
+      return acc;
+    }, [] as Mentor[]) || [];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{t('menteePortal.myMentors')}</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-mentors-title">{t('menteePortal.myMentors')}</h1>
         <p className="text-muted-foreground">{t('menteePortal.myMentorsSubtitle')}</p>
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>{t('menteePortal.favoriteMentors')}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            {t('menteePortal.myMentors')}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{t('menteePortal.noFavoriteMentors')}</p>
+          {uniqueMentors.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noFavoriteMentors')}</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {uniqueMentors.map((mentor) => (
+                <div key={mentor.id} className="flex items-center gap-4 p-4 border rounded-lg" data-testid={`mentor-card-${mentor.id}`}>
+                  <Avatar className="h-14 w-14">
+                    <AvatarImage src={mentor.photo_url || undefined} />
+                    <AvatarFallback>
+                      <User className="h-7 w-7" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{mentor.name}</p>
+                    <p className="text-sm text-muted-foreground truncate">{mentor.position}</p>
+                    <p className="text-sm text-muted-foreground truncate">{mentor.company}</p>
+                    {mentor.average_rating && parseFloat(mentor.average_rating) > 0 && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                        <span className="text-sm">{parseFloat(mentor.average_rating).toFixed(1)}</span>
+                      </div>
+                    )}
+                  </div>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href={`/mentors/${mentor.id}`}>{t('menteePortal.viewMentorProfile')}</Link>
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -145,28 +401,391 @@ function MenteeMentors({ menteeId }: { menteeId: string }) {
 function MenteeFeedback({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   
+  const { data: feedback, isLoading } = useQuery<FeedbackBooking[]>({
+    queryKey: ['/api/mentee', menteeId, 'feedback'],
+  });
+
+  const feedbackGiven = feedback?.filter(f => f.mentee_rating) || [];
+  const feedbackReceived = feedback?.filter(f => f.mentor_rating) || [];
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{t('menteePortal.feedback')}</h1>
+        <h1 className="text-2xl font-bold" data-testid="text-feedback-title">{t('menteePortal.feedback')}</h1>
         <p className="text-muted-foreground">{t('menteePortal.feedbackSubtitle')}</p>
       </div>
+      
       <Card>
         <CardHeader>
-          <CardTitle>{t('menteePortal.feedbackGiven')}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Star className="w-5 h-5" />
+            {t('menteePortal.feedbackGiven')}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{t('menteePortal.noFeedbackGiven')}</p>
+          {feedbackGiven.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noFeedbackGiven')}</p>
+          ) : (
+            <div className="space-y-4">
+              {feedbackGiven.map((item) => (
+                <div key={item.id} className="p-4 border rounded-lg" data-testid={`feedback-given-${item.id}`}>
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={item.mentor?.photo_url || undefined} />
+                        <AvatarFallback>
+                          <User className="h-5 w-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{item.mentor?.name || 'Mentor'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.completed_at ? format(new Date(item.completed_at), 'PP') : '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${i < (item.mentee_rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {item.mentee_feedback && (
+                    <p className="text-sm text-muted-foreground mt-2">"{item.mentee_feedback}"</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+      
       <Card>
         <CardHeader>
-          <CardTitle>{t('menteePortal.feedbackReceived')}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            {t('menteePortal.feedbackReceived')}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground">{t('menteePortal.noFeedbackReceived')}</p>
+          {feedbackReceived.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noFeedbackReceived')}</p>
+          ) : (
+            <div className="space-y-4">
+              {feedbackReceived.map((item) => (
+                <div key={item.id} className="p-4 border rounded-lg" data-testid={`feedback-received-${item.id}`}>
+                  <div className="flex items-center justify-between gap-4 mb-2">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarImage src={item.mentor?.photo_url || undefined} />
+                        <AvatarFallback>
+                          <User className="h-5 w-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium">{item.mentor?.name || 'Mentor'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.completed_at ? format(new Date(item.completed_at), 'PP') : '-'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${i < (item.mentor_rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {item.mentor_feedback && (
+                    <p className="text-sm text-muted-foreground mt-2">"{item.mentor_feedback}"</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+const profileFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  country: z.string().optional(),
+  timezone: z.string().min(1, "Timezone is required"),
+  user_type: z.enum(["individual", "organization"]),
+  organization_name: z.string().optional(),
+});
+
+type ProfileFormValues = z.infer<typeof profileFormSchema>;
+
+function MenteeProfileSettings({ mentee }: { mentee: Mentee }) {
+  const { t, i18n } = useTranslation();
+  const isRTL = i18n.language === 'ar';
+  const { toast } = useToast();
+
+  const form = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      name: mentee.name || "",
+      country: mentee.country || "",
+      timezone: mentee.timezone || "",
+      user_type: mentee.user_type || "individual",
+      organization_name: mentee.organization_name || "",
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: ProfileFormValues) => {
+      return apiRequest("PATCH", `/api/mentees/${mentee.id}`, {
+        name: data.name,
+        country: data.country || null,
+        timezone: data.timezone,
+        user_type: data.user_type,
+        organization_name: data.user_type === 'organization' ? data.organization_name : null,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/mentees/email'] });
+      toast({
+        title: t('common.success'),
+        description: t('menteePortal.profileSettings.saveSuccess'),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('menteePortal.profileSettings.saveError'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: ProfileFormValues) => {
+    saveMutation.mutate(data);
+  };
+
+  const userType = form.watch("user_type");
+
+  const timezones = [
+    "UTC",
+    "Africa/Cairo",
+    "Asia/Dubai",
+    "Asia/Riyadh",
+    "Asia/Kuwait",
+    "Asia/Bahrain",
+    "Asia/Qatar",
+    "Europe/London",
+    "America/New_York",
+    "America/Los_Angeles",
+    "Asia/Tokyo",
+    "Asia/Singapore",
+  ];
+
+  const countries = [
+    "United Arab Emirates",
+    "Saudi Arabia",
+    "Egypt",
+    "Kuwait",
+    "Bahrain",
+    "Qatar",
+    "Oman",
+    "Jordan",
+    "Lebanon",
+    "United States",
+    "United Kingdom",
+    "Germany",
+    "France",
+    "Japan",
+    "Singapore",
+  ];
+
+  return (
+    <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
+      <div>
+        <h1 className="text-2xl font-bold" data-testid="text-profile-settings-title">
+          {t('menteePortal.profileSettings.title')}
+        </h1>
+        <p className="text-muted-foreground">
+          {t('menteePortal.profileSettings.subtitle')}
+        </p>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="w-5 h-5" />
+                {t('menteePortal.profileSettings.personalInfo')}
+              </CardTitle>
+              <CardDescription>
+                {t('menteePortal.profileSettings.personalInfoDesc')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('menteePortal.profileSettings.name')}</FormLabel>
+                    <FormControl>
+                      <Input {...field} data-testid="input-mentee-name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <div>
+                <Label>{t('menteePortal.profileSettings.email')}</Label>
+                <Input 
+                  value={mentee.email} 
+                  disabled 
+                  className="bg-muted"
+                  data-testid="input-mentee-email-readonly"
+                />
+                <p className="text-sm text-muted-foreground mt-1">
+                  {t('menteePortal.profileSettings.emailHint')}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="country"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('menteePortal.profileSettings.country')}</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ""}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-mentee-country">
+                            <SelectValue placeholder={t('menteePortal.profileSettings.countryPlaceholder')} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {countries.map((country) => (
+                            <SelectItem key={country} value={country}>
+                              {country}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="timezone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('menteePortal.profileSettings.timezone')}</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-mentee-timezone">
+                            <SelectValue placeholder={t('menteePortal.profileSettings.timezonePlaceholder')} />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {timezones.map((tz) => (
+                            <SelectItem key={tz} value={tz}>
+                              {tz}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building2 className="w-5 h-5" />
+                {t('menteePortal.profileSettings.accountInfo')}
+              </CardTitle>
+              <CardDescription>
+                {t('menteePortal.profileSettings.accountInfoDesc')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FormField
+                control={form.control}
+                name="user_type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('menteePortal.profileSettings.userType')}</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-mentee-user-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="individual">{t('menteePortal.profileSettings.individual')}</SelectItem>
+                        <SelectItem value="organization">{t('menteePortal.profileSettings.organization')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {userType === 'organization' && (
+                <FormField
+                  control={form.control}
+                  name="organization_name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('menteePortal.profileSettings.organizationName')}</FormLabel>
+                      <FormControl>
+                        <Input 
+                          {...field} 
+                          placeholder={t('menteePortal.profileSettings.organizationNamePlaceholder')}
+                          data-testid="input-mentee-organization"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              disabled={saveMutation.isPending}
+              data-testid="button-save-mentee-profile"
+            >
+              <Save className="w-4 h-4 mr-2" />
+              {saveMutation.isPending ? t('common.loading') : t('common.save')}
+            </Button>
+          </div>
+        </form>
+      </Form>
     </div>
   );
 }
@@ -359,8 +978,12 @@ export default function MenteeDashboard() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild data-testid="sidebar-mentee-profile">
-                      <Link href={`/profile/mentee/${mentee.id}`}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location === "/mentee-dashboard/profile"}
+                      data-testid="sidebar-mentee-profile"
+                    >
+                      <Link href="/mentee-dashboard/profile">
                         <Settings className="w-4 h-4" />
                         <span>{t('menteePortal.sidebarProfile')}</span>
                       </Link>
@@ -402,6 +1025,9 @@ export default function MenteeDashboard() {
               </Route>
               <Route path="/mentee-dashboard/feedback">
                 <MenteeFeedback menteeId={mentee.id} />
+              </Route>
+              <Route path="/mentee-dashboard/profile">
+                <MenteeProfileSettings mentee={mentee} />
               </Route>
             </Switch>
           </main>

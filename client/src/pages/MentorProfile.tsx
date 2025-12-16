@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import Cal, { getCalApi } from "@calcom/embed-react";
 import { Mentor } from "@shared/schema";
 import { Card } from "@/components/ui/card";
@@ -43,6 +43,70 @@ const confirmationSchema = z.object({
 
 type ConfirmationFormData = z.infer<typeof confirmationSchema>;
 
+interface CalEmbedWrapperProps {
+  calLink: string;
+  onBookingSuccess: (mentorId: string, menteeName: string, menteeEmail: string) => void;
+  mentorId: string;
+  menteeInfo: { name: string; email: string } | null;
+}
+
+const CalEmbedWrapper = memo(function CalEmbedWrapper({
+  calLink,
+  onBookingSuccess,
+  mentorId,
+  menteeInfo,
+}: CalEmbedWrapperProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const calInitialized = useRef(false);
+  const callbackDataRef = useRef({ mentorId, menteeInfo, onBookingSuccess });
+
+  useEffect(() => {
+    callbackDataRef.current = { mentorId, menteeInfo, onBookingSuccess };
+  }, [mentorId, menteeInfo, onBookingSuccess]);
+
+  useEffect(() => {
+    if (calInitialized.current) return;
+    calInitialized.current = true;
+
+    (async function () {
+      const cal = await getCalApi({ namespace: "30min" });
+      cal("ui", {
+        hideEventTypeDetails: false,
+        layout: "month_view",
+      });
+      cal("on", {
+        action: "bookingSuccessful",
+        callback: (e: { detail: { data: unknown } }) => {
+          const { mentorId, menteeInfo, onBookingSuccess } = callbackDataRef.current;
+          if (menteeInfo && mentorId) {
+            console.log("[Cal.com Event]", e.detail.data);
+            onBookingSuccess(mentorId, menteeInfo.name, menteeInfo.email);
+          }
+        },
+      });
+    })();
+  }, []);
+
+  return (
+    <div 
+      ref={containerRef}
+      className="rounded-lg overflow-hidden" 
+      style={{ width: "100%", height: "700px" }}
+      data-testid="cal-widget"
+    >
+      <Cal
+        namespace="30min"
+        calLink={calLink}
+        style={{ width: "100%", height: "100%", overflow: "scroll" }}
+        config={{ layout: "month_view", theme: "light" }}
+        calOrigin="https://app.cal.com"
+      />
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.calLink === nextProps.calLink;
+});
+
 export default function MentorProfile() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
@@ -56,21 +120,10 @@ export default function MentorProfile() {
   });
   const [showIdentityForm, setShowIdentityForm] = useState(!menteeInfo);
   
-  // Cache mentor data in a ref to ensure it's always available during Cal.com events
-  // even if React Query refetches and temporarily sets mentor to undefined
-  const mentorRef = useRef<Mentor | null>(null);
-
   const { data: mentor, isLoading } = useQuery<Mentor>({
     queryKey: ["/api/mentors", mentorId],
     enabled: !!mentorId,
   });
-
-  // Update ref whenever mentor data is available
-  useEffect(() => {
-    if (mentor) {
-      mentorRef.current = mentor;
-    }
-  }, [mentor]);
 
   const form = useForm<ConfirmationFormData>({
     resolver: zodResolver(confirmationSchema),
@@ -102,29 +155,13 @@ export default function MentorProfile() {
     },
   });
 
-  useEffect(() => {
-    (async function () {
-      const cal = await getCalApi({ namespace: "30min" });
-      cal("ui", {
-        hideEventTypeDetails: false,
-        layout: "month_view",
-      });
-      cal("on", {
-        action: "bookingSuccessful",
-        callback: (e: { detail: { data: unknown } }) => {
-          const currentMentor = mentorRef.current;
-          if (menteeInfo && currentMentor) {
-            console.log("[Cal.com Event]", e.detail.data);
-            createBookingMutation.mutate({
-              mentor_id: currentMentor.id,
-              mentee_name: menteeInfo.name,
-              mentee_email: menteeInfo.email,
-            });
-          }
-        },
-      });
-    })();
-  }, [menteeInfo, createBookingMutation]);
+  const handleBookingSuccess = useCallback((mentorId: string, menteeName: string, menteeEmail: string) => {
+    createBookingMutation.mutate({
+      mentor_id: mentorId,
+      mentee_name: menteeName,
+      mentee_email: menteeEmail,
+    });
+  }, [createBookingMutation]);
 
   const onSubmitIdentity = (data: ConfirmationFormData) => {
     localStorage.setItem("menteeName", data.name);
@@ -396,20 +433,13 @@ export default function MentorProfile() {
                     {t('identity.enterDetails')}
                   </Button>
                 </div>
-              ) : isLoading ? (
-                <div className="p-12 flex items-center justify-center">
-                  <Skeleton className="h-[700px] w-full" />
-                </div>
               ) : (
-                <div className="rounded-lg overflow-hidden" style={{ height: "700px" }} data-testid="cal-widget">
-                  <Cal
-                    namespace="30min"
-                    calLink={calLink}
-                    style={{ width: "100%", height: "100%", overflow: "scroll" }}
-                    config={{ layout: "month_view", theme: "light" }}
-                    calOrigin="https://app.cal.com"
-                  />
-                </div>
+                <CalEmbedWrapper
+                  calLink={calLink}
+                  mentorId={mentor.id}
+                  menteeInfo={menteeInfo}
+                  onBookingSuccess={handleBookingSuccess}
+                />
               )}
             </Card>
           </div>

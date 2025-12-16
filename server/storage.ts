@@ -18,6 +18,7 @@ export interface IStorage {
   getMentorByEmail(email: string): Promise<Mentor | undefined>;
   createMentor(mentor: InsertMentor): Promise<Mentor>;
   updateMentorAvailability(id: string, isAvailable: boolean): Promise<Mentor | undefined>;
+  updateMentor(id: string, updates: Partial<InsertMentor>): Promise<Mentor | undefined>;
   getBookings(): Promise<Booking[]>;
   getBooking(id: string): Promise<Booking | undefined>;
   createBooking(booking: InsertBooking): Promise<Booking>;
@@ -411,6 +412,16 @@ export class DatabaseStorage implements IStorage {
     const now = new Date().toISOString();
     const result = await db.update(mentors)
       .set({ is_available: isAvailable, updated_at: now })
+      .where(eq(mentors.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async updateMentor(id: string, updates: Partial<InsertMentor>): Promise<Mentor | undefined> {
+    await this.seedPromise;
+    const now = new Date().toISOString();
+    const result = await db.update(mentors)
+      .set({ ...updates, updated_at: now })
       .where(eq(mentors.id, id))
       .returning();
     return result[0];

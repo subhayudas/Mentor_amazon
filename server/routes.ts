@@ -608,6 +608,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update mentor profile
+  app.patch("/api/mentors/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const mentor = await storage.updateMentor(id, updates);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+
+      res.json(mentor);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update mentor profile" });
+    }
+  });
+
   // Update mentee profile
   app.patch("/api/mentees/:id", async (req, res) => {
     try {

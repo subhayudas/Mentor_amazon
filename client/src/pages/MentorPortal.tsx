@@ -39,6 +39,7 @@ import MySessions from "@/pages/mentor/MySessions";
 import TaskManager from "@/pages/mentor/TaskManager";
 import Availability from "@/pages/mentor/Availability";
 import Feedback from "@/pages/mentor/Feedback";
+import ProfileSettings from "@/pages/mentor/ProfileSettings";
 import type { Mentor } from "@shared/schema";
 
 export default function MentorPortal() {
@@ -242,8 +243,12 @@ export default function MentorPortal() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild data-testid="sidebar-profile">
-                      <Link href={`/profile/mentor/${mentor.id}`}>
+                    <SidebarMenuButton 
+                      asChild 
+                      isActive={location.startsWith('/mentor-portal/profile')}
+                      data-testid="sidebar-profile"
+                    >
+                      <Link href="/mentor-portal/profile">
                         <Settings className="w-4 h-4" />
                         <span>{t('mentorPortal.sidebarProfile')}</span>
                       </Link>
@@ -291,6 +296,9 @@ export default function MentorPortal() {
               </Route>
               <Route path="/mentor-portal/feedback">
                 <Feedback mentorId={mentor.id} />
+              </Route>
+              <Route path="/mentor-portal/profile">
+                <ProfileSettings mentorId={mentor.id} mentorEmail={storedEmail || ""} />
               </Route>
             </Switch>
           </main>
