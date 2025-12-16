@@ -158,6 +158,103 @@ export const usersRelations = relations(users, ({ one }) => ({
   }),
 }));
 
+export const mentorAvailability = pgTable("mentor_availability", {
+  id: varchar("id").primaryKey(),
+  mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
+  day_of_week: integer("day_of_week").notNull(),
+  start_time: text("start_time").notNull(),
+  end_time: text("end_time").notNull(),
+  is_active: boolean("is_active").default(true).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+});
+
+export const mentorTasks = pgTable("mentor_tasks", {
+  id: varchar("id").primaryKey(),
+  mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
+  mentee_id: varchar("mentee_id").references(() => mentees.id),
+  booking_id: varchar("booking_id").references(() => bookings.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  due_date: timestamp("due_date", { mode: "string" }),
+  status: text("status", { enum: ["pending", "in_progress", "completed", "canceled"] }).notNull().default("pending"),
+  priority: text("priority", { enum: ["low", "medium", "high"] }).notNull().default("medium"),
+  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  updated_at: timestamp("updated_at", { mode: "string" }).notNull(),
+  completed_at: timestamp("completed_at", { mode: "string" }),
+});
+
+export const mentorEarnings = pgTable("mentor_earnings", {
+  id: varchar("id").primaryKey(),
+  mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
+  booking_id: varchar("booking_id").references(() => bookings.id),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  currency: text("currency").notNull().default("USD"),
+  earned_at: timestamp("earned_at", { mode: "string" }).notNull(),
+  payout_month: text("payout_month").notNull(),
+  payout_status: text("payout_status", { enum: ["pending", "paid"] }).notNull().default("pending"),
+});
+
+export const mentorActivityLog = pgTable("mentor_activity_log", {
+  id: varchar("id").primaryKey(),
+  mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
+  mentee_id: varchar("mentee_id").references(() => mentees.id),
+  booking_id: varchar("booking_id").references(() => bookings.id),
+  activity_type: text("activity_type", { 
+    enum: ["booking_received", "booking_confirmed", "booking_completed", "booking_canceled", "task_created", "task_completed", "rating_received"] 
+  }).notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+});
+
+export const mentorAvailabilityRelations = relations(mentorAvailability, ({ one }) => ({
+  mentor: one(mentors, {
+    fields: [mentorAvailability.mentor_id],
+    references: [mentors.id],
+  }),
+}));
+
+export const mentorTasksRelations = relations(mentorTasks, ({ one }) => ({
+  mentor: one(mentors, {
+    fields: [mentorTasks.mentor_id],
+    references: [mentors.id],
+  }),
+  mentee: one(mentees, {
+    fields: [mentorTasks.mentee_id],
+    references: [mentees.id],
+  }),
+  booking: one(bookings, {
+    fields: [mentorTasks.booking_id],
+    references: [bookings.id],
+  }),
+}));
+
+export const mentorEarningsRelations = relations(mentorEarnings, ({ one }) => ({
+  mentor: one(mentors, {
+    fields: [mentorEarnings.mentor_id],
+    references: [mentors.id],
+  }),
+  booking: one(bookings, {
+    fields: [mentorEarnings.booking_id],
+    references: [bookings.id],
+  }),
+}));
+
+export const mentorActivityLogRelations = relations(mentorActivityLog, ({ one }) => ({
+  mentor: one(mentors, {
+    fields: [mentorActivityLog.mentor_id],
+    references: [mentors.id],
+  }),
+  mentee: one(mentees, {
+    fields: [mentorActivityLog.mentee_id],
+    references: [mentees.id],
+  }),
+  booking: one(bookings, {
+    fields: [mentorActivityLog.booking_id],
+    references: [bookings.id],
+  }),
+}));
+
 export const insertMentorSchema = createInsertSchema(mentors).omit({
   id: true,
   created_at: true,
@@ -195,6 +292,27 @@ export const insertUserSchema = createInsertSchema(users).omit({
   reset_token_expires: true,
 });
 
+export const insertMentorAvailabilitySchema = createInsertSchema(mentorAvailability).omit({
+  id: true,
+  created_at: true,
+});
+
+export const insertMentorTaskSchema = createInsertSchema(mentorTasks).omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+  completed_at: true,
+});
+
+export const insertMentorEarningsSchema = createInsertSchema(mentorEarnings).omit({
+  id: true,
+});
+
+export const insertMentorActivityLogSchema = createInsertSchema(mentorActivityLog).omit({
+  id: true,
+  created_at: true,
+});
+
 export type InsertMentor = z.infer<typeof insertMentorSchema>;
 export type Mentor = typeof mentors.$inferSelect;
 export type InsertMentee = z.infer<typeof insertMenteeSchema>;
@@ -207,3 +325,11 @@ export type InsertNotification = z.infer<typeof insertNotificationSchema>;
 export type Notification = typeof notifications.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+export type InsertMentorAvailability = z.infer<typeof insertMentorAvailabilitySchema>;
+export type MentorAvailability = typeof mentorAvailability.$inferSelect;
+export type InsertMentorTask = z.infer<typeof insertMentorTaskSchema>;
+export type MentorTask = typeof mentorTasks.$inferSelect;
+export type InsertMentorEarnings = z.infer<typeof insertMentorEarningsSchema>;
+export type MentorEarnings = typeof mentorEarnings.$inferSelect;
+export type InsertMentorActivityLog = z.infer<typeof insertMentorActivityLogSchema>;
+export type MentorActivityLog = typeof mentorActivityLog.$inferSelect;

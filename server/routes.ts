@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema, insertNotificationSchema, insertUserSchema } from "@shared/schema";
+import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema, insertNotificationSchema, insertUserSchema, insertMentorTaskSchema, insertMentorAvailabilitySchema, insertMentorActivityLogSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
@@ -743,6 +743,220 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "All notifications marked as read" });
     } catch (error) {
       res.status(500).json({ message: "Failed to mark all notifications as read" });
+    }
+  });
+
+  // Mentor Dashboard endpoints
+  app.get("/api/mentor/:mentorId/dashboard", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const stats = await storage.getMentorDashboardStats(mentorId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Dashboard stats error:", error);
+      res.status(500).json({ message: "Failed to fetch dashboard stats" });
+    }
+  });
+
+  app.get("/api/mentor/:mentorId/bookings", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      const status = req.query.status as string | undefined;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const mentorBookings = await storage.getMentorBookingsWithStatus(mentorId, status);
+      res.json(mentorBookings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentor bookings" });
+    }
+  });
+
+  app.patch("/api/mentor/:mentorId/bookings/:bookingId", async (req, res) => {
+    try {
+      const { mentorId, bookingId } = req.params;
+      const { status } = req.body;
+      
+      if (!status) {
+        return res.status(400).json({ message: "Status is required" });
+      }
+      
+      const validStatuses = ["clicked", "scheduled", "completed", "canceled"];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status value" });
+      }
+      
+      const booking = await storage.getBooking(bookingId);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+      
+      if (booking.mentor_id !== mentorId) {
+        return res.status(403).json({ message: "Booking does not belong to this mentor" });
+      }
+      
+      const updatedBooking = await storage.updateBookingStatus(bookingId, status);
+      res.json(updatedBooking);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update booking status" });
+    }
+  });
+
+  app.get("/api/mentor/:mentorId/tasks", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const tasks = await storage.getMentorTasks(mentorId);
+      res.json(tasks);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentor tasks" });
+    }
+  });
+
+  app.post("/api/mentor/:mentorId/tasks", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const taskData = {
+        ...req.body,
+        mentor_id: mentorId,
+      };
+      
+      const result = insertMentorTaskSchema.safeParse(taskData);
+      if (!result.success) {
+        return res.status(400).json({
+          message: "Invalid task data",
+          errors: result.error.errors,
+        });
+      }
+      
+      const task = await storage.createMentorTask(result.data);
+      res.status(201).json(task);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create task" });
+    }
+  });
+
+  app.patch("/api/mentor/:mentorId/tasks/:taskId", async (req, res) => {
+    try {
+      const { mentorId, taskId } = req.params;
+      const updates = req.body;
+      
+      const task = await storage.updateMentorTask(taskId, updates);
+      if (!task) {
+        return res.status(404).json({ message: "Task not found" });
+      }
+      
+      if (task.mentor_id !== mentorId) {
+        return res.status(403).json({ message: "Task does not belong to this mentor" });
+      }
+      
+      res.json(task);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update task" });
+    }
+  });
+
+  app.get("/api/mentor/:mentorId/availability", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const availability = await storage.getMentorAvailabilitySlots(mentorId);
+      res.json(availability);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentor availability" });
+    }
+  });
+
+  app.put("/api/mentor/:mentorId/availability", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      const { slots } = req.body;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      if (!Array.isArray(slots)) {
+        return res.status(400).json({ message: "Slots must be an array" });
+      }
+      
+      // Validate each slot
+      for (const slot of slots) {
+        const result = insertMentorAvailabilitySchema.safeParse({
+          ...slot,
+          mentor_id: mentorId,
+        });
+        if (!result.success) {
+          return res.status(400).json({
+            message: "Invalid availability slot data",
+            errors: result.error.errors,
+          });
+        }
+      }
+      
+      const availability = await storage.setMentorAvailability(mentorId, slots);
+      res.json(availability);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to set mentor availability" });
+    }
+  });
+
+  app.get("/api/mentor/:mentorId/earnings", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const earnings = await storage.getMentorEarnings(mentorId);
+      res.json(earnings);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentor earnings" });
+    }
+  });
+
+  app.get("/api/mentor/:mentorId/activity", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const activity = await storage.getMentorActivityLog(mentorId, limit);
+      res.json(activity);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch mentor activity log" });
     }
   });
 

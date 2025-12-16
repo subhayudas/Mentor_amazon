@@ -1,7 +1,16 @@
-import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, type BookingNote, type InsertBookingNote, type Notification, type InsertNotification, type User, type InsertUser, mentors, bookings, mentees, bookingNotes, notifications, users } from "@shared/schema";
+import { type Mentor, type InsertMentor, type Booking, type InsertBooking, type Mentee, type InsertMentee, type BookingNote, type InsertBookingNote, type Notification, type InsertNotification, type User, type InsertUser, type MentorAvailability, type InsertMentorAvailability, type MentorTask, type InsertMentorTask, type MentorEarnings, type InsertMentorEarnings, type MentorActivityLog, type InsertMentorActivityLog, mentors, bookings, mentees, bookingNotes, notifications, users, mentorAvailability, mentorTasks, mentorEarnings, mentorActivityLog } from "@shared/schema";
 import { db } from "./db";
-import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
+import { eq, ilike, or, and, sql, desc, sum } from "drizzle-orm";
 import { randomUUID } from "crypto";
+
+export interface MentorDashboardStats {
+  totalSessions: number;
+  completedSessions: number;
+  averageRating: number;
+  totalEarnings: number;
+  monthlyEarnings: number;
+  pendingBookings: number;
+}
 
 export interface IStorage {
   getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<Mentor[]>;
@@ -35,6 +44,19 @@ export interface IStorage {
   updateUserResetToken(id: string, token: string | null, expires: string | null): Promise<void>;
   updateUserPassword(id: string, hashedPassword: string): Promise<void>;
   verifyUser(id: string): Promise<void>;
+  
+  // Mentor Dashboard methods
+  getMentorDashboardStats(mentorId: string): Promise<MentorDashboardStats>;
+  getMentorBookingsWithStatus(mentorId: string, status?: string): Promise<Booking[]>;
+  updateBookingStatus(bookingId: string, status: string): Promise<Booking | undefined>;
+  getMentorTasks(mentorId: string): Promise<MentorTask[]>;
+  createMentorTask(task: InsertMentorTask): Promise<MentorTask>;
+  updateMentorTask(taskId: string, updates: Partial<MentorTask>): Promise<MentorTask | undefined>;
+  getMentorAvailabilitySlots(mentorId: string): Promise<MentorAvailability[]>;
+  setMentorAvailability(mentorId: string, slots: InsertMentorAvailability[]): Promise<MentorAvailability[]>;
+  getMentorEarnings(mentorId: string): Promise<MentorEarnings[]>;
+  getMentorActivityLog(mentorId: string, limit?: number): Promise<MentorActivityLog[]>;
+  createActivityLog(log: InsertMentorActivityLog): Promise<MentorActivityLog>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -527,6 +549,175 @@ export class DatabaseStorage implements IStorage {
     await db.update(users)
       .set({ is_verified: true })
       .where(eq(users.id, id));
+  }
+
+  // Mentor Dashboard methods
+  async getMentorDashboardStats(mentorId: string): Promise<MentorDashboardStats> {
+    await this.seedPromise;
+    
+    // Get all bookings for this mentor
+    const allBookings = await db.select().from(bookings).where(eq(bookings.mentor_id, mentorId));
+    
+    const totalSessions = allBookings.length;
+    const completedSessions = allBookings.filter(b => b.status === "completed").length;
+    const pendingBookings = allBookings.filter(b => b.status === "scheduled" || b.status === "clicked").length;
+    
+    // Calculate average rating from completed sessions with ratings
+    const ratingsData = allBookings.filter(b => b.mentee_rating !== null);
+    const averageRating = ratingsData.length > 0 
+      ? ratingsData.reduce((sum, b) => sum + (b.mentee_rating || 0), 0) / ratingsData.length 
+      : 0;
+    
+    // Get total earnings
+    const earningsResult = await db.select().from(mentorEarnings).where(eq(mentorEarnings.mentor_id, mentorId));
+    const totalEarnings = earningsResult.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    
+    // Get current month earnings
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+    const monthlyEarningsData = earningsResult.filter(e => e.payout_month === currentMonth);
+    const monthlyEarnings = monthlyEarningsData.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    
+    return {
+      totalSessions,
+      completedSessions,
+      averageRating: Math.round(averageRating * 100) / 100,
+      totalEarnings,
+      monthlyEarnings,
+      pendingBookings,
+    };
+  }
+
+  async getMentorBookingsWithStatus(mentorId: string, status?: string): Promise<Booking[]> {
+    await this.seedPromise;
+    
+    if (status) {
+      return await db.select().from(bookings)
+        .where(and(
+          eq(bookings.mentor_id, mentorId),
+          eq(bookings.status, status as "clicked" | "scheduled" | "completed" | "canceled")
+        ))
+        .orderBy(desc(bookings.created_at));
+    }
+    
+    return await db.select().from(bookings)
+      .where(eq(bookings.mentor_id, mentorId))
+      .orderBy(desc(bookings.created_at));
+  }
+
+  async updateBookingStatus(bookingId: string, status: string): Promise<Booking | undefined> {
+    await this.seedPromise;
+    const now = new Date().toISOString();
+    
+    const updateData: Record<string, string> = { status };
+    
+    if (status === "completed") {
+      updateData.completed_at = now;
+    } else if (status === "canceled") {
+      updateData.canceled_at = now;
+    }
+    
+    const result = await db.update(bookings)
+      .set(updateData)
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    return result[0];
+  }
+
+  async getMentorTasks(mentorId: string): Promise<MentorTask[]> {
+    await this.seedPromise;
+    return await db.select().from(mentorTasks)
+      .where(eq(mentorTasks.mentor_id, mentorId))
+      .orderBy(desc(mentorTasks.created_at));
+  }
+
+  async createMentorTask(task: InsertMentorTask): Promise<MentorTask> {
+    await this.seedPromise;
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const result = await db.insert(mentorTasks).values({
+      ...task,
+      id,
+      created_at: now,
+      updated_at: now,
+    }).returning();
+    return result[0];
+  }
+
+  async updateMentorTask(taskId: string, updates: Partial<MentorTask>): Promise<MentorTask | undefined> {
+    await this.seedPromise;
+    const now = new Date().toISOString();
+    
+    const updateData: Partial<MentorTask> = {
+      ...updates,
+      updated_at: now,
+    };
+    
+    if (updates.status === "completed" && !updates.completed_at) {
+      updateData.completed_at = now;
+    }
+    
+    const result = await db.update(mentorTasks)
+      .set(updateData)
+      .where(eq(mentorTasks.id, taskId))
+      .returning();
+    return result[0];
+  }
+
+  async getMentorAvailabilitySlots(mentorId: string): Promise<MentorAvailability[]> {
+    await this.seedPromise;
+    return await db.select().from(mentorAvailability)
+      .where(eq(mentorAvailability.mentor_id, mentorId))
+      .orderBy(mentorAvailability.day_of_week);
+  }
+
+  async setMentorAvailability(mentorId: string, slots: InsertMentorAvailability[]): Promise<MentorAvailability[]> {
+    await this.seedPromise;
+    
+    // Delete existing availability for this mentor
+    await db.delete(mentorAvailability).where(eq(mentorAvailability.mentor_id, mentorId));
+    
+    // Insert new slots
+    if (slots.length === 0) {
+      return [];
+    }
+    
+    const now = new Date().toISOString();
+    const slotsWithIds = slots.map(slot => ({
+      ...slot,
+      id: randomUUID(),
+      mentor_id: mentorId,
+      created_at: now,
+    }));
+    
+    const result = await db.insert(mentorAvailability).values(slotsWithIds).returning();
+    return result;
+  }
+
+  async getMentorEarnings(mentorId: string): Promise<MentorEarnings[]> {
+    await this.seedPromise;
+    return await db.select().from(mentorEarnings)
+      .where(eq(mentorEarnings.mentor_id, mentorId))
+      .orderBy(desc(mentorEarnings.earned_at));
+  }
+
+  async getMentorActivityLog(mentorId: string, limit: number = 50): Promise<MentorActivityLog[]> {
+    await this.seedPromise;
+    return await db.select().from(mentorActivityLog)
+      .where(eq(mentorActivityLog.mentor_id, mentorId))
+      .orderBy(desc(mentorActivityLog.created_at))
+      .limit(limit);
+  }
+
+  async createActivityLog(log: InsertMentorActivityLog): Promise<MentorActivityLog> {
+    await this.seedPromise;
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    const result = await db.insert(mentorActivityLog).values({
+      ...log,
+      id,
+      created_at: now,
+    }).returning();
+    return result[0];
   }
 }
 
