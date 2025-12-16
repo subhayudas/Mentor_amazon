@@ -281,7 +281,7 @@ export default function MentorPortal() {
                 <BookingRequests mentorId={mentor.id} />
               </Route>
               <Route path="/mentor-portal/sessions">
-                <MySessions mentorId={mentor.id} />
+                <MySessions mentorId={mentor.id} mentorEmail={storedEmail || undefined} />
               </Route>
               <Route path="/mentor-portal/tasks">
                 <TaskManager mentorId={mentor.id} />
