@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Calendar, Clock, User, CheckCircle, XCircle, FileText, Plus, Trash2 } from "lucide-react";
+import { Calendar, Clock, User, CheckCircle, XCircle, FileText, Plus, Trash2, Star, MessageSquare } from "lucide-react";
 import { format, parseISO, isFuture, isPast } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -35,6 +35,10 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
   const [noteContent, setNoteContent] = useState("");
   const [noteType, setNoteType] = useState<"note" | "task">("note");
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
+  const [feedbackBooking, setFeedbackBooking] = useState<Booking | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState<number>(0);
+  const [feedbackText, setFeedbackText] = useState("");
 
   const { data: bookings, isLoading } = useQuery<Booking[]>({
     queryKey: ['/api/mentor', mentorId, 'bookings'],
@@ -91,7 +95,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
   });
 
   const updateNoteMutation = useMutation({
-    mutationFn: async ({ noteId, is_completed }: { noteId: number; is_completed: boolean }) => {
+    mutationFn: async ({ noteId, is_completed }: { noteId: string; is_completed: boolean }) => {
       return apiRequest("PATCH", `/api/bookings/${selectedBooking?.id}/notes/${noteId}`, { is_completed });
     },
     onSuccess: (_, variables) => {
@@ -111,7 +115,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
   });
 
   const deleteNoteMutation = useMutation({
-    mutationFn: async (noteId: number) => {
+    mutationFn: async (noteId: string) => {
       return apiRequest("DELETE", `/api/bookings/${selectedBooking?.id}/notes/${noteId}`);
     },
     onSuccess: () => {
@@ -125,6 +129,30 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
       toast({
         title: t('common.error'),
         description: t('mentorPortal.noteDeleteError'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const submitFeedbackMutation = useMutation({
+    mutationFn: async ({ bookingId, mentor_rating, mentor_feedback }: { bookingId: string; mentor_rating: number; mentor_feedback: string }) => {
+      return apiRequest("POST", `/api/bookings/${bookingId}/mentor-feedback`, { mentor_rating, mentor_feedback });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
+      setFeedbackDialogOpen(false);
+      setFeedbackBooking(null);
+      setFeedbackRating(0);
+      setFeedbackText("");
+      toast({
+        title: t('common.success'),
+        description: t('mentorPortal.feedbackSubmitted'),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('mentorPortal.feedbackSubmitError'),
         variant: "destructive",
       });
     },
@@ -168,8 +196,60 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
     updateNoteMutation.mutate({ noteId: note.id, is_completed: !note.is_completed });
   };
 
-  const handleDeleteNote = (noteId: number) => {
+  const handleDeleteNote = (noteId: string) => {
     deleteNoteMutation.mutate(noteId);
+  };
+
+  const handleOpenFeedback = (booking: Booking) => {
+    setFeedbackBooking(booking);
+    setFeedbackRating(booking.mentor_rating || 0);
+    setFeedbackText(booking.mentor_feedback || "");
+    setFeedbackDialogOpen(true);
+  };
+
+  const handleSubmitFeedback = () => {
+    if (!feedbackBooking || feedbackRating === 0) {
+      toast({
+        title: t('common.error'),
+        description: t('mentorPortal.selectRating'),
+        variant: "destructive",
+      });
+      return;
+    }
+    submitFeedbackMutation.mutate({
+      bookingId: feedbackBooking.id,
+      mentor_rating: feedbackRating,
+      mentor_feedback: feedbackText.trim(),
+    });
+  };
+
+  const renderStars = (rating: number, interactive: boolean = false) => {
+    return (
+      <div className="flex items-center gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            disabled={!interactive}
+            className={cn(
+              "focus:outline-none transition-colors",
+              interactive && "cursor-pointer hover:scale-110"
+            )}
+            onClick={() => interactive && setFeedbackRating(star)}
+            data-testid={interactive ? `button-star-${star}` : `star-display-${star}`}
+          >
+            <Star
+              className={cn(
+                "w-5 h-5",
+                star <= rating
+                  ? "fill-yellow-400 text-yellow-400"
+                  : "text-muted-foreground"
+              )}
+            />
+          </button>
+        ))}
+      </div>
+    );
   };
 
   const getStatusBadge = (status: string) => {
@@ -253,6 +333,18 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
                 {t('mentorPortal.cancelSession')}
               </Button>
             </>
+          )}
+
+          {(booking.status === 'completed' || (booking.scheduled_at && isPast(parseISO(booking.scheduled_at)))) && (
+            <Button
+              size="sm"
+              variant={booking.mentor_rating ? "secondary" : "default"}
+              onClick={() => handleOpenFeedback(booking)}
+              data-testid={`button-feedback-${booking.id}`}
+            >
+              <MessageSquare className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
+              {booking.mentor_rating ? t('mentorPortal.viewFeedback') : t('mentorPortal.giveFeedback')}
+            </Button>
           )}
         </div>
       </CardContent>
@@ -489,6 +581,113 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-notes">
                   {t('mentorPortal.noNotes')}
+                </p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle data-testid="text-feedback-dialog-title">
+              {t('mentorPortal.feedbackDialogTitle')}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {t('mentorPortal.feedbackDialogDesc')}
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-6">
+            <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
+              <div>
+                <Label className="text-base font-semibold" data-testid="label-your-feedback">
+                  {t('mentorPortal.yourFeedback')}
+                </Label>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">{t('mentorPortal.ratingLabel')}</Label>
+                {feedbackBooking?.mentor_rating ? (
+                  <div className="flex items-center gap-2">
+                    {renderStars(feedbackBooking.mentor_rating, false)}
+                    <span className="text-sm text-muted-foreground">
+                      ({feedbackBooking.mentor_rating} {t('mentorPortal.stars')})
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    {renderStars(feedbackRating, true)}
+                    {feedbackRating > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        ({feedbackRating} {t('mentorPortal.stars')})
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {!feedbackBooking?.mentor_rating ? (
+                <>
+                  <Textarea
+                    placeholder={t('mentorPortal.feedbackPlaceholder')}
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    className="min-h-[100px]"
+                    data-testid="input-feedback-text"
+                  />
+
+                  <Button
+                    onClick={handleSubmitFeedback}
+                    disabled={feedbackRating === 0 || submitFeedbackMutation.isPending}
+                    className="w-full"
+                    data-testid="button-submit-feedback"
+                  >
+                    {submitFeedbackMutation.isPending ? t('common.loading') : t('mentorPortal.submitFeedback')}
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="text-sm">{t('mentorPortal.feedback')}</Label>
+                  <p className="text-sm p-3 bg-background rounded border" data-testid="text-mentor-feedback">
+                    {feedbackBooking.mentor_feedback || '-'}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 p-4 rounded-lg border">
+              <div>
+                <Label className="text-base font-semibold" data-testid="label-mentee-feedback">
+                  {t('mentorPortal.menteeFeedback')}
+                </Label>
+              </div>
+
+              {feedbackBooking?.mentee_rating ? (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-sm">{t('mentorPortal.ratingLabel')}</Label>
+                    <div className="flex items-center gap-2">
+                      {renderStars(feedbackBooking.mentee_rating, false)}
+                      <span className="text-sm text-muted-foreground">
+                        ({feedbackBooking.mentee_rating} {t('mentorPortal.stars')})
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {feedbackBooking.mentee_feedback && (
+                    <div className="space-y-2">
+                      <Label className="text-sm">{t('mentorPortal.feedback')}</Label>
+                      <p className="text-sm p-3 bg-muted/50 rounded" data-testid="text-mentee-feedback">
+                        {feedbackBooking.mentee_feedback}
+                      </p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground py-2" data-testid="text-no-mentee-feedback">
+                  {t('mentorPortal.noMenteeFeedback')}
                 </p>
               )}
             </div>

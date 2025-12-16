@@ -26,7 +26,9 @@ import {
   StickyNote, 
   CheckSquare, 
   Plus,
-  CalendarPlus
+  CalendarPlus,
+  Star,
+  MessageSquare
 } from "lucide-react";
 import { format, parseISO, isFuture } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -46,6 +48,10 @@ export default function MyBookings() {
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newNote, setNewNote] = useState("");
   const [noteType, setNoteType] = useState<"note" | "task">("note");
+  const [feedbackBooking, setFeedbackBooking] = useState<Booking | null>(null);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery<Booking[]>({
     queryKey: ["/api/mentees", email, "bookings"],
@@ -96,6 +102,35 @@ export default function MyBookings() {
     },
   });
 
+  // Submit feedback mutation
+  const submitFeedbackMutation = useMutation({
+    mutationFn: async (data: { bookingId: string; rating: number; feedback: string }) => {
+      return apiRequest("POST", `/api/bookings/${data.bookingId}/mentee-feedback`, {
+        rating: data.rating,
+        feedback: data.feedback,
+        menteeEmail: email,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mentees", email, "bookings"] });
+      setFeedbackDialogOpen(false);
+      setFeedbackBooking(null);
+      setFeedbackRating(0);
+      setFeedbackText("");
+      toast({
+        title: t('myBookings.feedbackSubmitted'),
+        description: t('myBookings.feedbackSubmittedDesc'),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('myBookings.feedbackSubmitError'),
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setEmail(inputEmail);
@@ -112,6 +147,48 @@ export default function MyBookings() {
       note_type: noteType,
       author_email: email,
     });
+  };
+
+  const handleSubmitFeedback = () => {
+    if (!feedbackBooking || feedbackRating === 0) return;
+    
+    submitFeedbackMutation.mutate({
+      bookingId: feedbackBooking.id,
+      rating: feedbackRating,
+      feedback: feedbackText.trim(),
+    });
+  };
+
+  const openFeedbackDialog = (booking: Booking) => {
+    setFeedbackBooking(booking);
+    setFeedbackRating(booking.mentee_rating || 0);
+    setFeedbackText(booking.mentee_feedback || "");
+    setFeedbackDialogOpen(true);
+  };
+
+  const StarRating = ({ rating, onRate, readonly = false }: { rating: number; onRate?: (r: number) => void; readonly?: boolean }) => {
+    return (
+      <div className="flex gap-1">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <button
+            key={star}
+            type="button"
+            onClick={() => !readonly && onRate?.(star)}
+            disabled={readonly}
+            className={`${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}
+            data-testid={`star-${star}`}
+          >
+            <Star
+              className={`w-6 h-6 ${
+                star <= rating
+                  ? 'fill-yellow-400 text-yellow-400'
+                  : 'text-muted-foreground'
+              }`}
+            />
+          </button>
+        ))}
+      </div>
+    );
   };
 
   if (!email) {
@@ -323,6 +400,21 @@ export default function MyBookings() {
                 </DialogContent>
               </Dialog>
 
+              {/* Feedback Button - Show for past bookings */}
+              {(!booking.scheduled_at || !isFuture(parseISO(booking.scheduled_at))) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openFeedbackDialog(booking)}
+                  data-testid={`button-feedback-${booking.id}`}
+                >
+                  <MessageSquare className="w-4 h-4 mr-2" />
+                  {booking.mentee_rating || booking.mentor_rating
+                    ? t('myBookings.viewFeedback')
+                    : t('myBookings.giveFeedback')}
+                </Button>
+              )}
+
               {/* Schedule Additional Session Button */}
               <Button
                 variant="outline"
@@ -392,6 +484,95 @@ export default function MyBookings() {
           </div>
         </div>
       </div>
+
+      {/* Feedback Dialog */}
+      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {feedbackBooking?.mentee_rating
+                ? t('myBookings.sessionFeedback')
+                : t('myBookings.giveFeedbackTitle')}
+            </DialogTitle>
+            <DialogDescription>
+              {feedbackBooking?.mentee_rating
+                ? t('myBookings.feedbackViewDesc')
+                : t('myBookings.feedbackGiveDesc')}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 mt-4">
+            {/* Your Feedback Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-base">{t('myBookings.yourFeedback')}</h4>
+              
+              {feedbackBooking?.mentee_rating ? (
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{t('myBookings.yourRating')}:</span>
+                    <StarRating rating={feedbackBooking.mentee_rating} readonly />
+                  </div>
+                  {feedbackBooking.mentee_feedback && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">{t('myBookings.yourComment')}:</span>
+                      <p className="mt-1 text-sm">{feedbackBooking.mentee_feedback}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4 p-4 border rounded-lg">
+                  <div className="space-y-2">
+                    <Label>{t('myBookings.rateSession')}</Label>
+                    <StarRating rating={feedbackRating} onRate={setFeedbackRating} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t('myBookings.writeFeedback')}</Label>
+                    <Textarea
+                      placeholder={t('myBookings.feedbackPlaceholder')}
+                      value={feedbackText}
+                      onChange={(e) => setFeedbackText(e.target.value)}
+                      className="min-h-24"
+                      data-testid="input-feedback-text"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSubmitFeedback}
+                    disabled={feedbackRating === 0 || submitFeedbackMutation.isPending}
+                    className="w-full"
+                    data-testid="button-submit-feedback"
+                  >
+                    {submitFeedbackMutation.isPending ? t('common.loading') : t('myBookings.submitFeedback')}
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Mentor's Feedback Section */}
+            <div className="space-y-4">
+              <h4 className="font-medium text-base">{t('myBookings.mentorFeedback')}</h4>
+              
+              {feedbackBooking?.mentor_rating ? (
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{t('myBookings.mentorRating')}:</span>
+                    <StarRating rating={feedbackBooking.mentor_rating} readonly />
+                  </div>
+                  {feedbackBooking.mentor_feedback && (
+                    <div>
+                      <span className="text-sm text-muted-foreground">{t('myBookings.mentorComment')}:</span>
+                      <p className="mt-1 text-sm">{feedbackBooking.mentor_feedback}</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
+                  {t('myBookings.noMentorFeedback')}
+                </p>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
