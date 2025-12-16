@@ -54,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.removeItem("menteeId");
       localStorage.removeItem("mentorEmail");
       localStorage.removeItem("menteeEmail");
-      queryClient.setQueryData(["/api/auth/me"], null);
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      localStorage.removeItem("menteeName");
+      queryClient.clear();
       setLocation("/login");
     },
   });
