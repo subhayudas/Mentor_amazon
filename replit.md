@@ -39,6 +39,14 @@ Preferred communication style: Simple, everyday language.
 - Mentor Onboarding: Multi-step form for new mentors with mentorship preference (ongoing/rotating/either), optional "Why did you join?" testimonial field
 - Analytics: Dashboard with session metrics, time-series charts, and mentor performance analytics
 - My Bookings: Mentee booking history showing upcoming and past sessions with mentor details
+- **Mentor Portal** (/mentor-portal): Comprehensive mentor management portal with:
+  - Email-based access gate (mentors access by entering their registered email)
+  - Dashboard Home: Quick stats cards (sessions, ratings, earnings, pending requests), activity feed
+  - Booking Requests: View and manage incoming session requests
+  - My Sessions: Track upcoming and completed sessions with mentees
+  - Task Manager: Create and track follow-up tasks with priorities and due dates
+  - Availability Calendar: Manage weekly time slots (day-of-week based)
+  - Earnings: Monthly breakdown of session fees and payment status
 - 404: Custom not-found page
 
 ### Backend Architecture
