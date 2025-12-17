@@ -1,7 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
-import { useState, useRef, useEffect, useCallback, memo } from "react";
-import Cal, { getCalApi } from "@calcom/embed-react";
+import { useState } from "react";
 import { Mentor } from "@shared/schema";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Clock, Globe, Star, Briefcase, MapPin } from "lucide-react";
+import { ArrowLeft, Clock, Globe, Star, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -23,7 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -36,76 +35,13 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-const confirmationSchema = z.object({
+const bookingRequestFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Valid email is required"),
+  goal: z.string().min(10, "Please describe your goals in at least 10 characters"),
 });
 
-type ConfirmationFormData = z.infer<typeof confirmationSchema>;
-
-interface CalEmbedWrapperProps {
-  calLink: string;
-  onBookingSuccess: (mentorId: string, menteeName: string, menteeEmail: string) => void;
-  mentorId: string;
-  menteeInfo: { name: string; email: string } | null;
-}
-
-const CalEmbedWrapper = memo(function CalEmbedWrapper({
-  calLink,
-  onBookingSuccess,
-  mentorId,
-  menteeInfo,
-}: CalEmbedWrapperProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const calInitialized = useRef(false);
-  const callbackDataRef = useRef({ mentorId, menteeInfo, onBookingSuccess });
-
-  useEffect(() => {
-    callbackDataRef.current = { mentorId, menteeInfo, onBookingSuccess };
-  }, [mentorId, menteeInfo, onBookingSuccess]);
-
-  useEffect(() => {
-    if (calInitialized.current) return;
-    calInitialized.current = true;
-
-    (async function () {
-      const cal = await getCalApi({ namespace: "30min" });
-      cal("ui", {
-        hideEventTypeDetails: false,
-        layout: "month_view",
-      });
-      cal("on", {
-        action: "bookingSuccessful",
-        callback: (e: { detail: { data: unknown } }) => {
-          const { mentorId, menteeInfo, onBookingSuccess } = callbackDataRef.current;
-          if (menteeInfo && mentorId) {
-            console.log("[Cal.com Event]", e.detail.data);
-            onBookingSuccess(mentorId, menteeInfo.name, menteeInfo.email);
-          }
-        },
-      });
-    })();
-  }, []);
-
-  return (
-    <div 
-      ref={containerRef}
-      className="rounded-lg overflow-hidden" 
-      style={{ width: "100%", height: "700px" }}
-      data-testid="cal-widget"
-    >
-      <Cal
-        namespace="30min"
-        calLink={calLink}
-        style={{ width: "100%", height: "100%", overflow: "scroll" }}
-        config={{ layout: "month_view", theme: "light" }}
-        calOrigin="https://app.cal.com"
-      />
-    </div>
-  );
-}, (prevProps, nextProps) => {
-  return prevProps.calLink === nextProps.calLink;
-});
+type BookingRequestFormData = z.infer<typeof bookingRequestFormSchema>;
 
 export default function MentorProfile() {
   const { t, i18n } = useTranslation();
@@ -113,67 +49,75 @@ export default function MentorProfile() {
   const [, params] = useRoute("/mentor/:id");
   const mentorId = params?.id;
   const { toast } = useToast();
-  const [menteeInfo, setMenteeInfo] = useState<{ name: string; email: string } | null>(() => {
-    const savedEmail = localStorage.getItem("menteeEmail");
-    const savedName = localStorage.getItem("menteeName");
-    return savedEmail && savedName ? { name: savedName, email: savedEmail } : null;
-  });
-  const [showIdentityForm, setShowIdentityForm] = useState(!menteeInfo);
+  const [showBookingDialog, setShowBookingDialog] = useState(false);
   
   const { data: mentor, isLoading } = useQuery<Mentor>({
     queryKey: ["/api/mentors", mentorId],
     enabled: !!mentorId,
   });
 
-  const form = useForm<ConfirmationFormData>({
-    resolver: zodResolver(confirmationSchema),
+  const form = useForm<BookingRequestFormData>({
+    resolver: zodResolver(bookingRequestFormSchema),
     defaultValues: {
-      name: "",
+      name: localStorage.getItem("menteeName") || "",
       email: localStorage.getItem("menteeEmail") || "",
+      goal: "",
     },
   });
 
-  const createBookingMutation = useMutation({
-    mutationFn: async (data: { mentor_id: string; mentee_name: string; mentee_email: string }) => {
-      return await apiRequest("POST", "/api/bookings", data);
+  const bookingRequestMutation = useMutation({
+    mutationFn: async (data: { mentor_id: string; mentee_name: string; mentee_email: string; goal: string }) => {
+      return await apiRequest("POST", "/api/bookings/request", data);
     },
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
       toast({
-        title: t('session.bookingRecorded'),
-        description: t('session.bookingRecordedDescription'),
+        title: isArabic ? "تم إرسال طلبك" : "Request Sent",
+        description: isArabic 
+          ? "تم إرسال طلبك إلى المرشد. سيتم إعلامك بمجرد ردهم."
+          : "Your request has been sent to the mentor. You'll be notified once they respond.",
+      });
+      setShowBookingDialog(false);
+      form.reset({
+        name: localStorage.getItem("menteeName") || "",
+        email: localStorage.getItem("menteeEmail") || "",
+        goal: "",
       });
     },
     onError: () => {
       toast({
-        title: t('session.recordingFailed'),
-        description: t('session.recordingFailedDescription'),
+        title: isArabic ? "فشل الإرسال" : "Request Failed",
+        description: isArabic 
+          ? "فشل إرسال طلبك. يرجى المحاولة مرة أخرى."
+          : "Failed to send your request. Please try again.",
         variant: "destructive",
       });
     },
   });
 
-  const handleBookingSuccess = useCallback((mentorId: string, menteeName: string, menteeEmail: string) => {
-    createBookingMutation.mutate({
-      mentor_id: mentorId,
-      mentee_name: menteeName,
-      mentee_email: menteeEmail,
-    });
-  }, [createBookingMutation]);
-
-  const onSubmitIdentity = (data: ConfirmationFormData) => {
+  const onSubmitBookingRequest = (data: BookingRequestFormData) => {
+    if (!mentorId) return;
+    
     localStorage.setItem("menteeName", data.name);
     localStorage.setItem("menteeEmail", data.email);
-    setMenteeInfo({ name: data.name, email: data.email });
-    setShowIdentityForm(false);
-    toast({
-      title: t('identity.identitySaved'),
-      description: t('identity.identitySavedDescription'),
+    
+    bookingRequestMutation.mutate({
+      mentor_id: mentorId,
+      mentee_name: data.name,
+      mentee_email: data.email,
+      goal: data.goal,
     });
   };
 
+  const handleOpenBookingDialog = () => {
+    form.reset({
+      name: localStorage.getItem("menteeName") || "",
+      email: localStorage.getItem("menteeEmail") || "",
+      goal: "",
+    });
+    setShowBookingDialog(true);
+  };
 
   if (isLoading) {
     return (
@@ -203,7 +147,7 @@ export default function MentorProfile() {
               </Card>
             </div>
             <div className="lg:col-span-3">
-              <Skeleton className="h-[700px] w-full rounded-lg" />
+              <Skeleton className="h-[400px] w-full rounded-lg" />
             </div>
           </div>
         </div>
@@ -273,8 +217,6 @@ export default function MentorProfile() {
       return ianaTimeZone.split('/').pop() || ianaTimeZone;
     }
   };
-
-  const calLink = mentor?.cal_link || "";
 
   return (
     <div className="min-h-screen py-12">
@@ -378,38 +320,13 @@ export default function MentorProfile() {
                     )}
                   </div>
                 </div>
-
-                <Separator />
-
-                <div className="space-y-2">
-                  {menteeInfo ? (
-                    <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground text-center">
-                        {t('identity.trackingFor')} {menteeInfo.name}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowIdentityForm(true)}
-                        className="w-full text-xs"
-                        data-testid="button-change-identity"
-                      >
-                        {t('identity.changeIdentity')}
-                      </Button>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center">
-                      {t('identity.enterDetailsPrompt')}
-                    </p>
-                  )}
-                </div>
               </div>
             </Card>
           </div>
 
           <div className="lg:col-span-3">
-            <Card className="p-4">
-              <h2 className="text-2xl font-bold mb-4 px-4">{t('session.bookSession')}</h2>
+            <Card className="p-8">
+              <h2 className="text-2xl font-bold mb-6">{t('session.bookSession')}</h2>
               {!mentor.is_available ? (
                 <div className="p-12 text-center space-y-4" data-testid="mentor-unavailable">
                   <Star className="w-12 h-12 mx-auto text-muted-foreground" />
@@ -420,53 +337,61 @@ export default function MentorProfile() {
                     {t('profile.starForLater')}
                   </p>
                 </div>
-              ) : !menteeInfo ? (
-                <div className="p-12 text-center space-y-4" data-testid="cal-locked">
-                  <p className="text-lg text-muted-foreground">
-                    {t('identity.pleaseEnterDetails')}
-                  </p>
-                  <Button
-                    onClick={() => setShowIdentityForm(true)}
-                    size="lg"
-                    data-testid="button-enter-details"
+              ) : (
+                <div className="text-center space-y-6" data-testid="booking-section">
+                  <div className="space-y-3">
+                    <Calendar className="w-16 h-16 mx-auto text-primary" />
+                    <p className="text-lg text-muted-foreground">
+                      {isArabic 
+                        ? `هل أنت مستعد للتواصل مع ${displayName}؟`
+                        : `Ready to connect with ${displayName}?`}
+                    </p>
+                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                      {isArabic
+                        ? "اطلب جلسة إرشاد وشارك أهدافك. سيقوم المرشد بمراجعة طلبك والرد عليه."
+                        : "Request a mentoring session and share your goals. The mentor will review your request and respond."}
+                    </p>
+                  </div>
+                  <Button 
+                    size="lg" 
+                    onClick={handleOpenBookingDialog}
+                    data-testid="button-request-session"
                   >
-                    {t('identity.enterDetails')}
+                    <Calendar className={`w-5 h-5 ${isArabic ? 'ml-2' : 'mr-2'}`} />
+                    {isArabic ? 'طلب جلسة' : 'Request a Session'}
                   </Button>
                 </div>
-              ) : (
-                <CalEmbedWrapper
-                  calLink={calLink}
-                  mentorId={mentor.id}
-                  menteeInfo={menteeInfo}
-                  onBookingSuccess={handleBookingSuccess}
-                />
               )}
             </Card>
           </div>
         </div>
 
-        <Dialog open={showIdentityForm} onOpenChange={setShowIdentityForm}>
-          <DialogContent data-testid="dialog-enter-identity">
+        <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
+          <DialogContent data-testid="dialog-booking-request">
             <DialogHeader>
-              <DialogTitle>{t('identity.enterDetails')}</DialogTitle>
+              <DialogTitle>
+                {isArabic ? 'طلب جلسة إرشاد' : 'Request a Mentoring Session'}
+              </DialogTitle>
               <DialogDescription>
-                {t('identity.enterDetailsDescription')}
+                {isArabic 
+                  ? `أرسل طلبًا إلى ${displayName} للتواصل. يرجى مشاركة أهدافك حتى يتمكنوا من الاستعداد لجلستكم.`
+                  : `Send a request to ${displayName} to connect. Please share your goals so they can prepare for your session.`}
               </DialogDescription>
             </DialogHeader>
 
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmitIdentity)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmitBookingRequest)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('identity.yourName')}</FormLabel>
+                      <FormLabel>{isArabic ? 'اسمك' : 'Your Name'}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
-                          placeholder={t('identity.namePlaceholder')}
-                          data-testid="input-identity-name"
+                          placeholder={isArabic ? 'أدخل اسمك الكامل' : 'Enter your full name'}
+                          data-testid="input-booking-name"
                         />
                       </FormControl>
                       <FormMessage />
@@ -479,13 +404,13 @@ export default function MentorProfile() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('identity.yourEmail')}</FormLabel>
+                      <FormLabel>{isArabic ? 'بريدك الإلكتروني' : 'Your Email'}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
                           type="email"
-                          placeholder={t('identity.emailPlaceholder')}
-                          data-testid="input-identity-email"
+                          placeholder={isArabic ? 'أدخل بريدك الإلكتروني' : 'Enter your email address'}
+                          data-testid="input-booking-email"
                         />
                       </FormControl>
                       <FormMessage />
@@ -493,20 +418,48 @@ export default function MentorProfile() {
                   )}
                 />
 
-                <DialogFooter>
+                <FormField
+                  control={form.control}
+                  name="goal"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {isArabic 
+                          ? 'ما الذي تأمل تحقيقه من هذه الجلسة؟'
+                          : 'What are you hoping to achieve from this session?'}
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea
+                          {...field}
+                          placeholder={isArabic 
+                            ? 'صف أهدافك، والتحديات التي تواجهها، أو المواضيع التي ترغب في مناقشتها...'
+                            : 'Describe your goals, challenges you\'re facing, or topics you\'d like to discuss...'}
+                          className="min-h-[120px] resize-none"
+                          data-testid="textarea-booking-goal"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <DialogFooter className="gap-2">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowIdentityForm(false)}
-                    data-testid="button-cancel-identity"
+                    onClick={() => setShowBookingDialog(false)}
+                    data-testid="button-cancel-booking"
                   >
-                    {t('common.cancel')}
+                    {isArabic ? 'إلغاء' : 'Cancel'}
                   </Button>
                   <Button
                     type="submit"
-                    data-testid="button-submit-identity"
+                    disabled={bookingRequestMutation.isPending}
+                    data-testid="button-submit-booking"
                   >
-                    {t('identity.saveAndContinue')}
+                    {bookingRequestMutation.isPending 
+                      ? (isArabic ? 'جاري الإرسال...' : 'Sending...') 
+                      : (isArabic ? 'إرسال الطلب' : 'Submit Request')}
                   </Button>
                 </DialogFooter>
               </form>

@@ -12,12 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Check, X, Calendar, Clock, User } from "lucide-react";
+import { Check, X, Calendar, Clock, User, Target, Mail } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import type { Booking } from "@shared/schema";
+import type { Booking, Mentee } from "@shared/schema";
+
+type BookingWithMentee = Booking & { mentee?: Mentee };
 
 interface BookingRequestsProps {
   mentorId: string;
@@ -28,14 +30,35 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
   const isRTL = i18n.language === 'ar';
   const { toast } = useToast();
 
-  const { data: bookings, isLoading } = useQuery<Booking[]>({
-    queryKey: ['/api/mentor', mentorId, 'bookings', { status: 'clicked' }],
+  const { data: bookings, isLoading } = useQuery<BookingWithMentee[]>({
+    queryKey: ['/api/mentor', mentorId, 'bookings', 'pending'],
     enabled: !!mentorId,
   });
 
-  const updateBookingMutation = useMutation({
-    mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
-      return apiRequest("PATCH", `/api/mentor/${mentorId}/bookings/${bookingId}`, { status });
+  const acceptMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      return apiRequest("PATCH", `/api/bookings/${bookingId}/accept`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'dashboard'] });
+      toast({
+        title: t('common.success'),
+        description: "Booking accepted! The mentee will receive a Cal.com link to schedule their session.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('mentorPortal.bookingUpdateError'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const declineMutation = useMutation({
+    mutationFn: async (bookingId: string) => {
+      return apiRequest("PATCH", `/api/bookings/${bookingId}/decline`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
@@ -55,14 +78,15 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
   });
 
   const handleAccept = (bookingId: string) => {
-    updateBookingMutation.mutate({ bookingId, status: 'scheduled' });
+    acceptMutation.mutate(bookingId);
   };
 
   const handleDecline = (bookingId: string) => {
-    updateBookingMutation.mutate({ bookingId, status: 'canceled' });
+    declineMutation.mutate(bookingId);
   };
 
-  const pendingBookings = bookings?.filter(b => b.status === 'clicked') ?? [];
+  const pendingBookings = bookings?.filter(b => b.status === 'pending') ?? [];
+  const isMutating = acceptMutation.isPending || declineMutation.isPending;
 
   return (
     <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -98,8 +122,8 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('mentorPortal.mentee')}</TableHead>
+                    <TableHead>{t('mentorPortal.goal') || 'Goal'}</TableHead>
                     <TableHead>{t('mentorPortal.requestedAt')}</TableHead>
-                    <TableHead>{t('mentorPortal.scheduledFor')}</TableHead>
                     <TableHead className="text-right">{t('mentorPortal.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -109,37 +133,42 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <Avatar className="w-8 h-8">
+                            <AvatarImage src={booking.mentee?.photo_url || undefined} />
                             <AvatarFallback>
                               <User className="w-4 h-4" />
                             </AvatarFallback>
                           </Avatar>
-                          <span className="font-medium">{booking.mentee_id}</span>
+                          <div className="flex flex-col">
+                            <span className="font-medium" data-testid={`text-mentee-name-${booking.id}`}>
+                              {booking.mentee?.name || 'Unknown Mentee'}
+                            </span>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1" data-testid={`text-mentee-email-${booking.id}`}>
+                              <Mail className="w-3 h-3" />
+                              {booking.mentee?.email || 'No email'}
+                            </span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-start gap-1 text-sm max-w-xs">
+                          <Target className="w-3 h-3 mt-1 flex-shrink-0 text-muted-foreground" />
+                          <span className="line-clamp-2" data-testid={`text-goal-${booking.id}`}>
+                            {booking.goal || t('mentorPortal.noGoalSpecified') || 'No goal specified'}
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1 text-sm text-muted-foreground">
                           <Clock className="w-3 h-3" />
-                          {format(parseISO(booking.clicked_at), 'MMM d, yyyy h:mm a')}
+                          {booking.created_at ? format(parseISO(booking.created_at), 'MMM d, yyyy h:mm a') : 'N/A'}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        {booking.scheduled_at ? (
-                          <div className="flex items-center gap-1 text-sm">
-                            <Calendar className="w-3 h-3" />
-                            {format(parseISO(booking.scheduled_at), 'MMM d, yyyy h:mm a')}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            {t('mentorPortal.notScheduled')}
-                          </span>
-                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
                           <Button
                             size="sm"
                             onClick={() => handleAccept(booking.id)}
-                            disabled={updateBookingMutation.isPending}
+                            disabled={isMutating}
                             data-testid={`button-accept-${booking.id}`}
                           >
                             <Check className="w-4 h-4 mr-1" />
@@ -149,7 +178,7 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
                             size="sm"
                             variant="outline"
                             onClick={() => handleDecline(booking.id)}
-                            disabled={updateBookingMutation.isPending}
+                            disabled={isMutating}
                             data-testid={`button-decline-${booking.id}`}
                           >
                             <X className="w-4 h-4 mr-1" />
