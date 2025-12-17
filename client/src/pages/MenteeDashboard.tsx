@@ -93,6 +93,7 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
 
   const { data: bookings } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
+    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
   });
 
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed').slice(0, 3) || [];
@@ -304,6 +305,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
+    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
   });
 
   const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted') || [];
@@ -549,6 +551,7 @@ function MenteeMentors({ menteeId }: { menteeId: string }) {
   
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
+    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
   });
 
   const uniqueMentors = bookings
