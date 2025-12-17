@@ -124,7 +124,7 @@ export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey(),
   recipient_email: text("recipient_email").notNull(),
   recipient_type: text("recipient_type", { enum: ["mentor", "mentee"] }).notNull(),
-  type: text("type", { enum: ["booking_request", "booking_accepted", "booking_rejected", "booking_completed", "booking_canceled", "reminder"] }).notNull(),
+  type: text("type", { enum: ["booking_request", "booking_accepted", "booking_rejected", "booking_completed", "booking_canceled", "booking_confirmed", "feedback_received", "reminder"] }).notNull(),
   title: text("title").notNull(),
   message: text("message").notNull(),
   booking_id: varchar("booking_id").references(() => bookings.id),

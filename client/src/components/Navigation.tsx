@@ -141,21 +141,19 @@ export function Navigation() {
           </>
         )}
 
-        {mentorId && (
-          <Link href="/mentor-portal" data-testid="link-mentor-portal" onClick={handleClick}>
-            <Button 
-              variant="ghost" 
-              className={mobile 
-                ? "w-full justify-start text-foreground" 
-                : "w-full justify-start"
-              }
-              data-testid="button-mentor-portal"
-            >
-              <LayoutDashboard className="w-4 h-4 mr-2" />
-              {t('nav.mentorPortal')}
-            </Button>
-          </Link>
-        )}
+        <Link href="/mentor-portal" data-testid="link-mentor-portal" onClick={handleClick}>
+          <Button 
+            variant="ghost" 
+            className={mobile 
+              ? "w-full justify-start text-foreground" 
+              : "w-full justify-start"
+            }
+            data-testid="button-mentor-portal"
+          >
+            <LayoutDashboard className="w-4 h-4 mr-2" />
+            {t('nav.mentorPortal')}
+          </Button>
+        </Link>
         {menteeId && (
           <Link href="/mentee-dashboard" data-testid="link-mentee-dashboard" onClick={handleClick}>
             <Button 

@@ -159,7 +159,7 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
-            {t('menteePortal.pendingRequests') || 'Pending Requests'}
+            {t('menteePortal.awaitingMentorApproval') || 'Awaiting Mentor Approval'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -303,7 +303,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
-            {t('menteePortal.pendingRequests') || 'Pending Requests'}
+            {t('menteePortal.awaitingMentorApproval') || 'Awaiting Mentor Approval'}
           </CardTitle>
         </CardHeader>
         <CardContent>

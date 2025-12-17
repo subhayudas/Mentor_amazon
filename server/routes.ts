@@ -1184,6 +1184,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update mentor's average rating
       await storage.updateMentorRating(booking.mentor_id);
       
+      // Create notification for mentor that they received feedback
+      const mentor = await storage.getMentor(booking.mentor_id);
+      if (mentor) {
+        await storage.createNotification({
+          recipient_email: mentor.email,
+          recipient_type: 'mentor',
+          type: 'feedback_received',
+          title: 'New Feedback Received',
+          message: `${mentee.name} has left you feedback and rated your session ${rating}/5 stars.${feedback ? ` Their feedback: "${feedback}"` : ''}`,
+          booking_id: bookingId
+        });
+      }
+      
       res.json(updatedBooking);
     } catch (error) {
       console.error("Submit mentee feedback error:", error);
@@ -1215,6 +1228,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updatedBooking = await storage.submitMentorFeedback(bookingId, actualRating, actualFeedback);
+      
+      // Create notification for mentee that they received feedback from mentor
+      const mentee = await storage.getMentee(booking.mentee_id);
+      if (mentee) {
+        await storage.createNotification({
+          recipient_email: mentee.email,
+          recipient_type: 'mentee',
+          type: 'feedback_received',
+          title: 'New Feedback from Mentor',
+          message: `${mentor.name} has left you feedback and rated your session ${actualRating}/5 stars.${actualFeedback ? ` Their feedback: "${actualFeedback}"` : ''}`,
+          booking_id: bookingId
+        });
+      }
+      
       res.json(updatedBooking);
     } catch (error) {
       console.error("Submit mentor feedback error:", error);
