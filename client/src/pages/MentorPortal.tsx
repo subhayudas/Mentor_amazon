@@ -17,11 +17,17 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   LayoutDashboard,
   Calendar,
@@ -46,62 +52,86 @@ export default function MentorPortal() {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
   const [location] = useLocation();
-  const [mentorEmail, setMentorEmail] = useState("");
-  const [storedEmail, setStoredEmail] = useState<string | null>(null);
+  const [selectedMentorId, setSelectedMentorId] = useState<string | null>(null);
+  const [storedMentorId, setStoredMentorId] = useState<string | null>(null);
 
   useEffect(() => {
-    const email = localStorage.getItem("mentorEmail");
-    if (email) {
-      setStoredEmail(email);
+    const mentorId = localStorage.getItem("mentorId");
+    if (mentorId) {
+      setStoredMentorId(mentorId);
     }
   }, []);
 
-  const { data: mentor, isLoading: mentorLoading, error } = useQuery<Mentor>({
-    queryKey: ['/api/mentors/email', storedEmail],
-    enabled: !!storedEmail,
+  const { data: allMentors, isLoading: mentorsLoading } = useQuery<Mentor[]>({
+    queryKey: ['/api/mentors'],
   });
 
-  const handleAccessDashboard = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (mentorEmail.trim()) {
-      localStorage.setItem("mentorEmail", mentorEmail.trim());
-      setStoredEmail(mentorEmail.trim());
+  const { data: mentor, isLoading: mentorLoading, error } = useQuery<Mentor>({
+    queryKey: ['/api/mentors', storedMentorId],
+    enabled: !!storedMentorId,
+  });
+
+  const handleAccessDashboard = () => {
+    if (selectedMentorId) {
+      localStorage.setItem("mentorId", selectedMentorId);
+      setStoredMentorId(selectedMentorId);
     }
   };
 
-  const handleChangeEmail = () => {
-    localStorage.removeItem("mentorEmail");
-    setStoredEmail(null);
-    setMentorEmail("");
+  const handleChangeMentor = () => {
+    localStorage.removeItem("mentorId");
+    setStoredMentorId(null);
+    setSelectedMentorId(null);
   };
 
-  if (!storedEmail) {
+  if (!storedMentorId) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-center">
-              {t('mentorPortal.accessPortal')}
+              {t('mentorPortal.accessPortal') || 'Mentor Portal'}
             </CardTitle>
+            <CardDescription className="text-center">
+              {t('mentorPortal.selectMentor') || 'Select your profile to access your dashboard'}
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAccessDashboard} className="space-y-4">
+          <CardContent className="space-y-4">
+            {mentorsLoading ? (
               <div className="space-y-2">
-                <Label htmlFor="email">{t('mentorPortal.enterEmail')}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={mentorEmail}
-                  onChange={(e) => setMentorEmail(e.target.value)}
-                  placeholder={t('mentorPortal.emailPlaceholder')}
-                  data-testid="input-mentor-email"
-                  required
-                />
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
               </div>
-              <Button type="submit" className="w-full" data-testid="button-access-portal">
-                {t('mentorPortal.accessBtn')}
-              </Button>
-            </form>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>{t('mentorPortal.chooseMentor') || 'Choose your profile'}</Label>
+                  <Select value={selectedMentorId || ""} onValueChange={setSelectedMentorId}>
+                    <SelectTrigger data-testid="select-mentor">
+                      <SelectValue placeholder={t('mentorPortal.selectPlaceholder') || 'Select a mentor profile'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allMentors?.map((m) => (
+                        <SelectItem key={m.id} value={m.id} data-testid={`mentor-option-${m.id}`}>
+                          <div className="flex items-center gap-2">
+                            <span>{m.name}</span>
+                            <span className="text-muted-foreground text-xs">({m.email})</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  onClick={handleAccessDashboard} 
+                  className="w-full" 
+                  disabled={!selectedMentorId}
+                  data-testid="button-access-portal"
+                >
+                  {t('mentorPortal.accessBtn') || 'Access Dashboard'}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -126,15 +156,15 @@ export default function MentorPortal() {
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle className="text-center text-destructive">
-              {t('mentorDashboard.notFound')}
+              {t('mentorDashboard.notFound') || 'Mentor Not Found'}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <p className="text-muted-foreground">
-              {t('mentorDashboard.notFoundDesc')}
+              {t('mentorDashboard.notFoundDesc') || 'The selected mentor profile could not be found.'}
             </p>
-            <Button onClick={handleChangeEmail} data-testid="button-try-again">
-              {t('mentorDashboard.tryAgain')}
+            <Button onClick={handleChangeMentor} data-testid="button-try-again">
+              {t('mentorDashboard.tryAgain') || 'Select Another Mentor'}
             </Button>
           </CardContent>
         </Card>
@@ -263,7 +293,7 @@ export default function MentorPortal() {
             <Button 
               variant="ghost" 
               className="w-full justify-start" 
-              onClick={handleChangeEmail}
+              onClick={handleChangeMentor}
               data-testid="button-logout"
             >
               <LogOut className="w-4 h-4 mr-2" />
@@ -286,7 +316,7 @@ export default function MentorPortal() {
                 <BookingRequests mentorId={mentor.id} />
               </Route>
               <Route path="/mentor-portal/sessions">
-                <MySessions mentorId={mentor.id} mentorEmail={storedEmail || undefined} />
+                <MySessions mentorId={mentor.id} mentorEmail={mentor.email || undefined} />
               </Route>
               <Route path="/mentor-portal/tasks">
                 <TaskManager mentorId={mentor.id} />
@@ -298,7 +328,7 @@ export default function MentorPortal() {
                 <Feedback mentorId={mentor.id} />
               </Route>
               <Route path="/mentor-portal/profile">
-                <ProfileSettings mentorId={mentor.id} mentorEmail={storedEmail || ""} />
+                <ProfileSettings mentorId={mentor.id} mentorEmail={mentor.email || ""} />
               </Route>
             </Switch>
           </main>
