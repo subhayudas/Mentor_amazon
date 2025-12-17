@@ -585,7 +585,7 @@ export class DatabaseStorage implements IStorage {
     
     const totalSessions = allBookings.length;
     const completedSessions = allBookings.filter(b => b.status === "completed").length;
-    const pendingBookings = allBookings.filter(b => b.status === "pending" || b.status === "accepted").length;
+    const pendingBookings = allBookings.filter(b => b.status === "pending").length;
     
     // Calculate average rating from completed sessions with ratings
     const ratingsData = allBookings.filter(b => b.mentee_rating !== null);
