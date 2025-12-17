@@ -59,10 +59,11 @@ import {
   Globe,
   Building2,
   X,
-  ExternalLink,
+  CalendarPlus,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { CalEmbed } from "@/components/CalEmbed";
 import type { Mentee, Booking, Mentor } from "@shared/schema";
 
 interface MenteeStats {
@@ -82,6 +83,8 @@ interface FeedbackBooking extends Booking {
 
 function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
+  const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
   
   const { data: stats, isLoading: statsLoading } = useQuery<MenteeStats>({
     queryKey: ['/api/mentee', menteeId, 'stats'],
@@ -93,6 +96,11 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
 
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed').slice(0, 3) || [];
   const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted').slice(0, 3) || [];
+  
+  const handleScheduleClick = (booking: BookingWithMentor) => {
+    setSelectedBooking(booking);
+    setShowCalendar(true);
+  };
   
   return (
     <div className="space-y-6">
@@ -195,12 +203,20 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
                       <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.accepted') || 'Accepted'}</Badge>
                     )}
                     {booking.status === 'accepted' && booking.mentor?.cal_link && (
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={booking.mentor.cal_link} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-3 h-3 mr-1" />
-                          {t('menteePortal.scheduleNow') || 'Schedule Now'}
-                        </a>
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => handleScheduleClick(booking)}
+                        data-testid={`button-schedule-${booking.id}`}
+                      >
+                        <CalendarPlus className="w-3 h-3 mr-1" />
+                        {t('menteePortal.scheduleNow') || 'Schedule Now'}
                       </Button>
+                    )}
+                    {booking.status === 'accepted' && !booking.mentor?.cal_link && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300">
+                        {t('menteePortal.calendarNotAvailable') || 'Calendar not configured - Contact mentor'}
+                      </Badge>
                     )}
                   </div>
                 </div>
@@ -248,12 +264,24 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
           )}
         </CardContent>
       </Card>
+
+      {selectedBooking && selectedBooking.mentor?.cal_link && (
+        <CalEmbed
+          calLink={selectedBooking.mentor.cal_link}
+          mentorName={selectedBooking.mentor.name || "Mentor"}
+          bookingId={selectedBooking.id}
+          open={showCalendar}
+          onOpenChange={setShowCalendar}
+        />
+      )}
     </div>
   );
 }
 
 function MenteeBookings({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
+  const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
+  const [showCalendar, setShowCalendar] = useState(false);
   
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
@@ -263,6 +291,11 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed') || [];
   const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
   const canceledBookings = bookings?.filter(b => b.status === 'canceled' || b.status === 'rejected') || [];
+  
+  const handleScheduleClick = (booking: BookingWithMentor) => {
+    setSelectedBooking(booking);
+    setShowCalendar(true);
+  };
   
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -336,12 +369,20 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     {getStatusBadge(booking.status)}
                     {booking.status === 'accepted' && booking.mentor?.cal_link && (
-                      <Button variant="default" size="sm" asChild>
-                        <a href={booking.mentor.cal_link} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="w-3 h-3 mr-1" />
-                          {t('menteePortal.scheduleNow') || 'Schedule Now'}
-                        </a>
+                      <Button 
+                        variant="default" 
+                        size="sm"
+                        onClick={() => handleScheduleClick(booking)}
+                        data-testid={`button-schedule-booking-${booking.id}`}
+                      >
+                        <CalendarPlus className="w-3 h-3 mr-1" />
+                        {t('menteePortal.scheduleNow') || 'Schedule Now'}
                       </Button>
+                    )}
+                    {booking.status === 'accepted' && !booking.mentor?.cal_link && (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300">
+                        {t('menteePortal.calendarNotAvailable') || 'Calendar not configured - Contact mentor'}
+                      </Badge>
                     )}
                     {booking.mentor && (
                       <Button variant="outline" size="sm" asChild>
@@ -453,6 +494,16 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
           )}
         </CardContent>
       </Card>
+
+      {selectedBooking && selectedBooking.mentor?.cal_link && (
+        <CalEmbed
+          calLink={selectedBooking.mentor.cal_link}
+          mentorName={selectedBooking.mentor.name || "Mentor"}
+          bookingId={selectedBooking.id}
+          open={showCalendar}
+          onOpenChange={setShowCalendar}
+        />
+      )}
     </div>
   );
 }
