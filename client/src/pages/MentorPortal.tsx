@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Route, Switch, useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -17,9 +17,7 @@ import {
   SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
@@ -38,6 +36,7 @@ import {
   User,
   Settings,
   LogOut,
+  RefreshCw,
 } from "lucide-react";
 import DashboardHome from "@/pages/mentor/DashboardHome";
 import BookingRequests from "@/pages/mentor/BookingRequests";
@@ -51,94 +50,37 @@ import type { Mentor } from "@shared/schema";
 export default function MentorPortal() {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
-  const [location] = useLocation();
-  const [selectedMentorId, setSelectedMentorId] = useState<string | null>(null);
-  const [storedMentorId, setStoredMentorId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const mentorId = localStorage.getItem("mentorId");
-    if (mentorId) {
-      setStoredMentorId(mentorId);
-    }
-  }, []);
+  const [location, setLocation] = useLocation();
+  const [currentMentorId, setCurrentMentorId] = useState<string | null>(() => {
+    return localStorage.getItem('mentorId');
+  });
 
   const { data: allMentors, isLoading: mentorsLoading } = useQuery<Mentor[]>({
     queryKey: ['/api/mentors'],
   });
 
-  const { data: mentor, isLoading: mentorLoading, error } = useQuery<Mentor>({
-    queryKey: ['/api/mentors', storedMentorId],
-    enabled: !!storedMentorId,
-  });
-
-  const handleAccessDashboard = () => {
-    if (selectedMentorId) {
-      localStorage.setItem("mentorId", selectedMentorId);
-      setStoredMentorId(selectedMentorId);
+  useEffect(() => {
+    if (!mentorsLoading && allMentors && allMentors.length > 0 && !currentMentorId) {
+      const firstMentorId = allMentors[0].id;
+      localStorage.setItem('mentorId', firstMentorId);
+      setCurrentMentorId(firstMentorId);
     }
+  }, [mentorsLoading, allMentors, currentMentorId]);
+
+  useEffect(() => {
+    if (!mentorsLoading && (!allMentors || allMentors.length === 0)) {
+      setLocation('/');
+    }
+  }, [mentorsLoading, allMentors, setLocation]);
+
+  const mentor = allMentors?.find(m => m.id === currentMentorId) || allMentors?.[0];
+
+  const handleMentorSwitch = (mentorId: string) => {
+    localStorage.setItem('mentorId', mentorId);
+    setCurrentMentorId(mentorId);
   };
 
-  const handleChangeMentor = () => {
-    localStorage.removeItem("mentorId");
-    setStoredMentorId(null);
-    setSelectedMentorId(null);
-  };
-
-  if (!storedMentorId) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">
-              {t('mentorPortal.accessPortal') || 'Mentor Portal'}
-            </CardTitle>
-            <CardDescription className="text-center">
-              {t('mentorPortal.selectMentor') || 'Select your profile to access your dashboard'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {mentorsLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label>{t('mentorPortal.chooseMentor') || 'Choose your profile'}</Label>
-                  <Select value={selectedMentorId || ""} onValueChange={setSelectedMentorId}>
-                    <SelectTrigger data-testid="select-mentor">
-                      <SelectValue placeholder={t('mentorPortal.selectPlaceholder') || 'Select a mentor profile'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allMentors?.map((m) => (
-                        <SelectItem key={m.id} value={m.id} data-testid={`mentor-option-${m.id}`}>
-                          <div className="flex items-center gap-2">
-                            <span>{m.name}</span>
-                            <span className="text-muted-foreground text-xs">({m.email})</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button 
-                  onClick={handleAccessDashboard} 
-                  className="w-full" 
-                  disabled={!selectedMentorId}
-                  data-testid="button-access-portal"
-                >
-                  {t('mentorPortal.accessBtn') || 'Access Dashboard'}
-                </Button>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (mentorLoading) {
+  if (mentorsLoading || !mentor) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="space-y-4 w-full max-w-md p-4">
@@ -146,28 +88,6 @@ export default function MentorPortal() {
           <Skeleton className="h-8" />
           <Skeleton className="h-8" />
         </div>
-      </div>
-    );
-  }
-
-  if (error || !mentor) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-destructive">
-              {t('mentorDashboard.notFound') || 'Mentor Not Found'}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center space-y-4">
-            <p className="text-muted-foreground">
-              {t('mentorDashboard.notFoundDesc') || 'The selected mentor profile could not be found.'}
-            </p>
-            <Button onClick={handleChangeMentor} data-testid="button-try-again">
-              {t('mentorDashboard.tryAgain') || 'Select Another Mentor'}
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     );
   }
@@ -289,15 +209,30 @@ export default function MentorPortal() {
             </SidebarGroup>
           </SidebarContent>
 
-          <SidebarFooter className="border-t p-4">
+          <SidebarFooter className="border-t p-4 space-y-2">
+            {allMentors && allMentors.length > 1 && (
+              <Select value={currentMentorId || ""} onValueChange={handleMentorSwitch}>
+                <SelectTrigger className="w-full" data-testid="select-switch-mentor">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder={t('mentorPortal.switchMentor') || 'Switch Mentor'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {allMentors.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button 
               variant="ghost" 
               className="w-full justify-start" 
-              onClick={handleChangeMentor}
-              data-testid="button-logout"
+              onClick={() => setLocation('/')}
+              data-testid="button-exit-portal"
             >
               <LogOut className="w-4 h-4 mr-2" />
-              {t('mentorPortal.changeAccount')}
+              {t('mentorPortal.exitPortal') || 'Exit Portal'}
             </Button>
           </SidebarFooter>
         </Sidebar>

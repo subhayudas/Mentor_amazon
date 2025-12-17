@@ -85,6 +85,7 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<string | null>(null);
   
   const { data: stats, isLoading: statsLoading } = useQuery<MenteeStats>({
     queryKey: ['/api/mentee', menteeId, 'stats'],
@@ -96,6 +97,23 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
 
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed').slice(0, 3) || [];
   const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted').slice(0, 3) || [];
+  
+  useEffect(() => {
+    if (!bookings) return;
+    
+    const acceptedBooking = bookings.find(
+      b => b.status === 'accepted' && 
+           b.mentor?.cal_link && 
+           !b.scheduled_at &&
+           b.id !== autoOpenedBookingId
+    );
+    
+    if (acceptedBooking) {
+      setSelectedBooking(acceptedBooking);
+      setShowCalendar(true);
+      setAutoOpenedBookingId(acceptedBooking.id);
+    }
+  }, [bookings, autoOpenedBookingId]);
   
   const handleScheduleClick = (booking: BookingWithMentor) => {
     setSelectedBooking(booking);
@@ -282,6 +300,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<string | null>(null);
   
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
@@ -291,6 +310,23 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed') || [];
   const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
   const canceledBookings = bookings?.filter(b => b.status === 'canceled' || b.status === 'rejected') || [];
+  
+  useEffect(() => {
+    if (!bookings) return;
+    
+    const acceptedBooking = bookings.find(
+      b => b.status === 'accepted' && 
+           b.mentor?.cal_link && 
+           !b.scheduled_at &&
+           b.id !== autoOpenedBookingId
+    );
+    
+    if (acceptedBooking) {
+      setSelectedBooking(acceptedBooking);
+      setShowCalendar(true);
+      setAutoOpenedBookingId(acceptedBooking.id);
+    }
+  }, [bookings, autoOpenedBookingId]);
   
   const handleScheduleClick = (booking: BookingWithMentor) => {
     setSelectedBooking(booking);
