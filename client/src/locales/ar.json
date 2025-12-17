@@ -98,6 +98,8 @@
   },
   "nav": {
     "home": "الرئيسية",
+    "menu": "القائمة",
+    "navigation": "التنقل",
     "browseMentors": "تصفح المرشدين",
     "analytics": "التحليلات",
     "becomeMentor": "كن مرشداً",

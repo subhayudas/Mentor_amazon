@@ -4,12 +4,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { 
   Calendar, 
-  DollarSign, 
   Star, 
   Users,
   CheckCircle,
   Clock,
-  Bell
+  Bell,
+  MessageSquare
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -19,9 +19,8 @@ interface DashboardStats {
   totalSessions: number;
   completedSessions: number;
   averageRating: number;
-  totalEarnings: number;
-  monthlyEarnings: number;
   pendingBookings: number;
+  feedbackCount: number;
 }
 
 interface DashboardHomeProps {
@@ -59,9 +58,9 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
       suffix: "/5.0",
     },
     {
-      title: t('mentorPortal.monthlyEarnings'),
-      value: `$${stats?.monthlyEarnings?.toLocaleString() ?? 0}`,
-      icon: DollarSign,
+      title: t('mentorPortal.feedbackReceived'),
+      value: stats?.feedbackCount ?? 0,
+      icon: MessageSquare,
       color: "text-green-600",
       bgColor: "bg-green-100 dark:bg-green-900/20",
     },
@@ -170,8 +169,8 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
                   <Badge variant="secondary">{stats?.completedSessions ?? 0}</Badge>
                 </div>
                 <div className="flex items-center justify-between p-3 border rounded-lg">
-                  <span className="text-sm font-medium">{t('mentorPortal.totalEarnings')}</span>
-                  <Badge variant="secondary">${stats?.totalEarnings?.toLocaleString() ?? 0}</Badge>
+                  <span className="text-sm font-medium">{t('mentorPortal.feedbackReceived')}</span>
+                  <Badge variant="secondary">{stats?.feedbackCount ?? 0}</Badge>
                 </div>
               </>
             )}
@@ -214,7 +213,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
                         {format(parseISO(item.created_at), 'MMM d, h:mm a')}
                       </p>
                     </div>
-                    <Badge variant={getActivityBadgeVariant(item.activity_type)} size="sm">
+                    <Badge variant={getActivityBadgeVariant(item.activity_type)} className="text-xs">
                       {item.activity_type.replace(/_/g, ' ')}
                     </Badge>
                   </div>

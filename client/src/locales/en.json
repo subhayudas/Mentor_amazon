@@ -98,6 +98,8 @@
   },
   "nav": {
     "home": "Home",
+    "menu": "Menu",
+    "navigation": "Navigation",
     "browseMentors": "Browse Mentors",
     "analytics": "Analytics",
     "becomeMentor": "Become a Mentor",

@@ -259,7 +259,7 @@ export default function MenteeRegistration() {
         localStorage.setItem("menteeEmail", newMentee.email);
         localStorage.setItem("menteeName", newMentee.name);
         window.dispatchEvent(new Event("userRegistered"));
-        setLocation(`/profile/mentee/${newMentee.id}`);
+        setLocation("/mentee-dashboard");
       } else {
         toast({
           title: t('common.error'),

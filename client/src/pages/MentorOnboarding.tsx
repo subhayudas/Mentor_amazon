@@ -227,7 +227,7 @@ export default function MentorOnboarding() {
         localStorage.setItem("mentorEmail", newMentor.email);
         localStorage.setItem("mentorName", newMentor.name);
         window.dispatchEvent(new Event("userRegistered"));
-        setLocation(`/profile/mentor/${newMentor.id}`);
+        setLocation("/mentor-portal");
       } else {
         toast({
           title: t('common.error'),
