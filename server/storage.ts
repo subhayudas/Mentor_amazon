@@ -648,6 +648,46 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
+  async findAndConfirmAcceptedBooking(
+    mentorId: string, 
+    menteeEmail: string, 
+    calEventUri?: string,
+    scheduledAt?: string
+  ): Promise<Booking | undefined> {
+    await this.seedPromise;
+    
+    // Find an accepted booking for this mentor and mentee
+    const mentee = await this.getMenteeByEmail(menteeEmail);
+    if (!mentee) return undefined;
+    
+    const acceptedBookings = await db.select().from(bookings)
+      .where(and(
+        eq(bookings.mentor_id, mentorId),
+        eq(bookings.mentee_id, mentee.id),
+        eq(bookings.status, "accepted")
+      ))
+      .orderBy(desc(bookings.created_at))
+      .limit(1);
+    
+    if (acceptedBookings.length === 0) return undefined;
+    
+    const booking = acceptedBookings[0];
+    const now = new Date().toISOString();
+    
+    // Update to confirmed with Cal.com details
+    const result = await db.update(bookings)
+      .set({
+        status: "confirmed",
+        cal_event_uri: calEventUri,
+        scheduled_at: scheduledAt,
+        responded_at: now,
+      })
+      .where(eq(bookings.id, booking.id))
+      .returning();
+    
+    return result[0];
+  }
+
   async getMentorTasks(mentorId: string): Promise<MentorTask[]> {
     await this.seedPromise;
     return await db.select().from(mentorTasks)

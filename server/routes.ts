@@ -557,11 +557,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Mentor not found" });
       }
 
-      let mentee = await storage.getMenteeByEmail(menteeEmail);
+      // First try to find and confirm an existing accepted booking
+      const confirmedBooking = await storage.findAndConfirmAcceptedBooking(
+        mentorId, 
+        menteeEmail!, 
+        calEventUri, 
+        scheduledAt
+      );
+      
+      if (confirmedBooking) {
+        // Create confirmation notifications
+        const mentee = await storage.getMenteeByEmail(menteeEmail!);
+        if (mentee) {
+          await storage.createNotification({
+            recipient_email: mentor.email,
+            recipient_type: "mentor",
+            type: "booking_confirmed",
+            title: "Session Confirmed",
+            message: `${mentee.name} has scheduled their session with you.`,
+            booking_id: confirmedBooking.id,
+          });
+          
+          await storage.createNotification({
+            recipient_email: mentee.email,
+            recipient_type: "mentee",
+            type: "booking_confirmed",
+            title: "Session Scheduled",
+            message: `Your session with ${mentor.name} has been scheduled successfully.`,
+            booking_id: confirmedBooking.id,
+          });
+        }
+        
+        return res.status(200).json({ 
+          message: "Booking confirmed successfully",
+          booking: confirmedBooking 
+        });
+      }
+
+      // Fallback: create new booking if no accepted booking exists
+      let mentee = await storage.getMenteeByEmail(menteeEmail!);
       if (!mentee) {
         mentee = await storage.createMentee({
-          name: menteeName,
-          email: menteeEmail,
+          name: menteeName!,
+          email: menteeEmail!,
           user_type: "individual",
           timezone: "Africa/Cairo",
           languages_spoken: ["English"],
