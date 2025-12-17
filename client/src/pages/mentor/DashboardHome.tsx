@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +10,8 @@ import {
   CheckCircle,
   Clock,
   Bell,
-  MessageSquare
+  MessageSquare,
+  ArrowRight
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -48,6 +50,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
       icon: Calendar,
       color: "text-blue-600",
       bgColor: "bg-blue-100 dark:bg-blue-900/20",
+      link: null,
     },
     {
       title: t('mentorPortal.avgRating'),
@@ -56,6 +59,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
       color: "text-yellow-600",
       bgColor: "bg-yellow-100 dark:bg-yellow-900/20",
       suffix: "/5.0",
+      link: null,
     },
     {
       title: t('mentorPortal.feedbackReceived'),
@@ -63,6 +67,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
       icon: MessageSquare,
       color: "text-green-600",
       bgColor: "bg-green-100 dark:bg-green-900/20",
+      link: null,
     },
     {
       title: t('mentorPortal.pendingBookings'),
@@ -70,6 +75,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
       icon: Users,
       color: "text-orange-600",
       bgColor: "bg-orange-100 dark:bg-orange-900/20",
+      link: "/mentor-portal/bookings",
     },
   ];
 
@@ -123,28 +129,47 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
             <Skeleton key={i} className="h-32" />
           ))
         ) : (
-          statCards.map((stat, index) => (
-            <Card key={index} data-testid={`stat-card-${index}`}>
-              <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                <CardDescription className="text-sm font-medium">
-                  {stat.title}
-                </CardDescription>
-                <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                  <stat.icon className={`w-4 h-4 ${stat.color}`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">
-                  {stat.value}
-                  {stat.suffix && (
-                    <span className="text-sm font-normal text-muted-foreground">
-                      {stat.suffix}
-                    </span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))
+          statCards.map((stat, index) => {
+            const CardWrapper = stat.link ? Link : 'div';
+            const cardContent = (
+              <Card 
+                className={stat.link ? "hover-elevate cursor-pointer transition-colors" : ""}
+                data-testid={`stat-card-${index}`}
+              >
+                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                  <CardDescription className="text-sm font-medium">
+                    {stat.title}
+                  </CardDescription>
+                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                    <stat.icon className={`w-4 h-4 ${stat.color}`} />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-2xl font-bold">
+                      {stat.value}
+                      {stat.suffix && (
+                        <span className="text-sm font-normal text-muted-foreground">
+                          {stat.suffix}
+                        </span>
+                      )}
+                    </div>
+                    {stat.link && stat.value > 0 && (
+                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+            
+            return stat.link ? (
+              <Link key={index} href={stat.link}>
+                {cardContent}
+              </Link>
+            ) : (
+              <div key={index}>{cardContent}</div>
+            );
+          })
         )}
       </div>
 

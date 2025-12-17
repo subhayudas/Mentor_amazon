@@ -58,6 +58,8 @@ import {
   Save,
   Globe,
   Building2,
+  X,
+  ExternalLink,
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -89,7 +91,8 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
     queryKey: ['/api/mentee', menteeId, 'bookings'],
   });
 
-  const upcomingBookings = bookings?.filter(b => b.status === 'scheduled').slice(0, 3) || [];
+  const upcomingBookings = bookings?.filter(b => b.status === 'confirmed').slice(0, 3) || [];
+  const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted').slice(0, 3) || [];
   
   return (
     <div className="space-y-6">
@@ -154,15 +157,18 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
       
       <Card>
         <CardHeader>
-          <CardTitle>{t('menteePortal.upcomingSessions')}</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            {t('menteePortal.pendingRequests') || 'Pending Requests'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          {upcomingBookings.length === 0 ? (
-            <p className="text-muted-foreground">{t('menteePortal.noUpcomingSessions')}</p>
+          {pendingBookings.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noPendingRequests') || 'No pending requests'}</p>
           ) : (
             <div className="space-y-4">
-              {upcomingBookings.map((booking) => (
-                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg">
+              {pendingBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg" data-testid={`booking-pending-${booking.id}`}>
                   <div className="flex items-center gap-3">
                     <Avatar className="h-10 w-10">
                       <AvatarImage src={booking.mentor?.photo_url || undefined} />
@@ -172,12 +178,70 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
                     </Avatar>
                     <div>
                       <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : t('menteePortal.scheduled')}
+                      {booking.goal && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">{booking.goal}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {booking.status === 'pending' 
+                          ? (t('menteePortal.awaitingMentorResponse') || 'Awaiting mentor response')
+                          : (t('menteePortal.acceptedBookNow') || 'Mentor accepted - Book your time slot')}
                       </p>
                     </div>
                   </div>
-                  <Badge variant="secondary">{t('menteePortal.scheduled')}</Badge>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {booking.status === 'pending' ? (
+                      <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />{t('menteePortal.pending') || 'Pending'}</Badge>
+                    ) : (
+                      <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.accepted') || 'Accepted'}</Badge>
+                    )}
+                    {booking.status === 'accepted' && booking.mentor?.cal_link && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={booking.mentor.cal_link} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          {t('menteePortal.scheduleNow') || 'Schedule Now'}
+                        </a>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            {t('menteePortal.upcomingSessions')}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {upcomingBookings.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noUpcomingSessions')}</p>
+          ) : (
+            <div className="space-y-4">
+              {upcomingBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg" data-testid={`booking-confirmed-${booking.id}`}>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={booking.mentor?.photo_url || undefined} />
+                      <AvatarFallback>
+                        <User className="h-5 w-5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
+                      {booking.goal && (
+                        <p className="text-sm text-muted-foreground line-clamp-1">{booking.goal}</p>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        {booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : t('menteePortal.confirmed') || 'Confirmed'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary"><Calendar className="w-3 h-3 mr-1" />{t('menteePortal.confirmed') || 'Confirmed'}</Badge>
                 </div>
               ))}
             </div>
@@ -195,14 +259,21 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
     queryKey: ['/api/mentee', menteeId, 'bookings'],
   });
 
-  const upcomingBookings = bookings?.filter(b => b.status === 'scheduled') || [];
+  const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted') || [];
+  const upcomingBookings = bookings?.filter(b => b.status === 'confirmed') || [];
   const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
-  const canceledBookings = bookings?.filter(b => b.status === 'canceled') || [];
+  const canceledBookings = bookings?.filter(b => b.status === 'canceled' || b.status === 'rejected') || [];
   
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'scheduled':
-        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />{t('menteePortal.scheduled')}</Badge>;
+      case 'pending':
+        return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />{t('menteePortal.awaitingResponse') || 'Awaiting Response'}</Badge>;
+      case 'accepted':
+        return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.acceptedScheduleNow') || 'Accepted - Schedule Now'}</Badge>;
+      case 'confirmed':
+        return <Badge variant="secondary"><Calendar className="w-3 h-3 mr-1" />{t('menteePortal.confirmed') || 'Confirmed'}</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive"><X className="w-3 h-3 mr-1" />{t('menteePortal.declined') || 'Declined'}</Badge>;
       case 'completed':
         return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.completed')}</Badge>;
       case 'canceled':
@@ -232,6 +303,63 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
+            {t('menteePortal.pendingRequests') || 'Pending Requests'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {pendingBookings.length === 0 ? (
+            <p className="text-muted-foreground">{t('menteePortal.noPendingRequests') || 'No pending requests. Your booking requests will appear here while waiting for mentor response.'}</p>
+          ) : (
+            <div className="space-y-4">
+              {pendingBookings.map((booking) => (
+                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg" data-testid={`booking-pending-${booking.id}`}>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={booking.mentor?.photo_url || undefined} />
+                      <AvatarFallback>
+                        <User className="h-6 w-6" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
+                      <p className="text-sm text-muted-foreground">{booking.mentor?.position}</p>
+                      {booking.goal && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{booking.goal}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {booking.status === 'pending' 
+                          ? (t('menteePortal.awaitingMentorResponse') || 'Awaiting mentor response')
+                          : (t('menteePortal.acceptedBookNow') || 'Mentor accepted - Book your time slot')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {getStatusBadge(booking.status)}
+                    {booking.status === 'accepted' && booking.mentor?.cal_link && (
+                      <Button variant="default" size="sm" asChild>
+                        <a href={booking.mentor.cal_link} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          {t('menteePortal.scheduleNow') || 'Schedule Now'}
+                        </a>
+                      </Button>
+                    )}
+                    {booking.mentor && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={`/mentors/${booking.mentor.id}`}>{t('menteePortal.viewMentorProfile')}</Link>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
             {t('menteePortal.upcoming')}
           </CardTitle>
         </CardHeader>
@@ -252,6 +380,9 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                     <div>
                       <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
                       <p className="text-sm text-muted-foreground">{booking.mentor?.position}</p>
+                      {booking.goal && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{booking.goal}</p>
+                      )}
                       <p className="text-sm text-muted-foreground">
                         {booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : '-'}
                       </p>
@@ -296,6 +427,9 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                     <div>
                       <p className="font-medium">{booking.mentor?.name || 'Mentor'}</p>
                       <p className="text-sm text-muted-foreground">{booking.mentor?.position}</p>
+                      {booking.goal && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">{booking.goal}</p>
+                      )}
                       <p className="text-sm text-muted-foreground">
                         {booking.completed_at ? format(new Date(booking.completed_at), 'PPp') : 
                          booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : '-'}

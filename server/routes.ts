@@ -925,6 +925,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/mentor/:mentorId/bookings/pending", async (req, res) => {
+    try {
+      const { mentorId } = req.params;
+      
+      const mentor = await storage.getMentor(mentorId);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+      
+      const pendingBookings = await storage.getPendingBookingsForMentor(mentorId);
+      res.json(pendingBookings);
+    } catch (error) {
+      console.error("Pending bookings error:", error);
+      res.status(500).json({ message: "Failed to fetch pending bookings" });
+    }
+  });
+
   app.patch("/api/mentor/:mentorId/bookings/:bookingId", async (req, res) => {
     try {
       const { mentorId, bookingId } = req.params;
