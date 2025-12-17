@@ -8,6 +8,9 @@ import multer from "multer";
 import path from "path";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 const uploadStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
@@ -758,6 +761,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: `${mentor.name} has accepted your mentorship request.${calLink ? ` Schedule your session: ${calLink}` : ""}`,
           booking_id: booking.id,
         });
+
+        // Send email notification to mentee
+        if (process.env.RESEND_API_KEY && calLink) {
+          try {
+            await resend.emails.send({
+              from: "onboarding@resend.dev",
+              to: mentee.email,
+              subject: `Your Mentorship Request Has Been Accepted - ${mentor.name}`,
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #232F3E;">Great News! 🎉</h2>
+                  <p>Hi ${mentee.name},</p>
+                  <p><strong>${mentor.name}</strong> has accepted your mentorship request!</p>
+                  <p>Please book a time for your session using the link below:</p>
+                  <p style="margin: 24px 0;">
+                    <a href="${calLink}" style="background-color: #FF9900; color: #232F3E; padding: 12px 24px; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                      Schedule Your Session
+                    </a>
+                  </p>
+                  <p>Or copy this link: <a href="${calLink}">${calLink}</a></p>
+                  <p style="color: #666; font-size: 14px; margin-top: 32px;">
+                    Best regards,<br/>
+                    MentorConnect Team
+                  </p>
+                </div>
+              `,
+            });
+            console.log(`Email sent to ${mentee.email} for booking ${booking.id}`);
+          } catch (emailError) {
+            console.error("Failed to send email notification:", emailError);
+            // Don't fail the request if email fails
+          }
+        }
       }
 
       res.json(booking);
