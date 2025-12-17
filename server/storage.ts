@@ -67,6 +67,12 @@ export interface IStorage {
   getMenteeFeedback(menteeId: string): Promise<(Booking & { mentor?: Mentor })[]>;
   getMenteeBookings(menteeId: string, status?: string): Promise<(Booking & { mentor?: Mentor })[]>;
   getMenteeStats(menteeId: string): Promise<{ totalSessions: number; completedSessions: number; upcomingSessions: number; uniqueMentors: number }>;
+  
+  // Booking request methods
+  createBookingRequest(mentorId: string, menteeId: string, goal: string): Promise<Booking>;
+  acceptBooking(bookingId: string): Promise<Booking | undefined>;
+  declineBooking(bookingId: string): Promise<Booking | undefined>;
+  getPendingBookingsForMentor(mentorId: string): Promise<(Booking & { mentee?: Mentee })[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -579,7 +585,7 @@ export class DatabaseStorage implements IStorage {
     
     const totalSessions = allBookings.length;
     const completedSessions = allBookings.filter(b => b.status === "completed").length;
-    const pendingBookings = allBookings.filter(b => b.status === "scheduled" || b.status === "clicked").length;
+    const pendingBookings = allBookings.filter(b => b.status === "pending" || b.status === "accepted").length;
     
     // Calculate average rating from completed sessions with ratings
     const ratingsData = allBookings.filter(b => b.mentee_rating !== null);
@@ -613,7 +619,7 @@ export class DatabaseStorage implements IStorage {
       return await db.select().from(bookings)
         .where(and(
           eq(bookings.mentor_id, mentorId),
-          eq(bookings.status, status as "clicked" | "scheduled" | "completed" | "canceled")
+          eq(bookings.status, status as "pending" | "accepted" | "rejected" | "confirmed" | "completed" | "canceled")
         ))
         .orderBy(desc(bookings.created_at));
     }
@@ -824,7 +830,7 @@ export class DatabaseStorage implements IStorage {
       menteeBookings = await db.select().from(bookings)
         .where(and(
           eq(bookings.mentee_id, menteeId),
-          eq(bookings.status, status as "clicked" | "scheduled" | "completed" | "canceled")
+          eq(bookings.status, status as "pending" | "accepted" | "rejected" | "confirmed" | "completed" | "canceled")
         ))
         .orderBy(desc(bookings.created_at));
     } else {
@@ -850,7 +856,7 @@ export class DatabaseStorage implements IStorage {
     
     const totalSessions = menteeBookings.length;
     const completedSessions = menteeBookings.filter(b => b.status === "completed").length;
-    const upcomingSessions = menteeBookings.filter(b => b.status === "scheduled").length;
+    const upcomingSessions = menteeBookings.filter(b => b.status === "confirmed").length;
     const uniqueMentors = new Set(menteeBookings.map(b => b.mentor_id)).size;
     
     return {
@@ -859,6 +865,72 @@ export class DatabaseStorage implements IStorage {
       upcomingSessions,
       uniqueMentors,
     };
+  }
+
+  // Booking request methods
+  async createBookingRequest(mentorId: string, menteeId: string, goal: string): Promise<Booking> {
+    await this.seedPromise;
+    const id = randomUUID();
+    const now = new Date().toISOString();
+    
+    const result = await db.insert(bookings).values({
+      id,
+      mentor_id: mentorId,
+      mentee_id: menteeId,
+      goal,
+      status: "pending",
+      created_at: now,
+    }).returning();
+    
+    return result[0];
+  }
+
+  async acceptBooking(bookingId: string): Promise<Booking | undefined> {
+    await this.seedPromise;
+    const now = new Date().toISOString();
+    
+    const result = await db.update(bookings)
+      .set({ 
+        status: "accepted",
+        responded_at: now,
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async declineBooking(bookingId: string): Promise<Booking | undefined> {
+    await this.seedPromise;
+    const now = new Date().toISOString();
+    
+    const result = await db.update(bookings)
+      .set({ 
+        status: "rejected",
+        responded_at: now,
+      })
+      .where(eq(bookings.id, bookingId))
+      .returning();
+    
+    return result[0];
+  }
+
+  async getPendingBookingsForMentor(mentorId: string): Promise<(Booking & { mentee?: Mentee })[]> {
+    await this.seedPromise;
+    
+    const pendingBookings = await db.select().from(bookings)
+      .where(and(
+        eq(bookings.mentor_id, mentorId),
+        eq(bookings.status, "pending")
+      ))
+      .orderBy(desc(bookings.created_at));
+    
+    const result = await Promise.all(pendingBookings.map(async (booking) => {
+      const mentee = await this.getMentee(booking.mentee_id);
+      return { ...booking, mentee };
+    }));
+    
+    return result;
   }
 }
 

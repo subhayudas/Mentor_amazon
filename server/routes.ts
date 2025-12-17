@@ -375,7 +375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const bookingData = {
         mentor_id,
         mentee_id: resolvedMenteeId,
-        status: "clicked" as const,
+        status: "pending" as const,
         clicked_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
       };
@@ -389,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createNotification({
           recipient_email: mentor.email,
           recipient_type: "mentor",
-          type: "booking_created",
+          type: "booking_request",
           title: "New Session Booked",
           message: `${mentee.name} has booked a mentorship session with you.`,
           booking_id: booking.id,
@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createNotification({
           recipient_email: mentee.email,
           recipient_type: "mentee",
-          type: "booking_created",
+          type: "booking_request",
           title: "Session Confirmed",
           message: `Your session with ${mentor.name} has been booked successfully.`,
           booking_id: booking.id,
@@ -573,7 +573,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mentor_id: mentorId,
         mentee_id: mentee.id,
         cal_event_uri: calEventUri,
-        status: "scheduled",
+        status: "confirmed",
         scheduled_at: scheduledAt,
       });
       
@@ -639,6 +639,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(mentee);
     } catch (error) {
       res.status(500).json({ message: "Failed to update mentee" });
+    }
+  });
+
+  // Booking request endpoints
+  app.post("/api/bookings/request", async (req, res) => {
+    try {
+      const { mentor_id, mentee_name, mentee_email, goal } = req.body;
+
+      if (!mentor_id || !mentee_email || !goal) {
+        return res.status(400).json({ message: "mentor_id, mentee_email, and goal are required" });
+      }
+
+      const mentor = await storage.getMentor(mentor_id);
+      if (!mentor) {
+        return res.status(404).json({ message: "Mentor not found" });
+      }
+
+      // Get or create mentee
+      let mentee = await storage.getMenteeByEmail(mentee_email);
+      if (!mentee) {
+        mentee = await storage.createMentee({
+          name: mentee_name || "Anonymous",
+          email: mentee_email,
+          user_type: "individual",
+          timezone: "UTC",
+          languages_spoken: ["English"],
+          areas_exploring: ["Career Development"],
+        });
+      }
+
+      const booking = await storage.createBookingRequest(mentor_id, mentee.id, goal);
+
+      // Notify mentor about the new booking request
+      await storage.createNotification({
+        recipient_email: mentor.email,
+        recipient_type: "mentor",
+        type: "booking_request",
+        title: "New Booking Request",
+        message: `${mentee.name} has requested a mentorship session with you. Goal: ${goal}`,
+        booking_id: booking.id,
+      });
+
+      res.status(201).json(booking);
+    } catch (error) {
+      console.error("Booking request error:", error);
+      res.status(500).json({ message: "Failed to create booking request" });
+    }
+  });
+
+  app.patch("/api/bookings/:id/accept", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const existingBooking = await storage.getBooking(id);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (existingBooking.status !== "pending") {
+        return res.status(400).json({ message: "Booking is not in pending status" });
+      }
+
+      const booking = await storage.acceptBooking(id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Get mentor info for Cal link
+      const mentor = await storage.getMentor(booking.mentor_id);
+      const mentee = await storage.getMentee(booking.mentee_id);
+
+      if (mentee && mentor) {
+        const calLink = mentor.cal_link ? `https://cal.com/${mentor.cal_link}` : "";
+        await storage.createNotification({
+          recipient_email: mentee.email,
+          recipient_type: "mentee",
+          type: "booking_accepted",
+          title: "Booking Request Accepted",
+          message: `${mentor.name} has accepted your mentorship request.${calLink ? ` Schedule your session: ${calLink}` : ""}`,
+          booking_id: booking.id,
+        });
+      }
+
+      res.json(booking);
+    } catch (error) {
+      console.error("Accept booking error:", error);
+      res.status(500).json({ message: "Failed to accept booking" });
+    }
+  });
+
+  app.patch("/api/bookings/:id/decline", async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const existingBooking = await storage.getBooking(id);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      if (existingBooking.status !== "pending") {
+        return res.status(400).json({ message: "Booking is not in pending status" });
+      }
+
+      const booking = await storage.declineBooking(id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      // Get mentor info for notification
+      const mentor = await storage.getMentor(booking.mentor_id);
+      const mentee = await storage.getMentee(booking.mentee_id);
+
+      if (mentee && mentor) {
+        await storage.createNotification({
+          recipient_email: mentee.email,
+          recipient_type: "mentee",
+          type: "booking_rejected",
+          title: "Booking Request Declined",
+          message: `${mentor.name} was unable to accept your mentorship request at this time.`,
+          booking_id: booking.id,
+        });
+      }
+
+      res.json(booking);
+    } catch (error) {
+      console.error("Decline booking error:", error);
+      res.status(500).json({ message: "Failed to decline booking" });
     }
   });
 

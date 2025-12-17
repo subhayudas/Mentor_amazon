@@ -66,10 +66,12 @@ export const bookings = pgTable("bookings", {
   mentee_id: varchar("mentee_id").notNull().references(() => mentees.id),
   cal_event_uri: text("cal_event_uri"),
   status: text("status", { 
-    enum: ["clicked", "scheduled", "completed", "canceled"] 
-  }).notNull().default("clicked"),
+    enum: ["pending", "accepted", "rejected", "confirmed", "completed", "canceled"] 
+  }).notNull().default("pending"),
+  goal: text("goal"),
   scheduled_at: timestamp("scheduled_at", { mode: "string" }),
-  clicked_at: timestamp("clicked_at", { mode: "string" }).notNull(),
+  clicked_at: timestamp("clicked_at", { mode: "string" }),
+  responded_at: timestamp("responded_at", { mode: "string" }),
   completed_at: timestamp("completed_at", { mode: "string" }),
   canceled_at: timestamp("canceled_at", { mode: "string" }),
   mentee_rating: integer("mentee_rating"),
@@ -122,7 +124,7 @@ export const notifications = pgTable("notifications", {
   id: varchar("id").primaryKey(),
   recipient_email: text("recipient_email").notNull(),
   recipient_type: text("recipient_type", { enum: ["mentor", "mentee"] }).notNull(),
-  type: text("type", { enum: ["booking_created", "booking_completed", "booking_canceled", "reminder"] }).notNull(),
+  type: text("type", { enum: ["booking_request", "booking_accepted", "booking_rejected", "booking_completed", "booking_canceled", "reminder"] }).notNull(),
   title: text("title").notNull(),
   message: text("message").notNull(),
   booking_id: varchar("booking_id").references(() => bookings.id),
@@ -273,7 +275,13 @@ export const insertMenteeSchema = createInsertSchema(mentees).omit({
 export const insertBookingSchema = createInsertSchema(bookings).omit({
   id: true,
   created_at: true,
-  clicked_at: true,
+});
+
+export const bookingRequestSchema = z.object({
+  mentor_id: z.string(),
+  mentee_name: z.string().min(1, "Name is required"),
+  mentee_email: z.string().email("Valid email is required"),
+  goal: z.string().min(10, "Please describe your goals in at least 10 characters"),
 });
 
 export const insertBookingNoteSchema = createInsertSchema(bookingNotes).omit({

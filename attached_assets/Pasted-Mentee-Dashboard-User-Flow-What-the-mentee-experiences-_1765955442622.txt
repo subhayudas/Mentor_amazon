@@ -1,0 +1,227 @@
+Mentee Dashboard – User Flow (What the mentee experiences)
+A. Mentee logs in → lands on Mentee Dashboard
+
+Dashboard should show (dynamic):
+
+Upcoming approved sessions
+
+Pending booking requests
+
+Past sessions (optional for now)
+
+Notifications (accepted / rejected)
+
+👉 Rule:
+If no data exists, show empty states, NOT fake numbers.
+
+Example:
+
+“You don’t have any upcoming sessions yet. Find a mentor to get started.”
+
+B. Mentee searches & views a Mentor Profile
+
+From:
+
+Mentor listing / search results
+
+Clicks:
+
+View Profile
+
+Sees:
+
+Mentor bio
+
+Expertise
+
+Availability note (no calendar yet)
+
+CTA: “Request a Session”
+
+2. Booking Form Flow (This replaces direct Cal booking)
+A. Mentee clicks “Request a Session”
+
+➡️ Opens a modal / popup form (VERY IMPORTANT for demo clarity)
+
+Form fields (keep minimal):
+
+Name (auto-filled if logged in)
+
+Email (auto-filled if logged in)
+
+What are you hoping to achieve from this session? (textarea)
+
+Buttons:
+
+Submit Request
+
+Cancel
+
+B. On Submit (what happens behind the scenes)
+
+Create a Booking Request object in DB:
+
+{
+  id: "req_123",
+  mentee_id: "mentee_45",
+  mentor_id: "mentor_12",
+  name: "John Doe",
+  email: "john@email.com",
+  goal: "Career guidance for product roles",
+  status: "PENDING",
+  created_at: "timestamp"
+}
+
+
+🚫 No calendar invite yet
+🚫 No Cal link sent yet
+
+C. What the mentee sees immediately after submission
+
+Toast / confirmation:
+
+“Your request has been sent to the mentor. You’ll be notified once they respond.”
+
+Dashboard updates in real time:
+
+Pending Requests: +1
+
+New card under Pending Bookings
+
+3. Mentor Side – Approval Flow (MOST IMPORTANT FIX)
+A. Mentor logs in → Mentor Dashboard
+
+Dashboard must dynamically show:
+
+Pending booking requests (count + list)
+
+Upcoming approved sessions
+
+Recent activity
+
+Example dashboard card:
+
+Pending Requests (1)
+John Doe – “Career guidance for product roles”
+
+👉 Clicking this card redirects to Booking Requests page
+
+B. Booking Requests Page (Mentor Inbox)
+
+Each request card shows:
+
+Mentee name
+
+Email
+
+Goal / context
+
+Timestamp
+
+Buttons:
+
+✅ Accept
+
+❌ Decline
+
+C. Mentor clicks Accept
+System actions:
+
+Update request status:
+
+status: "ACCEPTED"
+
+
+Generate mentor’s Cal booking link
+
+Send email (or in-platform notification) to mentee:
+
+“Your request has been accepted. Book a time here: [Cal Link]”
+
+Create a Session placeholder:
+
+{
+  id: "session_789",
+  mentor_id: "mentor_12",
+  mentee_id: "mentee_45",
+  status: "AWAITING_TIME_SELECTION"
+}
+
+D. Mentor clicks Decline
+System actions:
+
+Update request status:
+
+status: "REJECTED"
+
+
+Notify mentee:
+
+“Your request was declined by the mentor.”
+
+Nothing goes to calendar
+
+4. Calendar Booking Flow (After Acceptance)
+A. Mentee clicks Cal link
+
+Selects time
+
+Confirms booking
+
+B. After time is booked
+
+Update Session object:
+
+{
+  status: "CONFIRMED",
+  start_time: "...",
+  end_time: "...",
+  cal_event_id: "abc123"
+}
+
+
+📩 Calendar invites sent only now
+
+5. Making the Dashboards 100% Dynamic (No Hardcoding)
+A. Single Source of Truth (IMPORTANT)
+
+You should NOT rely on Cal for dashboard data.
+
+Your platform DB should track:
+
+Requests
+
+Sessions
+
+Status changes
+
+Cal = only for final scheduling
+
+B. Mentee Dashboard – Dynamic Sections
+1. Pending Requests
+
+Query:
+
+WHERE mentee_id = X AND status = 'PENDING'
+
+2. Upcoming Sessions
+WHERE mentee_id = X AND status = 'CONFIRMED' AND start_time > now()
+
+3. Past Sessions
+WHERE mentee_id = X AND status = 'COMPLETED'
+
+C. Mentor Dashboard – Dynamic Sections
+1. Pending Requests (CRITICAL)
+WHERE mentor_id = X AND status = 'PENDING'
+
+
+This powers:
+
+Dashboard count
+
+“Pending bookings” card
+
+Booking Requests page
+
+2. Upcoming Sessions
+WHERE mentor_id = X AND status = 'CONFIRMED'
