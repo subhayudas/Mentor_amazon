@@ -174,7 +174,14 @@ export default function Login() {
               </form>
             </Form>
 
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center space-y-2">
+              <Link
+                href="/forgot-password"
+                className="text-sm text-[#0066C0] hover:text-[#C45500] hover:underline"
+                data-testid="link-forgot-password"
+              >
+                {t("auth.forgotPassword", "Forgot Password?")}
+              </Link>
               <p className="text-sm text-[#565959]">
                 {t("auth.noAccount")}{" "}
                 <Link

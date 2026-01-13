@@ -1,14 +1,17 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Navigation } from "@/components/Navigation";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ResetPassword from "@/pages/ResetPassword";
 import MentorProfile from "@/pages/MentorProfile";
 import Analytics from "@/pages/Analytics";
 import MentorOnboarding from "@/pages/MentorOnboarding";
@@ -27,6 +30,8 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/signup" component={Signup} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/mentor/:id" component={MentorProfile} />
       <Route path="/mentors/:id" component={MentorProfile} />
       <Route path="/profile/mentor/:id" component={MentorProfileView} />
@@ -47,19 +52,23 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <LanguageProvider>
-            <div className="min-h-screen bg-background">
-              <Navigation />
-              <Router />
-            </div>
-            <Toaster />
-          </LanguageProvider>
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TooltipProvider>
+            <LanguageProvider>
+              <div className="min-h-screen bg-background">
+                <Navigation />
+                <main className="animate-fade-in">
+                  <Router />
+                </main>
+              </div>
+              <Toaster />
+            </LanguageProvider>
+          </TooltipProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

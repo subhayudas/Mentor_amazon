@@ -14,10 +14,10 @@ export function LanguageToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="text-primary-foreground hover:bg-primary-foreground/10"
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-[var(--ink)] hover:bg-[var(--cream-dark)] rounded-full"
           data-testid="button-language-toggle"
         >
           <Globe className="h-5 w-5" />
@@ -25,7 +25,7 @@ export function LanguageToggle() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => setLanguage('en')}
           className={language === 'en' ? 'bg-accent' : ''}
           data-testid="menu-item-english"
@@ -35,7 +35,7 @@ export function LanguageToggle() {
           </span>
           English
         </DropdownMenuItem>
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => setLanguage('ar')}
           className={language === 'ar' ? 'bg-accent' : ''}
           data-testid="menu-item-arabic"

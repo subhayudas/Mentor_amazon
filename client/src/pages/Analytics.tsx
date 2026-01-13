@@ -39,8 +39,8 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { 
-  Users, Calendar, TrendingUp, CheckCircle2, XCircle, 
+import {
+  Users, Calendar, TrendingUp, CheckCircle2, XCircle,
   Clock, BarChart3, Activity, Filter, PieChart as PieChartIcon, Globe, User
 } from "lucide-react";
 import {
@@ -57,7 +57,7 @@ import {
 import { MOCK_ANALYTICS_DATA } from "@/data/mockAnalytics";
 
 type DateRange = "7" | "30" | "90" | "all";
-type BookingStatus = "clicked" | "scheduled" | "completed" | "canceled" | "all";
+type BookingStatus = "pending" | "accepted" | "rejected" | "confirmed" | "completed" | "canceled" | "all";
 
 interface TimeSeriesData {
   date: string;
@@ -107,7 +107,7 @@ function aggregateBookingsByDate(
       break;
     case "all":
       const oldestBooking = bookings.reduce((oldest, booking) => {
-        const bookingDate = new Date(booking.clicked_at);
+        const bookingDate = booking.clicked_at ? new Date(booking.clicked_at) : new Date();
         return bookingDate < oldest ? bookingDate : oldest;
       }, new Date());
       startDate = startOfMonth(oldestBooking);
@@ -119,6 +119,7 @@ function aggregateBookingsByDate(
   }
 
   const filteredBookings = bookings.filter((booking) => {
+    if (!booking.clicked_at) return false;
     const bookingDate = new Date(booking.clicked_at);
     return isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime();
   });
@@ -126,6 +127,7 @@ function aggregateBookingsByDate(
   const bookingsByDate: Record<string, { total: number; scheduled: number; completed: number; canceled: number }> = {};
 
   filteredBookings.forEach((booking) => {
+    if (!booking.clicked_at) return;
     const bookingDate = new Date(booking.clicked_at);
     let key: string;
 
@@ -142,7 +144,7 @@ function aggregateBookingsByDate(
     }
 
     bookingsByDate[key].total += 1;
-    if (booking.status === "scheduled") bookingsByDate[key].scheduled += 1;
+    if (booking.status === "confirmed") bookingsByDate[key].scheduled += 1;
     if (booking.status === "completed") bookingsByDate[key].completed += 1;
     if (booking.status === "canceled") bookingsByDate[key].canceled += 1;
   });
@@ -248,6 +250,7 @@ export default function Analytics() {
     }
 
     return bookings.filter((booking) => {
+      if (!booking.clicked_at) return false;
       const bookingDate = new Date(booking.clicked_at);
       if (!(isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime())) {
         return false;
@@ -289,13 +292,13 @@ export default function Analytics() {
 
   const statusBreakdown = useMemo(() => {
     const getStatusLabel = (key: string) => t(`analytics.chartLabels.${key}`);
-    
+
     if (useMockData) {
       const scheduled = MOCK_ANALYTICS_DATA.kpis.upcoming_meetings;
       const completed = MOCK_ANALYTICS_DATA.kpis.completed_meetings;
       const canceled = MOCK_ANALYTICS_DATA.kpis.canceled_meetings;
       const clicked = MOCK_ANALYTICS_DATA.kpis.total_bookings - scheduled - completed - canceled;
-      
+
       return [
         { name: getStatusLabel('clicked'), value: clicked, color: STATUS_COLORS.clicked },
         { name: getStatusLabel('scheduled'), value: scheduled, color: STATUS_COLORS.scheduled },
@@ -303,25 +306,29 @@ export default function Analytics() {
         { name: getStatusLabel('canceled'), value: canceled, color: STATUS_COLORS.canceled },
       ].filter((item) => item.value > 0);
     }
-    
+
     if (!filteredBookings) return [];
-    
-    const counts = {
-      clicked: 0,
-      scheduled: 0,
+
+    const counts: Record<string, number> = {
+      pending: 0,
+      accepted: 0,
+      rejected: 0,
+      confirmed: 0,
       completed: 0,
       canceled: 0,
     };
 
     filteredBookings.forEach((booking) => {
-      counts[booking.status] = (counts[booking.status] || 0) + 1;
+      if (counts[booking.status] !== undefined) {
+        counts[booking.status] += 1;
+      }
     });
 
     return [
-      { name: getStatusLabel('clicked'), value: counts.clicked, color: STATUS_COLORS.clicked },
-      { name: getStatusLabel('scheduled'), value: counts.scheduled, color: STATUS_COLORS.scheduled },
+      { name: getStatusLabel('clicked'), value: counts.pending + counts.accepted, color: STATUS_COLORS.clicked },
+      { name: getStatusLabel('scheduled'), value: counts.confirmed, color: STATUS_COLORS.scheduled },
       { name: getStatusLabel('completed'), value: counts.completed, color: STATUS_COLORS.completed },
-      { name: getStatusLabel('canceled'), value: counts.canceled, color: STATUS_COLORS.canceled },
+      { name: getStatusLabel('canceled'), value: counts.canceled + counts.rejected, color: STATUS_COLORS.canceled },
     ].filter((item) => item.value > 0);
   }, [useMockData, filteredBookings, t]);
 
@@ -361,17 +368,17 @@ export default function Analytics() {
   const geographicDistribution = useMemo(() => {
     const mentorsByCountry: Record<string, number> = {};
     const menteesByCountry: Record<string, number> = {};
-    
+
     mentors?.forEach((mentor) => {
       const country = mentor.country || "Not specified";
       mentorsByCountry[country] = (mentorsByCountry[country] || 0) + 1;
     });
-    
+
     mentees?.forEach((mentee) => {
       const country = mentee.country || "Not specified";
       menteesByCountry[country] = (menteesByCountry[country] || 0) + 1;
     });
-    
+
     const CHART_COLORS = [
       "hsl(var(--chart-1))",
       "hsl(var(--chart-2))",
@@ -381,7 +388,7 @@ export default function Analytics() {
       "hsl(var(--primary))",
       "hsl(var(--secondary))",
     ];
-    
+
     let mentorData = Object.entries(mentorsByCountry)
       .map(([name, value], index) => ({
         name,
@@ -390,7 +397,7 @@ export default function Analytics() {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
-    
+
     // Show sample data if no real mentor data exists
     if (mentorData.length === 0) {
       mentorData = [
@@ -403,7 +410,7 @@ export default function Analytics() {
         { name: "Jordan", value: 2, color: CHART_COLORS[6] },
       ];
     }
-    
+
     let menteeData = Object.entries(menteesByCountry)
       .map(([name, value], index) => ({
         name,
@@ -412,7 +419,7 @@ export default function Analytics() {
       }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
-    
+
     // Show sample data if no real mentee data exists
     if (menteeData.length === 0) {
       menteeData = [
@@ -425,18 +432,19 @@ export default function Analytics() {
         { name: "Jordan", value: 6, color: CHART_COLORS[6] },
       ];
     }
-    
+
     return { mentorData, menteeData };
   }, [mentors, mentees]);
 
   const totalBookings = useMockData ? MOCK_ANALYTICS_DATA.kpis.total_bookings : filteredBookings.length;
-  const scheduledCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.upcoming_meetings : filteredBookings.filter((b) => b.status === "scheduled").length;
+  const scheduledCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.upcoming_meetings : filteredBookings.filter((b) => b.status === "confirmed").length;
   const completedCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.completed_meetings : filteredBookings.filter((b) => b.status === "completed").length;
   const canceledCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.canceled_meetings : filteredBookings.filter((b) => b.status === "canceled").length;
   const uniqueMentees = useMockData ? MOCK_ANALYTICS_DATA.kpis.unique_mentees : new Set(filteredBookings.map((b) => b.mentee_id)).size;
 
   const recentBookings = useMockData ? MOCK_ANALYTICS_DATA.recent_bookings : filteredBookings
-    .sort((a, b) => new Date(b.clicked_at).getTime() - new Date(a.clicked_at).getTime())
+    .filter(b => b.clicked_at)
+    .sort((a, b) => new Date(b.clicked_at!).getTime() - new Date(a.clicked_at!).getTime())
     .slice(0, 10);
 
   const getStatusBadge = (status: string) => {
@@ -1030,14 +1038,14 @@ export default function Analytics() {
                             {format(new Date(booking.booked_at), "MMM d, h:mm a")}
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {booking.status === "scheduled" 
+                            {booking.status === "scheduled"
                               ? format(new Date(booking.booked_at), "MMM d, h:mm a")
                               : "-"}
                           </TableCell>
                         </TableRow>
                       );
                     }
-                    
+
                     const mentor = mentors?.find((m) => m.id === booking.mentor_id);
                     const mentee = mentees?.find((m) => m.id === booking.mentee_id);
                     return (
@@ -1058,7 +1066,7 @@ export default function Analytics() {
                           {format(new Date(booking.clicked_at), "MMM d, h:mm a")}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {booking.scheduled_at 
+                          {booking.scheduled_at
                             ? format(new Date(booking.scheduled_at), "MMM d, h:mm a")
                             : "-"}
                         </TableCell>

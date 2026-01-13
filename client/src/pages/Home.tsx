@@ -1,14 +1,15 @@
 import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { motion } from "framer-motion";
 import { Mentor } from "@shared/schema";
 import { MentorCard } from "@/components/MentorCard";
 import { SearchAndFilter } from "@/components/SearchAndFilter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Users, Calendar, Globe, TrendingUp, HelpCircle, ArrowRight } from "lucide-react";
+import { NumberTicker, ScrambleHover } from "@/components/fancy/FancyComponents";
+import { ArrowRight, Sparkles, MessageCircle, Target, Zap, Globe, ChevronRight } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -16,10 +17,10 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Link } from "wouter";
-import heroImage from "@assets/image_1765099874695.png";
 
 export default function Home() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language === 'ar';
   const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
 
   const buildQueryParams = () => {
@@ -34,10 +35,7 @@ export default function Home() {
   const queryParams = buildQueryParams();
   const apiUrl = queryParams ? `/api/mentors?${queryParams}` : "/api/mentors";
 
-  const { data: mentors, isLoading } = useQuery<Mentor[]>({
-    queryKey: [apiUrl],
-  });
-
+  const { data: mentors, isLoading } = useQuery<Mentor[]>({ queryKey: [apiUrl] });
   const allMentors = mentors;
 
   const handleFilterChange = useCallback((newFilters: { search: string; expertise: string; industry: string; language: string }) => {
@@ -51,213 +49,498 @@ export default function Home() {
     filters.language && filters.language !== "all"
   ].filter(Boolean).length;
 
+  const pastelColors: Array<'pink' | 'mint' | 'purple' | 'coral' | 'blue'> = ['pink', 'mint', 'purple', 'coral', 'blue'];
+  const getCardColor = (index: number): 'pink' | 'mint' | 'purple' | 'coral' | 'blue' => pastelColors[index % pastelColors.length];
+
   return (
-    <div className="min-h-screen">
-      <section 
-        className="relative overflow-hidden min-h-[420px] md:min-h-[480px]"
-        style={{
-          backgroundImage: `url(${heroImage})`,
-          backgroundSize: '180% auto',
-          backgroundPosition: 'center bottom',
-          backgroundRepeat: 'no-repeat',
-        }}
-        data-testid="hero-section"
-      >
-        {/* Cream overlay for text readability - matching Composio style */}
-        <div 
-          className="absolute inset-0 z-0"
-          style={{
-            background: 'linear-gradient(to bottom, rgba(245, 243, 240, 0.95) 0%, rgba(245, 243, 240, 0.85) 40%, rgba(245, 243, 240, 0.4) 70%, transparent 100%)',
-          }}
+    <div className="min-h-screen" style={{ background: 'var(--cream)' }}>
+
+      {/* ========== HERO SECTION ========== */}
+      <section className="hero-mesh relative py-20 md:py-32 overflow-hidden">
+        {/* Floating decorative elements */}
+        <motion.div
+          className="absolute top-20 right-[15%] w-20 h-20 rounded-3xl float-slow"
+          style={{ background: 'var(--pastel-peach)', opacity: 0.6 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 0.6, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.8 }}
         />
-        <div 
-          className="absolute inset-0 z-0 dark:block hidden"
-          style={{
-            background: 'linear-gradient(to bottom, rgba(28, 25, 23, 0.95) 0%, rgba(28, 25, 23, 0.85) 40%, rgba(28, 25, 23, 0.4) 70%, transparent 100%)',
-          }}
+        <motion.div
+          className="absolute bottom-32 left-[10%] w-16 h-16 rounded-2xl float-slow"
+          style={{ background: 'var(--pastel-lavender)', opacity: 0.5, animationDelay: '2s' }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 0.5, y: 0 }}
+          transition={{ delay: 0.7, duration: 0.8 }}
         />
-        
-        {/* Text Content */}
-        <div className="relative z-10 max-w-4xl mx-auto px-4 md:px-8 pt-12 md:pt-16 pb-48 md:pb-56 text-center">
-          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-stone-900 dark:text-stone-100 leading-tight mb-3" data-testid="hero-headline">
-            {t('hero.headline')}
-          </h1>
-          <p className="text-lg md:text-xl font-medium text-[#FF9900] mb-3" data-testid="hero-tagline">
-            <em>{t('hero.tagline')}</em>
-          </p>
-          <p className="text-stone-600 dark:text-stone-400 text-sm md:text-base leading-relaxed max-w-xl mx-auto mb-6" data-testid="hero-narrative">
-            {t('hero.shortNarrative')}
-          </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <a href="#mentors">
-              <Button size="lg" className="bg-[#232F3E] text-white hover:bg-[#232F3E]/90" data-testid="button-browse-mentors">
-                {t('nav.browseMentors')}
-              </Button>
-            </a>
-            <Link href="/mentor-onboarding">
-              <Button size="lg" variant="outline" className="border-stone-800 text-stone-800 dark:border-stone-200 dark:text-stone-200 hover:bg-stone-800/5" data-testid="button-become-mentor">
-                <ArrowRight className="w-4 h-4 mr-2 rtl:mr-0 rtl:ml-2 rtl:rotate-180" />
-                {t('nav.becomeMentor')}
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+        <motion.div
+          className="absolute top-40 left-[20%] w-12 h-12 rounded-full float-slow"
+          style={{ background: 'var(--pastel-sage)', opacity: 0.4, animationDelay: '4s' }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.4 }}
+          transition={{ delay: 0.9, duration: 0.8 }}
+        />
 
-      <section id="mentors" className="py-8 md:py-12 bg-gradient-to-b from-background via-muted/30 to-background">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="text-center md:text-left">
-                <h2 className="text-3xl font-bold mb-2">
-                  {t('mentors.featured')}
-                  {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="ml-3 align-middle">
-                      {activeFilterCount} {t('mentors.filtersActive', { count: activeFilterCount })}
-                    </Badge>
-                  )}
-                </h2>
-                <p className="text-muted-foreground">
-                  {t('mentors.browseDescription')}
-                </p>
-              </div>
-            </div>
+        <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-8 text-center">
+          {/* Badge */}
+          <motion.div
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
+            style={{ background: 'var(--pastel-butter)', border: '1px solid rgba(255, 153, 0, 0.15)' }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+          >
+            <Sparkles className="w-4 h-4" style={{ color: 'var(--amazon-orange)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
+              {t('hero.badge')}
+            </span>
+          </motion.div>
 
-            {allMentors && (
-              <SearchAndFilter 
-                mentors={allMentors} 
-                onFilterChange={handleFilterChange}
-              />
-            )}
-
-            {isLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <Card key={i} className="p-8">
-                    <div className="flex flex-col items-center gap-4">
-                      <Skeleton className="w-24 h-24 rounded-full" />
-                      <div className="space-y-2 w-full">
-                        <Skeleton className="h-6 w-3/4 mx-auto" />
-                        <Skeleton className="h-4 w-1/2 mx-auto" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-5/6 mx-auto" />
-                      </div>
-                      <div className="flex gap-2">
-                        <Skeleton className="h-6 w-16" />
-                        <Skeleton className="h-6 w-20" />
-                        <Skeleton className="h-6 w-16" />
-                      </div>
-                      <Skeleton className="h-10 w-full" />
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            ) : mentors && mentors.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" data-testid="mentor-grid">
-                {mentors.map((mentor) => (
-                  <MentorCard key={mentor.id} mentor={mentor} />
-                ))}
-              </div>
+          {/* Main Headline */}
+          <motion.h1
+            className="mb-6"
+            style={{ fontFamily: 'var(--font-display)' }}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.1 }}
+          >
+            {isArabic ? (
+              <>
+                اعثر على <span className="italic">مرشدك</span>
+                <br />
+                <span className="relative inline-block">
+                  المثالي
+                  <svg
+                    className="absolute -bottom-2 left-0 w-full"
+                    viewBox="0 0 200 12"
+                    fill="none"
+                    style={{ height: '0.15em' }}
+                  >
+                    <path
+                      d="M2 8 Q100 2 198 8"
+                      stroke="var(--amazon-orange)"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </svg>
+                </span>
+              </>
             ) : (
-              <Card className="p-12 text-center">
-                <p className="text-muted-foreground" data-testid="text-no-results">
-                  {activeFilterCount > 0 
-                    ? t('mentors.noResultsFilter')
-                    : t('mentors.noResults')}
+              <>
+                Find your <span className="italic">perfect</span>
+                <br />
+                <span className="relative inline-block">
+                  mentor
+                  <svg
+                    className="absolute -bottom-2 left-0 w-full"
+                    viewBox="0 0 200 12"
+                    fill="none"
+                    style={{ height: '0.15em' }}
+                  >
+                    <path
+                      d="M2 8 Q100 2 198 8"
+                      stroke="var(--amazon-orange)"
+                      strokeWidth="4"
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </svg>
+                </span>
+              </>
+            )}
+          </motion.h1>
+
+          {/* Subheadline */}
+          <motion.p
+            className="text-xl md:text-2xl mb-6"
+            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', color: 'var(--amazon-orange)' }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            {t('hero.tagline')}
+          </motion.p>
+
+          {/* Description */}
+          <motion.p
+            className="text-lg max-w-2xl mx-auto mb-10"
+            style={{ color: 'var(--ink-light)', lineHeight: 1.7 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+          >
+            {t('hero.shortNarrative')}
+          </motion.p>
+
+          {/* CTA Buttons */}
+          <motion.div
+            className="flex flex-wrap gap-4 justify-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.4 }}
+          >
+            <a href="#mentors">
+              <button className="btn-primary text-lg group">
+                {t('nav.browseMentors')}
+                <ArrowRight className={`w-5 h-5 transition-transform group-hover:translate-x-1 ${isArabic ? 'rotate-180' : ''}`} />
+              </button>
+            </a>
+            <Link href="/mentee-registration">
+              <button className="btn-outline text-lg">
+                {t('nav.joinMentee')}
+              </button>
+            </Link>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ========== FEATURE CARDS - ASYMMETRIC BENTO ========== */}
+      <section className="py-20 md:py-28">
+        <div className="max-w-6xl mx-auto px-6 md:px-8">
+
+          {/* Asymmetric Grid */}
+          <div className="grid grid-cols-12 gap-4 md:gap-6">
+
+            {/* Large Card - Personal Mentorship */}
+            <motion.div
+              className="feature-card card-blush col-span-12 md:col-span-7 min-h-[320px] flex flex-col justify-between"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.6 }}
+            >
+              <div>
+                <div className="inline-flex p-3 rounded-2xl mb-6" style={{ background: 'rgba(255, 182, 193, 0.5)' }}>
+                  <MessageCircle className="w-6 h-6" style={{ color: '#E75480' }} />
+                </div>
+                <h3 className="mb-4" style={{ fontFamily: 'var(--font-display)' }}>
+                  {isArabic ? 'إرشاد فردي' : '1:1 Mentorship'}
+                </h3>
+                <p style={{ color: 'var(--ink-light)', fontSize: '1.1rem', lineHeight: 1.7 }}>
+                  {isArabic
+                    ? 'احجز جلسات مخصصة مع قادة أمازون. احصل على ملاحظات مباشرة حول مشاريعك وقراراتك المهنية ومسار نموك.'
+                    : 'Book personalized sessions with Amazon leaders. Get direct feedback on your projects, career decisions, and growth trajectory.'
+                  }
                 </p>
-              </Card>
+              </div>
+              <div className="mt-8">
+                <Link href="/mentee-registration" className="group inline-flex items-center gap-2 font-semibold" style={{ color: 'var(--ink)' }}>
+                  <ScrambleHover>{isArabic ? 'ابدأ الآن' : 'Get Started'}</ScrambleHover>
+                  <ChevronRight className={`w-4 h-4 transition-transform group-hover:translate-x-1 ${isArabic ? 'rotate-180' : ''}`} />
+                </Link>
+              </div>
+              <div className="card-deco" />
+            </motion.div>
+
+            {/* Stats Card */}
+            <motion.div
+              className="feature-card card-sage col-span-12 md:col-span-5 flex flex-col justify-center"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+            >
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <div className="stat-value">
+                    <NumberTicker target={mentors?.length || 50} suffix="+" />
+                  </div>
+                  <div className="stat-label mt-1">{t('stats.activeMentors')}</div>
+                </div>
+                <div>
+                  <div className="stat-value">
+                    <NumberTicker target={500} duration={2.5} suffix="+" />
+                  </div>
+                  <div className="stat-label mt-1">{t('stats.sessionsBooked')}</div>
+                </div>
+                <div>
+                  <div className="stat-value">
+                    <NumberTicker target={12} suffix="+" />
+                  </div>
+                  <div className="stat-label mt-1">{t('stats.countries')}</div>
+                </div>
+                <div>
+                  <div className="stat-value">
+                    <NumberTicker target={98} suffix="%" />
+                  </div>
+                  <div className="stat-label mt-1">{t('stats.satisfaction')}</div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Career Goals */}
+            <motion.div
+              className="feature-card card-lavender col-span-12 md:col-span-4"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+            >
+              <div className="inline-flex p-3 rounded-2xl mb-4" style={{ background: 'rgba(201, 182, 228, 0.5)' }}>
+                <Target className="w-6 h-6" style={{ color: '#7C3AED' }} />
+              </div>
+              <h3 className="text-2xl mb-3" style={{ fontFamily: 'var(--font-display)' }}>
+                {isArabic ? 'حدد أهدافك' : 'Set Goals'}
+              </h3>
+              <p style={{ color: 'var(--ink-light)' }}>
+                {isArabic
+                  ? 'أهداف واضحة مع توجيه من الذين سبقوك في المسار.'
+                  : "Clear objectives with guidance from those who've walked the path."
+                }
+              </p>
+            </motion.div>
+
+            {/* Fast Growth */}
+            <motion.div
+              className="feature-card card-peach col-span-12 md:col-span-4"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.6, delay: 0.3 }}
+            >
+              <div className="inline-flex p-3 rounded-2xl mb-4" style={{ background: 'rgba(255, 179, 153, 0.5)' }}>
+                <Zap className="w-6 h-6" style={{ color: '#EA580C' }} />
+              </div>
+              <h3 className="text-2xl mb-3" style={{ fontFamily: 'var(--font-display)' }}>
+                {isArabic ? 'نمو سريع' : 'Fast Growth'}
+              </h3>
+              <p style={{ color: 'var(--ink-light)' }}>
+                {isArabic
+                  ? 'تخطى سنوات من التجربة والخطأ برؤى من كبار الأمازونيين.'
+                  : 'Skip years of trial and error with insights from senior Amazonians.'
+                }
+              </p>
+            </motion.div>
+
+            {/* Global Network */}
+            <motion.div
+              className="feature-card card-sky col-span-12 md:col-span-4"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.6, delay: 0.4 }}
+            >
+              <div className="inline-flex p-3 rounded-2xl mb-4" style={{ background: 'rgba(135, 206, 235, 0.5)' }}>
+                <Globe className="w-6 h-6" style={{ color: '#0284C7' }} />
+              </div>
+              <h3 className="text-2xl mb-3" style={{ fontFamily: 'var(--font-display)' }}>
+                {isArabic ? 'شبكة عالمية' : 'Global Network'}
+              </h3>
+              <p style={{ color: 'var(--ink-light)' }}>
+                {isArabic
+                  ? 'تواصل مع مرشدين من أكثر من 12 دولة وخلفيات متنوعة.'
+                  : 'Connect with mentors across 12+ countries and diverse backgrounds.'
+                }
+              </p>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* ========== MENTORS SECTION ========== */}
+      <section id="mentors" className="py-20 md:py-28" style={{ background: 'white' }}>
+        <div className="max-w-7xl mx-auto px-6 md:px-8">
+          {/* Section Header */}
+          <div className="text-center max-w-2xl mx-auto mb-12">
+            <motion.h2
+              className="mb-4"
+              style={{ fontFamily: 'var(--font-display)' }}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6 }}
+            >
+              {t('mentors.featured')}
+            </motion.h2>
+            <p style={{ color: 'var(--ink-light)', fontSize: '1.125rem' }}>
+              {t('mentors.browseDescription')}
+            </p>
+            {activeFilterCount > 0 && (
+              <Badge className="mt-4 rounded-full px-4 py-1" style={{ background: 'var(--pastel-butter)', color: 'var(--ink)' }}>
+                {activeFilterCount} {isArabic ? 'فلتر نشط' : (activeFilterCount > 1 ? 'filters' : 'filter')} {isArabic ? '' : 'active'}
+              </Badge>
             )}
           </div>
-        </div>
-      </section>
 
-      <section className="py-8 md:py-10 bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-mentors">
-              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
-                <Users className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold text-orange-600">{mentors?.length || "50"}+</div>
-              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.activeMentors')}</div>
-            </Card>
-            
-            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-sessions">
-              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
-                <Calendar className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold text-orange-600">500+</div>
-              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.sessionsBooked')}</div>
-            </Card>
-            
-            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-countries">
-              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
-                <Globe className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold text-orange-600">12+</div>
-              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.countries')}</div>
-            </Card>
-            
-            <Card className="p-4 md:p-6 text-center bg-white/80 dark:bg-card/80 backdrop-blur-sm border-orange-200/50 dark:border-orange-800/30" data-testid="stat-satisfaction">
-              <div className="inline-flex items-center justify-center w-10 h-10 md:w-12 md:h-12 rounded-full bg-orange-100 dark:bg-orange-900/30 mb-3">
-                <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
-              </div>
-              <div className="text-2xl md:text-3xl font-bold text-orange-600">98%</div>
-              <div className="text-xs md:text-sm text-muted-foreground">{t('stats.satisfaction')}</div>
-            </Card>
-          </div>
-        </div>
-      </section>
+          {/* Search and Filter */}
+          {allMentors && (
+            <SearchAndFilter mentors={allMentors} onFilterChange={handleFilterChange} />
+          )}
 
-      <section className="py-12 md:py-16 bg-muted/30">
-        <div className="max-w-3xl mx-auto px-4 md:px-8">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 mb-2">
-              <HelpCircle className="w-6 h-6 text-orange-500" />
-              <h2 className="text-2xl md:text-3xl font-bold">{t('faq.title')}</h2>
+          {/* Mentor Grid */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Card key={i} className="p-6 rounded-3xl bg-white">
+                  <Skeleton className="w-20 h-20 rounded-2xl mb-4" />
+                  <Skeleton className="h-6 w-3/4 mb-2" />
+                  <Skeleton className="h-4 w-1/2 mb-4" />
+                  <div className="flex gap-2 mb-4">
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                    <Skeleton className="h-6 w-20 rounded-full" />
+                  </div>
+                  <Skeleton className="h-12 w-full rounded-xl" />
+                </Card>
+              ))}
             </div>
-            <p className="text-muted-foreground">{t('faq.subtitle')}</p>
-          </div>
-          
-          <Accordion type="single" collapsible className="w-full" data-testid="faq-accordion">
-            <AccordionItem value="spam">
-              <AccordionTrigger className="text-left" data-testid="faq-spam-trigger">
-                {t('faq.spamQuestion')}
-              </AccordionTrigger>
-              <AccordionContent data-testid="faq-spam-answer">
-                {t('faq.spamAnswer')}
-              </AccordionContent>
-            </AccordionItem>
-            
-            <AccordionItem value="commitment">
-              <AccordionTrigger className="text-left" data-testid="faq-commitment-trigger">
-                {t('faq.commitmentQuestion')}
-              </AccordionTrigger>
-              <AccordionContent data-testid="faq-commitment-answer">
-                {t('faq.commitmentAnswer')}
-              </AccordionContent>
-            </AccordionItem>
-            
-            <AccordionItem value="matching">
-              <AccordionTrigger className="text-left" data-testid="faq-matching-trigger">
-                {t('faq.matchingQuestion')}
-              </AccordionTrigger>
-              <AccordionContent data-testid="faq-matching-answer">
-                {t('faq.matchingAnswer')}
-              </AccordionContent>
-            </AccordionItem>
-            
-            <AccordionItem value="cancel">
-              <AccordionTrigger className="text-left" data-testid="faq-cancel-trigger">
-                {t('faq.cancelQuestion')}
-              </AccordionTrigger>
-              <AccordionContent data-testid="faq-cancel-answer">
-                {t('faq.cancelAnswer')}
-              </AccordionContent>
-            </AccordionItem>
+          ) : mentors && mentors.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
+              {mentors.map((mentor, index) => (
+                <motion.div
+                  key={mentor.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: index * 0.05 }}
+                >
+                  <MentorCard mentor={mentor} accentColor={getCardColor(index)} />
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <Card className="p-12 text-center rounded-3xl mt-10">
+              <p style={{ color: 'var(--ink-muted)' }}>
+                {activeFilterCount > 0 ? t('mentors.noResultsFilter') : t('mentors.noResults')}
+              </p>
+            </Card>
+          )}
+        </div>
+      </section>
+
+      {/* ========== FAQ SECTION ========== */}
+      <section className="py-20 md:py-28" style={{ background: 'var(--cream)' }}>
+        <div className="max-w-3xl mx-auto px-6 md:px-8">
+          <motion.div
+            className="text-center mb-12"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <h2 className="mb-4" style={{ fontFamily: 'var(--font-display)' }}>
+              {t('faq.title')}
+            </h2>
+            <p style={{ color: 'var(--ink-muted)' }}>{t('faq.subtitle')}</p>
+          </motion.div>
+
+          <Accordion type="single" collapsible className="w-full space-y-3">
+            {[
+              { value: "spam", question: t('faq.spamQuestion'), answer: t('faq.spamAnswer') },
+              { value: "commitment", question: t('faq.commitmentQuestion'), answer: t('faq.commitmentAnswer') },
+              { value: "matching", question: t('faq.matchingQuestion'), answer: t('faq.matchingAnswer') },
+              { value: "cancel", question: t('faq.cancelQuestion'), answer: t('faq.cancelAnswer') },
+            ].map((faq) => (
+              <AccordionItem
+                key={faq.value}
+                value={faq.value}
+                className="bg-white rounded-2xl px-6 border-none data-[state=open]:shadow-sm"
+              >
+                <AccordionTrigger className="text-left hover:no-underline py-5 font-medium text-[var(--ink)]">
+                  {faq.question}
+                </AccordionTrigger>
+                <AccordionContent className="pb-5 text-[var(--ink-light)]">
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            ))}
           </Accordion>
         </div>
       </section>
+
+      {/* ========== VEROSEK-STYLE FOOTER ========== */}
+      <footer className="relative py-20 md:py-28 overflow-hidden" style={{ background: 'var(--cream)' }}>
+        {/* Background shader gradient - warm orange tones */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: `
+              radial-gradient(ellipse 80% 50% at 30% 70%, rgba(255, 153, 0, 0.08) 0%, transparent 50%),
+              radial-gradient(ellipse 60% 40% at 70% 50%, rgba(255, 173, 51, 0.06) 0%, transparent 50%)
+            `,
+          }}
+        />
+
+        <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-8">
+          {/* Top section - Newsletter + Navigation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
+            {/* Newsletter */}
+            <div>
+              <h4 className="text-lg font-semibold mb-4" style={{ color: 'var(--ink)' }}>
+                {isArabic ? 'انضم إلينا' : 'Join Waitlist'}
+              </h4>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  placeholder={isArabic ? 'بريدك الإلكتروني' : 'Your email'}
+                  className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--amazon-orange)] focus:border-transparent"
+                />
+                <button
+                  className="px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 hover:brightness-110"
+                  style={{
+                    background: 'var(--amazon-orange)',
+                    color: 'white',
+                  }}
+                >
+                  {isArabic ? 'إرسال' : 'Submit'}
+                </button>
+              </div>
+            </div>
+
+            {/* Navigation Links */}
+            <div>
+              <h4 className="text-lg font-semibold mb-4" style={{ color: 'var(--ink)' }}>
+                {isArabic ? 'التنقل' : 'Navigation'}
+              </h4>
+              <ul className="space-y-3">
+                <li>
+                  <Link href="/" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
+                    {t('nav.home')}
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/mentee-registration" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
+                    {t('nav.joinMentee')}
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/mentor-onboarding" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
+                    {t('nav.becomeMentor')}
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/analytics" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
+                    {t('nav.analytics')}
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-[var(--border)] mb-8" />
+
+          {/* Copyright */}
+          <div className="text-center text-sm" style={{ color: 'var(--ink-muted)' }}>
+            © 2025 amazon. {t('footer.allRightsReserved')}
+          </div>
+        </div>
+
+        {/* Large "amazon" text - Verosek style with orange */}
+        <div
+          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full text-center pointer-events-none select-none overflow-hidden"
+          style={{
+            fontSize: 'clamp(8rem, 25vw, 20rem)',
+            fontFamily: 'var(--font-display)',
+            fontWeight: 500,
+            color: 'var(--amazon-orange)',
+            opacity: 0.25,
+            lineHeight: 0.8,
+            letterSpacing: '-0.05em',
+          }}
+        >
+          amazon
+        </div>
+      </footer>
     </div>
   );
 }

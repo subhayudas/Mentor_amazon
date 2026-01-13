@@ -158,11 +158,11 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
     },
   });
 
-  const upcomingSessions = bookings?.filter(b => 
-    b.status === 'scheduled' && b.scheduled_at && isFuture(parseISO(b.scheduled_at))
+  const upcomingSessions = bookings?.filter(b =>
+    b.status === 'confirmed' && b.scheduled_at && isFuture(parseISO(b.scheduled_at))
   ) ?? [];
 
-  const completedSessions = bookings?.filter(b => 
+  const completedSessions = bookings?.filter(b =>
     b.status === 'completed' || (b.scheduled_at && isPast(parseISO(b.scheduled_at)))
   ) ?? [];
 
@@ -181,7 +181,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
 
   const handleAddNote = () => {
     if (!noteContent.trim() || !selectedBooking) return;
-    
+
     addNoteMutation.mutate({
       booking_id: selectedBooking.id,
       author_type: "mentor",
@@ -254,7 +254,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'scheduled':
+      case 'confirmed':
         return <Badge variant="default">{t('mentorPortal.statusScheduled')}</Badge>;
       case 'completed':
         return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">{t('mentorPortal.statusCompleted')}</Badge>;
@@ -284,7 +284,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
             {getStatusBadge(booking.status)}
           </div>
         </div>
-        
+
         <div className="mt-4 flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
           {booking.scheduled_at && (
             <>
@@ -310,8 +310,8 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
             <FileText className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
             {t('mentorPortal.viewNotes')}
           </Button>
-          
-          {showActions && booking.status === 'scheduled' && (
+
+          {showActions && booking.status === 'confirmed' && (
             <>
               <Button
                 size="sm"
@@ -439,7 +439,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
           <div className="space-y-4">
             <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
               <Label data-testid="label-add-note">{t('mentorPortal.addNoteOrTask')}</Label>
-              
+
               <div className="flex gap-2">
                 <Button
                   size="sm"
@@ -517,7 +517,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
 
             <div className="space-y-2">
               <Label data-testid="label-existing-notes">{t('mentorPortal.existingNotes')}</Label>
-              
+
               {notesLoading ? (
                 <div className="space-y-2">
                   <Skeleton className="h-16" />
@@ -675,7 +675,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
                       </span>
                     </div>
                   </div>
-                  
+
                   {feedbackBooking.mentee_feedback && (
                     <div className="space-y-2">
                       <Label className="text-sm">{t('mentorPortal.feedback')}</Label>

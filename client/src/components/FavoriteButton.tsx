@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Favorite } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Heart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+// Local type for favorites since it's not in the shared schema
+interface Favorite {
+  mentorId: string;
+  menteeId?: string;
+}
 
 interface FavoriteButtonProps {
   mentorId: string;
@@ -14,12 +19,12 @@ interface FavoriteButtonProps {
   showLabel?: boolean;
 }
 
-export function FavoriteButton({ 
-  mentorId, 
-  mentorName, 
-  variant = "ghost", 
+export function FavoriteButton({
+  mentorId,
+  mentorName,
+  variant = "ghost",
   size = "icon",
-  showLabel = false 
+  showLabel = false
 }: FavoriteButtonProps) {
   const { toast } = useToast();
   const [menteeEmail, setMenteeEmail] = useState<string | null>(null);
@@ -111,7 +116,7 @@ export function FavoriteButton({
       disabled={isPending}
       data-testid={`button-favorite-${mentorId}`}
     >
-      <Heart 
+      <Heart
         className={`w-4 h-4 ${isFavorited ? "fill-current text-red-500" : ""} ${showLabel ? "mr-2" : ""}`}
       />
       {showLabel && (isFavorited ? "Favorited" : "Add to Favorites")}

@@ -182,9 +182,14 @@ export default function MentorOnboarding() {
         let calLink = data.cal_link.trim();
         // Strip https://cal.com/ prefix if present
         calLink = calLink.replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
-        // Accept username/eventtype format (letters, numbers, dots, dashes, underscores)
-        const validPattern = /^[a-z0-9._-]+\/[a-z0-9._-]+$/i;
-        return validPattern.test(calLink);
+        // Accept username/eventtype format 
+        // Cal.com usernames can contain: letters, numbers, dots, dashes
+        // Event types can contain: letters, numbers, dashes
+        // Examples: username/30min, vats-s.-shah-2krirj/30min, john.doe/meeting
+        const validPattern = /^[a-z0-9][a-z0-9._-]*[a-z0-9]\/[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]\/[a-z0-9]$/i;
+        // Also accept single character username/event: a/b
+        const simplePattern = /^[a-z0-9._-]+\/[a-z0-9_-]+$/i;
+        return simplePattern.test(calLink);
       },
       {
         message: "Please enter a valid Cal.com link (e.g., username/30min or https://cal.com/username/30min)",
@@ -572,9 +577,9 @@ export default function MentorOnboarding() {
                       </FormControl>
                       <FormDescription className="space-y-1">
                         <span>{t('mentorOnboarding.calHelp')}</span>
-                        <a 
-                          href="https://cal.com/signup" 
-                          target="_blank" 
+                        <a
+                          href="https://cal.com/signup"
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="block text-primary hover:underline"
                           data-testid="link-setup-cal"
@@ -787,12 +792,12 @@ export default function MentorOnboarding() {
                       <FormItem>
                         <FormLabel>{t('mentorOnboarding.assistantEmail')} *</FormLabel>
                         <FormControl>
-                          <Input 
-                            type="email" 
-                            placeholder="assistant@example.com" 
-                            {...field} 
-                            value={field.value || ""} 
-                            data-testid="input-assistant-email" 
+                          <Input
+                            type="email"
+                            placeholder="assistant@example.com"
+                            {...field}
+                            value={field.value || ""}
+                            data-testid="input-assistant-email"
                           />
                         </FormControl>
                         <FormDescription>

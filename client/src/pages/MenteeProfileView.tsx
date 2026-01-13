@@ -151,7 +151,7 @@ export default function MenteeProfileView() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Upcoming</span>
                   <span className="font-semibold text-blue-600" data-testid="text-upcoming-bookings">
-                    {menteeBookings.filter((b) => b.status === "scheduled").length}
+                    {menteeBookings.filter((b) => b.status === "confirmed").length}
                   </span>
                 </div>
               </div>
@@ -219,7 +219,7 @@ export default function MenteeProfileView() {
                         <div>
                           <p className="font-medium">{mentor?.name || "Unknown Mentor"}</p>
                           <p className="text-sm text-muted-foreground">
-                            {format(new Date(booking.clicked_at), "MMM d, yyyy")}
+                            {booking.clicked_at ? format(new Date(booking.clicked_at), "MMM d, yyyy") : "Date unavailable"}
                           </p>
                         </div>
                       </div>
@@ -227,9 +227,9 @@ export default function MenteeProfileView() {
                         variant={
                           booking.status === "completed"
                             ? "secondary"
-                            : booking.status === "scheduled"
-                            ? "default"
-                            : "outline"
+                            : booking.status === "confirmed"
+                              ? "default"
+                              : "outline"
                         }
                       >
                         {booking.status}

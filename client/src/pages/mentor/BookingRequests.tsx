@@ -85,6 +85,7 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
     declineMutation.mutate(bookingId);
   };
 
+  // The API already returns only pending bookings, but filter to be safe
   const pendingBookings = bookings?.filter(b => b.status === 'pending') ?? [];
   const isMutating = acceptMutation.isPending || declineMutation.isPending;
 

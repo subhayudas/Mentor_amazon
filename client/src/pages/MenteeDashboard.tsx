@@ -86,41 +86,41 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<string | null>(null);
-  
+
   const { data: stats, isLoading: statsLoading } = useQuery<MenteeStats>({
     queryKey: ['/api/mentee', menteeId, 'stats'],
   });
 
   const { data: bookings } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
-    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
   });
 
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed').slice(0, 3) || [];
   const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted').slice(0, 3) || [];
-  
+
   useEffect(() => {
     if (!bookings) return;
-    
+
     const acceptedBooking = bookings.find(
-      b => b.status === 'accepted' && 
-           b.mentor?.cal_link && 
-           !b.scheduled_at &&
-           b.id !== autoOpenedBookingId
+      b => b.status === 'accepted' &&
+        b.mentor?.cal_link &&
+        !b.scheduled_at &&
+        b.id !== autoOpenedBookingId
     );
-    
+
     if (acceptedBooking) {
       setSelectedBooking(acceptedBooking);
       setShowCalendar(true);
       setAutoOpenedBookingId(acceptedBooking.id);
     }
   }, [bookings, autoOpenedBookingId]);
-  
+
   const handleScheduleClick = (booking: BookingWithMentor) => {
     setSelectedBooking(booking);
     setShowCalendar(true);
   };
-  
+
   return (
     <div className="space-y-6">
       <div>
@@ -181,7 +181,7 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
           </CardContent>
         </Card>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -209,7 +209,7 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
                         <p className="text-sm text-muted-foreground line-clamp-1">{booking.goal}</p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        {booking.status === 'pending' 
+                        {booking.status === 'pending'
                           ? (t('menteePortal.awaitingMentorResponse') || 'Awaiting mentor response')
                           : (t('menteePortal.acceptedBookNow') || 'Mentor accepted - Book your time slot')}
                       </p>
@@ -222,8 +222,8 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
                       <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.accepted') || 'Accepted'}</Badge>
                     )}
                     {booking.status === 'accepted' && booking.mentor?.cal_link && (
-                      <Button 
-                        variant="default" 
+                      <Button
+                        variant="default"
                         size="sm"
                         onClick={() => handleScheduleClick(booking)}
                         data-testid={`button-schedule-${booking.id}`}
@@ -302,39 +302,39 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<string | null>(null);
-  
+
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
-    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
   });
 
   const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted') || [];
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed') || [];
   const completedBookings = bookings?.filter(b => b.status === 'completed') || [];
   const canceledBookings = bookings?.filter(b => b.status === 'canceled' || b.status === 'rejected') || [];
-  
+
   useEffect(() => {
     if (!bookings) return;
-    
+
     const acceptedBooking = bookings.find(
-      b => b.status === 'accepted' && 
-           b.mentor?.cal_link && 
-           !b.scheduled_at &&
-           b.id !== autoOpenedBookingId
+      b => b.status === 'accepted' &&
+        b.mentor?.cal_link &&
+        !b.scheduled_at &&
+        b.id !== autoOpenedBookingId
     );
-    
+
     if (acceptedBooking) {
       setSelectedBooking(acceptedBooking);
       setShowCalendar(true);
       setAutoOpenedBookingId(acceptedBooking.id);
     }
   }, [bookings, autoOpenedBookingId]);
-  
+
   const handleScheduleClick = (booking: BookingWithMentor) => {
     setSelectedBooking(booking);
     setShowCalendar(true);
   };
-  
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -362,14 +362,14 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-bookings-title">{t('menteePortal.myBookings')}</h1>
         <p className="text-muted-foreground">{t('menteePortal.myBookingsSubtitle')}</p>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -398,7 +398,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                         <p className="text-sm text-muted-foreground line-clamp-2">{booking.goal}</p>
                       )}
                       <p className="text-xs text-muted-foreground mt-1">
-                        {booking.status === 'pending' 
+                        {booking.status === 'pending'
                           ? (t('menteePortal.awaitingMentorResponse') || 'Awaiting mentor response')
                           : (t('menteePortal.acceptedBookNow') || 'Mentor accepted - Book your time slot')}
                       </p>
@@ -407,8 +407,8 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     {getStatusBadge(booking.status)}
                     {booking.status === 'accepted' && booking.mentor?.cal_link && (
-                      <Button 
-                        variant="default" 
+                      <Button
+                        variant="default"
                         size="sm"
                         onClick={() => handleScheduleClick(booking)}
                         data-testid={`button-schedule-booking-${booking.id}`}
@@ -434,7 +434,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
           )}
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -481,7 +481,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
           )}
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -510,8 +510,8 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                         <p className="text-sm text-muted-foreground line-clamp-2">{booking.goal}</p>
                       )}
                       <p className="text-sm text-muted-foreground">
-                        {booking.completed_at ? format(new Date(booking.completed_at), 'PPp') : 
-                         booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : '-'}
+                        {booking.completed_at ? format(new Date(booking.completed_at), 'PPp') :
+                          booking.scheduled_at ? format(new Date(booking.scheduled_at), 'PPp') : '-'}
                       </p>
                     </div>
                   </div>
@@ -548,7 +548,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
 
 function MenteeMentors({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
-  
+
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
     refetchInterval: 5000, // Poll every 5 seconds for real-time updates
@@ -571,7 +571,7 @@ function MenteeMentors({ menteeId }: { menteeId: string }) {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <div>
@@ -624,7 +624,7 @@ function MenteeMentors({ menteeId }: { menteeId: string }) {
 
 function MenteeFeedback({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
-  
+
   const { data: feedback, isLoading } = useQuery<FeedbackBooking[]>({
     queryKey: ['/api/mentee', menteeId, 'feedback'],
   });
@@ -640,14 +640,14 @@ function MenteeFeedback({ menteeId }: { menteeId: string }) {
       </div>
     );
   }
-  
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold" data-testid="text-feedback-title">{t('menteePortal.feedback')}</h1>
         <p className="text-muted-foreground">{t('menteePortal.feedbackSubtitle')}</p>
       </div>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -695,7 +695,7 @@ function MenteeFeedback({ menteeId }: { menteeId: string }) {
           )}
         </CardContent>
       </Card>
-      
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -878,9 +878,9 @@ function MenteeProfileSettings({ mentee }: { mentee: Mentee }) {
 
               <div>
                 <Label>{t('menteePortal.profileSettings.email')}</Label>
-                <Input 
-                  value={mentee.email} 
-                  disabled 
+                <Input
+                  value={mentee.email}
+                  disabled
                   className="bg-muted"
                   data-testid="input-mentee-email-readonly"
                 />
@@ -984,8 +984,8 @@ function MenteeProfileSettings({ mentee }: { mentee: Mentee }) {
                     <FormItem>
                       <FormLabel>{t('menteePortal.profileSettings.organizationName')}</FormLabel>
                       <FormControl>
-                        <Input 
-                          {...field} 
+                        <Input
+                          {...field}
                           placeholder={t('menteePortal.profileSettings.organizationNamePlaceholder')}
                           data-testid="input-mentee-organization"
                         />
@@ -1173,7 +1173,7 @@ export default function MenteeDashboard() {
               </div>
             </div>
           </SidebarHeader>
-          
+
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupLabel>{t('menteePortal.sidebarMenu')}</SidebarGroupLabel>
@@ -1181,7 +1181,7 @@ export default function MenteeDashboard() {
                 <SidebarMenu>
                   {menuItems.map((item) => (
                     <SidebarMenuItem key={item.key}>
-                      <SidebarMenuButton 
+                      <SidebarMenuButton
                         asChild
                         isActive={isActive(item.url)}
                         data-testid={`sidebar-mentee-${item.key}`}
@@ -1202,8 +1202,8 @@ export default function MenteeDashboard() {
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
-                    <SidebarMenuButton 
-                      asChild 
+                    <SidebarMenuButton
+                      asChild
                       isActive={location === "/mentee-dashboard/profile"}
                       data-testid="sidebar-mentee-profile"
                     >
@@ -1219,9 +1219,9 @@ export default function MenteeDashboard() {
           </SidebarContent>
 
           <SidebarFooter className="border-t p-4">
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start" 
+            <Button
+              variant="ghost"
+              className="w-full justify-start"
               onClick={handleChangeEmail}
               data-testid="button-mentee-logout"
             >
@@ -1235,7 +1235,7 @@ export default function MenteeDashboard() {
           <header className="flex items-center gap-2 p-4 border-b bg-background">
             <SidebarTrigger data-testid="button-mentee-sidebar-toggle" />
           </header>
-          
+
           <main className="flex-1 overflow-auto p-6">
             <Switch>
               <Route path="/mentee-dashboard">

@@ -1,8 +1,8 @@
 import { Link, useLocation } from "wouter";
-import { BarChart3, UserPlus, Users, User, LogOut, LogIn, LayoutDashboard, Menu, ChevronDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { LogOut, Menu, ChevronDown, Globe } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { NotificationBell } from "@/components/NotificationBell";
+import { AmazonLogo } from "@/components/AmazonSmile";
 import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -15,31 +15,29 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import amazonLogo from "@assets/image_1763389700490.png";
 
 export function Navigation() {
   const { t } = useTranslation();
   const { user, isLoading, logout } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location] = useLocation();
+  const [, setLocationPath] = useLocation();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [mentorId, setMentorId] = useState<string | null>(null);
   const [menteeId, setMenteeId] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const updateUserInfo = () => {
       const menteeEmail = localStorage.getItem("menteeEmail");
       const mentorEmail = localStorage.getItem("mentorEmail");
       setUserEmail(menteeEmail || mentorEmail || null);
-      
       setMentorId(localStorage.getItem("mentorId"));
       setMenteeId(localStorage.getItem("menteeId"));
     };
 
     updateUserInfo();
-
     window.addEventListener("storage", updateUserInfo);
     window.addEventListener("userRegistered", updateUserInfo);
-
     return () => {
       window.removeEventListener("storage", updateUserInfo);
       window.removeEventListener("userRegistered", updateUserInfo);
@@ -48,223 +46,141 @@ export function Navigation() {
 
   const handleLogout = async () => {
     await logout();
-    localStorage.removeItem("mentorId");
-    localStorage.removeItem("menteeId");
-    localStorage.removeItem("mentorEmail");
-    localStorage.removeItem("menteeEmail");
-    localStorage.removeItem("menteeName");
+    localStorage.clear();
     setMentorId(null);
     setMenteeId(null);
     setUserEmail(null);
-    setLocation("/");
+    setLocationPath("/");
   };
 
   const handleLocalLogout = () => {
-    localStorage.removeItem("mentorId");
-    localStorage.removeItem("menteeId");
-    localStorage.removeItem("mentorEmail");
-    localStorage.removeItem("menteeEmail");
-    localStorage.removeItem("menteeName");
+    localStorage.clear();
     setMentorId(null);
     setMenteeId(null);
     setUserEmail(null);
-    setLocation("/");
+    setLocationPath("/");
   };
-  
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isLoggedIn = user || mentorId || menteeId;
 
-  const NavLinks = ({ mobile = false, onItemClick }: { mobile?: boolean; onItemClick?: () => void }) => {
-    const handleClick = () => {
-      if (mobile) setMobileMenuOpen(false);
-      if (onItemClick) onItemClick();
-    };
+  // Navigation items
+  const coreNavItems = [
+    { href: "/", label: t('nav.browseMentors') },
+    { href: "/analytics", label: t('nav.analytics') },
+  ];
 
-    return (
-      <>
-        <Link href="/" data-testid="link-browse" onClick={handleClick}>
-          <Button 
-            variant="ghost" 
-            className={mobile 
-              ? "w-full justify-start text-foreground" 
-              : "w-full justify-start"
-            }
-            data-testid="button-browse"
-          >
-            <Users className="w-4 h-4 mr-2" />
-            {t('nav.browseMentors')}
-          </Button>
-        </Link>
-        <Link href="/analytics" data-testid="link-analytics" onClick={handleClick}>
-          <Button 
-            variant="ghost" 
-            className={mobile 
-              ? "w-full justify-start text-foreground" 
-              : "w-full justify-start"
-            }
-            data-testid="button-analytics"
-          >
-            <BarChart3 className="w-4 h-4 mr-2" />
-            {t('nav.analytics')}
-          </Button>
-        </Link>
-        
-        {!isLoggedIn && (
-          <>
-            <Link href="/mentor-onboarding" data-testid="link-mentor-onboarding" onClick={handleClick}>
-              <Button 
-                variant="ghost" 
-                className={mobile 
-                  ? "w-full justify-start text-foreground" 
-                  : "w-full justify-start"
-                }
-                data-testid="button-mentor-onboarding"
-              >
-                <Users className="w-4 h-4 mr-2" />
-                {t('nav.becomeMentor')}
-              </Button>
-            </Link>
-            <Link href="/mentee-registration" data-testid="link-mentee-registration" onClick={handleClick}>
-              <Button 
-                variant="ghost" 
-                className={mobile 
-                  ? "w-full justify-start text-foreground" 
-                  : "w-full justify-start"
-                }
-                data-testid="button-mentee-registration"
-              >
-                <UserPlus className="w-4 h-4 mr-2" />
-                {t('nav.joinMentee')}
-              </Button>
-            </Link>
-          </>
-        )}
+  const guestItems = [
+    { href: "/mentee-registration", label: t('nav.joinMentee') },
+    { href: "/mentor-onboarding", label: t('nav.becomeMentor') },
+  ];
 
-        <Link href="/mentor-portal" data-testid="link-mentor-portal" onClick={handleClick}>
-          <Button 
-            variant="ghost" 
-            className={mobile 
-              ? "w-full justify-start text-foreground" 
-              : "w-full justify-start"
-            }
-            data-testid="button-mentor-portal"
-          >
-            <LayoutDashboard className="w-4 h-4 mr-2" />
-            {t('nav.mentorPortal')}
-          </Button>
-        </Link>
-        {menteeId && (
-          <Link href="/mentee-dashboard" data-testid="link-mentee-dashboard" onClick={handleClick}>
-            <Button 
-              variant="ghost" 
-              className={mobile 
-                ? "w-full justify-start text-foreground" 
-                : "w-full justify-start"
-              }
-              data-testid="button-mentee-dashboard"
-            >
-              <LayoutDashboard className="w-4 h-4 mr-2" />
-              {t('nav.menteeDashboard')}
-            </Button>
-          </Link>
-        )}
-      </>
-    );
-  };
-  
+  const userItems = [
+    ...(mentorId ? [{ href: "/mentor-portal", label: t('nav.mentorPortal') }] : []),
+    ...(menteeId ? [{ href: "/mentee-dashboard", label: t('nav.menteeDashboard') }] : []),
+  ];
+
   return (
-    <nav className="sticky top-0 z-50 border-b bg-secondary backdrop-blur supports-[backdrop-filter]:bg-secondary/95">
-      <div className="max-w-7xl mx-auto px-4 md:px-6">
-        <div className="flex items-center justify-between h-16">
+    <>
+      {/* Clean, Spacious Navigation */}
+      <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-4">
+        <div
+          className="max-w-5xl mx-auto flex items-center justify-between px-6 py-3 rounded-full"
+          style={{
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 0, 0, 0.06)',
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.06)',
+          }}
+        >
           {/* Logo */}
-          <Link href="/" data-testid="link-home" className="flex-shrink-0">
-            <div className="flex items-center gap-2 hover-elevate active-elevate-2 px-2 py-1.5 rounded-md transition-colors">
-              <img 
-                src={amazonLogo} 
-                alt="Amazon" 
-                className="h-7 w-auto"
-                data-testid="img-amazon-logo"
-              />
-              <div className="h-6 w-px bg-primary-foreground/30 hidden sm:block"></div>
-              <div className="hidden sm:flex flex-col">
-                <span className="text-sm font-bold text-primary-foreground leading-tight">MentorConnect</span>
-                <span className="text-[9px] text-primary-foreground/60 font-medium leading-tight">Amazon</span>
-              </div>
-            </div>
+          <Link href="/" className="flex items-center gap-3">
+            <AmazonLogo size="md" />
+            <span className="font-bold text-base hidden sm:block" style={{ color: 'var(--ink)' }}>
+              MentorConnect
+            </span>
           </Link>
 
-          {/* Desktop Navigation - Dropdown Menu */}
-          <div className="hidden md:flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
-                  data-testid="button-nav-menu"
+          {/* Desktop Navigation */}
+          <div className="hidden lg:flex items-center gap-2">
+            {coreNavItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <button
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${location === item.href
+                      ? 'bg-[var(--amazon-squid)] text-white'
+                      : 'text-[var(--ink-light)] hover:bg-[var(--cream-dark)] hover:text-[var(--ink)]'
+                    }`}
                 >
-                  <Menu className="w-4 h-4 mr-2" />
-                  {t('nav.menu')}
-                  <ChevronDown className="w-4 h-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="center" className="w-56">
-                <DropdownMenuLabel>{t('nav.navigation')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <div className="flex flex-col">
-                  <NavLinks />
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {item.label}
+                </button>
+              </Link>
+            ))}
+
+            {!isLoggedIn && guestItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <button
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${location === item.href
+                      ? 'bg-[var(--amazon-squid)] text-white'
+                      : 'text-[var(--ink-light)] hover:bg-[var(--cream-dark)] hover:text-[var(--ink)]'
+                    }`}
+                >
+                  {item.label}
+                </button>
+              </Link>
+            ))}
+
+            {isLoggedIn && userItems.map((item) => (
+              <Link key={item.href} href={item.href}>
+                <button
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${location === item.href
+                      ? 'bg-[var(--amazon-squid)] text-white'
+                      : 'text-[var(--ink-light)] hover:bg-[var(--cream-dark)] hover:text-[var(--ink)]'
+                    }`}
+                >
+                  {item.label}
+                </button>
+              </Link>
+            ))}
           </div>
 
           {/* Right side actions */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-3">
             {userEmail && <NotificationBell email={userEmail} />}
             <LanguageToggle />
-            
-            {/* Login button when not logged in */}
-            {!isLoading && !user && !mentorId && !menteeId && (
-              <Link href="/login" data-testid="link-nav-login">
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  className="text-primary-foreground hover:bg-primary-foreground/10"
-                  data-testid="button-nav-login"
+
+            {!isLoading && !isLoggedIn && (
+              <Link href="/login">
+                <button
+                  className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-200"
+                  style={{
+                    background: 'var(--amazon-orange)',
+                    color: 'white'
+                  }}
                 >
-                  <LogIn className="w-4 h-4 md:mr-1" />
-                  <span className="hidden md:inline">{t('auth.login')}</span>
-                </Button>
+                  {t('auth.login')}
+                </button>
               </Link>
             )}
-            
-            {/* User menu for authenticated users */}
+
             {user && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    className="text-primary-foreground hover:bg-primary-foreground/10"
-                    data-testid="button-user-menu"
-                  >
-                    <User className="w-4 h-4 md:mr-1" />
-                    <span className="hidden md:inline max-w-[100px] truncate">{user.email}</span>
-                  </Button>
+                  <button className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-[var(--cream-dark)] transition-colors">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--amazon-orange)] to-[#E68A00] flex items-center justify-center text-white text-sm font-bold">
+                      {user.email?.charAt(0).toUpperCase()}
+                    </div>
+                    <ChevronDown className="w-4 h-4 text-[var(--ink-muted)]" />
+                  </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-56 rounded-2xl">
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                      <p className="text-sm font-medium">{user.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={handleLogout}
-                    className="cursor-pointer text-destructive focus:text-destructive focus:bg-destructive/10"
-                    data-testid="button-logout"
-                  >
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
                     <LogOut className="w-4 h-4 mr-2" />
                     {t('auth.logout')}
                   </DropdownMenuItem>
@@ -272,57 +188,56 @@ export function Navigation() {
               </DropdownMenu>
             )}
 
-            {/* Logout button for localStorage-based users (not authenticated) */}
             {!user && (mentorId || menteeId) && (
-              <Button 
-                variant="ghost" 
-                size="sm"
+              <button
                 onClick={handleLocalLogout}
-                className="text-primary-foreground hover:bg-primary-foreground/10"
-                data-testid="button-local-logout"
+                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-red-50 text-red-600 transition-colors"
               >
-                <LogOut className="w-4 h-4 md:mr-1" />
-                <span className="hidden md:inline">{t('auth.logout')}</span>
-              </Button>
+                <LogOut className="w-4 h-4" />
+              </button>
             )}
 
-            {/* Mobile Menu */}
+            {/* Mobile menu */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
               <SheetTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  className="md:hidden text-primary-foreground hover:bg-primary-foreground/10"
-                  data-testid="button-mobile-menu"
-                >
+                <button className="lg:hidden p-2 rounded-full hover:bg-[var(--cream-dark)] transition-colors">
                   <Menu className="w-5 h-5" />
-                </Button>
+                </button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-72">
-                <SheetTitle className="text-lg font-bold mb-4">{t('nav.menu')}</SheetTitle>
-                <div className="flex flex-col gap-1 mt-4">
-                  <NavLinks mobile />
-                  
-                  {/* Mobile logout option */}
-                  {(user || mentorId || menteeId) && (
+              <SheetContent side="right" className="w-80" style={{ background: 'var(--cream)' }}>
+                <SheetTitle className="sr-only">{t('nav.menu')}</SheetTitle>
+                <div className="flex flex-col gap-2 mt-8">
+                  <div className="flex items-center gap-3 mb-6 px-2">
+                    <AmazonLogo size="md" />
+                    <span className="font-bold text-lg" style={{ color: 'var(--ink)' }}>
+                      MentorConnect
+                    </span>
+                  </div>
+
+                  {[...coreNavItems, ...(isLoggedIn ? userItems : guestItems)].map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white font-medium transition-colors">
+                        {item.label}
+                      </button>
+                    </Link>
+                  ))}
+
+                  {isLoggedIn && (
                     <>
-                      <div className="border-t my-2" />
-                      <Button 
-                        variant="ghost" 
-                        className="w-full justify-start text-destructive"
+                      <div className="border-t my-4" />
+                      <button
+                        className="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 font-medium transition-colors"
                         onClick={() => {
                           setMobileMenuOpen(false);
-                          if (user) {
-                            handleLogout();
-                          } else {
-                            handleLocalLogout();
-                          }
+                          user ? handleLogout() : handleLocalLogout();
                         }}
-                        data-testid="button-mobile-logout"
                       >
-                        <LogOut className="w-4 h-4 mr-2" />
                         {t('auth.logout')}
-                      </Button>
+                      </button>
                     </>
                   )}
                 </div>
@@ -330,7 +245,10 @@ export function Navigation() {
             </Sheet>
           </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      {/* Spacer */}
+      <div className="h-24" />
+    </>
   );
 }

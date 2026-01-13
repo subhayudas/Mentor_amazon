@@ -4,7 +4,7 @@ import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useLocation } from "wouter";
 
 interface User {
-  id: number;
+  id: string;
   email: string;
   name: string;
   role: string;

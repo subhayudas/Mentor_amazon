@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -19,12 +19,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  StickyNote, 
-  CheckSquare, 
+import {
+  Calendar,
+  Clock,
+  User,
+  StickyNote,
+  CheckSquare,
   Plus,
   CalendarPlus,
   Star,
@@ -140,7 +140,7 @@ export default function MyBookings() {
 
   const handleAddNote = () => {
     if (!selectedBooking || !newNote.trim()) return;
-    
+
     addNoteMutation.mutate({
       booking_id: selectedBooking.id,
       content: newNote.trim(),
@@ -151,7 +151,7 @@ export default function MyBookings() {
 
   const handleSubmitFeedback = () => {
     if (!feedbackBooking || feedbackRating === 0) return;
-    
+
     submitFeedbackMutation.mutate({
       bookingId: feedbackBooking.id,
       rating: feedbackRating,
@@ -179,11 +179,10 @@ export default function MyBookings() {
             data-testid={`star-${star}`}
           >
             <Star
-              className={`w-6 h-6 ${
-                star <= rating
+              className={`w-6 h-6 ${star <= rating
                   ? 'fill-yellow-400 text-yellow-400'
                   : 'text-muted-foreground'
-              }`}
+                }`}
             />
           </button>
         ))}
@@ -243,10 +242,10 @@ export default function MyBookings() {
     );
   }
 
-  const upcomingBookings = bookings?.filter(b => 
+  const upcomingBookings = bookings?.filter(b =>
     b.scheduled_at && isFuture(parseISO(b.scheduled_at))
   ) || [];
-  const pastBookings = bookings?.filter(b => 
+  const pastBookings = bookings?.filter(b =>
     !b.scheduled_at || !isFuture(parseISO(b.scheduled_at))
   ) || [];
 
@@ -287,12 +286,14 @@ export default function MyBookings() {
                 {t(`myBookings.status.${booking.status}`)}
               </Badge>
             </div>
-            
+
             <div className="flex flex-col gap-1 mt-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Calendar className="w-4 h-4" />
-                <span>{format(parseISO(displayDate), "MMMM d, yyyy")}</span>
-              </div>
+              {displayDate && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="w-4 h-4" />
+                  <span>{format(parseISO(displayDate), "MMMM d, yyyy")}</span>
+                </div>
+              )}
               {booking.scheduled_at && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="w-4 h-4" />
@@ -304,9 +305,9 @@ export default function MyBookings() {
             <div className="flex gap-2 mt-3 flex-wrap">
               <Dialog>
                 <DialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setSelectedBooking(booking)}
                     data-testid={`button-notes-${booking.id}`}
                   >
@@ -321,7 +322,7 @@ export default function MyBookings() {
                       {t('myBookings.sessionNotesDesc', { mentor: displayName })}
                     </DialogDescription>
                   </DialogHeader>
-                  
+
                   <div className="space-y-4 mt-4">
                     {/* Add New Note Section */}
                     <div className="p-4 border rounded-lg bg-muted/30">
@@ -346,8 +347,8 @@ export default function MyBookings() {
                           className="min-h-20"
                           data-testid="input-new-note"
                         />
-                        <Button 
-                          onClick={handleAddNote} 
+                        <Button
+                          onClick={handleAddNote}
                           disabled={!newNote.trim() || addNoteMutation.isPending}
                           data-testid="button-add-note"
                         >
@@ -367,8 +368,8 @@ export default function MyBookings() {
                         </div>
                       ) : bookingNotes && bookingNotes.length > 0 ? (
                         bookingNotes.map((note) => (
-                          <div 
-                            key={note.id} 
+                          <div
+                            key={note.id}
                             className="p-3 border rounded-lg"
                             data-testid={`note-${note.id}`}
                           >
@@ -500,12 +501,12 @@ export default function MyBookings() {
                 : t('myBookings.feedbackGiveDesc')}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 mt-4">
             {/* Your Feedback Section */}
             <div className="space-y-4">
               <h4 className="font-medium text-base">{t('myBookings.yourFeedback')}</h4>
-              
+
               {feedbackBooking?.mentee_rating ? (
                 <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
                   <div className="flex items-center gap-2">
@@ -550,7 +551,7 @@ export default function MyBookings() {
             {/* Mentor's Feedback Section */}
             <div className="space-y-4">
               <h4 className="font-medium text-base">{t('myBookings.mentorFeedback')}</h4>
-              
+
               {feedbackBooking?.mentor_rating ? (
                 <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
                   <div className="flex items-center gap-2">

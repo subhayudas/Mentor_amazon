@@ -72,6 +72,8 @@ export default function MentorProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+      // Invalidate mentor bookings to refresh dashboard
+      queryClient.invalidateQueries({ queryKey: ["/api/mentor"] });
       toast({
         title: isArabic ? "تم إرسال طلبك" : "Request Sent",
         description: isArabic 

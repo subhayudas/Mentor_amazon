@@ -10,10 +10,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { 
-  Calendar, 
-  Clock, 
-  User, 
+import {
+  Calendar,
+  Clock,
+  User,
   Mail,
   PauseCircle,
   PlayCircle,
@@ -58,7 +58,7 @@ export default function MentorDashboard() {
       queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
       toast({
         title: t('mentorDashboard.availabilityUpdated'),
-        description: mentor?.is_available 
+        description: mentor?.is_available
           ? t('mentorDashboard.profilePaused')
           : t('mentorDashboard.profileActive'),
       });
@@ -176,7 +176,7 @@ export default function MentorDashboard() {
     .join("")
     .toUpperCase();
 
-  const upcomingBookings = bookings?.filter(b => 
+  const upcomingBookings = bookings?.filter(b =>
     b.scheduled_at && isFuture(parseISO(b.scheduled_at))
   ) || [];
   const totalBookings = bookings?.length || 0;
@@ -225,14 +225,14 @@ export default function MentorDashboard() {
                     </div>
                   </div>
                 </div>
-                <Badge 
+                <Badge
                   variant={mentor.is_available ? "default" : "secondary"}
                   className={mentor.is_available ? "bg-green-600" : ""}
                   data-testid="badge-availability"
                 >
-                  {mentor.is_available 
-                    ? (isRTL ? 'متاح' : 'Available')
-                    : (isRTL ? 'غير متاح' : 'Unavailable')
+                  {mentor.is_available
+                    ? t('mentorDashboard.available', 'Available')
+                    : t('mentorDashboard.unavailable', 'Unavailable')
                   }
                 </Badge>
               </div>
@@ -251,7 +251,7 @@ export default function MentorDashboard() {
                 {t('mentorDashboard.profileStatus')}
               </CardTitle>
               <CardDescription>
-                {mentor.is_available 
+                {mentor.is_available
                   ? t('mentorDashboard.profileActiveDesc')
                   : t('mentorDashboard.profilePausedDesc')
                 }
@@ -267,7 +267,7 @@ export default function MentorDashboard() {
                   )}
                   <div>
                     <p className="font-medium">
-                      {mentor.is_available 
+                      {mentor.is_available
                         ? t('mentorDashboard.acceptingBookings')
                         : t('mentorDashboard.notAcceptingBookings')
                       }
@@ -333,8 +333,8 @@ export default function MentorDashboard() {
               ) : (
                 <div className="space-y-3">
                   {upcomingBookings.slice(0, 5).map((booking) => (
-                    <div 
-                      key={booking.id} 
+                    <div
+                      key={booking.id}
                       className="flex items-center justify-between p-3 border rounded-lg"
                       data-testid={`booking-${booking.id}`}
                     >
