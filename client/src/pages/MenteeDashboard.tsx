@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Route, Switch, useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -85,7 +85,8 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<string | null>(null);
+  // Use a ref to track dismissed bookings to avoid re-triggering useEffect
+  const dismissedBookingIdsRef = useRef<Set<string>>(new Set());
 
   const { data: stats, isLoading: statsLoading } = useQuery<MenteeStats>({
     queryKey: ['/api/mentee', menteeId, 'stats'],
@@ -105,23 +106,33 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
   useEffect(() => {
     if (!bookings) return;
 
+    // Find an accepted booking that hasn't been dismissed
     const acceptedBooking = bookings.find(
       b => b.status === 'accepted' &&
         b.mentor?.cal_link &&
         !b.scheduled_at &&
-        b.id !== autoOpenedBookingId
+        !dismissedBookingIdsRef.current.has(b.id)
     );
 
     if (acceptedBooking) {
       setSelectedBooking(acceptedBooking);
       setShowCalendar(true);
-      setAutoOpenedBookingId(acceptedBooking.id);
+      // Mark as dismissed so it won't auto-open again
+      dismissedBookingIdsRef.current.add(acceptedBooking.id);
     }
-  }, [bookings, autoOpenedBookingId]);
+  }, [bookings]);
 
   const handleScheduleClick = (booking: BookingWithMentor) => {
     setSelectedBooking(booking);
     setShowCalendar(true);
+  };
+
+  const handleCalendarClose = (open: boolean) => {
+    setShowCalendar(open);
+    // When closing, make sure the current booking is marked as dismissed
+    if (!open && selectedBooking) {
+      dismissedBookingIdsRef.current.add(selectedBooking.id);
+    }
   };
 
   return (
@@ -293,7 +304,7 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
           mentorName={selectedBooking.mentor.name || "Mentor"}
           bookingId={selectedBooking.id}
           open={showCalendar}
-          onOpenChange={setShowCalendar}
+          onOpenChange={handleCalendarClose}
         />
       )}
     </div>
@@ -304,7 +315,8 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
-  const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<string | null>(null);
+  // Use a ref to track dismissed bookings to avoid re-triggering useEffect
+  const dismissedBookingIdsRef = useRef<Set<string>>(new Set());
 
   const { data: bookings, isLoading, refetch, isFetching } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
@@ -320,23 +332,33 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   useEffect(() => {
     if (!bookings) return;
 
+    // Find an accepted booking that hasn't been dismissed
     const acceptedBooking = bookings.find(
       b => b.status === 'accepted' &&
         b.mentor?.cal_link &&
         !b.scheduled_at &&
-        b.id !== autoOpenedBookingId
+        !dismissedBookingIdsRef.current.has(b.id)
     );
 
     if (acceptedBooking) {
       setSelectedBooking(acceptedBooking);
       setShowCalendar(true);
-      setAutoOpenedBookingId(acceptedBooking.id);
+      // Mark as dismissed so it won't auto-open again
+      dismissedBookingIdsRef.current.add(acceptedBooking.id);
     }
-  }, [bookings, autoOpenedBookingId]);
+  }, [bookings]);
 
   const handleScheduleClick = (booking: BookingWithMentor) => {
     setSelectedBooking(booking);
     setShowCalendar(true);
+  };
+
+  const handleCalendarClose = (open: boolean) => {
+    setShowCalendar(open);
+    // When closing, make sure the current booking is marked as dismissed
+    if (!open && selectedBooking) {
+      dismissedBookingIdsRef.current.add(selectedBooking.id);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -586,7 +608,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
           mentorName={selectedBooking.mentor.name || "Mentor"}
           bookingId={selectedBooking.id}
           open={showCalendar}
-          onOpenChange={setShowCalendar}
+          onOpenChange={handleCalendarClose}
         />
       )}
     </div>
