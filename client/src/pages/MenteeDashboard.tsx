@@ -225,6 +225,8 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
                       <p className="text-xs text-muted-foreground">
                         {booking.status === 'pending'
                           ? (t('menteePortal.awaitingMentorResponse') || 'Awaiting mentor response')
+                          : booking.scheduled_at
+                          ? (t('menteePortal.sessionScheduled') || 'Session scheduled - waiting for confirmation')
                           : (t('menteePortal.acceptedBookNow') || 'Mentor accepted - Book your time slot')}
                       </p>
                     </div>
@@ -232,10 +234,12 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     {booking.status === 'pending' ? (
                       <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />{t('menteePortal.pending') || 'Pending'}</Badge>
+                    ) : booking.scheduled_at ? (
+                      <Badge variant="default" className="bg-green-600"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.meetingScheduled') || 'Meeting Scheduled'}</Badge>
                     ) : (
                       <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.accepted') || 'Accepted'}</Badge>
                     )}
-                    {booking.status === 'accepted' && booking.mentor?.cal_link && (
+                    {booking.status === 'accepted' && booking.mentor?.cal_link && !booking.scheduled_at && (
                       <Button
                         variant="default"
                         size="sm"
@@ -246,7 +250,12 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
                         {t('menteePortal.scheduleNow') || 'Schedule Now'}
                       </Button>
                     )}
-                    {booking.status === 'accepted' && !booking.mentor?.cal_link && (
+                    {booking.status === 'accepted' && booking.scheduled_at && (
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(booking.scheduled_at), 'PPp')}
+                      </span>
+                    )}
+                    {booking.status === 'accepted' && !booking.mentor?.cal_link && !booking.scheduled_at && (
                       <Badge variant="outline" className="text-amber-600 border-amber-300">
                         {t('menteePortal.calendarNotAvailable') || 'Calendar not configured - Contact mentor'}
                       </Badge>
@@ -389,7 +398,8 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
     );
   }
 
-  const acceptedCount = pendingBookings.filter(b => b.status === 'accepted').length;
+  const acceptedCount = pendingBookings.filter(b => b.status === 'accepted' && !b.scheduled_at).length;
+  const scheduledCount = pendingBookings.filter(b => b.status === 'accepted' && b.scheduled_at).length;
   const waitingCount = pendingBookings.filter(b => b.status === 'pending').length;
 
   return (
@@ -469,13 +479,19 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                       <p className="text-xs text-muted-foreground mt-1">
                         {booking.status === 'pending'
                           ? (t('menteePortal.awaitingMentorResponse') || 'Awaiting mentor response')
+                          : booking.scheduled_at
+                          ? (t('menteePortal.sessionScheduled') || 'Session scheduled - waiting for confirmation')
                           : (t('menteePortal.acceptedBookNow') || 'Mentor accepted - Book your time slot')}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    {getStatusBadge(booking.status)}
-                    {booking.status === 'accepted' && booking.mentor?.cal_link && (
+                    {booking.status === 'accepted' && booking.scheduled_at ? (
+                      <Badge variant="default" className="bg-green-600"><CheckCircle className="w-3 h-3 mr-1" />{t('menteePortal.meetingScheduled') || 'Meeting Scheduled'}</Badge>
+                    ) : (
+                      getStatusBadge(booking.status)
+                    )}
+                    {booking.status === 'accepted' && booking.mentor?.cal_link && !booking.scheduled_at && (
                       <Button
                         variant="default"
                         size="sm"
@@ -486,7 +502,12 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                         {t('menteePortal.scheduleNow') || 'Schedule Now'}
                       </Button>
                     )}
-                    {booking.status === 'accepted' && !booking.mentor?.cal_link && (
+                    {booking.status === 'accepted' && booking.scheduled_at && (
+                      <span className="text-sm text-muted-foreground">
+                        {format(new Date(booking.scheduled_at), 'PPp')}
+                      </span>
+                    )}
+                    {booking.status === 'accepted' && !booking.mentor?.cal_link && !booking.scheduled_at && (
                       <Badge variant="outline" className="text-amber-600 border-amber-300">
                         {t('menteePortal.calendarNotAvailable') || 'Calendar not configured - Contact mentor'}
                       </Badge>

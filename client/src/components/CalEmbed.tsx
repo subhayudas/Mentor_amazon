@@ -61,25 +61,33 @@ export function CalEmbed({ calLink, mentorName, bookingId, open, onOpenChange }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0 relative [&>button:last-child]:hidden" data-testid="dialog-cal-embed">
+      <DialogContent 
+        className="fixed left-[50%] max-w-4xl w-[95vw] h-[90vh] overflow-hidden p-0 z-[9999] [&>button:last-child]:hidden" 
+        data-testid="dialog-cal-embed"
+        style={{ 
+          top: '2vh', 
+          transform: 'translateX(-50%)', 
+          maxHeight: '96vh'
+        }}
+      >
         {/* Use a Button component for reliable close behavior */}
         <Button
           variant="outline"
           size="icon"
-          className="absolute right-4 top-4 z-[100] rounded-sm"
+          className="absolute right-4 top-4 z-[100] rounded-sm bg-white hover:bg-gray-100"
           onClick={handleCloseDialog}
           data-testid="cal-embed-close-button"
         >
           <X className="h-5 w-5" />
           <span className="sr-only">Close</span>
         </Button>
-        <DialogHeader className="p-6 pb-0 pr-16">
+        <DialogHeader className="p-6 pb-2 pr-16 border-b">
           <DialogTitle>Schedule a Session with {mentorName}</DialogTitle>
           <DialogDescription>
             Select a time slot that works for you. Once booked, you'll receive a confirmation email.
           </DialogDescription>
         </DialogHeader>
-        <div className="h-[70vh] overflow-auto p-4">
+        <div className="flex-1 overflow-auto" style={{ height: 'calc(90vh - 120px)' }}>
           {isLoading && (
             <div className="space-y-4 p-4">
               <Skeleton className="h-8 w-48" />
@@ -88,7 +96,7 @@ export function CalEmbed({ calLink, mentorName, bookingId, open, onOpenChange }:
           )}
           <Cal
             calLink={calUsername}
-            style={{ width: "100%", height: "100%", overflow: "auto" }}
+            style={{ width: "100%", height: "100%", minHeight: "600px", overflow: "scroll" }}
             config={{
               name: "Mentee",
             }}

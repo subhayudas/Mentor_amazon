@@ -62,6 +62,10 @@ export function Navigation() {
   };
 
   const isLoggedIn = user || mentorId || menteeId;
+  
+  // Determine user role from auth context or localStorage
+  const isMentor = user?.role === 'mentor' || !!mentorId;
+  const isMentee = user?.role === 'mentee' || !!menteeId;
 
   // Navigation items
   const coreNavItems = [
@@ -74,9 +78,10 @@ export function Navigation() {
     { href: "/mentor-onboarding", label: t('nav.becomeMentor') },
   ];
 
+  // Role-specific navigation items
   const userItems = [
-    ...(mentorId ? [{ href: "/mentor-portal", label: t('nav.mentorPortal') }] : []),
-    ...(menteeId ? [{ href: "/mentee-dashboard", label: t('nav.menteeDashboard') }] : []),
+    ...(isMentor ? [{ href: "/mentor-portal", label: t('nav.mentorPortal') }] : []),
+    ...(isMentee ? [{ href: "/mentee-dashboard", label: t('nav.menteeDashboard') }] : []),
   ];
 
   return (

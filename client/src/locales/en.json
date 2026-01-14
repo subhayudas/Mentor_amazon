@@ -764,6 +764,8 @@
     "awaitingMentorResponse": "Awaiting mentor response",
     "acceptedBookNow": "Mentor accepted - Book your time slot",
     "acceptedScheduleNow": "Accepted - Schedule Now",
+    "meetingScheduled": "Meeting Scheduled",
+    "sessionScheduled": "Session scheduled - waiting for confirmation",
     "pending": "Pending",
     "accepted": "Accepted",
     "confirmed": "Confirmed",

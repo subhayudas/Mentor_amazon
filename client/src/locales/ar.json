@@ -764,6 +764,8 @@
     "awaitingMentorResponse": "في انتظار رد المرشد",
     "acceptedBookNow": "وافق المرشد - احجز موعدك",
     "acceptedScheduleNow": "مقبول - حدد الموعد الآن",
+    "meetingScheduled": "تم جدولة الاجتماع",
+    "sessionScheduled": "تمت جدولة الجلسة - في انتظار التأكيد",
     "pending": "معلق",
     "accepted": "مقبول",
     "confirmed": "مؤكد",
