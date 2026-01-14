@@ -6,8 +6,8 @@ import { useLocation } from "wouter";
 interface User {
   id: string;
   email: string;
-  name: string;
-  role: string;
+  name?: string;
+  user_type: 'mentor' | 'mentee';
 }
 
 interface LoginData {

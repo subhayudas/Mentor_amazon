@@ -52,6 +52,19 @@ export default function Login() {
     },
     onSuccess: (data) => {
       localStorage.setItem("user", JSON.stringify(data));
+      
+      // Set role-specific localStorage values for immediate navigation updates
+      if (data.user_type === 'mentor') {
+        localStorage.setItem("mentorId", data.profile_id || data.id);
+        localStorage.setItem("mentorEmail", data.email);
+      } else if (data.user_type === 'mentee') {
+        localStorage.setItem("menteeId", data.profile_id || data.id);
+        localStorage.setItem("menteeEmail", data.email);
+      }
+      
+      // Dispatch event to notify Navigation component of user registration
+      window.dispatchEvent(new CustomEvent("userRegistered"));
+      
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
       toast({
         title: t("auth.loginSuccess"),

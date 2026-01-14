@@ -64,8 +64,8 @@ export function Navigation() {
   const isLoggedIn = user || mentorId || menteeId;
   
   // Determine user role from auth context or localStorage
-  const isMentor = user?.role === 'mentor' || !!mentorId;
-  const isMentee = user?.role === 'mentee' || !!menteeId;
+  const isMentor = user?.user_type === 'mentor' || !!mentorId;
+  const isMentee = user?.user_type === 'mentee' || !!menteeId;
 
   // Navigation items
   const coreNavItems = [
