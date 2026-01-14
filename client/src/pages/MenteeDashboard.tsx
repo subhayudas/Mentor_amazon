@@ -89,11 +89,14 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
 
   const { data: stats, isLoading: statsLoading } = useQuery<MenteeStats>({
     queryKey: ['/api/mentee', menteeId, 'stats'],
+    refetchInterval: 15000, // Poll every 15 seconds for updates
+    staleTime: 10000,
   });
 
   const { data: bookings } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
-    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
+    refetchInterval: 10000, // Poll every 10 seconds for real-time updates on booking status
+    staleTime: 5000,
   });
 
   const upcomingBookings = bookings?.filter(b => b.status === 'confirmed').slice(0, 3) || [];
@@ -303,9 +306,10 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   const [showCalendar, setShowCalendar] = useState(false);
   const [autoOpenedBookingId, setAutoOpenedBookingId] = useState<string | null>(null);
 
-  const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
+  const { data: bookings, isLoading, refetch, isFetching } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
-    refetchInterval: 30000, // Poll every 30 seconds for real-time updates
+    refetchInterval: 10000, // Poll every 10 seconds for real-time updates on booking status
+    staleTime: 5000,
   });
 
   const pendingBookings = bookings?.filter(b => b.status === 'pending' || b.status === 'accepted') || [];
@@ -363,18 +367,61 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
     );
   }
 
+  const acceptedCount = pendingBookings.filter(b => b.status === 'accepted').length;
+  const waitingCount = pendingBookings.filter(b => b.status === 'pending').length;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold" data-testid="text-bookings-title">{t('menteePortal.myBookings')}</h1>
-        <p className="text-muted-foreground">{t('menteePortal.myBookingsSubtitle')}</p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-bookings-title">{t('menteePortal.myBookings')}</h1>
+          <p className="text-muted-foreground">{t('menteePortal.myBookingsSubtitle')}</p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => refetch()}
+          disabled={isFetching}
+          data-testid="button-refresh-bookings"
+        >
+          <Clock className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+          {t('common.refresh') || 'Refresh'}
+        </Button>
       </div>
+
+      {/* Alert for accepted bookings that need scheduling */}
+      {acceptedCount > 0 && (
+        <Card className="border-green-500 bg-green-50 dark:bg-green-950/20">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+                <CheckCircle className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="font-medium text-green-700 dark:text-green-300">
+                  {acceptedCount === 1 
+                    ? (t('menteePortal.oneRequestAccepted') || '1 request has been accepted!') 
+                    : (t('menteePortal.requestsAccepted') || `${acceptedCount} requests have been accepted!`)}
+                </p>
+                <p className="text-sm text-green-600 dark:text-green-400">
+                  {t('menteePortal.clickScheduleNow') || 'Click "Schedule Now" below to book your session time.'}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="w-5 h-5" />
-            {t('menteePortal.awaitingMentorApproval') || 'Awaiting Mentor Approval'}
+            {t('menteePortal.awaitingMentorApproval') || 'Session Requests'}
+            {pendingBookings.length > 0 && (
+              <Badge variant={acceptedCount > 0 ? 'default' : 'secondary'} className={acceptedCount > 0 ? 'bg-green-500' : ''}>
+                {acceptedCount > 0 ? `${acceptedCount} ready` : waitingCount}
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -551,7 +598,8 @@ function MenteeMentors({ menteeId }: { menteeId: string }) {
 
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
     queryKey: ['/api/mentee', menteeId, 'bookings'],
-    refetchInterval: 5000, // Poll every 5 seconds for real-time updates
+    refetchInterval: 15000, // Poll every 15 seconds
+    staleTime: 10000,
   });
 
   const uniqueMentors = bookings

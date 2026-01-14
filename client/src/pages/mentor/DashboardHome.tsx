@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { 
@@ -11,7 +12,8 @@ import {
   Clock,
   Bell,
   MessageSquare,
-  ArrowRight
+  ArrowRight,
+  Inbox
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
@@ -36,11 +38,15 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/mentor', mentorId, 'dashboard'],
     enabled: !!mentorId,
+    refetchInterval: 15000, // Poll every 15 seconds for updates
+    staleTime: 10000,
   });
 
   const { data: activity, isLoading: activityLoading } = useQuery<MentorActivityLog[]>({
     queryKey: ['/api/mentor', mentorId, 'activity'],
     enabled: !!mentorId,
+    refetchInterval: 30000, // Poll every 30 seconds
+    staleTime: 20000,
   });
 
   const statCards = [
@@ -112,6 +118,8 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
     }
   };
 
+  const pendingCount = stats?.pendingBookings ?? 0;
+
   return (
     <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
       <div>
@@ -122,6 +130,39 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
           {t('mentorPortal.dashboardSubtitle')}
         </p>
       </div>
+
+      {/* Pending Requests Alert Banner */}
+      {!statsLoading && pendingCount > 0 && (
+        <Card className="border-orange-500 bg-orange-50 dark:bg-orange-950/20" data-testid="pending-requests-banner">
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center">
+                  <Inbox className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <p className="font-semibold text-orange-700 dark:text-orange-300 text-lg">
+                    {pendingCount === 1 
+                      ? (isRTL ? 'لديك طلب واحد معلق!' : 'You have 1 pending request!') 
+                      : (isRTL ? `لديك ${pendingCount} طلبات معلقة!` : `You have ${pendingCount} pending requests!`)}
+                  </p>
+                  <p className="text-sm text-orange-600 dark:text-orange-400">
+                    {isRTL 
+                      ? "المتدربون ينتظرون ردك. راجع واقبل أو ارفض الطلبات."
+                      : "Mentees are waiting for your response. Review and accept or decline their requests."}
+                  </p>
+                </div>
+              </div>
+              <Link href="/mentor-portal/bookings">
+                <Button className="bg-orange-500 hover:bg-orange-600" data-testid="button-view-requests">
+                  <Inbox className="w-4 h-4 mr-2" />
+                  {isRTL ? 'عرض الطلبات' : 'View Requests'}
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {statsLoading ? (

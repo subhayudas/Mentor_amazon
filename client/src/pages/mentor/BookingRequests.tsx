@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -12,7 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Check, X, Calendar, Clock, User, Target, Mail } from "lucide-react";
+import { Check, X, Calendar, Clock, User, Target, Mail, RefreshCw, Inbox } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -30,9 +30,11 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
   const isRTL = i18n.language === 'ar';
   const { toast } = useToast();
 
-  const { data: bookings, isLoading } = useQuery<BookingWithMentee[]>({
+  const { data: bookings, isLoading, refetch, isFetching } = useQuery<BookingWithMentee[]>({
     queryKey: ['/api/mentor', mentorId, 'bookings', 'pending'],
     enabled: !!mentorId,
+    refetchInterval: 10000, // Poll every 10 seconds for new requests
+    staleTime: 5000, // Consider data stale after 5 seconds
   });
 
   const acceptMutation = useMutation({
@@ -40,11 +42,16 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
       return apiRequest("PATCH", `/api/bookings/${bookingId}/accept`);
     },
     onSuccess: () => {
+      // Invalidate all relevant queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings', 'pending'] });
       queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       toast({
         title: t('common.success'),
-        description: "Booking accepted! The mentee will receive a Cal.com link to schedule their session.",
+        description: isRTL 
+          ? "تم قبول الطلب! سيتلقى المتدرب رابط Cal.com لجدولة جلسته."
+          : "Request accepted! The mentee will receive your Cal.com link to schedule their session.",
       });
     },
     onError: () => {
@@ -61,11 +68,16 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
       return apiRequest("PATCH", `/api/bookings/${bookingId}/decline`);
     },
     onSuccess: () => {
+      // Invalidate all relevant queries to ensure fresh data
       queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings', 'pending'] });
       queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
       toast({
         title: t('common.success'),
-        description: t('mentorPortal.bookingUpdated'),
+        description: isRTL 
+          ? "تم رفض الطلب"
+          : "Request declined. The mentee has been notified.",
       });
     },
     onError: () => {
@@ -91,24 +103,41 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
 
   return (
     <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div>
-        <h1 className="text-2xl font-bold" data-testid="text-booking-requests-title">
-          {t('mentorPortal.bookingRequests')}
-        </h1>
-        <p className="text-muted-foreground">
-          {t('mentorPortal.bookingRequestsSubtitle')}
-        </p>
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" data-testid="text-booking-requests-title">
+            {t('mentorPortal.bookingRequests')}
+          </h1>
+          <p className="text-muted-foreground">
+            {t('mentorPortal.bookingRequestsSubtitle')}
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => refetch()}
+          disabled={isFetching}
+          data-testid="button-refresh-requests"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
+          {isRTL ? 'تحديث' : 'Refresh'}
+        </Button>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
+            <Inbox className="w-5 h-5" />
             {t('mentorPortal.pendingRequests')}
             {pendingBookings.length > 0 && (
-              <Badge variant="secondary">{pendingBookings.length}</Badge>
+              <Badge variant="default" className="bg-orange-500">{pendingBookings.length}</Badge>
             )}
           </CardTitle>
+          <CardDescription>
+            {isRTL 
+              ? "راجع طلبات الجلسات من المتدربين واقبلها أو ارفضها"
+              : "Review session requests from mentees and accept or decline them"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -193,11 +222,43 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
               </Table>
             </div>
           ) : (
-            <div className="text-center py-12">
-              <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                {t('mentorPortal.noPendingBookings')}
-              </p>
+            <div className="text-center py-12 space-y-4">
+              <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center">
+                <Inbox className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-medium text-lg">
+                  {isRTL ? 'لا توجد طلبات معلقة' : 'No Pending Requests'}
+                </p>
+                <p className="text-muted-foreground max-w-md mx-auto">
+                  {isRTL 
+                    ? "عندما يطلب المتدربون جلسة معك، ستظهر طلباتهم هنا للمراجعة."
+                    : "When mentees request a session with you, their requests will appear here for you to review."}
+                </p>
+              </div>
+              <div className="pt-4 border-t max-w-lg mx-auto">
+                <h4 className="font-medium mb-2">{isRTL ? 'كيف يعمل النظام:' : 'How it works:'}</h4>
+                <ol className="text-sm text-muted-foreground text-left space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="font-semibold text-primary">1.</span>
+                    {isRTL 
+                      ? "يطلب المتدرب جلسة من صفحة ملفك الشخصي"
+                      : "A mentee requests a session from your profile page"}
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-semibold text-primary">2.</span>
+                    {isRTL 
+                      ? "تقوم بمراجعة الطلب وقبوله أو رفضه"
+                      : "You review the request and accept or decline it"}
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="font-semibold text-primary">3.</span>
+                    {isRTL 
+                      ? "إذا قبلت، يتلقى المتدرب رابط Cal.com الخاص بك لحجز موعد"
+                      : "If accepted, the mentee receives your Cal.com link to book a time"}
+                  </li>
+                </ol>
+              </div>
             </div>
           )}
         </CardContent>

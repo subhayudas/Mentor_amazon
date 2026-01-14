@@ -577,7 +577,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Mentor Dashboard methods
-  async getMentorDashboardStats(mentorId: string): Promise<MentorDashboardStats> {
+  async getMentorDashboardStats(mentorId: string): Promise<MentorDashboardStats & { feedbackCount: number }> {
     await this.seedPromise;
     
     // Get all bookings for this mentor
@@ -592,6 +592,9 @@ export class DatabaseStorage implements IStorage {
     const averageRating = ratingsData.length > 0 
       ? ratingsData.reduce((sum, b) => sum + (b.mentee_rating || 0), 0) / ratingsData.length 
       : 0;
+    
+    // Count feedback received
+    const feedbackCount = ratingsData.length;
     
     // Get total earnings
     const earningsResult = await db.select().from(mentorEarnings).where(eq(mentorEarnings.mentor_id, mentorId));
@@ -609,6 +612,7 @@ export class DatabaseStorage implements IStorage {
       totalEarnings,
       monthlyEarnings,
       pendingBookings,
+      feedbackCount,
     };
   }
 

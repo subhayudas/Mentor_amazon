@@ -70,15 +70,16 @@ export default function MentorProfile() {
       return await apiRequest("POST", "/api/bookings/request", data);
     },
     onSuccess: () => {
+      // Invalidate all relevant queries
       queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      // Invalidate mentor bookings to refresh dashboard
       queryClient.invalidateQueries({ queryKey: ["/api/mentor"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/mentee"] });
       toast({
-        title: isArabic ? "تم إرسال طلبك" : "Request Sent",
+        title: isArabic ? "تم إرسال طلبك" : "Request Sent Successfully!",
         description: isArabic 
-          ? "تم إرسال طلبك إلى المرشد. سيتم إعلامك بمجرد ردهم."
-          : "Your request has been sent to the mentor. You'll be notified once they respond.",
+          ? "تم إرسال طلبك إلى المرشد. سيتم إعلامك عبر البريد الإلكتروني بمجرد ردهم."
+          : "Your request has been sent to the mentor. You'll receive an email notification once they respond. Check your mentee dashboard for updates.",
       });
       setShowBookingDialog(false);
       form.reset({
@@ -362,6 +363,29 @@ export default function MentorProfile() {
                     <Calendar className={`w-5 h-5 ${isArabic ? 'ml-2' : 'mr-2'}`} />
                     {isArabic ? 'طلب جلسة' : 'Request a Session'}
                   </Button>
+                  <div className="pt-4 border-t max-w-lg mx-auto">
+                    <h4 className="text-sm font-medium mb-3">{isArabic ? 'كيف يعمل النظام:' : 'How it works:'}</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                      <div className="space-y-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto font-bold">1</div>
+                        <p className="text-xs text-muted-foreground">
+                          {isArabic ? 'أرسل طلبك مع أهدافك' : 'Submit your request with your goals'}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto font-bold">2</div>
+                        <p className="text-xs text-muted-foreground">
+                          {isArabic ? 'المرشد يراجع ويقبل' : 'Mentor reviews and accepts'}
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto font-bold">3</div>
+                        <p className="text-xs text-muted-foreground">
+                          {isArabic ? 'احجز موعدك عبر التقويم' : 'Book your time via calendar'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </Card>
