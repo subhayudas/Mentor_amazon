@@ -2,6 +2,7 @@ import type { Express, Request, Response } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { supabase, supabaseAdmin } from "./supabase";
 import { insertBookingSchema, insertMenteeSchema, insertMentorSchema, insertBookingNoteSchema, insertNotificationSchema, insertUserSchema, insertMentorTaskSchema, insertMentorAvailabilitySchema, insertMentorActivityLogSchema } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -34,9 +35,11 @@ const upload = multer({
   },
 });
 
-const signupSchema = insertUserSchema.extend({
-  password: z.string().min(8, "Password must be at least 8 characters"),
+const signupSchema = z.object({
   email: z.string().email("Invalid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  user_type: z.enum(["mentor", "mentee"]),
+  profile_id: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -71,9 +74,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(409).json({ message: "User with this email already exists" });
       }
 
+      // Create user in Supabase Auth (using admin client to auto-confirm email)
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: result.data.email,
+        password: result.data.password,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          user_type: result.data.user_type,
+        }
+      });
+
+      if (authError) {
+        console.error("Supabase signup error:", authError);
+        return res.status(400).json({ message: authError.message });
+      }
+
+      if (!authData.user) {
+        return res.status(500).json({ message: "Failed to create user" });
+      }
+
+      // Also create user in our database for backward compatibility
       const hashedPassword = await bcrypt.hash(result.data.password, 10);
       const user = await storage.createUser({
         ...result.data,
+        id: authData.user.id, // Use Supabase user ID
         password: hashedPassword,
       });
 
@@ -111,19 +135,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const user = await storage.getUserByEmail(result.data.email);
-      if (!user) {
-        return res.status(401).json({ message: "Invalid email or password" });
+      // Try Supabase Auth first
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: result.data.email,
+        password: result.data.password,
+      });
+
+      if (authError || !authData.user) {
+        // Fallback to local auth for existing users
+        const user = await storage.getUserByEmail(result.data.email);
+        if (!user) {
+          return res.status(401).json({ message: "Invalid email or password" });
+        }
+
+        const isPasswordValid = await bcrypt.compare(result.data.password, user.password);
+        if (!isPasswordValid) {
+          return res.status(401).json({ message: "Invalid email or password" });
+        }
+
+        req.session.userId = user.id;
+        
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error("Session save error:", err);
+              reject(err);
+            } else {
+              console.log("Login successful - Session saved:", req.sessionID);
+              console.log("Login successful - User ID:", req.session.userId);
+              resolve();
+            }
+          });
+        });
+
+        const { password: _, ...userWithoutPassword } = user;
+        return res.json(userWithoutPassword);
       }
 
-      const isPasswordValid = await bcrypt.compare(result.data.password, user.password);
-      if (!isPasswordValid) {
-        return res.status(401).json({ message: "Invalid email or password" });
+      // Supabase auth successful - get user from our database
+      const user = await storage.getUserById(authData.user.id);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
       }
 
       req.session.userId = user.id;
       
-      // Save session explicitly to ensure it's persisted
       await new Promise<void>((resolve, reject) => {
         req.session.save((err) => {
           if (err) {
@@ -198,16 +254,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const user = await storage.getUserByEmail(result.data.email);
-      if (!user) {
-        return res.json({ message: "If an account exists, a reset link will be sent" });
+      // Use Supabase password reset
+      const { error } = await supabase.auth.resetPasswordForEmail(result.data.email, {
+        redirectTo: `${req.protocol}://${req.get('host')}/reset-password`,
+      });
+
+      if (error) {
+        console.error("Supabase forgot password error:", error);
       }
 
-      const resetToken = randomUUID();
-      const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      await storage.updateUserResetToken(user.id, resetToken, expires);
+      // Also update local database for backward compatibility
+      const user = await storage.getUserByEmail(result.data.email);
+      if (user) {
+        const resetToken = randomUUID();
+        const expires = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+        await storage.updateUserResetToken(user.id, resetToken, expires);
+      }
 
-      res.json({ message: "If an account exists, a reset link will be sent", token: resetToken });
+      res.json({ message: "If an account exists, a reset link will be sent" });
     } catch (error) {
       console.error("Forgot password error:", error);
       res.status(500).json({ message: "Failed to process forgot password request" });
@@ -224,21 +288,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      // Check if token is a Supabase access token or our custom token
       const user = await storage.getUserByResetToken(result.data.token);
 
-      if (!user || !user.reset_token_expires) {
-        return res.status(400).json({ message: "Invalid or expired reset token" });
+      if (user) {
+        // Using our custom reset token
+        if (!user.reset_token_expires) {
+          return res.status(400).json({ message: "Invalid or expired reset token" });
+        }
+
+        const expires = new Date(user.reset_token_expires);
+        if (expires < new Date()) {
+          return res.status(400).json({ message: "Reset token has expired" });
+        }
+
+        const hashedPassword = await bcrypt.hash(result.data.password, 10);
+        await storage.updateUserPassword(user.id, hashedPassword);
+
+        res.json({ message: "Password reset successfully" });
+      } else {
+        // Assume it's a Supabase reset - let frontend handle this
+        res.status(400).json({ message: "Invalid or expired reset token" });
       }
-
-      const expires = new Date(user.reset_token_expires);
-      if (expires < new Date()) {
-        return res.status(400).json({ message: "Reset token has expired" });
-      }
-
-      const hashedPassword = await bcrypt.hash(result.data.password, 10);
-      await storage.updateUserPassword(user.id, hashedPassword);
-
-      res.json({ message: "Password reset successfully" });
     } catch (error) {
       console.error("Reset password error:", error);
       res.status(500).json({ message: "Failed to reset password" });

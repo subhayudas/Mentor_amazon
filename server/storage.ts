@@ -543,9 +543,9 @@ export class DatabaseStorage implements IStorage {
     return result[0];
   }
 
-  async createUser(userData: InsertUser & { password: string }): Promise<User> {
+  async createUser(userData: InsertUser & { password: string; id?: string }): Promise<User> {
     await this.seedPromise;
-    const id = randomUUID();
+    const id = userData.id || randomUUID();
     const now = new Date().toISOString();
     const result = await db.insert(users).values({
       ...userData,
