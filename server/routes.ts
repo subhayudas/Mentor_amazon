@@ -207,7 +207,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (err) {
           return res.status(500).json({ message: "Failed to logout" });
         }
-        res.clearCookie("connect.sid");
+        res.clearCookie("mentor.sid"); 
         res.json({ message: "Logged out successfully" });
       });
     } catch (error) {
@@ -263,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Supabase forgot password error:", error);
       }
 
-      // Also update local database for backward compatibility
+     
       const user = await storage.getUserByEmail(result.data.email);
       if (user) {
         const resetToken = randomUUID();
@@ -288,11 +288,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check if token is a Supabase access token or our custom token
+    
       const user = await storage.getUserByResetToken(result.data.token);
 
       if (user) {
-        // Using our custom reset token
+       
         if (!user.reset_token_expires) {
           return res.status(400).json({ message: "Invalid or expired reset token" });
         }
@@ -307,7 +307,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         res.json({ message: "Password reset successfully" });
       } else {
-        // Assume it's a Supabase reset - let frontend handle this
+       
         res.status(400).json({ message: "Invalid or expired reset token" });
       }
     } catch (error) {
