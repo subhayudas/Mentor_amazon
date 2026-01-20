@@ -61,10 +61,11 @@ import {
   X,
   CalendarPlus,
 } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { menteeService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CalEmbed } from "@/components/CalEmbed";
-import type { Mentee, Booking, Mentor } from "@shared/schema";
+import type { Mentee, Booking, Mentor } from "@/lib/database";
 
 interface MenteeStats {
   totalSessions: number;
@@ -89,13 +90,15 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
   const dismissedBookingIdsRef = useRef<Set<string>>(new Set());
 
   const { data: stats, isLoading: statsLoading } = useQuery<MenteeStats>({
-    queryKey: ['/api/mentee', menteeId, 'stats'],
+    queryKey: ['mentee', menteeId, 'stats'],
+    queryFn: () => menteeService.getStats(menteeId),
     refetchInterval: 15000, // Poll every 15 seconds for updates
     staleTime: 10000,
   });
 
   const { data: bookings } = useQuery<BookingWithMentor[]>({
-    queryKey: ['/api/mentee', menteeId, 'bookings'],
+    queryKey: ['mentee', menteeId, 'bookings'],
+    queryFn: () => menteeService.getBookings(menteeId) as Promise<BookingWithMentor[]>,
     refetchInterval: 10000, // Poll every 10 seconds for real-time updates on booking status
     staleTime: 5000,
   });
@@ -328,7 +331,8 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
   const dismissedBookingIdsRef = useRef<Set<string>>(new Set());
 
   const { data: bookings, isLoading, refetch, isFetching } = useQuery<BookingWithMentor[]>({
-    queryKey: ['/api/mentee', menteeId, 'bookings'],
+    queryKey: ['mentee', menteeId, 'bookings'],
+    queryFn: () => menteeService.getBookings(menteeId) as Promise<BookingWithMentor[]>,
     refetchInterval: 10000, // Poll every 10 seconds for real-time updates on booking status
     staleTime: 5000,
   });
@@ -640,7 +644,8 @@ function MenteeMentors({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
 
   const { data: bookings, isLoading } = useQuery<BookingWithMentor[]>({
-    queryKey: ['/api/mentee', menteeId, 'bookings'],
+    queryKey: ['mentee', menteeId, 'bookings'],
+    queryFn: () => menteeService.getBookings(menteeId) as Promise<BookingWithMentor[]>,
     refetchInterval: 15000, // Poll every 15 seconds
     staleTime: 10000,
   });
@@ -717,7 +722,8 @@ function MenteeFeedback({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
 
   const { data: feedback, isLoading } = useQuery<FeedbackBooking[]>({
-    queryKey: ['/api/mentee', menteeId, 'feedback'],
+    queryKey: ['mentee', menteeId, 'feedback'],
+    queryFn: () => menteeService.getFeedback(menteeId) as Promise<FeedbackBooking[]>,
   });
 
   const feedbackGiven = feedback?.filter(f => f.mentee_rating) || [];
@@ -866,16 +872,16 @@ function MenteeProfileSettings({ mentee }: { mentee: Mentee }) {
 
   const saveMutation = useMutation({
     mutationFn: async (data: ProfileFormValues) => {
-      return apiRequest("PATCH", `/api/mentees/${mentee.id}`, {
+      return menteeService.update(mentee.id, {
         name: data.name,
-        country: data.country || null,
+        country: data.country || undefined,
         timezone: data.timezone,
         user_type: data.user_type,
-        organization_name: data.user_type === 'organization' ? data.organization_name : null,
+        organization_name: data.user_type === 'organization' ? data.organization_name : undefined,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mentees/email'] });
+      queryClient.invalidateQueries({ queryKey: ['mentee', 'email'] });
       toast({
         title: t('common.success'),
         description: t('menteePortal.profileSettings.saveSuccess'),
@@ -1119,8 +1125,9 @@ export default function MenteeDashboard() {
     }
   }, []);
 
-  const { data: mentee, isLoading: menteeLoading, error } = useQuery<Mentee>({
-    queryKey: ['/api/mentees/email', storedEmail],
+  const { data: mentee, isLoading: menteeLoading, error } = useQuery<Mentee | null>({
+    queryKey: ['mentee', 'email', storedEmail],
+    queryFn: () => menteeService.getByEmail(storedEmail!),
     enabled: !!storedEmail,
   });
 

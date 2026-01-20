@@ -45,7 +45,8 @@ import TaskManager from "@/pages/mentor/TaskManager";
 import Availability from "@/pages/mentor/Availability";
 import Feedback from "@/pages/mentor/Feedback";
 import ProfileSettings from "@/pages/mentor/ProfileSettings";
-import type { Mentor } from "@shared/schema";
+import { mentorService } from "@/lib/services";
+import type { Mentor } from "@/lib/database";
 
 export default function MentorPortal() {
   const { t, i18n } = useTranslation();
@@ -56,7 +57,8 @@ export default function MentorPortal() {
   });
 
   const { data: allMentors, isLoading: mentorsLoading } = useQuery<Mentor[]>({
-    queryKey: ['/api/mentors'],
+    queryKey: ['mentors'],
+    queryFn: () => mentorService.getAll(),
   });
 
   useEffect(() => {

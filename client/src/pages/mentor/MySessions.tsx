@@ -14,10 +14,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Calendar, Clock, User, CheckCircle, XCircle, FileText, Plus, Trash2, Star, MessageSquare } from "lucide-react";
 import { format, parseISO, isFuture, isPast } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { mentorService, bookingService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import type { Booking, BookingNote } from "@shared/schema";
+import type { Booking, BookingNote } from "@/lib/database";
 import { cn } from "@/lib/utils";
 
 interface MySessionsProps {
@@ -41,22 +42,24 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
   const [feedbackText, setFeedbackText] = useState("");
 
   const { data: bookings, isLoading } = useQuery<Booking[]>({
-    queryKey: ['/api/mentor', mentorId, 'bookings'],
+    queryKey: ['mentor', mentorId, 'bookings'],
+    queryFn: () => mentorService.getBookings(mentorId),
     enabled: !!mentorId,
   });
 
   const { data: notes, isLoading: notesLoading } = useQuery<BookingNote[]>({
-    queryKey: ['/api/bookings', selectedBooking?.id, 'notes'],
+    queryKey: ['bookings', selectedBooking?.id, 'notes'],
+    queryFn: () => bookingService.getNotes(selectedBooking!.id),
     enabled: !!selectedBooking?.id && notesDialogOpen,
   });
 
   const updateBookingMutation = useMutation({
     mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
-      return apiRequest("PATCH", `/api/mentor/${mentorId}/bookings/${bookingId}`, { status });
+      return bookingService.updateStatus(bookingId, status);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'dashboard'] });
       toast({
         title: t('common.success'),
         description: t('mentorPortal.sessionUpdated'),
@@ -73,10 +76,17 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
 
   const addNoteMutation = useMutation({
     mutationFn: async (data: { booking_id: string; author_type: string; author_email: string; note_type: string; content: string; due_date?: string }) => {
-      return apiRequest("POST", `/api/bookings/${data.booking_id}/notes`, data);
+      return bookingService.addNote({
+        booking_id: data.booking_id,
+        author_type: data.author_type as 'mentor' | 'mentee',
+        author_email: data.author_email,
+        note_type: data.note_type as 'note' | 'task',
+        content: data.content,
+        due_date: data.due_date,
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings', selectedBooking?.id, 'notes'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', selectedBooking?.id, 'notes'] });
       setNoteContent("");
       setNoteType("note");
       setDueDate(undefined);
@@ -96,10 +106,10 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
 
   const updateNoteMutation = useMutation({
     mutationFn: async ({ noteId, is_completed }: { noteId: string; is_completed: boolean }) => {
-      return apiRequest("PATCH", `/api/bookings/${selectedBooking?.id}/notes/${noteId}`, { is_completed });
+      return bookingService.updateNote(noteId, { is_completed });
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings', selectedBooking?.id, 'notes'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', selectedBooking?.id, 'notes'] });
       toast({
         title: t('common.success'),
         description: variables.is_completed ? t('mentorPortal.taskCompleted') : t('mentorPortal.taskIncomplete'),
@@ -116,10 +126,10 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
 
   const deleteNoteMutation = useMutation({
     mutationFn: async (noteId: string) => {
-      return apiRequest("DELETE", `/api/bookings/${selectedBooking?.id}/notes/${noteId}`);
+      return bookingService.deleteNote(noteId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/bookings', selectedBooking?.id, 'notes'] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', selectedBooking?.id, 'notes'] });
       toast({
         title: t('common.success'),
         description: t('mentorPortal.noteDeleted'),
@@ -136,10 +146,10 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
 
   const submitFeedbackMutation = useMutation({
     mutationFn: async ({ bookingId, mentor_rating, mentor_feedback }: { bookingId: string; mentor_rating: number; mentor_feedback: string }) => {
-      return apiRequest("POST", `/api/bookings/${bookingId}/mentor-feedback`, { mentor_rating, mentor_feedback });
+      return bookingService.submitMentorFeedback(bookingId, mentor_rating, mentor_feedback);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings'] });
       setFeedbackDialogOpen(false);
       setFeedbackBooking(null);
       setFeedbackRating(0);

@@ -3,8 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { insertMentorSchema, type InsertMentor, type Mentor } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { z } from "zod";
+import { mentorService, uploadService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
+import type { Mentor } from "@/lib/database";
 import { useToast } from "@/hooks/use-toast";
 import {
   Form,
@@ -165,6 +167,28 @@ const COUNTRY_OPTIONS = [
   "Other",
 ];
 
+const mentorSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email is required"),
+  company: z.string().optional(),
+  position: z.string().optional(),
+  timezone: z.string().min(1, "Timezone is required"),
+  country: z.string().optional(),
+  photo_url: z.string().optional(),
+  bio: z.string().min(1, "Bio is required"),
+  linkedin_url: z.string().optional(),
+  cal_link: z.string().min(1, "Cal.com link is required"),
+  expertise: z.array(z.string()).min(1, "At least one expertise is required"),
+  industries: z.array(z.string()).min(1, "At least one industry is required"),
+  languages_spoken: z.array(z.string()).min(1, "At least one language is required"),
+  comms_owner: z.enum(["exec", "assistant"]),
+  assistant_email: z.string().optional(),
+  mentorship_preference: z.enum(["ongoing", "rotating", "either"]).optional(),
+  why_joined: z.string().optional(),
+});
+
+type MentorFormData = z.infer<typeof mentorSchema>;
+
 export default function MentorOnboarding() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
@@ -173,21 +197,14 @@ export default function MentorOnboarding() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<InsertMentor>({
-    resolver: zodResolver(insertMentorSchema.refine(
+  const form = useForm<MentorFormData>({
+    resolver: zodResolver(mentorSchema.refine(
       (data) => {
         if (!data.cal_link || data.cal_link.trim() === "") {
           return false;
         }
         let calLink = data.cal_link.trim();
-        // Strip https://cal.com/ prefix if present
         calLink = calLink.replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
-        // Accept username/eventtype format 
-        // Cal.com usernames can contain: letters, numbers, dots, dashes
-        // Event types can contain: letters, numbers, dashes
-        // Examples: username/30min, vats-s.-shah-2krirj/30min, john.doe/meeting
-        const validPattern = /^[a-z0-9][a-z0-9._-]*[a-z0-9]\/[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]\/[a-z0-9]$/i;
-        // Also accept single character username/event: a/b
         const simplePattern = /^[a-z0-9._-]+\/[a-z0-9_-]+$/i;
         return simplePattern.test(calLink);
       },
@@ -216,13 +233,19 @@ export default function MentorOnboarding() {
     },
   });
 
-  const createMentorMutation = useMutation<Mentor, Error, InsertMentor>({
-    mutationFn: async (data: InsertMentor) => {
-      const response = await apiRequest("POST", "/api/mentors", data);
-      return await response.json();
+  const createMentorMutation = useMutation<Mentor, Error, MentorFormData>({
+    mutationFn: async (data: MentorFormData) => {
+      let calLink = data.cal_link?.trim() || "";
+      calLink = calLink.replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
+      
+      return mentorService.create({
+        ...data,
+        cal_link: calLink,
+        is_available: true,
+      });
     },
     onSuccess: (newMentor: Mentor) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
+      queryClient.invalidateQueries({ queryKey: ['mentors'] });
       toast({
         title: t('mentorOnboarding.successTitle'),
         description: t('mentorOnboarding.successMessage'),
@@ -274,22 +297,11 @@ export default function MentorOnboarding() {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      const response = await fetch("/api/uploads", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const result = await response.json();
-      form.setValue("photo_url", result.url);
-      setPhotoPreview(result.url);
+      const url = await uploadService.uploadFile(file, 'mentors');
+      form.setValue("photo_url", url);
+      setPhotoPreview(url);
       toast({
         title: t('mentorOnboarding.photoUploaded'),
         description: t('mentorOnboarding.photoUploadSuccess'),
@@ -307,15 +319,8 @@ export default function MentorOnboarding() {
 
   const commsOwner = form.watch("comms_owner");
 
-  const onSubmit = (data: InsertMentor) => {
-    let calLink = data.cal_link?.trim() || "";
-    // Strip https://cal.com/ prefix if present for storage
-    calLink = calLink.replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
-    const cleanedData = {
-      ...data,
-      cal_link: calLink,
-    };
-    createMentorMutation.mutate(cleanedData);
+  const onSubmit = (data: MentorFormData) => {
+    createMentorMutation.mutate(data);
   };
 
   return (

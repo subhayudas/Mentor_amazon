@@ -2,7 +2,8 @@ import { useState, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { motion } from "framer-motion";
-import { Mentor } from "@shared/schema";
+import { mentorService } from "@/lib/services";
+import type { Mentor } from "@/lib/database";
 import { MentorCard } from "@/components/MentorCard";
 import { SearchAndFilter } from "@/components/SearchAndFilter";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,19 +24,16 @@ export default function Home() {
   const isArabic = i18n.language === 'ar';
   const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
 
-  const buildQueryParams = () => {
-    const params = new URLSearchParams();
-    if (filters.search) params.append("search", filters.search);
-    if (filters.expertise && filters.expertise !== "all") params.append("expertise", filters.expertise);
-    if (filters.industry && filters.industry !== "all") params.append("industry", filters.industry);
-    if (filters.language && filters.language !== "all") params.append("language", filters.language);
-    return params.toString();
-  };
-
-  const queryParams = buildQueryParams();
-  const apiUrl = queryParams ? `/api/mentors?${queryParams}` : "/api/mentors";
-
-  const { data: mentors, isLoading } = useQuery<Mentor[]>({ queryKey: [apiUrl] });
+  const { data: mentors, isLoading } = useQuery<Mentor[]>({
+    queryKey: ['mentors', filters],
+    queryFn: () => mentorService.getAll({
+      search: filters.search || undefined,
+      expertise: filters.expertise && filters.expertise !== 'all' ? filters.expertise : undefined,
+      industry: filters.industry && filters.industry !== 'all' ? filters.industry : undefined,
+      language: filters.language && filters.language !== 'all' ? filters.language : undefined,
+    }),
+  });
+  
   const allMentors = mentors;
 
   const handleFilterChange = useCallback((newFilters: { search: string; expertise: string; industry: string; language: string }) => {
@@ -364,7 +362,7 @@ export default function Home() {
 
           {/* Search and Filter */}
           {allMentors && (
-            <SearchAndFilter mentors={allMentors} onFilterChange={handleFilterChange} />
+            <SearchAndFilter mentors={allMentors as any} onFilterChange={handleFilterChange} />
           )}
 
           {/* Mentor Grid */}
@@ -393,7 +391,7 @@ export default function Home() {
                   viewport={{ once: true, margin: "-50px" }}
                   transition={{ duration: 0.5, delay: index * 0.05 }}
                 >
-                  <MentorCard mentor={mentor} accentColor={getCardColor(index)} />
+                  <MentorCard mentor={mentor as any} accentColor={getCardColor(index)} />
                 </motion.div>
               ))}
             </div>

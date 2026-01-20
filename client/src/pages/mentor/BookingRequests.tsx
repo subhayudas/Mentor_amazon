@@ -14,10 +14,11 @@ import {
 } from "@/components/ui/table";
 import { Check, X, Calendar, Clock, User, Target, Mail, RefreshCw, Inbox } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { mentorService, bookingService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import type { Booking, Mentee } from "@shared/schema";
+import type { Booking, Mentee } from "@/lib/database";
 
 type BookingWithMentee = Booking & { mentee?: Mentee };
 
@@ -31,7 +32,8 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
   const { toast } = useToast();
 
   const { data: bookings, isLoading, refetch, isFetching } = useQuery<BookingWithMentee[]>({
-    queryKey: ['/api/mentor', mentorId, 'bookings', 'pending'],
+    queryKey: ['mentor', mentorId, 'bookings', 'pending'],
+    queryFn: () => mentorService.getPendingBookings(mentorId) as Promise<BookingWithMentee[]>,
     enabled: !!mentorId,
     refetchInterval: 10000, // Poll every 10 seconds for new requests
     staleTime: 5000, // Consider data stale after 5 seconds
@@ -39,14 +41,14 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
 
   const acceptMutation = useMutation({
     mutationFn: async (bookingId: string) => {
-      return apiRequest("PATCH", `/api/bookings/${bookingId}/accept`);
+      return bookingService.accept(bookingId);
     },
     onSuccess: () => {
       // Invalidate all relevant queries to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings', 'pending'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings', 'pending'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast({
         title: t('common.success'),
         description: isRTL 
@@ -65,14 +67,14 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
 
   const declineMutation = useMutation({
     mutationFn: async (bookingId: string) => {
-      return apiRequest("PATCH", `/api/bookings/${bookingId}/decline`);
+      return bookingService.decline(bookingId);
     },
     onSuccess: () => {
       // Invalidate all relevant queries to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'bookings', 'pending'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings', 'pending'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast({
         title: t('common.success'),
         description: isRTL 

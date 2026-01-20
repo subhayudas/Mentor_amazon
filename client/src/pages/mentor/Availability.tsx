@@ -13,10 +13,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Clock, Calendar, Plus, Trash2, Save } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { mentorService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import type { MentorAvailability as AvailabilityType } from "@shared/schema";
+import type { MentorAvailability as AvailabilityType } from "@/lib/database";
 
 interface AvailabilityProps {
   mentorId: string;
@@ -53,7 +54,8 @@ export default function Availability({ mentorId }: AvailabilityProps) {
   const [hasChanges, setHasChanges] = useState(false);
 
   const { data: availability, isLoading } = useQuery<AvailabilityType[]>({
-    queryKey: ['/api/mentor', mentorId, 'availability'],
+    queryKey: ['mentor', mentorId, 'availability'],
+    queryFn: () => mentorService.getAvailability(mentorId),
     enabled: !!mentorId,
   });
 
@@ -71,17 +73,15 @@ export default function Availability({ mentorId }: AvailabilityProps) {
 
   const saveMutation = useMutation({
     mutationFn: async (slotsToSave: LocalSlot[]) => {
-      return apiRequest("PUT", `/api/mentor/${mentorId}/availability`, {
-        slots: slotsToSave.map(s => ({
-          day_of_week: s.day_of_week,
-          start_time: s.start_time,
-          end_time: s.end_time,
-          is_active: s.is_active,
-        })),
-      });
+      return mentorService.setAvailability(mentorId, slotsToSave.map(s => ({
+        day_of_week: s.day_of_week,
+        start_time: s.start_time,
+        end_time: s.end_time,
+        is_active: s.is_active,
+      })));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'availability'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'availability'] });
       setHasChanges(false);
       toast({
         title: t('common.success'),

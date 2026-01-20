@@ -17,15 +17,8 @@ import {
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
-import type { MentorActivityLog } from "@shared/schema";
-
-interface DashboardStats {
-  totalSessions: number;
-  completedSessions: number;
-  averageRating: number;
-  pendingBookings: number;
-  feedbackCount: number;
-}
+import { mentorService } from "@/lib/services";
+import type { MentorActivityLog, MentorDashboardStats } from "@/lib/database";
 
 interface DashboardHomeProps {
   mentorId: string;
@@ -35,15 +28,17 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
 
-  const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
-    queryKey: ['/api/mentor', mentorId, 'dashboard'],
+  const { data: stats, isLoading: statsLoading } = useQuery<MentorDashboardStats>({
+    queryKey: ['mentor', mentorId, 'dashboard'],
+    queryFn: () => mentorService.getDashboardStats(mentorId),
     enabled: !!mentorId,
     refetchInterval: 15000, // Poll every 15 seconds for updates
     staleTime: 10000,
   });
 
   const { data: activity, isLoading: activityLoading } = useQuery<MentorActivityLog[]>({
-    queryKey: ['/api/mentor', mentorId, 'activity'],
+    queryKey: ['mentor', mentorId, 'activity'],
+    queryFn: () => mentorService.getActivityLog(mentorId),
     enabled: !!mentorId,
     refetchInterval: 30000, // Poll every 30 seconds
     staleTime: 20000,

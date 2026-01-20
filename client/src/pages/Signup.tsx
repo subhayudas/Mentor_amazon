@@ -4,7 +4,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation, Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { authService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Form,
@@ -85,16 +86,14 @@ export default function Signup() {
 
   const signupMutation = useMutation({
     mutationFn: async (data: SignupFormData) => {
-      const response = await apiRequest("POST", "/api/auth/signup", {
+      return authService.signup({
         email: data.email,
         password: data.password,
         user_type: data.userType,
       });
-      return response.json();
     },
     onSuccess: (data) => {
-     
-      queryClient.setQueryData(["/api/auth/me"], data);
+      queryClient.clear();
       localStorage.setItem("user", JSON.stringify(data));
       toast({
         title: t("auth.signupSuccess"),

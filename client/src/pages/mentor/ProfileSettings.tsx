@@ -26,10 +26,11 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Save, User, Building2, Globe } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { mentorService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import type { Mentor } from "@shared/schema";
+import type { Mentor } from "@/lib/database";
 
 interface ProfileSettingsProps {
   mentorId: string;
@@ -61,8 +62,9 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
   const isRTL = i18n.language === 'ar';
   const { toast } = useToast();
 
-  const { data: mentor, isLoading } = useQuery<Mentor>({
-    queryKey: ['/api/mentors/email', mentorEmail],
+  const { data: mentor, isLoading } = useQuery<Mentor | null>({
+    queryKey: ['mentor', 'email', mentorEmail],
+    queryFn: () => mentorService.getByEmail(mentorEmail),
     enabled: !!mentorEmail,
   });
 
@@ -113,25 +115,25 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
     mutationFn: async (data: ProfileFormValues) => {
       const payload = {
         name: data.name,
-        name_ar: data.name_ar || null,
-        position: data.position || null,
-        position_ar: data.position_ar || null,
-        company: data.company || null,
-        company_ar: data.company_ar || null,
+        name_ar: data.name_ar || undefined,
+        position: data.position || undefined,
+        position_ar: data.position_ar || undefined,
+        company: data.company || undefined,
+        company_ar: data.company_ar || undefined,
         bio: data.bio,
-        bio_ar: data.bio_ar || null,
+        bio_ar: data.bio_ar || undefined,
         expertise: data.expertise.split(",").map(s => s.trim()).filter(Boolean),
-        expertise_ar: data.expertise_ar ? data.expertise_ar.split(",").map(s => s.trim()).filter(Boolean) : null,
+        expertise_ar: data.expertise_ar ? data.expertise_ar.split(",").map(s => s.trim()).filter(Boolean) : undefined,
         industries: data.industries.split(",").map(s => s.trim()).filter(Boolean),
-        industries_ar: data.industries_ar ? data.industries_ar.split(",").map(s => s.trim()).filter(Boolean) : null,
-        country: data.country || null,
-        mentorship_preference: data.mentorship_preference || null,
-        why_joined: data.why_joined || null,
+        industries_ar: data.industries_ar ? data.industries_ar.split(",").map(s => s.trim()).filter(Boolean) : undefined,
+        country: data.country || undefined,
+        mentorship_preference: data.mentorship_preference || undefined,
+        why_joined: data.why_joined || undefined,
       };
-      return apiRequest("PATCH", `/api/mentors/${mentorId}`, payload);
+      return mentorService.update(mentorId, payload);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mentors/email', mentorEmail] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', 'email', mentorEmail] });
       toast({
         title: t('common.success'),
         description: t('profileSettings.saveSuccess'),

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Booking, Mentor, BookingNote } from "@shared/schema";
+import { menteeService, mentorService, bookingService } from "@/lib/services";
+import type { Booking, Mentor, BookingNote } from "@/lib/database";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import { format, parseISO, isFuture } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 
@@ -53,40 +54,41 @@ export default function MyBookings() {
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
 
-  const { data: bookings, isLoading: bookingsLoading } = useQuery<Booking[]>({
-    queryKey: ["/api/mentees", email, "bookings"],
+  const { data: mentee } = useQuery({
+    queryKey: ['mentee', 'email', email],
+    queryFn: () => menteeService.getByEmail(email),
     enabled: !!email,
   });
 
-  const mentorIds = bookings?.map(b => b.mentor_id) || [];
-  const uniqueMentorIds = Array.from(new Set(mentorIds));
-
-  const mentorQueries = useQuery<Mentor[]>({
-    queryKey: ["/api/mentors"],
-    enabled: uniqueMentorIds.length > 0,
+  const { data: bookings, isLoading: bookingsLoading } = useQuery<(Booking & { mentor?: Mentor })[]>({
+    queryKey: ['mentee', mentee?.id, 'bookings'],
+    queryFn: () => menteeService.getBookings(mentee!.id),
+    enabled: !!mentee?.id,
   });
 
-  const mentors = mentorQueries.data || [];
+  const mentors = bookings?.map(b => b.mentor).filter(Boolean) as Mentor[] || [];
   const mentorMap = new Map(mentors.map(m => [m.id, m]));
 
   // Fetch notes for selected booking
   const { data: bookingNotes, isLoading: notesLoading } = useQuery<BookingNote[]>({
-    queryKey: ["/api/bookings", selectedBooking?.id, "notes"],
+    queryKey: ['bookings', selectedBooking?.id, 'notes'],
+    queryFn: () => bookingService.getNotes(selectedBooking!.id),
     enabled: !!selectedBooking?.id,
   });
 
   // Add note mutation
   const addNoteMutation = useMutation({
     mutationFn: async (data: { booking_id: string; content: string; note_type: "note" | "task"; author_email: string }) => {
-      return apiRequest("POST", `/api/bookings/${data.booking_id}/notes`, {
+      return bookingService.addNote({
+        booking_id: data.booking_id,
         content: data.content,
         note_type: data.note_type,
-        author_type: "mentee",
+        author_type: 'mentee',
         author_email: data.author_email,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings", selectedBooking?.id, "notes"] });
+      queryClient.invalidateQueries({ queryKey: ['bookings', selectedBooking?.id, 'notes'] });
       setNewNote("");
       toast({
         title: t('myBookings.noteAdded'),
@@ -105,14 +107,10 @@ export default function MyBookings() {
   // Submit feedback mutation
   const submitFeedbackMutation = useMutation({
     mutationFn: async (data: { bookingId: string; rating: number; feedback: string }) => {
-      return apiRequest("POST", `/api/bookings/${data.bookingId}/mentee-feedback`, {
-        rating: data.rating,
-        feedback: data.feedback,
-        menteeEmail: email,
-      });
+      return bookingService.submitMenteeFeedback(data.bookingId, data.rating, data.feedback);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mentees", email, "bookings"] });
+      queryClient.invalidateQueries({ queryKey: ['mentee', mentee?.id, 'bookings'] });
       setFeedbackDialogOpen(false);
       setFeedbackBooking(null);
       setFeedbackRating(0);

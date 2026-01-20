@@ -1,63 +1,47 @@
-import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { getApiUrl } from "./api";
+import { QueryClient } from "@tanstack/react-query";
 
-async function throwIfResNotOk(res: Response) {
-  if (!res.ok) {
-    const text = (await res.text()) || res.statusText;
-    throw new Error(`${res.status}: ${text}`);
-  }
-}
-
-export async function apiRequest(
-  method: string,
-  url: string,
-  data?: unknown | undefined,
-): Promise<Response> {
-  const apiUrl = getApiUrl(url);
-  const res = await fetch(apiUrl, {
-    method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
-
-  await throwIfResNotOk(res);
-  return res;
-}
-
-type UnauthorizedBehavior = "returnNull" | "throw";
-export const getQueryFn: <T>(options: {
-  on401: UnauthorizedBehavior;
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior }) =>
-  async ({ queryKey }) => {
-    // Join query key parts and construct API URL
-    const path = queryKey.join("/") as string;
-    const apiUrl = getApiUrl(path);
-    
-    const res = await fetch(apiUrl, {
-      credentials: "include",
-    });
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
-    }
-
-    await throwIfResNotOk(res);
-    return await res.json();
-  };
-
+// Query client with default options optimized for frontend-only operation
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
     },
     mutations: {
       retry: false,
     },
   },
 });
+
+// Legacy exports for backward compatibility during migration
+export async function apiRequest(
+  method: string,
+  url: string,
+  data?: unknown | undefined,
+): Promise<Response> {
+  console.warn(`Legacy apiRequest called for ${method} ${url}. Consider using the database service directly.`);
+  
+  // Create a mock response for backward compatibility
+  return new Response(JSON.stringify({ message: 'Using frontend-only mode' }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+type UnauthorizedBehavior = "returnNull" | "throw";
+
+export const getQueryFn: <T>(options: {
+  on401: UnauthorizedBehavior;
+}) => () => Promise<T | null> =
+  ({ on401: unauthorizedBehavior }) =>
+  async () => {
+    console.warn('Legacy getQueryFn called. Consider using the database service directly.');
+    
+    if (unauthorizedBehavior === "returnNull") {
+      return null;
+    }
+    
+    throw new Error('Not authenticated');
+  };

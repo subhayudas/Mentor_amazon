@@ -9,8 +9,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Notification } from "@shared/schema";
+import { notificationService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
+import type { Notification } from "@/lib/database";
 
 interface NotificationBellProps {
   email: string;
@@ -18,34 +19,34 @@ interface NotificationBellProps {
 
 export function NotificationBell({ email }: NotificationBellProps) {
   const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
-    queryKey: ["/api/notifications", email],
+    queryKey: ["notifications", email],
+    queryFn: () => notificationService.getAll(email),
     enabled: !!email,
   });
 
-  const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/notifications", email, "unread-count"],
+  const { data: unreadCount = 0 } = useQuery<number>({
+    queryKey: ["notifications", email, "unread-count"],
+    queryFn: () => notificationService.getUnreadCount(email),
     enabled: !!email,
   });
-
-  const unreadCount = unreadData?.count ?? 0;
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
-      await apiRequest("PATCH", `/api/notifications/${notificationId}/read`);
+      await notificationService.markAsRead(notificationId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications", email] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications", email, "unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", email] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", email, "unread-count"] });
     },
   });
 
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("PATCH", `/api/notifications/${email}/mark-all-read`);
+      await notificationService.markAllAsRead(email);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications", email] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications", email, "unread-count"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", email] });
+      queryClient.invalidateQueries({ queryKey: ["notifications", email, "unread-count"] });
     },
   });
 

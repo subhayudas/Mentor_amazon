@@ -3,8 +3,10 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { insertMenteeSchema, type InsertMentee, type Mentee } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { z } from "zod";
+import { menteeService, uploadService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
+import type { Mentee } from "@/lib/database";
 import { useToast } from "@/hooks/use-toast";
 import {
   Form,
@@ -132,6 +134,28 @@ const EXPERIENCE_AREA_OPTIONS = [
   "other",
 ] as const;
 
+const menteeSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email is required"),
+  user_type: z.enum(["individual", "organization"]),
+  organization_name: z.string().optional(),
+  organization_website: z.string().optional(),
+  organization_sector: z.string().optional(),
+  organization_size: z.string().optional(),
+  organization_mission: z.string().optional(),
+  organization_needs: z.string().optional(),
+  country: z.string().optional(),
+  timezone: z.string().min(1, "Timezone is required"),
+  photo_url: z.string().optional(),
+  bio: z.string().optional(),
+  linkedin_url: z.string().optional(),
+  languages_spoken: z.array(z.string()).min(1, "At least one language is required"),
+  areas_exploring: z.array(z.string()).min(1, "At least one area is required"),
+  goals: z.string().optional(),
+});
+
+type MenteeFormData = z.infer<typeof menteeSchema>;
+
 export default function MenteeRegistration() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
@@ -140,8 +164,8 @@ export default function MenteeRegistration() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const form = useForm<InsertMentee>({
-    resolver: zodResolver(insertMenteeSchema.refine(
+  const form = useForm<MenteeFormData>({
+    resolver: zodResolver(menteeSchema.refine(
       (data) => {
         if (data.user_type === "organization") {
           const trimmed = data.organization_name?.trim() || "";
@@ -212,22 +236,11 @@ export default function MenteeRegistration() {
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
     try {
-      const response = await fetch("/api/uploads", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("Upload failed");
-      }
-
-      const result = await response.json();
-      form.setValue("photo_url", result.url);
-      setPhotoPreview(result.url);
+      const url = await uploadService.uploadFile(file, 'mentees');
+      form.setValue("photo_url", url);
+      setPhotoPreview(url);
       toast({
         title: t('mentorOnboarding.photoUploaded'),
         description: t('mentorOnboarding.photoUploadSuccess'),
@@ -243,13 +256,15 @@ export default function MenteeRegistration() {
     }
   };
 
-  const createMenteeMutation = useMutation<Mentee, Error, InsertMentee>({
-    mutationFn: async (data: InsertMentee) => {
-      const response = await apiRequest("POST", "/api/mentees", data);
-      return await response.json();
+  const createMenteeMutation = useMutation<Mentee, Error, MenteeFormData>({
+    mutationFn: async (data: MenteeFormData) => {
+      return menteeService.create({
+        ...data,
+        organization_name: data.organization_name?.trim() || undefined,
+      });
     },
     onSuccess: (newMentee: Mentee) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mentees"] });
+      queryClient.invalidateQueries({ queryKey: ['mentees'] });
       toast({
         title: t('menteeRegistration.successTitle'),
         description: t('menteeRegistration.successMessage'),
@@ -278,12 +293,8 @@ export default function MenteeRegistration() {
     },
   });
 
-  const onSubmit = (data: InsertMentee) => {
-    const cleanedData = {
-      ...data,
-      organization_name: data.organization_name?.trim() || null,
-    };
-    createMenteeMutation.mutate(cleanedData);
+  const onSubmit = (data: MenteeFormData) => {
+    createMenteeMutation.mutate(data);
   };
 
   return (

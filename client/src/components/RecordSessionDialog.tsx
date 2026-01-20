@@ -22,7 +22,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { bookingService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { CheckCircle2 } from "lucide-react";
 
 const recordSessionSchema = z.object({
@@ -51,16 +52,17 @@ export function RecordSessionDialog({ mentorId, mentorName }: RecordSessionDialo
 
   const recordMutation = useMutation({
     mutationFn: async (data: RecordSessionForm) => {
-      return await apiRequest("POST", "/api/sessions", {
-        mentorId,
-        menteeName: data.menteeName,
-        menteeEmail: data.menteeEmail,
+      return await bookingService.create({
+        mentor_id: mentorId,
+        mentee_name: data.menteeName,
+        mentee_email: data.menteeEmail,
       });
     },
     onSuccess: (_, variables) => {
       localStorage.setItem("menteeEmail", variables.menteeEmail);
-      queryClient.invalidateQueries({ queryKey: ["/api/sessions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mentees", variables.menteeEmail, "sessions"] });
+      localStorage.setItem("menteeName", variables.menteeName);
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['mentee'] });
       toast({
         title: "Session Recorded!",
         description: `Your session with ${mentorName} has been recorded successfully.`,

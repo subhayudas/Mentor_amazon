@@ -1,7 +1,9 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { useState } from "react";
-import { Mentor } from "@shared/schema";
+import { mentorService, bookingService } from "@/lib/services";
+import type { Mentor } from "@/lib/database";
+import { queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +13,6 @@ import { Separator } from "@/components/ui/separator";
 import { ArrowLeft, Clock, Globe, Star, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useTranslation } from "react-i18next";
 import {
   Dialog,
@@ -51,8 +52,9 @@ export default function MentorProfile() {
   const { toast } = useToast();
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   
-  const { data: mentor, isLoading } = useQuery<Mentor>({
-    queryKey: ["/api/mentors", mentorId],
+  const { data: mentor, isLoading } = useQuery<Mentor | null>({
+    queryKey: ['mentor', mentorId],
+    queryFn: () => mentorService.getById(mentorId!),
     enabled: !!mentorId,
   });
 
@@ -67,14 +69,11 @@ export default function MentorProfile() {
 
   const bookingRequestMutation = useMutation({
     mutationFn: async (data: { mentor_id: string; mentee_name: string; mentee_email: string; goal: string }) => {
-      return await apiRequest("POST", "/api/bookings/request", data);
+      return bookingService.createRequest(data);
     },
     onSuccess: () => {
-      // Invalidate all relevant queries
-      queryClient.invalidateQueries({ queryKey: ["/api/bookings"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mentor"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mentee"] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast({
         title: isArabic ? "تم إرسال طلبك" : "Request Sent Successfully!",
         description: isArabic 

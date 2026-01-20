@@ -1,14 +1,7 @@
-import { createContext, useContext, ReactNode } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
+import { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import { useLocation } from "wouter";
-
-interface User {
-  id: string;
-  email: string;
-  name?: string;
-  user_type: 'mentor' | 'mentee';
-}
+import { auth, AuthUser } from "@/lib/auth";
+import { queryClient } from "@/lib/queryClient";
 
 interface LoginData {
   email: string;
@@ -16,9 +9,9 @@ interface LoginData {
 }
 
 interface AuthContextType {
-  user: User | null | undefined;
+  user: AuthUser | null | undefined;
   isLoading: boolean;
-  login: (data: LoginData) => Promise<User>;
+  login: (data: LoginData) => Promise<AuthUser>;
   logout: () => Promise<void>;
 }
 
@@ -26,46 +19,70 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
+  const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const { data: user, isLoading } = useQuery<User | null>({
-    queryKey: ["/api/auth/me"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
+  // Initialize auth state
+  useEffect(() => {
+    let mounted = true;
 
-  const loginMutation = useMutation({
-    mutationFn: async (data: LoginData): Promise<User> => {
-      const response = await apiRequest("POST", "/api/auth/login", data);
-      return response.json();
-    },
-    onSuccess: (userData) => {
-      queryClient.setQueryData(["/api/auth/me"], userData);
-    },
-  });
+    const initAuth = async () => {
+      try {
+        const currentUser = await auth.getCurrentUser();
+        if (mounted) {
+          setUser(currentUser);
+          setIsLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth init error:', error);
+        if (mounted) {
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    };
 
-  const logoutMutation = useMutation({
-    mutationFn: async (): Promise<void> => {
-      await apiRequest("POST", "/api/auth/logout");
-    },
-    onSuccess: () => {
-      localStorage.removeItem("user");
-      localStorage.removeItem("mentorId");
-      localStorage.removeItem("menteeId");
-      localStorage.removeItem("mentorEmail");
-      localStorage.removeItem("menteeEmail");
-      localStorage.removeItem("menteeName");
+    initAuth();
+
+    // Listen for auth state changes
+    const unsubscribe = auth.onAuthStateChange((authUser) => {
+      if (mounted) {
+        setUser(authUser);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  const login = async (data: LoginData): Promise<AuthUser> => {
+    try {
+      const authUser = await auth.login(data);
+      setUser(authUser);
+      
+      // Clear any stale cache
       queryClient.clear();
-      setLocation("/login");
-    },
-  });
-
-  const login = async (data: LoginData): Promise<User> => {
-    return loginMutation.mutateAsync(data);
+      
+      return authUser;
+    } catch (error) {
+      throw error;
+    }
   };
 
   const logout = async (): Promise<void> => {
-    return logoutMutation.mutateAsync();
+    try {
+      await auth.logout();
+      setUser(null);
+      
+      // Clear all cached data
+      queryClient.clear();
+      
+      setLocation("/login");
+    } catch (error) {
+      throw error;
+    }
   };
 
   return (

@@ -26,10 +26,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, ListTodo, Clock, CheckCircle2 } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { mentorService } from "@/lib/services";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import type { MentorTask } from "@shared/schema";
+import type { MentorTask } from "@/lib/database";
 
 interface TaskManagerProps {
   mentorId: string;
@@ -48,19 +49,24 @@ export default function TaskManager({ mentorId }: TaskManagerProps) {
   });
 
   const { data: tasks, isLoading } = useQuery<MentorTask[]>({
-    queryKey: ['/api/mentor', mentorId, 'tasks'],
+    queryKey: ['mentor', mentorId, 'tasks'],
+    queryFn: () => mentorService.getTasks(mentorId),
     enabled: !!mentorId,
   });
 
   const createTaskMutation = useMutation({
     mutationFn: async (task: typeof newTask) => {
-      return apiRequest("POST", `/api/mentor/${mentorId}/tasks`, {
-        ...task,
-        due_date: task.due_date ? new Date(task.due_date).toISOString() : null,
+      return mentorService.createTask({
+        mentor_id: mentorId,
+        title: task.title,
+        description: task.description || undefined,
+        priority: task.priority,
+        due_date: task.due_date ? new Date(task.due_date).toISOString() : undefined,
+        status: 'pending',
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'tasks'] });
       setIsDialogOpen(false);
       setNewTask({ title: "", description: "", priority: "medium", due_date: "" });
       toast({
@@ -79,10 +85,10 @@ export default function TaskManager({ mentorId }: TaskManagerProps) {
 
   const updateTaskMutation = useMutation({
     mutationFn: async ({ taskId, updates }: { taskId: string; updates: Partial<MentorTask> }) => {
-      return apiRequest("PATCH", `/api/mentor/${mentorId}/tasks/${taskId}`, updates);
+      return mentorService.updateTask(taskId, updates);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/mentor', mentorId, 'tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'tasks'] });
       toast({
         title: t('common.success'),
         description: t('mentorPortal.taskUpdated'),

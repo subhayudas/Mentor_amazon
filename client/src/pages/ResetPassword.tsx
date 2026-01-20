@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { authService } from "@/lib/services";
 
 type ResetPasswordValues = {
   password: string;
@@ -83,27 +83,16 @@ export default function ResetPassword() {
 
   const resetPasswordMutation = useMutation({
     mutationFn: async (data: ResetPasswordValues) => {
-      const response = await apiRequest("POST", "/api/auth/reset-password", {
-        token,
-        password: data.password,
-      });
-      return response.json();
+      await authService.resetPassword(data.password);
+      return { success: true };
     },
     onSuccess: () => {
       setResetSuccess(true);
     },
     onError: (error: Error) => {
-      let errorMessage = t("auth.resetPasswordError");
-      try {
-        const jsonMatch = error.message.match(/\{.*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          errorMessage = parsed.message || errorMessage;
-        }
-      } catch {}
       toast({
         title: t("auth.error"),
-        description: errorMessage,
+        description: error.message || t("auth.resetPasswordError"),
         variant: "destructive",
       });
     },

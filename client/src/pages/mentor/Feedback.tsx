@@ -7,21 +7,14 @@ import { Star, MessageSquare, Calendar, User, ExternalLink } from "lucide-react"
 import { format, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
+import { mentorService } from "@/lib/services";
+import type { Booking, Mentee } from "@/lib/database";
 
 interface FeedbackProps {
   mentorId: string;
 }
 
-interface FeedbackItem {
-  id: string;
-  mentee_id: string;
-  mentee_name: string;
-  mentee_email: string;
-  mentee_photo?: string;
-  rating: number;
-  feedback: string;
-  scheduled_at: string;
-}
+type FeedbackItem = Booking & { mentee?: Mentee };
 
 function StarRating({ rating, size = "default" }: { rating: number; size?: "default" | "large" }) {
   const starSize = size === "large" ? "w-5 h-5" : "w-4 h-4";
@@ -46,19 +39,20 @@ export default function Feedback({ mentorId }: FeedbackProps) {
   const isRTL = i18n.language === 'ar';
 
   const { data: feedbackItems, isLoading } = useQuery<FeedbackItem[]>({
-    queryKey: ['/api/mentors', mentorId, 'feedback'],
+    queryKey: ['mentor', mentorId, 'feedback'],
+    queryFn: () => mentorService.getFeedback(mentorId),
     enabled: !!mentorId,
   });
 
   const sortedFeedback = feedbackItems?.sort((a, b) => 
-    new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   ) || [];
 
   const totalReviews = sortedFeedback.length;
   const averageRating = totalReviews > 0 
-    ? sortedFeedback.reduce((sum, item) => sum + item.rating, 0) / totalReviews 
+    ? sortedFeedback.reduce((sum, item) => sum + (item.mentee_rating || 0), 0) / totalReviews 
     : 0;
-  const sessionsWithFeedback = sortedFeedback.filter(item => item.feedback).length;
+  const sessionsWithFeedback = sortedFeedback.filter(item => item.mentee_feedback).length;
 
   return (
     <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
@@ -160,22 +154,22 @@ export default function Feedback({ mentorId }: FeedbackProps) {
                   <div className="flex items-start justify-between gap-4 flex-wrap">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10">
-                        <AvatarImage src={item.mentee_photo} alt={item.mentee_name} />
+                        <AvatarImage src={item.mentee?.photo_url} alt={item.mentee?.name} />
                         <AvatarFallback>
                           <User className="w-5 h-5" />
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium" data-testid={`mentee-name-${item.id}`}>
-                          {item.mentee_name}
+                          {item.mentee?.name || 'Unknown'}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {format(parseISO(item.scheduled_at), 'MMM d, yyyy')}
+                          {item.completed_at ? format(parseISO(item.completed_at), 'MMM d, yyyy') : format(parseISO(item.created_at), 'MMM d, yyyy')}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <StarRating rating={item.rating} size="large" />
+                      <StarRating rating={item.mentee_rating || 0} size="large" />
                       <Link href={`/my-bookings?session=${item.id}`}>
                         <Button 
                           variant="ghost" 
@@ -188,9 +182,9 @@ export default function Feedback({ mentorId }: FeedbackProps) {
                       </Link>
                     </div>
                   </div>
-                  {item.feedback && (
+                  {item.mentee_feedback && (
                     <p className="text-sm text-muted-foreground pl-13" data-testid={`feedback-text-${item.id}`}>
-                      "{item.feedback}"
+                      "{item.mentee_feedback}"
                     </p>
                   )}
                 </div>

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { authService } from "@/lib/services";
 
 type ForgotPasswordValues = {
   email: string;
@@ -37,25 +37,17 @@ export default function ForgotPassword() {
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async (data: ForgotPasswordValues) => {
-      const response = await apiRequest("POST", "/api/auth/forgot-password", data);
-      return response.json();
+      await authService.forgotPassword(data.email);
+      return { success: true };
     },
     onSuccess: (_data, variables) => {
       setSubmittedEmail(variables.email);
       setEmailSent(true);
     },
     onError: (error: Error) => {
-      let errorMessage = t("auth.forgotPasswordError");
-      try {
-        const jsonMatch = error.message.match(/\{.*\}/);
-        if (jsonMatch) {
-          const parsed = JSON.parse(jsonMatch[0]);
-          errorMessage = parsed.message || errorMessage;
-        }
-      } catch {}
       toast({
         title: t("auth.error"),
-        description: errorMessage,
+        description: error.message || t("auth.forgotPasswordError"),
         variant: "destructive",
       });
     },

@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { Mentor, Booking } from "@shared/schema";
+import { mentorService } from "@/lib/services";
+import type { Mentor, Booking } from "@/lib/database";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +22,7 @@ import {
   CheckCircle
 } from "lucide-react";
 import { format, parseISO, isFuture } from "date-fns";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
 
@@ -36,26 +37,26 @@ export default function MentorDashboard() {
   });
   const [inputEmail, setInputEmail] = useState(email);
 
-  const { data: mentor, isLoading: mentorLoading } = useQuery<Mentor>({
-    queryKey: ["/api/mentors/email", email],
+  const { data: mentor, isLoading: mentorLoading } = useQuery<Mentor | null>({
+    queryKey: ["mentor", "email", email],
+    queryFn: () => mentorService.getByEmail(email),
     enabled: !!email,
   });
 
   const { data: bookings, isLoading: bookingsLoading } = useQuery<Booking[]>({
-    queryKey: ["/api/mentors", mentor?.id, "bookings"],
+    queryKey: ["mentor", mentor?.id, "bookings"],
+    queryFn: () => mentorService.getBookings(mentor!.id),
     enabled: !!mentor?.id,
   });
 
   // Toggle availability mutation
   const toggleAvailabilityMutation = useMutation({
     mutationFn: async (isAvailable: boolean) => {
-      return apiRequest("PATCH", `/api/mentors/${mentor?.id}/availability`, {
-        is_available: isAvailable,
-      });
+      return mentorService.toggleAvailability(mentor!.id, isAvailable);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mentors/email", email] });
-      queryClient.invalidateQueries({ queryKey: ["/api/mentors"] });
+      queryClient.invalidateQueries({ queryKey: ["mentor", "email", email] });
+      queryClient.invalidateQueries({ queryKey: ["mentors"] });
       toast({
         title: t('mentorDashboard.availabilityUpdated'),
         description: mentor?.is_available
