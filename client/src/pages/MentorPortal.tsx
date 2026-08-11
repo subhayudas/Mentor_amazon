@@ -20,13 +20,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   LayoutDashboard,
   Calendar,
   Users,
@@ -36,7 +29,6 @@ import {
   User,
   Settings,
   LogOut,
-  RefreshCw,
 } from "lucide-react";
 import DashboardHome from "@/pages/mentor/DashboardHome";
 import BookingRequests from "@/pages/mentor/BookingRequests";
@@ -52,7 +44,7 @@ export default function MentorPortal() {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
   const [location, setLocation] = useLocation();
-  const [currentMentorId, setCurrentMentorId] = useState<string | null>(() => {
+  const [currentMentorId] = useState<string | null>(() => {
     return localStorage.getItem('mentorId');
   });
 
@@ -61,13 +53,14 @@ export default function MentorPortal() {
     queryFn: () => mentorService.getAll(),
   });
 
+  // No valid mentor identity -> send to login rather than granting one.
+  // The empty-list case is handled by the effect below.
   useEffect(() => {
-    if (!mentorsLoading && allMentors && allMentors.length > 0 && !currentMentorId) {
-      const firstMentorId = allMentors[0].id;
-      localStorage.setItem('mentorId', firstMentorId);
-      setCurrentMentorId(firstMentorId);
+    if (mentorsLoading || !allMentors || allMentors.length === 0) return;
+    if (!currentMentorId || !allMentors.some(m => m.id === currentMentorId)) {
+      setLocation('/login');
     }
-  }, [mentorsLoading, allMentors, currentMentorId]);
+  }, [mentorsLoading, allMentors, currentMentorId, setLocation]);
 
   useEffect(() => {
     if (!mentorsLoading && (!allMentors || allMentors.length === 0)) {
@@ -75,12 +68,7 @@ export default function MentorPortal() {
     }
   }, [mentorsLoading, allMentors, setLocation]);
 
-  const mentor = allMentors?.find(m => m.id === currentMentorId) || allMentors?.[0];
-
-  const handleMentorSwitch = (mentorId: string) => {
-    localStorage.setItem('mentorId', mentorId);
-    setCurrentMentorId(mentorId);
-  };
+  const mentor = allMentors?.find(m => m.id === currentMentorId);
 
   if (mentorsLoading || !mentor) {
     return (
@@ -212,22 +200,7 @@ export default function MentorPortal() {
           </SidebarContent>
 
           <SidebarFooter className="border-t p-4 space-y-2">
-            {allMentors && allMentors.length > 1 && (
-              <Select value={currentMentorId || ""} onValueChange={handleMentorSwitch}>
-                <SelectTrigger className="w-full" data-testid="select-switch-mentor">
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder={t('mentorPortal.switchMentor') || 'Switch Mentor'} />
-                </SelectTrigger>
-                <SelectContent>
-                  {allMentors.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button 
+            <Button
               variant="ghost" 
               className="w-full justify-start" 
               onClick={() => setLocation('/')}

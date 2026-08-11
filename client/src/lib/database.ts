@@ -1210,8 +1210,8 @@ class DatabaseService {
 // Export singleton instance
 export const db = new DatabaseService();
 
-// Auto-seed on module load (only in development)
-if (typeof window !== 'undefined') {
+// Auto-seed on module load (development only -- never in a deployed build)
+if (import.meta.env.DEV && typeof window !== 'undefined') {
   db.checkAndSeed();
 }
 
