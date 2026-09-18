@@ -1,13 +1,16 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { useLocation } from "wouter";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { mentorService, uploadService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
+import { supabase } from "@/lib/supabase";
+import { useRequireRole } from "@/components/RouteGuard";
 import type { Mentor } from "@/lib/database";
 import { useToast } from "@/hooks/use-toast";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Form,
   FormControl,
@@ -32,9 +35,77 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, Users, Clock, Award, Globe, Upload, Loader2 } from "lucide-react";
-import { useState, useRef } from "react";
+import { X, Users, Clock, Award, Globe, Upload, Loader2, ShieldAlert, KeyRound } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+
+/** PostgREST `or()` values must be double-quoted when they contain reserved characters (`@`, `.`, `,`). */
+function quoteFilterValue(value: string): string {
+  return `"${value.replace(/"/g, "")}"`;
+}
+
+interface OnboardingApproval {
+  /** An active approved_users row exists for this alias or email. */
+  approved: boolean;
+  /** A mentors row already belongs to this email; onboarding must not create a second one. */
+  existingMentorId: string | null;
+}
+
+/**
+ * Gate card shown instead of the form when the session cannot onboard.
+ * Explains why instead of redirecting silently, so mentors know what to do next.
+ */
+function OnboardingGateCard({
+  title,
+  body,
+  requestAccessHref,
+}: {
+  title: string;
+  body: string;
+  requestAccessHref?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center px-4 pb-12">
+      <Card className="w-full max-w-lg border-[#D5D9D9]" data-testid="card-onboarding-gate">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-[#FDECEC]">
+              <ShieldAlert className="w-5 h-5 text-[#C40000]" aria-hidden="true" />
+            </div>
+            <CardTitle className="text-xl">{title}</CardTitle>
+          </div>
+          <CardDescription className="pt-2">{body}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <Button asChild variant="outline" data-testid="link-gate-home">
+            <Link href="/">{t("mentorOnboarding.gate.backHome")}</Link>
+          </Button>
+          {requestAccessHref && (
+            <Button asChild data-testid="link-gate-request-access">
+              <Link href={requestAccessHref}>
+                <KeyRound className="w-4 h-4 me-2" />
+                {t("mentorOnboarding.gate.requestAccess")}
+              </Link>
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function OnboardingSkeleton() {
+  return (
+    <div className="min-h-[60vh] flex items-center justify-center px-4" role="status" aria-live="polite">
+      <div className="w-full max-w-md space-y-3">
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-6 w-1/2" />
+      </div>
+    </div>
+  );
+}
 
 const TIMEZONES = [
   "Africa/Cairo",
@@ -193,9 +264,46 @@ export default function MentorOnboarding() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  // Anonymous visitors are sent to /login?next=/mentor-onboarding by the guard hook.
+  const { status: authStatus, user } = useRequireRole();
   const [isUploading, setIsUploading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Onboarding is for approved Amazon mentors only. Identity comes from the
+  // session; the approval check reads the caller's own approved_users row
+  // (alias or email) and looks for a mentors row that already belongs to
+  // this email, in which case the portal is the right destination.
+  const isMentorSession = authStatus === "ok" && !!user && user.user_type === "mentor";
+  const sessionEmail = user?.email ?? "";
+  const sessionAlias = user?.amazon_alias ?? "";
+
+  const approvalQuery = useQuery<OnboardingApproval>({
+    queryKey: ["mentor-onboarding", "approval", sessionEmail, sessionAlias],
+    enabled: isMentorSession,
+    // Always re-check on entry: the answer changes the moment a profile is created or an alias is approved.
+    staleTime: 0,
+    gcTime: 0,
+    queryFn: async () => {
+      // ilike (no wildcards) = case-insensitive equality; admins may have typed the email in any case.
+      const filters = [`email.ilike.${quoteFilterValue(sessionEmail)}`];
+      if (sessionAlias) filters.push(`amazon_alias.eq.${quoteFilterValue(sessionAlias.toLowerCase())}`);
+      const { data: approvedRows, error } = await supabase
+        .from("approved_users")
+        .select("id, role, is_active, mentor_id")
+        .or(filters.join(","));
+      if (error) throw error;
+      const approved = (approvedRows ?? []).some((row: { is_active: boolean }) => row.is_active);
+      const existing = await mentorService.getByEmail(sessionEmail);
+      return { approved: approved || !!existing, existingMentorId: existing?.id ?? null };
+    },
+  });
+
+  useEffect(() => {
+    if (approvalQuery.data?.existingMentorId) {
+      setLocation("/mentor-portal", { replace: true });
+    }
+  }, [approvalQuery.data?.existingMentorId, setLocation]);
 
   const form = useForm<MentorFormData>({
     resolver: zodResolver(mentorSchema.refine(
@@ -233,13 +341,21 @@ export default function MentorOnboarding() {
     },
   });
 
+  // The email is owned by the session, not the form: RLS ties the mentors
+  // row to auth.jwt()->>'email', so the field is pre-filled and read-only.
+  useEffect(() => {
+    if (sessionEmail) form.setValue("email", sessionEmail, { shouldValidate: false });
+  }, [sessionEmail, form]);
+
   const createMentorMutation = useMutation<Mentor, Error, MentorFormData>({
     mutationFn: async (data: MentorFormData) => {
       let calLink = data.cal_link?.trim() || "";
       calLink = calLink.replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
-      
+
       return mentorService.create({
         ...data,
+        // Always the session email, whatever the form state says.
+        email: sessionEmail || data.email,
         cal_link: calLink,
         is_available: true,
       });
@@ -252,7 +368,7 @@ export default function MentorOnboarding() {
       });
       if (newMentor?.id) {
         localStorage.setItem("mentorId", newMentor.id);
-        localStorage.setItem("mentorEmail", newMentor.email);
+        localStorage.setItem("mentorEmail", newMentor.email ?? "");
         localStorage.setItem("mentorName", newMentor.name);
         window.dispatchEvent(new Event("userRegistered"));
         setLocation("/mentor-portal");
@@ -322,6 +438,46 @@ export default function MentorOnboarding() {
   const onSubmit = (data: MentorFormData) => {
     createMentorMutation.mutate(data);
   };
+
+  // ---- Gate: only approved Amazon mentors without a profile see the form ----
+  if (authStatus !== "ok" || !user) {
+    return <OnboardingSkeleton />;
+  }
+
+  if (user.user_type !== "mentor") {
+    // No alias here on purpose: a mentee/admin email is not an Amazon alias,
+    // and the request itself is recorded by the SSO callback, not by this link.
+    return (
+      <OnboardingGateCard
+        title={t("mentorOnboarding.gate.mentorsOnlyTitle")}
+        body={t("mentorOnboarding.gate.mentorsOnlyBody", { email: user.email })}
+        requestAccessHref="/request-access"
+      />
+    );
+  }
+
+  if (approvalQuery.isLoading || approvalQuery.data?.existingMentorId) {
+    return <OnboardingSkeleton />;
+  }
+
+  if (approvalQuery.isError) {
+    return (
+      <OnboardingGateCard
+        title={t("mentorOnboarding.gate.checkFailedTitle")}
+        body={t("mentorOnboarding.gate.checkFailedBody")}
+      />
+    );
+  }
+
+  if (!approvalQuery.data?.approved) {
+    return (
+      <OnboardingGateCard
+        title={t("mentorOnboarding.gate.notApprovedTitle")}
+        body={t("mentorOnboarding.gate.notApprovedBody", { alias: user.amazon_alias || user.email })}
+        requestAccessHref={`/request-access?alias=${encodeURIComponent(user.amazon_alias || user.email)}`}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background py-12 px-4">
@@ -394,14 +550,26 @@ export default function MentorOnboarding() {
                     <FormItem>
                       <FormLabel>{t('mentorOnboarding.email')} *</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="john@example.com" {...field} data-testid="input-email" />
+                        <Input
+                          type="email"
+                          value={sessionEmail || field.value}
+                          name={field.name}
+                          ref={field.ref}
+                          readOnly
+                          disabled
+                          aria-readonly="true"
+                          data-testid="input-email"
+                        />
                       </FormControl>
+                      {/* Disabled inputs are skipped by native submit; the value lives in form state and the session. */}
+                      <input type="hidden" name="email" value={sessionEmail || field.value} readOnly />
+                      <FormDescription>{t('mentorOnboarding.emailFromSession')}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="company"
@@ -431,7 +599,7 @@ export default function MentorOnboarding() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="timezone"
@@ -502,7 +670,7 @@ export default function MentorOnboarding() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="linkedin_url"
