@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,20 +6,39 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Calendar, Clock, User, CheckCircle, XCircle, FileText, Plus, Trash2, Star, MessageSquare } from "lucide-react";
+import { Calendar, Clock, User, CheckCircle, XCircle, FileText, Plus, Trash2, Star, MessageSquare, Timer } from "lucide-react";
 import { format, parseISO, isFuture, isPast } from "date-fns";
 import { mentorService, bookingService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "react-i18next";
-import type { Booking, BookingNote } from "@/lib/database";
+import type { Booking, BookingNote, Mentor } from "@/lib/database";
 import { cn } from "@/lib/utils";
+import {
+  completeSession,
+  getMentorCountry,
+  MAX_SESSION_MINUTES,
+  MIN_SESSION_MINUTES,
+  REPORTING_COUNTRIES,
+  SESSION_MINUTE_PRESETS,
+} from "@/lib/reporting";
+
+/** Radix Select cannot hold an empty-string value, so "no country" is this sentinel. */
+const NO_COUNTRY = "__none";
 
 interface MySessionsProps {
   mentorId: string;
@@ -40,12 +59,32 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
   const [feedbackBooking, setFeedbackBooking] = useState<Booking | null>(null);
   const [feedbackRating, setFeedbackRating] = useState<number>(0);
   const [feedbackText, setFeedbackText] = useState("");
+  const [completeBooking, setCompleteBooking] = useState<Booking | null>(null);
+  const [minutesInput, setMinutesInput] = useState<string>("30");
+  const [sessionCountry, setSessionCountry] = useState<string>("");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
   const { data: bookings, isLoading } = useQuery<Booking[]>({
     queryKey: ['mentor', mentorId, 'bookings'],
     queryFn: () => mentorService.getBookings(mentorId),
     enabled: !!mentorId,
   });
+
+  // The mentor's own row: its country pre-fills the reporting country when completing a session.
+  const { data: mentorProfile } = useQuery<Mentor | null>({
+    queryKey: ['mentor', mentorId, 'profile', mentorEmail],
+    queryFn: () => mentorService.getByEmail(mentorEmail!),
+    enabled: !!mentorEmail,
+  });
+
+  // Anchored feedback: after completing, scroll to the card and ring it for 2s.
+  useEffect(() => {
+    if (!highlightedId) return;
+    const card = document.querySelector<HTMLElement>(`[data-testid="session-card-${highlightedId}"]`);
+    card?.scrollIntoView({ behavior: "smooth", block: "center" });
+    const timer = window.setTimeout(() => setHighlightedId(null), 2000);
+    return () => window.clearTimeout(timer);
+  }, [highlightedId, bookings]);
 
   const { data: notes, isLoading: notesLoading } = useQuery<BookingNote[]>({
     queryKey: ['bookings', selectedBooking?.id, 'notes'],
@@ -63,6 +102,29 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
       toast({
         title: t('common.success'),
         description: t('mentorPortal.sessionUpdated'),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('mentorPortal.sessionUpdateError'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const completeSessionMutation = useMutation({
+    mutationFn: async ({ bookingId, minutes, country }: { bookingId: string; minutes: number; country?: string }) => {
+      return completeSession(bookingId, { minutes, country });
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId] });
+      setCompleteBooking(null);
+      setActiveTab("completed");
+      setHighlightedId(variables.bookingId);
+      toast({
+        title: t('common.success'),
+        description: t('mentorPortal.sessionCompleted', { minutes: variables.minutes }),
       });
     },
     onError: () => {
@@ -176,9 +238,28 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
     b.status === 'completed' || (b.scheduled_at && isPast(parseISO(b.scheduled_at)))
   ) ?? [];
 
-  const handleMarkComplete = (bookingId: string) => {
-    updateBookingMutation.mutate({ bookingId, status: 'completed' });
+  const handleMarkComplete = (booking: Booking) => {
+    setMinutesInput("30");
+    setSessionCountry(booking.country || getMentorCountry(mentorProfile) || "");
+    setCompleteBooking(booking);
   };
+
+  const parsedMinutes = Number.parseInt(minutesInput, 10);
+  const minutesValid =
+    Number.isInteger(parsedMinutes) && parsedMinutes >= MIN_SESSION_MINUTES && parsedMinutes <= MAX_SESSION_MINUTES;
+
+  const handleConfirmComplete = () => {
+    if (!completeBooking || !minutesValid) return;
+    completeSessionMutation.mutate({
+      bookingId: completeBooking.id,
+      minutes: parsedMinutes,
+      country: sessionCountry || undefined,
+    });
+  };
+
+  const countryChoices = sessionCountry && !REPORTING_COUNTRIES.includes(sessionCountry)
+    ? [sessionCountry, ...REPORTING_COUNTRIES]
+    : REPORTING_COUNTRIES;
 
   const handleCancel = (bookingId: string) => {
     updateBookingMutation.mutate({ bookingId, status: 'canceled' });
@@ -276,7 +357,13 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
   };
 
   const SessionCard = ({ booking, showActions = false }: { booking: Booking; showActions?: boolean }) => (
-    <Card data-testid={`session-card-${booking.id}`}>
+    <Card
+      className={cn(
+        "transition-shadow duration-500",
+        highlightedId === booking.id && "ring-2 ring-[#FF9900] ring-offset-2",
+      )}
+      data-testid={`session-card-${booking.id}`}
+    >
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
@@ -308,6 +395,12 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
               </div>
             </>
           )}
+          {booking.status === 'completed' && typeof booking.session_duration_minutes === 'number' && (
+            <div className="flex items-center gap-1" data-testid={`text-duration-${booking.id}`}>
+              <Timer className="w-4 h-4" />
+              {t('mentorPortal.durationMinutes', { count: booking.session_duration_minutes })}
+            </div>
+          )}
         </div>
 
         <div className="mt-4 flex items-center gap-2 flex-wrap">
@@ -325,8 +418,8 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
             <>
               <Button
                 size="sm"
-                onClick={() => handleMarkComplete(booking.id)}
-                disabled={updateBookingMutation.isPending}
+                onClick={() => handleMarkComplete(booking)}
+                disabled={updateBookingMutation.isPending || completeSessionMutation.isPending}
                 data-testid={`button-complete-${booking.id}`}
               >
                 <CheckCircle className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
@@ -372,7 +465,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} dir={isRTL ? 'rtl' : 'ltr'}>
         <TabsList>
           <TabsTrigger value="upcoming" data-testid="tab-upcoming">
             {t('mentorPortal.upcoming')}
@@ -423,7 +516,9 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
           ) : completedSessions.length > 0 ? (
             <div className="grid gap-4">
               {completedSessions.map((session) => (
-                <SessionCard key={session.id} booking={session} />
+                // Past-due sessions still 'confirmed' land here; they need the
+                // complete action too, since durations are recorded after the fact.
+                <SessionCard key={session.id} booking={session} showActions />
               ))}
             </div>
           ) : (
@@ -438,6 +533,106 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!completeBooking} onOpenChange={(open) => { if (!open) setCompleteBooking(null); }}>
+        <DialogContent className="max-w-md" data-testid="dialog-complete-session">
+          <DialogHeader>
+            <DialogTitle>{t('mentorPortal.completeSessionTitle')}</DialogTitle>
+            <DialogDescription>{t('mentorPortal.completeSessionDesc')}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <Label htmlFor="input-session-minutes">{t('mentorPortal.sessionDuration')}</Label>
+              <div className="flex flex-wrap gap-2" role="group" aria-label={t('mentorPortal.sessionDuration')}>
+                {SESSION_MINUTE_PRESETS.map((preset) => {
+                  const selected = parsedMinutes === preset;
+                  return (
+                    <Button
+                      key={preset}
+                      type="button"
+                      size="sm"
+                      variant={selected ? "default" : "outline"}
+                      aria-pressed={selected}
+                      onClick={() => setMinutesInput(String(preset))}
+                      data-testid={`button-minutes-${preset}`}
+                    >
+                      {t('mentorPortal.durationMinutes', { count: preset })}
+                    </Button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="input-session-minutes"
+                  type="number"
+                  inputMode="numeric"
+                  min={MIN_SESSION_MINUTES}
+                  max={MAX_SESSION_MINUTES}
+                  value={minutesInput}
+                  onChange={(event) => setMinutesInput(event.target.value)}
+                  onKeyDown={(event) => { if (event.key === "Enter") handleConfirmComplete(); }}
+                  aria-invalid={!minutesValid}
+                  aria-describedby="session-minutes-hint"
+                  className="w-28"
+                  data-testid="input-session-minutes"
+                />
+                <span className="text-sm text-muted-foreground">{t('mentorPortal.minutesLabel')}</span>
+              </div>
+              <p
+                id="session-minutes-hint"
+                className={cn("text-xs", minutesValid ? "text-muted-foreground" : "text-destructive")}
+              >
+                {minutesValid
+                  ? t('mentorPortal.minutesHint', { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })
+                  : t('mentorPortal.invalidDuration', { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="select-session-country">{t('mentorPortal.sessionCountry')}</Label>
+              <Select
+                value={sessionCountry || NO_COUNTRY}
+                onValueChange={(value) => setSessionCountry(value === NO_COUNTRY ? "" : value)}
+              >
+                <SelectTrigger id="select-session-country" data-testid="select-session-country">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_COUNTRY}>{t('mentorPortal.sessionCountryNone')}</SelectItem>
+                  {countryChoices.map((country) => (
+                    <SelectItem key={country} value={country}>
+                      {country}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">{t('mentorPortal.sessionCountryHint')}</p>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setCompleteBooking(null)}
+              disabled={completeSessionMutation.isPending}
+              data-testid="button-cancel-complete"
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmComplete}
+              disabled={!minutesValid || completeSessionMutation.isPending}
+              data-testid="button-confirm-complete"
+            >
+              <CheckCircle className="w-4 h-4" />
+              {completeSessionMutation.isPending ? t('common.loading') : t('mentorPortal.confirmComplete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">

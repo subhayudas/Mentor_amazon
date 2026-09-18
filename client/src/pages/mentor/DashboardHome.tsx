@@ -13,12 +13,15 @@ import {
   Bell,
   MessageSquare,
   ArrowRight,
-  Inbox
+  Inbox,
+  Timer,
+  CalendarClock
 } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { useTranslation } from "react-i18next";
 import { mentorService } from "@/lib/services";
 import type { MentorActivityLog, MentorDashboardStats } from "@/lib/database";
+import { formatHours } from "@/lib/reporting";
 
 interface DashboardHomeProps {
   mentorId: string;
@@ -44,6 +47,8 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
     staleTime: 20000,
   });
 
+  // Amazon mentors volunteer their time: hours replace the earnings tiles this
+  // dashboard once had. Both values come straight from MentorDashboardStats.
   const statCards = [
     {
       title: t('mentorPortal.totalSessions'),
@@ -77,6 +82,26 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
       color: "text-orange-600",
       bgColor: "bg-orange-100 dark:bg-orange-900/20",
       link: "/mentor-portal/bookings",
+    },
+    {
+      title: t('mentorPortal.volunteerHours'),
+      value: formatHours(stats?.volunteerMinutes ?? 0),
+      icon: Timer,
+      color: "text-[#CC7A00]",
+      bgColor: "bg-[#FFF5E6] dark:bg-orange-900/20",
+      suffix: ` ${t('mentorPortal.hoursUnit')}`,
+      link: null,
+      testId: "stat-volunteer-hours",
+    },
+    {
+      title: t('mentorPortal.thisMonth'),
+      value: formatHours(stats?.monthlyVolunteerMinutes ?? 0),
+      icon: CalendarClock,
+      color: "text-[#232F3E]",
+      bgColor: "bg-slate-100 dark:bg-slate-900/20",
+      suffix: ` ${t('mentorPortal.hoursUnit')}`,
+      link: null,
+      testId: "stat-volunteer-hours-month",
     },
   ];
 
@@ -159,9 +184,9 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {statsLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
+          Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-32" />
           ))
         ) : (
@@ -170,7 +195,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
             const cardContent = (
               <Card 
                 className={stat.link ? "hover-elevate cursor-pointer transition-colors" : ""}
-                data-testid={`stat-card-${index}`}
+                data-testid={stat.testId ?? `stat-card-${index}`}
               >
                 <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                   <CardDescription className="text-sm font-medium">
@@ -182,7 +207,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
-                    <div className="text-2xl font-bold">
+                    <div className="text-2xl font-bold tabular-nums">
                       {stat.value}
                       {stat.suffix && (
                         <span className="text-sm font-normal text-muted-foreground">
@@ -190,7 +215,7 @@ export default function DashboardHome({ mentorId }: DashboardHomeProps) {
                         </span>
                       )}
                     </div>
-                    {stat.link && stat.value > 0 && (
+                    {stat.link && Number(stat.value) > 0 && (
                       <ArrowRight className="w-4 h-4 text-muted-foreground" />
                     )}
                   </div>
