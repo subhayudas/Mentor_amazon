@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "tsc",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

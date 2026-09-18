@@ -13,7 +13,8 @@
     "clear": "Clear",
     "all": "All",
     "required": "Required",
-    "optional": "Optional"
+    "optional": "Optional",
+    "refresh": "Refresh"
   },
   "auth": {
     "login": "Login",
@@ -97,7 +98,21 @@
     "logoutSuccess": "Logged out successfully",
     "amazonEmployeeTitle": "Amazon employee?",
     "amazonEmployeeHint": "Mentor accounts are created through Amazon sign-in, not this form.",
-    "signInWithAmazon": "Sign in with Amazon"
+    "signInWithAmazon": "Sign in with Amazon",
+    "sso": {
+      "signInWithAmazon": "Sign in with Amazon",
+      "amazonHint": "For Amazon employees (mentors and admins), using your Amazon Federate login.",
+      "or": "or",
+      "passwordDisclosure": "Use email and password (non-Amazon test accounts)",
+      "errorTitle": "Amazon sign-in did not complete",
+      "errors": {
+        "sso_state": "Your sign-in session expired or the link was already used. Please start again.",
+        "sso_token": "Amazon accepted your login but we could not complete the exchange. Please try again.",
+        "sso_failed": "We could not sign you in with Amazon. Please try again or contact the MentorConnect team.",
+        "generic": "Something went wrong during sign-in. Please try again."
+      },
+      "errorReference": "Reference: {{reason}}"
+    }
   },
   "nav": {
     "home": "Home",
@@ -212,7 +227,18 @@
     "createProfile": "Create Mentor Profile",
     "creating": "Creating Profile...",
     "successTitle": "Welcome to the Mentor Community!",
-    "successMessage": "Your mentor profile has been created successfully."
+    "successMessage": "Your mentor profile has been created successfully.",
+    "emailFromSession": "Taken from your signed-in account and cannot be changed here.",
+    "gate": {
+      "backHome": "Back to home",
+      "requestAccess": "Request access",
+      "mentorsOnlyTitle": "Mentor onboarding is for approved Amazon mentors",
+      "mentorsOnlyBody": "You are signed in as {{email}}, which is not a mentor account. Amazon employees join as mentors through Amazon sign-in after the programme team approves their alias.",
+      "notApprovedTitle": "Your alias is not approved yet",
+      "notApprovedBody": "{{alias}} is not on the approved mentor list yet. Request access and the programme team will review it; you can come back here once approved.",
+      "checkFailedTitle": "We couldn't check your approval",
+      "checkFailedBody": "Something went wrong while checking your approval status. Refresh the page to try again."
+    }
   },
   "menteeRegistration": {
     "title": "Join as a Mentee",
@@ -263,7 +289,8 @@
     "createProfile": "Create Mentee Profile",
     "creating": "Creating Profile...",
     "successTitle": "Welcome to MentorConnect!",
-    "successMessage": "Your profile has been created successfully."
+    "successMessage": "Your profile has been created successfully.",
+    "emailFromSession": "Taken from your signed-in account and cannot be changed here."
   },
   "analytics": {
     "title": "Analytics Dashboard",
@@ -309,7 +336,15 @@
       "mentee": "Mentee",
       "status": "Status",
       "clickedAt": "Clicked At",
-      "scheduledAt": "Scheduled At"
+      "scheduledAt": "Scheduled At",
+      "bookings": "Bookings",
+      "completed": "Completed",
+      "volunteerHours": "Volunteer hours",
+      "uniqueMentors": "Unique mentors",
+      "uniqueMentees": "Unique mentees",
+      "country": "Country",
+      "duration": "Duration",
+      "avgRating": "Avg rating"
     },
     "chartLabels": {
       "totalBookings": "Total Bookings",
@@ -318,10 +353,61 @@
       "canceled": "Canceled",
       "clicked": "Clicked",
       "mentors": "Mentors",
-      "mentees": "Mentees"
+      "mentees": "Mentees",
+      "completedSessions": "Completed sessions",
+      "volunteerHours": "Volunteer hours"
     },
     "demoBannerTitle": "Demo data — not programme metrics",
-    "demoBannerBody": "Fewer than {{threshold}} real bookings exist ({{count}} so far), so every number and chart on this page is illustrative sample data. Real metrics replace it automatically once bookings accumulate."
+    "demoBannerBody": "Fewer than {{threshold}} real bookings exist ({{count}} so far), so every number and chart on this page is illustrative sample data. Real metrics replace it automatically once bookings accumulate.",
+    "tabs": {
+      "overview": "Overview",
+      "countries": "Countries",
+      "mentors": "Mentors",
+      "bookings": "Bookings"
+    },
+    "country": "Country",
+    "allCountries": "All countries",
+    "notSpecified": "Not specified",
+    "unknown": "Unknown",
+    "volunteerHours": "Volunteer hours",
+    "hoursUnit": "h",
+    "hoursShort": "{{count}} h",
+    "minutesShort": "{{count}} min",
+    "sessionsWithoutDuration": "Sessions without a recorded duration: {{count}}",
+    "byCountry": "Sessions and hours by country",
+    "noCountryData": "No country data available",
+    "showing": "Showing",
+    "clearDrill": "Clear",
+    "drillHint": "Click a bar or segment to see its bookings.",
+    "noSegmentRows": "No bookings in this segment.",
+    "rowCount": "{{count}} bookings",
+    "showingRows": "Showing {{shown}} of {{total}} bookings",
+    "selectPeriod": "Select a period",
+    "selectSegment": "Select a segment",
+    "allSegments": "All",
+    "exportView": "Export current view (CSV)",
+    "exportRange": "Export date range",
+    "exportRangeHint": "Exports every booking in the range, ignoring the other filters.",
+    "exportFrom": "From",
+    "exportTo": "To",
+    "exportRangeConfirm": "Export",
+    "csv": {
+      "bookingId": "Booking ID",
+      "mentor": "Mentor",
+      "mentorCountry": "Mentor country",
+      "mentee": "Mentee",
+      "menteeEmail": "Mentee email",
+      "menteeType": "Mentee type",
+      "organization": "Organization",
+      "status": "Status",
+      "clickedAt": "Requested at",
+      "scheduledAt": "Scheduled at",
+      "completedAt": "Completed at",
+      "durationMinutes": "Duration (minutes)",
+      "country": "Country",
+      "menteeRating": "Mentee rating",
+      "mentorRating": "Mentor rating"
+    }
   },
   "booking": {
     "bookSession": "Book a Session",
@@ -352,7 +438,10 @@
     "goHome": "Go to Home",
     "loadFailed": "Failed to load mentors. Please try again.",
     "invalidCalLink": "Please enter a valid Cal.com link (e.g., username/30min)",
-    "organizationNameRequired": "Organization name is required for organization accounts"
+    "organizationNameRequired": "Organization name is required for organization accounts",
+    "notFoundTitle": "Page not found",
+    "notFoundBody": "The link may be out of date, or the page has moved.",
+    "notFoundHome": "Back to home"
   },
   "actions": {
     "retry": "Retry",
@@ -455,7 +544,9 @@
     "upcoming": "Upcoming",
     "upcomingSessions": "Upcoming Sessions",
     "noUpcoming": "No upcoming sessions scheduled",
-    "completeProfile": "Complete your mentor profile"
+    "completeProfile": "Complete your mentor profile",
+    "available": "Available",
+    "unavailable": "Unavailable"
   },
   "myBookings": {
     "title": "My Bookings",
@@ -687,7 +778,27 @@
     "feedbackSubmitError": "Failed to submit feedback",
     "noMenteeFeedback": "The mentee hasn't provided feedback yet",
     "stars": "stars",
-    "selectRating": "Please select a rating"
+    "selectRating": "Please select a rating",
+    "completeSessionTitle": "Complete session",
+    "completeSessionDesc": "Record how long the session ran. It counts towards your volunteer hours.",
+    "sessionDuration": "Session length",
+    "minutesLabel": "minutes",
+    "minutesHint": "Between {{min}} and {{max}} minutes",
+    "invalidDuration": "Enter a duration between {{min}} and {{max}} minutes",
+    "sessionCountry": "Country (optional)",
+    "sessionCountryHint": "Where this session is counted in reporting. Defaults to your profile country.",
+    "sessionCountryNone": "Not specified",
+    "confirmComplete": "Mark complete",
+    "sessionCompleted": "Session marked complete. {{minutes}} minutes added to your volunteer hours.",
+    "durationMinutes": "{{count}} min",
+    "volunteerHours": "Volunteer hours",
+    "hoursUnit": "h",
+    "feedbackReceived": "Feedback received",
+    "requestAcceptedBadge": "Accepted",
+    "requestDeclinedBadge": "Declined",
+    "exitPortal": "Exit portal",
+    "goal": "Goal",
+    "noGoalSpecified": "No goal specified"
   },
   "profileSettings": {
     "title": "Profile Settings",
@@ -806,6 +917,257 @@
       "organizationNamePlaceholder": "Enter your organization name",
       "saveSuccess": "Profile updated successfully",
       "saveError": "Failed to update profile. Please try again."
+    },
+    "calendarNotAvailable": "Calendar not configured – contact your mentor",
+    "oneRequestAccepted": "One request has been accepted!",
+    "requestsAccepted": "Several requests have been accepted!",
+    "clickScheduleNow": "Click \"Schedule now\" below to book your session time."
+  },
+  "sso": {
+    "callback": {
+      "title": "Signing you in",
+      "working": "Completing your Amazon sign-in…",
+      "errorTitle": "Sign-in could not be completed",
+      "errors": {
+        "missing_token": "This link is missing its sign-in token. Start the sign-in again from the login page.",
+        "verify_failed": "The sign-in link has expired or was already used.",
+        "no_user": "We signed you in but could not load your account. Please try again."
+      },
+      "tryAgain": "Try again with Amazon",
+      "usePassword": "Use email and password"
     }
+  },
+  "guard": {
+    "noAccessTitle": "You don't have access to this page",
+    "noAccessBody": "This page is only for {{role}} accounts. You are signed in as {{email}}.",
+    "role": {
+      "admin": "programme admin",
+      "mentor": "mentor",
+      "mentee": "mentee"
+    },
+    "goToYourArea": "Go to your dashboard",
+    "switchAccount": "Sign in with a different account",
+    "backHome": "Back to home",
+    "checkingAccess": "Checking your access…"
+  },
+  "access": {
+    "title": "Access not yet approved",
+    "limited": "MentorConnect access is limited to approved members of the Amazon mentoring programme.",
+    "aliasLabel": "Amazon alias",
+    "status": {
+      "pending": "Pending review",
+      "approved": "Approved",
+      "rejected": "Not approved"
+    },
+    "recorded": "Your request has been recorded and the programme team will review it. You will be able to sign in once it is approved.",
+    "approvedBody": "Your access has been approved. Sign in with Amazon again to continue.",
+    "rejectedBody": "This request was not approved. If you believe this is a mistake, contact the programme team.",
+    "noAliasBody": "To request access, sign in with Amazon. Your alias is recorded automatically and the programme team reviews it.",
+    "whatNext": "Approval usually happens within a few working days. There is nothing else you need to do right now.",
+    "backHome": "Back to home",
+    "signInAgain": "Sign in with Amazon again"
+  },
+  "admin": {
+    "title": "Admin",
+    "subtitle": "Programme administration for MentorConnect",
+    "overview": "Overview",
+    "tabsLabel": "Admin sections",
+    "tabs": {
+      "mentors": "Mentors",
+      "mentees": "Mentees & orgs",
+      "bookings": "Bookings",
+      "access": "Access"
+    },
+    "actions": "Actions",
+    "viewDetails": "View details",
+    "noMatches": "Nothing matches your search or filter.",
+    "saving": "Saving…",
+    "showingCount": "Showing {{shown}} of {{total}}",
+    "colEmail": "Email",
+    "colCountry": "Country",
+    "stats": {
+      "activeMentors": "Active mentors",
+      "inactiveMentors": "{{count}} inactive",
+      "verifiedOrgs": "Verified organizations",
+      "orgsBreakdown": "{{pending}} pending review · {{individuals}} individuals",
+      "bookings": "Bookings",
+      "bookingsBreakdown": "{{pending}} pending · {{confirmed}} confirmed · {{completed}} completed",
+      "pendingAccess": "Pending access requests",
+      "requestsTotal": "{{count}} requests in total"
+    },
+    "role": {
+      "mentor": "Mentor",
+      "admin": "Admin"
+    },
+    "bookingStatus": {
+      "pending": "Pending",
+      "accepted": "Accepted",
+      "confirmed": "Confirmed",
+      "completed": "Completed",
+      "rejected": "Declined",
+      "canceled": "Canceled"
+    },
+    "verification": {
+      "verified": "Verified",
+      "pending": "Pending review",
+      "rejected": "Rejected",
+      "unverified": "Unverified"
+    },
+    "mentors": {
+      "searchPlaceholder": "Search mentors by name, email or role",
+      "colMentor": "Mentor",
+      "colAvailability": "Availability",
+      "colRating": "Rating",
+      "colJoined": "Joined",
+      "empty": "No mentors yet. Approved mentors appear here after onboarding.",
+      "available": "Available",
+      "inactive": "Inactive",
+      "ssoApproved": "SSO approved",
+      "ssoApprovedHint": "Alias {{alias}} is on the approved list",
+      "openProfile": "Open profile",
+      "approveAccess": "Approve access",
+      "approveAccessBody": "Adds {{email}} to the approved mentor list so they can sign in with Amazon. Confirm the Amazon alias first.",
+      "aliasHint": "The Amazon login name, usually the part before @ in the work email.",
+      "accessApproved": "{{alias}} added to the approved list",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "deactivateTitle": "Deactivate {{name}}?",
+      "deactivateBody": "The mentor is hidden from the directory and stops receiving new booking requests. Existing bookings are not affected, and you can reactivate at any time.",
+      "deactivated": "{{name}} deactivated",
+      "reactivated": "{{name}} reactivated",
+      "timezone": "Timezone",
+      "calLink": "Cal.com link",
+      "commsOwner": "Communications",
+      "assistant": "Assistant",
+      "mentorThemselves": "Mentor directly",
+      "languages": "Languages",
+      "preference": "Mentorship preference",
+      "preferenceValue": {
+        "ongoing": "Ongoing mentorship",
+        "rotating": "Rotating mentees",
+        "either": "Either"
+      },
+      "expertise": "Expertise",
+      "industries": "Industries",
+      "bio": "Bio",
+      "whyJoined": "Why they joined"
+    },
+    "mentees": {
+      "searchPlaceholder": "Search mentees by name, email or organization",
+      "filterLabel": "Filter by verification status",
+      "colName": "Mentee",
+      "colType": "Type",
+      "colOrganization": "Organization",
+      "colVerification": "Verification",
+      "colRegistered": "Registered",
+      "empty": "No mentees have registered yet.",
+      "type": {
+        "individual": "Individual",
+        "organization": "Organization"
+      },
+      "reference": "Registration reference",
+      "website": "Website",
+      "sector": "Sector",
+      "size": "Size",
+      "mission": "Mission",
+      "needs": "Needs",
+      "areasExploring": "Areas exploring",
+      "goals": "Goals",
+      "markVerified": "Mark verified",
+      "markRejected": "Reject verification",
+      "markedVerified": "{{name}} marked as verified",
+      "markedRejected": "Verification rejected for {{name}}"
+    },
+    "bookings": {
+      "filterLabel": "Filter by status",
+      "searchPlaceholder": "Search by mentor, mentee or country",
+      "openAnalytics": "Open analytics",
+      "colCreated": "Created",
+      "colMentor": "Mentor",
+      "colMentee": "Mentee",
+      "colStatus": "Status",
+      "colScheduled": "Scheduled",
+      "colDuration": "Duration (min)",
+      "empty": "No bookings yet.",
+      "detailTitle": "Booking details",
+      "responded": "Responded",
+      "completed": "Completed",
+      "minutes": "{{count}} minutes",
+      "goal": "Goal",
+      "menteeRating": "Mentee rating",
+      "mentorRating": "Mentor rating",
+      "menteeFeedback": "Mentee feedback",
+      "mentorFeedback": "Mentor feedback"
+    },
+    "access": {
+      "pendingTitle": "Pending requests",
+      "pendingHint": "Amazon employees who signed in but are not on the approved list yet. Approving lets them sign in on their next attempt.",
+      "alias": "Amazon alias",
+      "name": "Name",
+      "requested": "Requested",
+      "role": "Role",
+      "approve": "Approve",
+      "reject": "Reject",
+      "noPending": "No pending requests.",
+      "approvedToast": "{{alias}} approved as {{role}}",
+      "rejectedToast": "Request from {{alias}} rejected",
+      "approvedTitle": "Approved aliases",
+      "approvedHint": "Everyone who can sign in with Amazon. Add an alias here to pre-approve a mentor before their first sign-in.",
+      "addAlias": "Add alias",
+      "addedToast": "{{alias}} added to the approved list",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "hasAccount": "Signed in",
+      "hasAccountHint": "This alias has signed in at least once",
+      "approvedBy": "Approved by",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "deactivatedToast": "{{alias}} can no longer sign in",
+      "reactivatedToast": "{{alias}} can sign in again",
+      "cannotDeactivateSelf": "You can't deactivate your own admin access",
+      "noApproved": "No approved aliases yet.",
+      "resolvedTitle": "Resolved requests",
+      "resolvedHint": "Recent approvals and rejections, for the record.",
+      "resolvedBy": "Resolved by",
+      "resolvedAt": "Resolved",
+      "statusApproved": "Approved",
+      "statusRejected": "Rejected",
+      "noResolved": "No resolved requests yet."
+    }
+  },
+  "verification": {
+    "badge": {
+      "pending": "Verification pending",
+      "unverified": "Unverified organization",
+      "rejected": "Verification rejected",
+      "verified": "Verified organization"
+    },
+    "tooltip": {
+      "pending": "The programme team is reviewing this organisation's details.",
+      "unverified": "This organisation has not been reviewed by the programme team yet.",
+      "rejected": "The programme team could not verify this organisation.",
+      "verified": "The programme team has confirmed this organisation's details."
+    },
+    "sectionTitle": "Verification",
+    "referenceLabel": "Registration / licence number (optional)",
+    "referencePlaceholder": "e.g. NGO licence or commercial registration number",
+    "referenceHelp": "Helps the programme team confirm your organisation faster.",
+    "registrationNoteTitle": "Organisations are marked \"pending review\" until confirmed",
+    "registrationNote": "We don't run automated checks yet. The MentorConnect programme team reviews each organisation manually before marking it verified. You can browse mentors and request sessions in the meantime.",
+    "inReviewToast": "Your organisation profile was created and is pending review.",
+    "inReviewTitle": "Verification in review",
+    "inReviewDescription": "{{name}} is registered. The programme team will review the details before marking the organisation verified.",
+    "inReviewStep1": "The MentorConnect programme team checks the details you provided.",
+    "inReviewStep2": "You can browse mentors and request sessions while the review is open. Mentors will see that verification is pending.",
+    "goToDashboard": "Go to dashboard",
+    "redirectingShortly": "Taking you to your dashboard in a moment…",
+    "dashboardPendingBody": "The programme team is reviewing your organisation's details. You can keep browsing mentors and requesting sessions; mentors will see that verification is pending until it is confirmed.",
+    "referenceSubmitted": "Reference submitted: {{reference}}",
+    "rejectedTitle": "Verification not approved",
+    "dashboardRejectedBody": "The programme team could not verify your organisation with the details provided. You can still browse mentors, but mentors will see that verification was not approved.",
+    "contactLine": "Contact the MentorConnect programme team to update your details or ask for another review.",
+    "mentorNoteUnverified": "This organisation has not been verified by the programme yet.",
+    "mentorNoteRejected": "The programme team did not approve this organisation's verification."
   }
 }

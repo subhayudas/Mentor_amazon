@@ -13,7 +13,8 @@
     "clear": "مسح",
     "all": "الكل",
     "required": "مطلوب",
-    "optional": "اختياري"
+    "optional": "اختياري",
+    "refresh": "تحديث"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -97,7 +98,21 @@
     "logoutSuccess": "تم تسجيل الخروج بنجاح",
     "amazonEmployeeTitle": "موظف في أمازون؟",
     "amazonEmployeeHint": "يتم إنشاء حسابات الموجّهين عبر تسجيل الدخول بحساب أمازون، وليس من خلال هذا النموذج.",
-    "signInWithAmazon": "تسجيل الدخول بحساب أمازون"
+    "signInWithAmazon": "تسجيل الدخول بحساب أمازون",
+    "sso": {
+      "signInWithAmazon": "تسجيل الدخول بحساب أمازون",
+      "amazonHint": "لموظفي أمازون (الموجّهين والمشرفين)، باستخدام تسجيل دخول Amazon Federate الخاص بك.",
+      "or": "أو",
+      "passwordDisclosure": "استخدام البريد الإلكتروني وكلمة المرور (حسابات اختبار غير تابعة لأمازون)",
+      "errorTitle": "لم يكتمل تسجيل الدخول عبر أمازون",
+      "errors": {
+        "sso_state": "انتهت صلاحية جلسة تسجيل الدخول أو سبق استخدام الرابط. يرجى البدء من جديد.",
+        "sso_token": "قبلت أمازون تسجيل دخولك لكن تعذّر إكمال العملية. يرجى المحاولة مرة أخرى.",
+        "sso_failed": "تعذّر تسجيل دخولك عبر أمازون. يرجى المحاولة مرة أخرى أو التواصل مع فريق MentorConnect.",
+        "generic": "حدث خطأ ما أثناء تسجيل الدخول. يرجى المحاولة مرة أخرى."
+      },
+      "errorReference": "المرجع: {{reason}}"
+    }
   },
   "nav": {
     "home": "الرئيسية",
@@ -212,7 +227,18 @@
     "createProfile": "إنشاء ملف المرشد",
     "creating": "جاري الإنشاء...",
     "successTitle": "مرحباً بك في مجتمع المرشدين!",
-    "successMessage": "تم إنشاء ملفك كمرشد بنجاح."
+    "successMessage": "تم إنشاء ملفك كمرشد بنجاح.",
+    "emailFromSession": "مأخوذ من حسابك المسجّل ولا يمكن تغييره هنا.",
+    "gate": {
+      "backHome": "العودة إلى الصفحة الرئيسية",
+      "requestAccess": "طلب الوصول",
+      "mentorsOnlyTitle": "إعداد ملف الموجّه مخصص لموجّهي أمازون المعتمدين",
+      "mentorsOnlyBody": "أنت مسجّل الدخول بحساب {{email}}، وهو ليس حساب موجّه. ينضم موظفو أمازون كموجّهين عبر تسجيل الدخول بحساب أمازون بعد موافقة فريق البرنامج على اسم المستخدم الخاص بهم.",
+      "notApprovedTitle": "لم تتم الموافقة على اسم المستخدم الخاص بك بعد",
+      "notApprovedBody": "{{alias}} ليس مدرجاً في قائمة الموجّهين المعتمدين بعد. اطلب الوصول وسيقوم فريق البرنامج بمراجعته؛ يمكنك العودة إلى هنا بعد الموافقة.",
+      "checkFailedTitle": "تعذّر التحقق من الموافقة",
+      "checkFailedBody": "حدث خطأ أثناء التحقق من حالة الموافقة. حدّث الصفحة للمحاولة مرة أخرى."
+    }
   },
   "menteeRegistration": {
     "title": "انضم كمتدرب",
@@ -263,7 +289,8 @@
     "createProfile": "إنشاء ملف المتدرب",
     "creating": "جاري الإنشاء...",
     "successTitle": "مرحباً بك في MentorConnect!",
-    "successMessage": "تم إنشاء ملفك الشخصي بنجاح."
+    "successMessage": "تم إنشاء ملفك الشخصي بنجاح.",
+    "emailFromSession": "مأخوذ من حسابك المسجّل الدخول ولا يمكن تغييره هنا."
   },
   "analytics": {
     "title": "لوحة التحليلات",
@@ -309,7 +336,15 @@
       "mentee": "المتدرب",
       "status": "الحالة",
       "clickedAt": "وقت النقر",
-      "scheduledAt": "موعد الجلسة"
+      "scheduledAt": "موعد الجلسة",
+      "bookings": "الحجوزات",
+      "completed": "مكتملة",
+      "volunteerHours": "ساعات التطوع",
+      "uniqueMentors": "عدد المرشدين",
+      "uniqueMentees": "عدد المتدربين",
+      "country": "الدولة",
+      "duration": "المدة",
+      "avgRating": "متوسط التقييم"
     },
     "chartLabels": {
       "totalBookings": "إجمالي الحجوزات",
@@ -318,10 +353,61 @@
       "canceled": "ملغاة",
       "clicked": "نقرات",
       "mentors": "المرشدون",
-      "mentees": "المتدربين"
+      "mentees": "المتدربين",
+      "completedSessions": "الجلسات المكتملة",
+      "volunteerHours": "ساعات التطوع"
     },
     "demoBannerTitle": "بيانات تجريبية — ليست مقاييس البرنامج",
-    "demoBannerBody": "يوجد أقل من {{threshold}} حجوزات حقيقية ({{count}} حتى الآن)، لذا فإن جميع الأرقام والرسوم البيانية في هذه الصفحة بيانات توضيحية فقط. ستحل المقاييس الحقيقية محلها تلقائياً بمجرد تراكم الحجوزات."
+    "demoBannerBody": "يوجد أقل من {{threshold}} حجوزات حقيقية ({{count}} حتى الآن)، لذا فإن جميع الأرقام والرسوم البيانية في هذه الصفحة بيانات توضيحية فقط. ستحل المقاييس الحقيقية محلها تلقائياً بمجرد تراكم الحجوزات.",
+    "tabs": {
+      "overview": "نظرة عامة",
+      "countries": "الدول",
+      "mentors": "المرشدون",
+      "bookings": "الحجوزات"
+    },
+    "country": "الدولة",
+    "allCountries": "كل الدول",
+    "notSpecified": "غير محدد",
+    "unknown": "غير معروف",
+    "volunteerHours": "ساعات التطوع",
+    "hoursUnit": "س",
+    "hoursShort": "{{count}} س",
+    "minutesShort": "{{count}} د",
+    "sessionsWithoutDuration": "جلسات بدون مدة مسجلة: {{count}}",
+    "byCountry": "الجلسات والساعات حسب الدولة",
+    "noCountryData": "لا تتوفر بيانات حسب الدولة",
+    "showing": "عرض",
+    "clearDrill": "مسح",
+    "drillHint": "انقر على شريط أو جزء لعرض حجوزاته.",
+    "noSegmentRows": "لا توجد حجوزات في هذا الجزء.",
+    "rowCount": "عدد الحجوزات: {{count}}",
+    "showingRows": "عرض {{shown}} من أصل {{total}} حجز",
+    "selectPeriod": "اختر فترة",
+    "selectSegment": "اختر جزءًا",
+    "allSegments": "الكل",
+    "exportView": "تصدير العرض الحالي (CSV)",
+    "exportRange": "تصدير نطاق زمني",
+    "exportRangeHint": "يصدّر كل الحجوزات ضمن النطاق الزمني بغض النظر عن الفلاتر الأخرى.",
+    "exportFrom": "من",
+    "exportTo": "إلى",
+    "exportRangeConfirm": "تصدير",
+    "csv": {
+      "bookingId": "معرّف الحجز",
+      "mentor": "المرشد",
+      "mentorCountry": "دولة المرشد",
+      "mentee": "المتدرب",
+      "menteeEmail": "بريد المتدرب",
+      "menteeType": "نوع المتدرب",
+      "organization": "المنظمة",
+      "status": "الحالة",
+      "clickedAt": "تاريخ الطلب",
+      "scheduledAt": "موعد الجلسة",
+      "completedAt": "تاريخ الإكمال",
+      "durationMinutes": "المدة (بالدقائق)",
+      "country": "الدولة",
+      "menteeRating": "تقييم المتدرب",
+      "mentorRating": "تقييم المرشد"
+    }
   },
   "booking": {
     "bookSession": "حجز جلسة",
@@ -352,7 +438,10 @@
     "goHome": "الذهاب للرئيسية",
     "loadFailed": "فشل في تحميل المرشدين. يرجى المحاولة مرة أخرى.",
     "invalidCalLink": "يرجى إدخال رابط Cal.com صالح (مثال: username/30min)",
-    "organizationNameRequired": "اسم المنظمة مطلوب لحسابات المنظمات"
+    "organizationNameRequired": "اسم المنظمة مطلوب لحسابات المنظمات",
+    "notFoundTitle": "الصفحة غير موجودة",
+    "notFoundBody": "قد يكون الرابط قديماً، أو أن الصفحة قد انتقلت.",
+    "notFoundHome": "العودة إلى الصفحة الرئيسية"
   },
   "actions": {
     "retry": "إعادة المحاولة",
@@ -455,7 +544,9 @@
     "upcoming": "قادمة",
     "upcomingSessions": "الجلسات القادمة",
     "noUpcoming": "لا توجد جلسات قادمة مجدولة",
-    "completeProfile": "أكمل ملفك التعريفي كموجّه"
+    "completeProfile": "أكمل ملفك التعريفي كموجّه",
+    "available": "متاح",
+    "unavailable": "غير متاح"
   },
   "myBookings": {
     "title": "حجوزاتي",
@@ -687,7 +778,27 @@
     "feedbackSubmitError": "فشل في إرسال التقييم",
     "noMenteeFeedback": "لم يقدم المتدرب تقييماً بعد",
     "stars": "نجوم",
-    "selectRating": "يرجى اختيار تقييم"
+    "selectRating": "يرجى اختيار تقييم",
+    "completeSessionTitle": "إكمال الجلسة",
+    "completeSessionDesc": "سجّل مدة الجلسة. تُحتسب ضمن ساعات التطوع الخاصة بك.",
+    "sessionDuration": "مدة الجلسة",
+    "minutesLabel": "دقيقة",
+    "minutesHint": "بين {{min}} و{{max}} دقيقة",
+    "invalidDuration": "أدخل مدة بين {{min}} و{{max}} دقيقة",
+    "sessionCountry": "الدولة (اختياري)",
+    "sessionCountryHint": "الدولة التي تُحتسب فيها هذه الجلسة في التقارير. الافتراضي هو دولة ملفك الشخصي.",
+    "sessionCountryNone": "غير محدد",
+    "confirmComplete": "تحديد كمكتملة",
+    "sessionCompleted": "تم تحديد الجلسة كمكتملة. أُضيفت {{minutes}} دقيقة إلى ساعات التطوع الخاصة بك.",
+    "durationMinutes": "{{count}} د",
+    "volunteerHours": "ساعات التطوع",
+    "hoursUnit": "س",
+    "feedbackReceived": "التقييمات المستلمة",
+    "requestAcceptedBadge": "تم القبول",
+    "requestDeclinedBadge": "تم الرفض",
+    "exitPortal": "الخروج من البوابة",
+    "goal": "الهدف",
+    "noGoalSpecified": "لم يتم تحديد هدف"
   },
   "profileSettings": {
     "title": "إعدادات الملف الشخصي",
@@ -806,6 +917,257 @@
       "organizationNamePlaceholder": "أدخل اسم مؤسستك",
       "saveSuccess": "تم تحديث الملف الشخصي بنجاح",
       "saveError": "فشل في تحديث الملف الشخصي. يرجى المحاولة مرة أخرى."
+    },
+    "calendarNotAvailable": "لم يتم إعداد التقويم – تواصل مع مرشدك",
+    "oneRequestAccepted": "تم قبول طلب واحد!",
+    "requestsAccepted": "تم قبول عدة طلبات!",
+    "clickScheduleNow": "انقر على \"جدولة الآن\" أدناه لحجز موعد جلستك."
+  },
+  "sso": {
+    "callback": {
+      "title": "جارٍ تسجيل دخولك",
+      "working": "جارٍ إكمال تسجيل الدخول عبر أمازون…",
+      "errorTitle": "تعذّر إكمال تسجيل الدخول",
+      "errors": {
+        "missing_token": "يفتقد هذا الرابط رمز تسجيل الدخول. ابدأ تسجيل الدخول مجددًا من صفحة الدخول.",
+        "verify_failed": "انتهت صلاحية رابط تسجيل الدخول أو سبق استخدامه.",
+        "no_user": "تم تسجيل دخولك لكن تعذّر تحميل حسابك. يرجى المحاولة مرة أخرى."
+      },
+      "tryAgain": "إعادة المحاولة عبر أمازون",
+      "usePassword": "استخدام البريد الإلكتروني وكلمة المرور"
     }
+  },
+  "guard": {
+    "noAccessTitle": "ليس لديك صلاحية الوصول إلى هذه الصفحة",
+    "noAccessBody": "هذه الصفحة مخصصة لحسابات {{role}} فقط. أنت مسجّل الدخول بحساب {{email}}.",
+    "role": {
+      "admin": "مسؤول البرنامج",
+      "mentor": "الموجّه",
+      "mentee": "المتدرّب"
+    },
+    "goToYourArea": "الانتقال إلى لوحتك",
+    "switchAccount": "تسجيل الدخول بحساب آخر",
+    "backHome": "العودة إلى الصفحة الرئيسية",
+    "checkingAccess": "جارٍ التحقق من صلاحياتك…"
+  },
+  "access": {
+    "title": "لم تتم الموافقة على الوصول بعد",
+    "limited": "الوصول إلى MentorConnect مقصور على الأعضاء المعتمدين في برنامج الإرشاد التابع لأمازون.",
+    "aliasLabel": "اسم مستخدم أمازون",
+    "status": {
+      "pending": "قيد المراجعة",
+      "approved": "تمت الموافقة",
+      "rejected": "لم تتم الموافقة"
+    },
+    "recorded": "تم تسجيل طلبك وسيقوم فريق البرنامج بمراجعته. ستتمكن من تسجيل الدخول بعد الموافقة عليه.",
+    "approvedBody": "تمت الموافقة على وصولك. سجّل الدخول بحساب أمازون مرة أخرى للمتابعة.",
+    "rejectedBody": "لم تتم الموافقة على هذا الطلب. إذا كنت تعتقد أن هذا خطأ، فتواصل مع فريق البرنامج.",
+    "noAliasBody": "لطلب الوصول، سجّل الدخول بحساب أمازون. يتم تسجيل اسم المستخدم الخاص بك تلقائياً ويقوم فريق البرنامج بمراجعته.",
+    "whatNext": "تتم الموافقة عادةً خلال بضعة أيام عمل. لا يوجد شيء آخر عليك فعله الآن.",
+    "backHome": "العودة إلى الصفحة الرئيسية",
+    "signInAgain": "تسجيل الدخول بحساب أمازون مرة أخرى"
+  },
+  "admin": {
+    "title": "لوحة الإدارة",
+    "subtitle": "إدارة برنامج MentorConnect",
+    "overview": "نظرة عامة",
+    "tabsLabel": "أقسام الإدارة",
+    "tabs": {
+      "mentors": "الموجّهون",
+      "mentees": "المتدرّبون والمنظمات",
+      "bookings": "الحجوزات",
+      "access": "الوصول"
+    },
+    "actions": "الإجراءات",
+    "viewDetails": "عرض التفاصيل",
+    "noMatches": "لا توجد نتائج مطابقة للبحث أو التصفية.",
+    "saving": "جارٍ الحفظ…",
+    "showingCount": "عرض {{shown}} من {{total}}",
+    "colEmail": "البريد الإلكتروني",
+    "colCountry": "الدولة",
+    "stats": {
+      "activeMentors": "الموجّهون النشطون",
+      "inactiveMentors": "{{count}} غير نشط",
+      "verifiedOrgs": "المنظمات الموثّقة",
+      "orgsBreakdown": "{{pending}} قيد المراجعة · {{individuals}} أفراد",
+      "bookings": "الحجوزات",
+      "bookingsBreakdown": "{{pending}} قيد الانتظار · {{confirmed}} مؤكدة · {{completed}} مكتملة",
+      "pendingAccess": "طلبات الوصول المعلقة",
+      "requestsTotal": "{{count}} طلبات إجمالاً"
+    },
+    "role": {
+      "mentor": "موجّه",
+      "admin": "مسؤول"
+    },
+    "bookingStatus": {
+      "pending": "قيد الانتظار",
+      "accepted": "مقبول",
+      "confirmed": "مؤكد",
+      "completed": "مكتمل",
+      "rejected": "مرفوض",
+      "canceled": "ملغى"
+    },
+    "verification": {
+      "verified": "موثّق",
+      "pending": "قيد المراجعة",
+      "rejected": "مرفوض",
+      "unverified": "غير موثّق"
+    },
+    "mentors": {
+      "searchPlaceholder": "ابحث عن الموجّهين بالاسم أو البريد الإلكتروني أو المنصب",
+      "colMentor": "الموجّه",
+      "colAvailability": "التوفر",
+      "colRating": "التقييم",
+      "colJoined": "تاريخ الانضمام",
+      "empty": "لا يوجد موجّهون بعد. يظهر الموجّهون المعتمدون هنا بعد إكمال الإعداد.",
+      "available": "متاح",
+      "inactive": "غير نشط",
+      "ssoApproved": "معتمد لتسجيل الدخول",
+      "ssoApprovedHint": "اسم المستخدم {{alias}} مدرج في قائمة المعتمدين",
+      "openProfile": "فتح الملف التعريفي",
+      "approveAccess": "الموافقة على الوصول",
+      "approveAccessBody": "يضيف {{email}} إلى قائمة الموجّهين المعتمدين ليتمكن من تسجيل الدخول بحساب أمازون. تأكد من اسم مستخدم أمازون أولاً.",
+      "aliasHint": "اسم تسجيل الدخول في أمازون، وهو عادةً الجزء الذي يسبق @ في بريد العمل.",
+      "accessApproved": "تمت إضافة {{alias}} إلى قائمة المعتمدين",
+      "deactivate": "إلغاء التنشيط",
+      "reactivate": "إعادة التنشيط",
+      "deactivateTitle": "إلغاء تنشيط {{name}}؟",
+      "deactivateBody": "سيتم إخفاء الموجّه من الدليل وسيتوقف عن استقبال طلبات حجز جديدة. لن تتأثر الحجوزات الحالية، ويمكنك إعادة التنشيط في أي وقت.",
+      "deactivated": "تم إلغاء تنشيط {{name}}",
+      "reactivated": "تمت إعادة تنشيط {{name}}",
+      "timezone": "المنطقة الزمنية",
+      "calLink": "رابط Cal.com",
+      "commsOwner": "التواصل",
+      "assistant": "المساعد",
+      "mentorThemselves": "الموجّه مباشرةً",
+      "languages": "اللغات",
+      "preference": "تفضيل الإرشاد",
+      "preferenceValue": {
+        "ongoing": "إرشاد مستمر",
+        "rotating": "متدرّبون متناوبون",
+        "either": "كلاهما"
+      },
+      "expertise": "مجالات الخبرة",
+      "industries": "القطاعات",
+      "bio": "نبذة",
+      "whyJoined": "سبب الانضمام"
+    },
+    "mentees": {
+      "searchPlaceholder": "ابحث عن المتدرّبين بالاسم أو البريد الإلكتروني أو المنظمة",
+      "filterLabel": "تصفية حسب حالة التوثيق",
+      "colName": "المتدرّب",
+      "colType": "النوع",
+      "colOrganization": "المنظمة",
+      "colVerification": "التوثيق",
+      "colRegistered": "تاريخ التسجيل",
+      "empty": "لم يسجّل أي متدرّب بعد.",
+      "type": {
+        "individual": "فرد",
+        "organization": "منظمة"
+      },
+      "reference": "مرجع التسجيل",
+      "website": "الموقع الإلكتروني",
+      "sector": "القطاع",
+      "size": "الحجم",
+      "mission": "الرسالة",
+      "needs": "الاحتياجات",
+      "areasExploring": "المجالات المستكشفة",
+      "goals": "الأهداف",
+      "markVerified": "وضع علامة موثّق",
+      "markRejected": "رفض التوثيق",
+      "markedVerified": "تم وضع علامة موثّق على {{name}}",
+      "markedRejected": "تم رفض توثيق {{name}}"
+    },
+    "bookings": {
+      "filterLabel": "تصفية حسب الحالة",
+      "searchPlaceholder": "ابحث حسب الموجّه أو المتدرّب أو الدولة",
+      "openAnalytics": "فتح التحليلات",
+      "colCreated": "تاريخ الإنشاء",
+      "colMentor": "الموجّه",
+      "colMentee": "المتدرّب",
+      "colStatus": "الحالة",
+      "colScheduled": "الموعد",
+      "colDuration": "المدة (دقيقة)",
+      "empty": "لا توجد حجوزات بعد.",
+      "detailTitle": "تفاصيل الحجز",
+      "responded": "تاريخ الرد",
+      "completed": "تاريخ الإكمال",
+      "minutes": "{{count}} دقيقة",
+      "goal": "الهدف",
+      "menteeRating": "تقييم المتدرّب",
+      "mentorRating": "تقييم الموجّه",
+      "menteeFeedback": "ملاحظات المتدرّب",
+      "mentorFeedback": "ملاحظات الموجّه"
+    },
+    "access": {
+      "pendingTitle": "الطلبات المعلقة",
+      "pendingHint": "موظفو أمازون الذين سجّلوا الدخول لكنهم ليسوا في قائمة المعتمدين بعد. تتيح لهم الموافقة تسجيل الدخول في المحاولة التالية.",
+      "alias": "اسم مستخدم أمازون",
+      "name": "الاسم",
+      "requested": "تاريخ الطلب",
+      "role": "الدور",
+      "approve": "موافقة",
+      "reject": "رفض",
+      "noPending": "لا توجد طلبات معلقة.",
+      "approvedToast": "تمت الموافقة على {{alias}} بصفة {{role}}",
+      "rejectedToast": "تم رفض طلب {{alias}}",
+      "approvedTitle": "أسماء المستخدمين المعتمدة",
+      "approvedHint": "كل من يمكنه تسجيل الدخول بحساب أمازون. أضف اسم مستخدم هنا للموافقة المسبقة على موجّه قبل أول تسجيل دخول له.",
+      "addAlias": "إضافة اسم مستخدم",
+      "addedToast": "تمت إضافة {{alias}} إلى قائمة المعتمدين",
+      "status": "الحالة",
+      "active": "نشط",
+      "inactive": "غير نشط",
+      "hasAccount": "سجّل الدخول",
+      "hasAccountHint": "سجّل هذا المستخدم الدخول مرة واحدة على الأقل",
+      "approvedBy": "تمت الموافقة بواسطة",
+      "deactivate": "إلغاء التنشيط",
+      "reactivate": "إعادة التنشيط",
+      "deactivatedToast": "لم يعد بإمكان {{alias}} تسجيل الدخول",
+      "reactivatedToast": "يمكن لـ {{alias}} تسجيل الدخول مجدداً",
+      "cannotDeactivateSelf": "لا يمكنك إلغاء تنشيط صلاحية الإدارة الخاصة بك",
+      "noApproved": "لا توجد أسماء مستخدمين معتمدة بعد.",
+      "resolvedTitle": "الطلبات المعالجة",
+      "resolvedHint": "الموافقات وحالات الرفض الأخيرة، للتوثيق.",
+      "resolvedBy": "تمت المعالجة بواسطة",
+      "resolvedAt": "تاريخ المعالجة",
+      "statusApproved": "تمت الموافقة",
+      "statusRejected": "مرفوض",
+      "noResolved": "لا توجد طلبات معالجة بعد."
+    }
+  },
+  "verification": {
+    "badge": {
+      "pending": "التحقق قيد الانتظار",
+      "unverified": "منظمة غير موثّقة",
+      "rejected": "تم رفض التحقق",
+      "verified": "منظمة موثّقة"
+    },
+    "tooltip": {
+      "pending": "يقوم فريق البرنامج بمراجعة بيانات هذه المنظمة.",
+      "unverified": "لم يقم فريق البرنامج بمراجعة هذه المنظمة بعد.",
+      "rejected": "لم يتمكن فريق البرنامج من التحقق من هذه المنظمة.",
+      "verified": "أكد فريق البرنامج بيانات هذه المنظمة."
+    },
+    "sectionTitle": "التحقق",
+    "referenceLabel": "رقم التسجيل / الترخيص (اختياري)",
+    "referencePlaceholder": "مثال: رقم ترخيص المنظمة أو السجل التجاري",
+    "referenceHelp": "يساعد فريق البرنامج على تأكيد منظمتك بشكل أسرع.",
+    "registrationNoteTitle": "يتم وضع علامة \"قيد المراجعة\" على المنظمات حتى يتم تأكيدها",
+    "registrationNote": "لا نجري فحوصات آلية حتى الآن. يراجع فريق برنامج MentorConnect كل منظمة يدويًا قبل وضع علامة موثّقة عليها. يمكنك تصفح المرشدين وطلب الجلسات في هذه الأثناء.",
+    "inReviewToast": "تم إنشاء ملف منظمتك وهو قيد المراجعة.",
+    "inReviewTitle": "التحقق قيد المراجعة",
+    "inReviewDescription": "تم تسجيل {{name}}. سيراجع فريق البرنامج البيانات قبل وضع علامة موثّقة على المنظمة.",
+    "inReviewStep1": "يتحقق فريق برنامج MentorConnect من البيانات التي قدمتها.",
+    "inReviewStep2": "يمكنك تصفح المرشدين وطلب الجلسات أثناء المراجعة. سيرى المرشدون أن التحقق قيد الانتظار.",
+    "goToDashboard": "الانتقال إلى لوحة التحكم",
+    "redirectingShortly": "سننقلك إلى لوحة التحكم بعد لحظات…",
+    "dashboardPendingBody": "يراجع فريق البرنامج بيانات منظمتك. يمكنك متابعة تصفح المرشدين وطلب الجلسات؛ سيرى المرشدون أن التحقق قيد الانتظار حتى يتم تأكيده.",
+    "referenceSubmitted": "المرجع المُقدَّم: {{reference}}",
+    "rejectedTitle": "لم تتم الموافقة على التحقق",
+    "dashboardRejectedBody": "لم يتمكن فريق البرنامج من التحقق من منظمتك بالبيانات المقدمة. لا يزال بإمكانك تصفح المرشدين، لكن المرشدين سيرون أنه لم تتم الموافقة على التحقق.",
+    "contactLine": "تواصل مع فريق برنامج MentorConnect لتحديث بياناتك أو طلب مراجعة أخرى.",
+    "mentorNoteUnverified": "لم يتم التحقق من هذه المنظمة من قبل البرنامج بعد.",
+    "mentorNoteRejected": "لم يوافق فريق البرنامج على التحقق من هذه المنظمة."
   }
 }
