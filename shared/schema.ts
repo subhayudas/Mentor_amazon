@@ -49,6 +49,8 @@ export const mentees = pgTable("mentees", {
   organization_size: text("organization_size"),
   organization_mission: text("organization_mission"),
   organization_needs: text("organization_needs"),
+  verification_status: text("verification_status", { enum: ["unverified", "pending", "verified", "rejected"] }).notNull().default("unverified"),
+  verification_reference: text("verification_reference"),
   country: text("country"),
   timezone: text("timezone").notNull(),
   photo_url: text("photo_url"),
@@ -78,6 +80,8 @@ export const bookings = pgTable("bookings", {
   mentee_feedback: text("mentee_feedback"),
   mentor_rating: integer("mentor_rating"),
   mentor_feedback: text("mentor_feedback"),
+  session_duration_minutes: integer("session_duration_minutes"),
+  country: text("country"),
   created_at: timestamp("created_at", { mode: "string" }).notNull(),
 });
 
@@ -143,8 +147,9 @@ export const users = pgTable("users", {
   id: varchar("id").primaryKey(),
   email: text("email").notNull().unique(),
   password: text("password").notNull(),
-  user_type: text("user_type", { enum: ["mentor", "mentee"] }).notNull(),
+  user_type: text("user_type", { enum: ["mentor", "mentee", "admin"] }).notNull(),
   profile_id: varchar("profile_id"),
+  amazon_alias: text("amazon_alias").unique(),
   is_verified: boolean("is_verified").default(false).notNull(),
   reset_token: text("reset_token"),
   reset_token_expires: timestamp("reset_token_expires", { mode: "string" }),

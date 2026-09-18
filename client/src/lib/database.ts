@@ -41,6 +41,8 @@ export interface Mentor {
   updated_at: string;
 }
 
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
+
 export interface Mentee {
   id: string;
   name: string;
@@ -52,6 +54,10 @@ export interface Mentee {
   organization_size?: string;
   organization_mission?: string;
   organization_needs?: string;
+  /** NGO verification state. Organizations start 'pending'; individuals stay 'unverified'. */
+  verification_status?: VerificationStatus;
+  /** Registration / licence number or third-party check reference supplied at registration. */
+  verification_reference?: string;
   country?: string;
   timezone: string;
   photo_url?: string;
@@ -79,6 +85,10 @@ export interface Booking {
   mentee_feedback?: string;
   mentor_rating?: number;
   mentor_feedback?: string;
+  /** Actual session length, captured when the session is marked completed. Feeds volunteer hours. */
+  session_duration_minutes?: number;
+  /** Country the session is attributed to for reporting (defaults to the mentor's country). */
+  country?: string;
   created_at: string;
 }
 
@@ -110,8 +120,10 @@ export interface User {
   id: string;
   email: string;
   password: string;
-  user_type: 'mentor' | 'mentee';
+  user_type: 'mentor' | 'mentee' | 'admin';
   profile_id?: string;
+  /** Amazon Federate alias (OIDC subject). Unique; the identity key for SSO users. */
+  amazon_alias?: string;
   is_verified: boolean;
   reset_token?: string;
   reset_token_expires?: string;
@@ -858,13 +870,16 @@ class DatabaseService {
 
   async updateMentorTask(taskId: string, updates: Partial<MentorTask>): Promise<MentorTask | null> {
     const now = new Date().toISOString();
-    const updateData: Partial<MentorTask> = {
+    const updateData: Record<string, unknown> = {
       ...updates,
       updated_at: now,
     };
 
     if (updates.status === 'completed' && !updates.completed_at) {
       updateData.completed_at = now;
+    } else if (updates.status && updates.status !== 'completed') {
+      // Re-opening a task clears its completion timestamp
+      updateData.completed_at = null;
     }
 
     const { data, error } = await supabase
