@@ -8,6 +8,7 @@ import { menteeService, uploadService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import type { Mentee } from "@/lib/database";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 import {
   Form,
   FormControl,
@@ -30,9 +31,13 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { X, BookOpen, Users, Target, Sparkles, Check, Upload, Loader2 } from "lucide-react";
-import { useState, useRef } from "react";
+import { X, BookOpen, Users, Target, Sparkles, Check, Upload, Loader2, Clock, ShieldCheck, ArrowRight } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { VerificationBadge } from "@/components/VerificationBadge";
+
+// How long the anchored "verification in review" card stays before we move on to the dashboard.
+const ORG_SUCCESS_REDIRECT_MS = 2500;
 
 const TIMEZONES = [
   "Africa/Cairo",
@@ -144,6 +149,7 @@ const menteeSchema = z.object({
   organization_size: z.string().optional(),
   organization_mission: z.string().optional(),
   organization_needs: z.string().optional(),
+  verification_reference: z.string().max(120).optional(),
   country: z.string().optional(),
   timezone: z.string().min(1, "Timezone is required"),
   photo_url: z.string().optional(),
@@ -160,9 +166,26 @@ export default function MenteeRegistration() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
+  // RLS only lets a signed-in user insert a mentees row whose email equals the session email,
+  // so when a session exists the field is prefilled from it and locked.
+  const sessionEmail = user?.email ?? "";
   const [isUploading, setIsUploading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Set only after an organisation registers: drives the anchored "verification in review" state.
+  const [registeredOrg, setRegisteredOrg] = useState<Mentee | null>(null);
+  const successCardRef = useRef<HTMLDivElement>(null);
+
+  const goToDashboard = () => setLocation("/mentee-dashboard");
+
+  useEffect(() => {
+    if (!registeredOrg) return;
+    successCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    successCardRef.current?.focus({ preventScroll: true });
+    const timer = window.setTimeout(() => setLocation("/mentee-dashboard"), ORG_SUCCESS_REDIRECT_MS);
+    return () => window.clearTimeout(timer);
+  }, [registeredOrg, setLocation]);
 
   const form = useForm<MenteeFormData>({
     resolver: zodResolver(menteeSchema.refine(
@@ -188,6 +211,7 @@ export default function MenteeRegistration() {
       organization_size: "",
       organization_mission: "",
       organization_needs: "",
+      verification_reference: "",
       country: "",
       timezone: "Asia/Dubai",
       photo_url: "",
@@ -197,6 +221,10 @@ export default function MenteeRegistration() {
       areas_exploring: [],
     },
   });
+
+  useEffect(() => {
+    if (sessionEmail) form.setValue("email", sessionEmail, { shouldValidate: false });
+  }, [sessionEmail, form]);
 
   const userType = form.watch("user_type");
 
@@ -209,6 +237,7 @@ export default function MenteeRegistration() {
       form.setValue("organization_size", "");
       form.setValue("organization_mission", "");
       form.setValue("organization_needs", "");
+      form.setValue("verification_reference", "");
       form.clearErrors("organization_name");
     }
   };
@@ -258,23 +287,36 @@ export default function MenteeRegistration() {
 
   const createMenteeMutation = useMutation<Mentee, Error, MenteeFormData>({
     mutationFn: async (data: MenteeFormData) => {
+      const isOrganization = data.user_type === "organization";
       return menteeService.create({
         ...data,
+        email: sessionEmail || data.email,
         organization_name: data.organization_name?.trim() || undefined,
+        // Organisations queue for a programme-team review; individuals are never verified.
+        // No third-party check runs yet — an IDfy-style provider can later flip this server-side.
+        verification_status: isOrganization ? "pending" : "unverified",
+        verification_reference: isOrganization ? data.verification_reference?.trim() || undefined : undefined,
       });
     },
     onSuccess: (newMentee: Mentee) => {
       queryClient.invalidateQueries({ queryKey: ['mentees'] });
       toast({
         title: t('menteeRegistration.successTitle'),
-        description: t('menteeRegistration.successMessage'),
+        description: newMentee?.user_type === "organization"
+          ? t('verification.inReviewToast')
+          : t('menteeRegistration.successMessage'),
       });
       if (newMentee?.id) {
         localStorage.setItem("menteeId", newMentee.id);
         localStorage.setItem("menteeEmail", newMentee.email);
         localStorage.setItem("menteeName", newMentee.name);
         window.dispatchEvent(new Event("userRegistered"));
-        setLocation("/mentee-dashboard");
+        if (newMentee.user_type === "organization") {
+          // Anchored feedback first; the effect above scrolls to the card and redirects.
+          setRegisteredOrg(newMentee);
+        } else {
+          goToDashboard();
+        }
       } else {
         toast({
           title: t('common.error'),
@@ -296,6 +338,56 @@ export default function MenteeRegistration() {
   const onSubmit = (data: MenteeFormData) => {
     createMenteeMutation.mutate(data);
   };
+
+  if (registeredOrg) {
+    return (
+      <div className="min-h-screen bg-background py-12 px-4">
+        <div className="max-w-3xl mx-auto space-y-8">
+          <Card
+            ref={successCardRef}
+            tabIndex={-1}
+            role="status"
+            aria-live="polite"
+            className="scroll-mt-24 border-amber-400 bg-amber-50/60 ring-4 ring-amber-300/60 outline-none transition-shadow"
+            data-testid="card-verification-in-review"
+          >
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                <Clock className="w-6 h-6 text-amber-700" aria-hidden="true" />
+                {t('verification.inReviewTitle')}
+              </CardTitle>
+              <CardDescription className="text-base text-foreground/80">
+                {t('verification.inReviewDescription', { name: registeredOrg.organization_name || registeredOrg.name })}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium">{registeredOrg.organization_name || registeredOrg.name}</span>
+                <VerificationBadge status={registeredOrg.verification_status ?? "pending"} type="organization" size="sm" />
+              </div>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
+                  {t('verification.inReviewStep1')}
+                </li>
+                <li className="flex items-start gap-2">
+                  <Users className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
+                  {t('verification.inReviewStep2')}
+                </li>
+              </ul>
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Button onClick={goToDashboard} data-testid="button-go-to-dashboard">
+                  {t('verification.goToDashboard')}
+                  <ArrowRight className="w-4 h-4 ms-2 rtl:rotate-180" aria-hidden="true" />
+                </Button>
+                <span className="text-xs text-muted-foreground">{t('verification.redirectingShortly')}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background py-12 px-4">
@@ -403,8 +495,22 @@ export default function MenteeRegistration() {
                     <FormItem>
                       <FormLabel>{t('menteeRegistration.email')} *</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="jane@example.com" {...field} data-testid="input-email" />
+                        {sessionEmail ? (
+                          <Input
+                            type="email"
+                            value={sessionEmail}
+                            name={field.name}
+                            ref={field.ref}
+                            readOnly
+                            aria-readonly="true"
+                            className="bg-muted text-muted-foreground"
+                            data-testid="input-email"
+                          />
+                        ) : (
+                          <Input type="email" placeholder="jane@example.com" {...field} data-testid="input-email" />
+                        )}
                       </FormControl>
+                      {sessionEmail && <FormDescription>{t('menteeRegistration.emailFromSession')}</FormDescription>}
                       <FormMessage />
                     </FormItem>
                   )}
@@ -442,7 +548,7 @@ export default function MenteeRegistration() {
                       )}
                     />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
                         name="organization_sector"
@@ -533,10 +639,50 @@ export default function MenteeRegistration() {
                         </FormItem>
                       )}
                     />
+
+                    <div className="space-y-4 border-t pt-4" data-testid="section-verification">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+                        <h3 className="font-medium">{t('verification.sectionTitle')}</h3>
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name="verification_reference"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('verification.referenceLabel')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder={t('verification.referencePlaceholder')}
+                                autoComplete="off"
+                                maxLength={120}
+                                {...field}
+                                value={field.value || ""}
+                                data-testid="input-verification-reference"
+                              />
+                            </FormControl>
+                            <FormDescription>{t('verification.referenceHelp')}</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div
+                        className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm"
+                        data-testid="note-verification-pending"
+                      >
+                        <Clock className="w-4 h-4 mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
+                        <div className="space-y-1">
+                          <p className="font-medium text-amber-900">{t('verification.registrationNoteTitle')}</p>
+                          <p className="text-amber-900/80">{t('verification.registrationNote')}</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="timezone"
@@ -608,7 +754,7 @@ export default function MenteeRegistration() {
                   )}
                 />
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name="linkedin_url"

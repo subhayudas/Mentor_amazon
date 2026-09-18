@@ -60,12 +60,17 @@ import {
   Building2,
   X,
   CalendarPlus,
+  ShieldX,
 } from "lucide-react";
 import { menteeService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { CalEmbed } from "@/components/CalEmbed";
+import { VerificationBadge } from "@/components/VerificationBadge";
 import type { Mentee, Booking, Mentor } from "@/lib/database";
+
+// Optional programme contact surfaced on the "not approved" banner; falls back to a generic line.
+const PROGRAMME_CONTACT_EMAIL: string | undefined = import.meta.env.VITE_PROGRAMME_CONTACT_EMAIL || undefined;
 
 interface MenteeStats {
   totalSessions: number;
@@ -82,7 +87,75 @@ interface FeedbackBooking extends Booking {
   mentor?: Mentor;
 }
 
-function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
+/**
+ * Compact verification state for organisation mentees. Pending and rejected get a banner;
+ * verified only gets the badge next to the organisation name. Nothing is ever blocked here —
+ * unverified organisations can still browse mentors and request sessions.
+ */
+function OrganizationVerificationStatus({ mentee }: { mentee: Mentee }) {
+  const { t } = useTranslation();
+
+  if (mentee.user_type !== "organization") return null;
+
+  const status = mentee.verification_status ?? "unverified";
+  const orgName = mentee.organization_name || mentee.name;
+
+  return (
+    <div className="space-y-3" data-testid="section-organization-verification">
+      <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="row-organization-identity">
+        <Building2 className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+        <span className="font-medium" data-testid="text-organization-name">{orgName}</span>
+        <VerificationBadge status={status} type="organization" size="sm" />
+      </div>
+
+      {status === "pending" && (
+        <Card className="border-amber-300 bg-amber-50/70" role="status" data-testid="banner-verification-pending">
+          <CardContent className="flex items-start gap-3 p-4">
+            <Clock className="w-5 h-5 mt-0.5 shrink-0 text-amber-700" aria-hidden="true" />
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-amber-900">{t('verification.inReviewTitle')}</p>
+              <p className="text-amber-900/80">{t('verification.dashboardPendingBody')}</p>
+              {mentee.verification_reference && (
+                <p className="text-xs text-amber-900/70" data-testid="text-verification-reference">
+                  {t('verification.referenceSubmitted', { reference: mentee.verification_reference })}
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {status === "rejected" && (
+        <Card className="border-[#C40000]/40 bg-[#C40000]/5" role="alert" data-testid="banner-verification-rejected">
+          <CardContent className="flex items-start gap-3 p-4">
+            <ShieldX className="w-5 h-5 mt-0.5 shrink-0 text-[#C40000]" aria-hidden="true" />
+            <div className="space-y-1 text-sm">
+              <p className="font-medium text-[#C40000]">{t('verification.rejectedTitle')}</p>
+              <p className="text-foreground/80">{t('verification.dashboardRejectedBody')}</p>
+              <p className="text-foreground/80">
+                {t('verification.contactLine')}
+                {PROGRAMME_CONTACT_EMAIL && (
+                  <>
+                    {" "}
+                    <a
+                      href={`mailto:${PROGRAMME_CONTACT_EMAIL}`}
+                      className="font-medium underline underline-offset-2"
+                      data-testid="link-programme-contact"
+                    >
+                      {PROGRAMME_CONTACT_EMAIL}
+                    </a>
+                  </>
+                )}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function MenteeDashboardHome({ menteeId, mentee }: { menteeId: string; mentee: Mentee }) {
   const { t } = useTranslation();
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -144,6 +217,7 @@ function MenteeDashboardHome({ menteeId }: { menteeId: string }) {
         <h1 className="text-2xl font-bold" data-testid="text-mentee-dashboard-title">{t('menteePortal.dashboardTitle')}</h1>
         <p className="text-muted-foreground">{t('menteePortal.dashboardSubtitle')}</p>
       </div>
+      <OrganizationVerificationStatus mentee={mentee} />
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
@@ -1129,6 +1203,9 @@ export default function MenteeDashboard() {
     queryKey: ['mentee', 'email', storedEmail],
     queryFn: () => menteeService.getByEmail(storedEmail!),
     enabled: !!storedEmail,
+    // Verification decisions land asynchronously; pick them up without a manual reload.
+    refetchInterval: 60000,
+    staleTime: 30000,
   });
 
   const handleAccessDashboard = (e: React.FormEvent) => {
@@ -1337,7 +1414,7 @@ export default function MenteeDashboard() {
           <main className="flex-1 overflow-auto p-6">
             <Switch>
               <Route path="/mentee-dashboard">
-                <MenteeDashboardHome menteeId={mentee.id} />
+                <MenteeDashboardHome menteeId={mentee.id} mentee={mentee} />
               </Route>
               <Route path="/mentee-dashboard/bookings">
                 <MenteeBookings menteeId={mentee.id} />
