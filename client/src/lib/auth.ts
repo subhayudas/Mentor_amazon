@@ -7,17 +7,57 @@ import { supabase } from './supabase';
 import { db } from './database';
 import type { User as DbUser, Mentor, Mentee } from './database';
 
+export type UserRole = 'mentor' | 'mentee' | 'admin';
+
 export interface AuthUser {
   id: string;
   email: string;
-  user_type: 'mentor' | 'mentee';
+  name?: string;
+  user_type: UserRole;
+  /** Verified profile row id (mentors.id / mentees.id) owned by this account, if any. */
   profile_id?: string;
+  /** Amazon Federate alias (OIDC `sub`) when the account was created via SSO. */
+  amazon_alias?: string;
 }
 
 export interface SignupData {
   email: string;
   password: string;
-  user_type: 'mentor' | 'mentee';
+  user_type: 'mentee';
+}
+
+/**
+ * localStorage keys that mirror the signed-in role for legacy consumers
+ * (Navigation, mentee dashboard). They are conveniences only — never an
+ * identity source. Anything that grants access derives identity from the
+ * authenticated session via `auth.getCurrentUser()`.
+ */
+const MENTOR_STORAGE_KEYS = ['mentorId', 'mentorEmail', 'mentorName'] as const;
+const MENTEE_STORAGE_KEYS = ['menteeId', 'menteeEmail', 'menteeName'] as const;
+
+export function clearRoleStorage(keep?: 'mentor' | 'mentee'): void {
+  if (keep !== 'mentor') MENTOR_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
+  if (keep !== 'mentee') MENTEE_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
+}
+
+/** Mirror an auth-derived identity into the legacy role keys (clearing the opposite role). */
+export function syncRoleStorage(user: AuthUser | null): void {
+  if (!user) {
+    clearRoleStorage();
+    localStorage.removeItem('user');
+    return;
+  }
+  if (user.user_type === 'mentor' && user.profile_id) {
+    clearRoleStorage('mentor');
+    localStorage.setItem('mentorId', user.profile_id);
+    localStorage.setItem('mentorEmail', user.email);
+  } else if (user.user_type === 'mentee') {
+    clearRoleStorage('mentee');
+    if (user.profile_id) localStorage.setItem('menteeId', user.profile_id);
+    localStorage.setItem('menteeEmail', user.email);
+  } else {
+    clearRoleStorage();
+  }
 }
 
 export interface LoginData {
@@ -37,6 +77,12 @@ class AuthService {
     }
 
     // Create user in Supabase Auth
+    // Self-service signup is mentee-only. Mentor identities come from Amazon
+    // SSO (amazonAlias) plus an approved mentor record — never a self-selected role.
+    if (data.user_type !== 'mentee') {
+      throw new Error('Mentor accounts are provisioned through Amazon sign-in');
+    }
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: data.email,
       password: data.password,
@@ -96,22 +142,53 @@ class AuthService {
       throw new Error('Login failed');
     }
 
-    // Get user type from metadata or database
-    let userType: 'mentor' | 'mentee' = authData.user.user_metadata?.user_type || 'mentee';
+    return this.resolveAuthUser(authData.user);
+  }
+
+  /**
+   * Build the app-level identity from a Supabase auth user.
+   *
+   * Role comes from the `users` row (authoritative) and falls back to auth
+   * metadata only for accounts that predate the row. The profile id is only
+   * ever a row that this account provably owns: `users.profile_id`, or the
+   * mentor/mentee row whose email equals the authenticated email (the same
+   * predicate RLS uses for ownership). Nothing here reads localStorage.
+   */
+  private async resolveAuthUser(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Promise<AuthUser> {
+    const email = user.email!;
+    const metadata = user.user_metadata || {};
+
+    let userType: UserRole = (metadata.user_type as UserRole) || 'mentee';
     let profileId: string | undefined;
 
-    // Try to get additional user info from database
-    const dbUser = await db.getUserByEmail(data.email);
+    const dbUser = await db.getUserByEmail(email);
     if (dbUser) {
       userType = dbUser.user_type;
       profileId = dbUser.profile_id || undefined;
     }
 
+    if (!profileId) {
+      if (userType === 'mentor') {
+        const mentor = await db.getMentorByEmail(email);
+        profileId = mentor?.id;
+      } else if (userType === 'mentee') {
+        const mentee = await db.getMenteeByEmail(email);
+        profileId = mentee?.id;
+      }
+    }
+
+    const name =
+      (metadata.full_name as string | undefined) ||
+      (metadata.name as string | undefined) ||
+      undefined;
+
     return {
-      id: authData.user.id,
-      email: data.email,
+      id: user.id,
+      email,
+      name,
       user_type: userType,
       profile_id: profileId,
+      amazon_alias: (dbUser?.amazon_alias || (metadata.amazon_alias as string | undefined)) || undefined,
     };
   }
 
@@ -125,13 +202,8 @@ class AuthService {
       throw new Error('Failed to logout');
     }
 
-    // Clear local storage
-    localStorage.removeItem('user');
-    localStorage.removeItem('mentorId');
-    localStorage.removeItem('menteeId');
-    localStorage.removeItem('mentorEmail');
-    localStorage.removeItem('menteeEmail');
-    localStorage.removeItem('menteeName');
+    // Clear every role mirror so a later login as the other role can't inherit stale ids
+    syncRoleStorage(null);
   }
 
   /**
@@ -144,23 +216,7 @@ class AuthService {
       return null;
     }
 
-    // Get user type from metadata or database
-    let userType: 'mentor' | 'mentee' = user.user_metadata?.user_type || 'mentee';
-    let profileId: string | undefined;
-
-    // Try to get additional user info from database
-    const dbUser = await db.getUserByEmail(user.email!);
-    if (dbUser) {
-      userType = dbUser.user_type;
-      profileId = dbUser.profile_id || undefined;
-    }
-
-    return {
-      id: user.id,
-      email: user.email!,
-      user_type: userType,
-      profile_id: profileId,
-    };
+    return this.resolveAuthUser(user);
   }
 
   /**

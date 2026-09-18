@@ -6,6 +6,7 @@ import { AmazonLogo } from "@/components/AmazonSmile";
 import { useTranslation } from "react-i18next";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { syncRoleStorage } from "@/lib/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +23,6 @@ export function Navigation() {
   const [location] = useLocation();
   const [, setLocationPath] = useLocation();
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [mentorId, setMentorId] = useState<string | null>(null);
   const [menteeId, setMenteeId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -31,7 +31,6 @@ export function Navigation() {
       const menteeEmail = localStorage.getItem("menteeEmail");
       const mentorEmail = localStorage.getItem("mentorEmail");
       setUserEmail(menteeEmail || mentorEmail || null);
-      setMentorId(localStorage.getItem("mentorId"));
       setMenteeId(localStorage.getItem("menteeId"));
     };
 
@@ -46,26 +45,27 @@ export function Navigation() {
 
   const handleLogout = async () => {
     await logout();
-    localStorage.clear();
-    setMentorId(null);
+    syncRoleStorage(null);
     setMenteeId(null);
     setUserEmail(null);
     setLocationPath("/");
   };
 
   const handleLocalLogout = () => {
-    localStorage.clear();
-    setMentorId(null);
+    syncRoleStorage(null);
     setMenteeId(null);
     setUserEmail(null);
     setLocationPath("/");
   };
 
-  const isLoggedIn = user || mentorId || menteeId;
-  
-  // Determine user role from auth context or localStorage
-  const isMentor = user?.user_type === 'mentor' || !!mentorId;
-  const isMentee = user?.user_type === 'mentee' || !!menteeId;
+  const isLoggedIn = user || menteeId;
+
+  // Roles that unlock protected surfaces come from the authenticated session
+  // only. A stored mentorId is never enough: mentor ids are world-readable.
+  // The mentee mirror is kept for the legacy anonymous mentee-dashboard path.
+  const isMentor = user?.user_type === 'mentor';
+  const isMentee = user?.user_type === 'mentee' || (!user && !!menteeId);
+  const isAdmin = user?.user_type === 'admin';
 
   // Navigation items
   const coreNavItems = [
@@ -82,6 +82,7 @@ export function Navigation() {
   const userItems = [
     ...(isMentor ? [{ href: "/mentor-portal", label: t('nav.mentorPortal') }] : []),
     ...(isMentee ? [{ href: "/mentee-dashboard", label: t('nav.menteeDashboard') }] : []),
+    ...(isAdmin ? [{ href: "/admin", label: t('nav.admin') }] : []),
   ];
 
   return (
@@ -150,7 +151,7 @@ export function Navigation() {
 
           {/* Right side actions */}
           <div className="flex items-center gap-3">
-            {userEmail && <NotificationBell email={userEmail} />}
+            {(user?.email || userEmail) && <NotificationBell email={user?.email || userEmail!} />}
             <LanguageToggle />
 
             {!isLoading && !isLoggedIn && (
@@ -180,7 +181,7 @@ export function Navigation() {
                 <DropdownMenuContent align="end" className="w-56 rounded-2xl">
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{user.name}</p>
+                      <p className="text-sm font-medium">{user.name || user.email}</p>
                       <p className="text-xs text-muted-foreground truncate">{user.email}</p>
                     </div>
                   </DropdownMenuLabel>
@@ -193,7 +194,7 @@ export function Navigation() {
               </DropdownMenu>
             )}
 
-            {!user && (mentorId || menteeId) && (
+            {!user && menteeId && (
               <button
                 onClick={handleLocalLogout}
                 className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-red-50 text-red-600 transition-colors"

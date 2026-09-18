@@ -17,10 +17,9 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Loader2, Mail, Lock, Users, GraduationCap } from "lucide-react";
+import { Loader2, Mail, Lock, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const passwordRegex = {
@@ -39,9 +38,6 @@ const signupSchema = z.object({
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number"),
   confirmPassword: z.string().min(1, "Please confirm your password"),
-  userType: z.enum(["mentor", "mentee"], {
-    required_error: "Please select how you want to join",
-  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -74,7 +70,6 @@ export default function Signup() {
       email: "",
       password: "",
       confirmPassword: "",
-      userType: undefined,
     },
   });
 
@@ -86,10 +81,12 @@ export default function Signup() {
 
   const signupMutation = useMutation({
     mutationFn: async (data: SignupFormData) => {
+      // Self-service accounts are mentee-only. Amazon mentors sign in with
+      // Amazon SSO and are matched to an approved mentor record.
       return authService.signup({
         email: data.email,
         password: data.password,
-        user_type: data.userType,
+        user_type: "mentee",
       });
     },
     onSuccess: (data) => {
@@ -99,12 +96,7 @@ export default function Signup() {
         title: t("auth.signupSuccess"),
         description: t("auth.accountCreated"),
       });
-      const userType = form.getValues("userType");
-      if (userType === "mentor") {
-        setLocation("/mentor-onboarding");
-      } else {
-        setLocation("/mentee-registration");
-      }
+      setLocation("/mentee-registration");
     },
     onError: (error: Error) => {
       toast({
@@ -233,66 +225,21 @@ export default function Signup() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="userType"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormLabel className="text-sm font-medium text-[#0F1111]">
-                        {t("auth.userTypeLabel")}
-                      </FormLabel>
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          value={field.value}
-                          className="space-y-3"
-                        >
-                          <div
-                            className={`flex items-center space-x-3 p-4 border rounded-md cursor-pointer transition-colors ${
-                              field.value === "mentor"
-                                ? "border-[#FF9900] bg-orange-50"
-                                : "border-[#D5D9D9] hover:border-[#FF9900]"
-                            }`}
-                            onClick={() => field.onChange("mentor")}
-                            data-testid="radio-mentor"
-                          >
-                            <RadioGroupItem value="mentor" id="mentor" />
-                            <Users className="h-5 w-5 text-[#FF9900]" />
-                            <div className="flex-1">
-                              <label htmlFor="mentor" className="text-sm font-medium cursor-pointer">
-                                {t("auth.wantToBeMentor")}
-                              </label>
-                              <p className="text-xs text-[#565959]">
-                                {t("auth.mentorDescription")}
-                              </p>
-                            </div>
-                          </div>
-                          <div
-                            className={`flex items-center space-x-3 p-4 border rounded-md cursor-pointer transition-colors ${
-                              field.value === "mentee"
-                                ? "border-[#FF9900] bg-orange-50"
-                                : "border-[#D5D9D9] hover:border-[#FF9900]"
-                            }`}
-                            onClick={() => field.onChange("mentee")}
-                            data-testid="radio-mentee"
-                          >
-                            <RadioGroupItem value="mentee" id="mentee" />
-                            <GraduationCap className="h-5 w-5 text-[#FF9900]" />
-                            <div className="flex-1">
-                              <label htmlFor="mentee" className="text-sm font-medium cursor-pointer">
-                                {t("auth.wantToFindMentor")}
-                              </label>
-                              <p className="text-xs text-[#565959]">
-                                {t("auth.menteeDescription")}
-                              </p>
-                            </div>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div
+                  className="flex items-start gap-3 p-4 border border-[#D5D9D9] rounded-md bg-[#FAFAFA]"
+                  data-testid="note-amazon-employees"
+                >
+                  <Users className="h-5 w-5 text-[#FF9900] mt-0.5 shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-[#0F1111]">{t("auth.amazonEmployeeTitle")}</p>
+                    <p className="text-xs text-[#565959]">
+                      {t("auth.amazonEmployeeHint")}{" "}
+                      <Link href="/login" className="text-[#0066C0] hover:underline" data-testid="link-amazon-signin">
+                        {t("auth.signInWithAmazon")}
+                      </Link>
+                    </p>
+                  </div>
+                </div>
 
                 <Button
                   type="submit"

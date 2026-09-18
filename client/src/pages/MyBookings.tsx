@@ -221,7 +221,7 @@ export default function MyBookings() {
     );
   }
 
-  if (bookingsLoading || mentorQueries.isLoading) {
+  if (bookingsLoading) {
     return (
       <div className="min-h-screen py-12" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="max-w-7xl mx-auto px-4 md:px-8">

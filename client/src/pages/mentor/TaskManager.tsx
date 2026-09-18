@@ -115,7 +115,7 @@ export default function TaskManager({ mentorId }: TaskManagerProps) {
       taskId: task.id,
       updates: { 
         status: newStatus,
-        completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
+        completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined,
       },
     });
   };

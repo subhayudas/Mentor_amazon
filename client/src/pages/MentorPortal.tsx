@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Route, Switch, useLocation, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -38,39 +38,62 @@ import Availability from "@/pages/mentor/Availability";
 import Feedback from "@/pages/mentor/Feedback";
 import ProfileSettings from "@/pages/mentor/ProfileSettings";
 import { mentorService } from "@/lib/services";
+import { syncRoleStorage } from "@/lib/auth";
+import { useAuth } from "@/context/AuthContext";
 import type { Mentor } from "@/lib/database";
 
 export default function MentorPortal() {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
   const [location, setLocation] = useLocation();
-  const [currentMentorId] = useState<string | null>(() => {
-    return localStorage.getItem('mentorId');
+  const { user, isLoading: authLoading } = useAuth();
+
+  // Identity comes from the authenticated session only. `profile_id` is the
+  // mentor row this account provably owns (users.profile_id, or the mentors row
+  // whose email matches the session email). localStorage is never consulted:
+  // mentor ids are world-readable, so a stored id proves nothing.
+  const isMentorSession = !!user && user.user_type === 'mentor';
+  const mentorId = isMentorSession ? user.profile_id : undefined;
+
+  const { data: mentor, isLoading: mentorLoading } = useQuery<Mentor | null>({
+    queryKey: ['mentor', mentorId],
+    queryFn: () => mentorService.getById(mentorId!),
+    enabled: !!mentorId,
   });
 
-  const { data: allMentors, isLoading: mentorsLoading } = useQuery<Mentor[]>({
-    queryKey: ['mentors'],
-    queryFn: () => mentorService.getAll(),
-  });
-
-  // No valid mentor identity -> send to login rather than granting one.
-  // The empty-list case is handled by the effect below.
   useEffect(() => {
-    if (mentorsLoading || !allMentors || allMentors.length === 0) return;
-    if (!currentMentorId || !allMentors.some(m => m.id === currentMentorId)) {
+    if (authLoading) return;
+    if (!user) {
+      setLocation('/login');
+      return;
+    }
+    if (user.user_type !== 'mentor') {
+      // Signed in, but not as a mentor: nothing here belongs to this account.
+      setLocation(user.user_type === 'mentee' ? '/mentee-dashboard' : '/');
+      return;
+    }
+    if (!user.profile_id) {
+      // Approved mentor account without a profile row yet.
+      setLocation('/mentor-onboarding');
+    }
+  }, [authLoading, user, setLocation]);
+
+  // Keep the legacy role mirror consistent with the verified identity
+  // (and clear any stale opposite-role ids left by a previous session).
+  useEffect(() => {
+    if (!authLoading && isMentorSession && mentor) {
+      syncRoleStorage(user);
+    }
+  }, [authLoading, isMentorSession, mentor, user]);
+
+  // Profile id present but the row is gone (deactivated/deleted): drop to login.
+  useEffect(() => {
+    if (mentorId && !mentorLoading && mentor === null) {
       setLocation('/login');
     }
-  }, [mentorsLoading, allMentors, currentMentorId, setLocation]);
+  }, [mentorId, mentorLoading, mentor, setLocation]);
 
-  useEffect(() => {
-    if (!mentorsLoading && (!allMentors || allMentors.length === 0)) {
-      setLocation('/');
-    }
-  }, [mentorsLoading, allMentors, setLocation]);
-
-  const mentor = allMentors?.find(m => m.id === currentMentorId);
-
-  if (mentorsLoading || !mentor) {
+  if (authLoading || mentorLoading || !mentor) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="space-y-4 w-full max-w-md p-4">

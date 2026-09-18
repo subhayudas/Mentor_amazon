@@ -5,6 +5,7 @@ import { useLocation, Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { authService } from "@/lib/services";
+import { clearRoleStorage } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -52,14 +53,21 @@ export default function Login() {
     },
     onSuccess: (data) => {
       localStorage.setItem("user", JSON.stringify(data));
-      
-      // Set role-specific localStorage values for immediate navigation updates
+
+      // Set role-specific localStorage values for immediate navigation updates.
+      // Always clear the opposite role first so a previous session's ids can't
+      // leak into this one. These mirrors are conveniences only — access control
+      // derives identity from the authenticated session, not from storage.
       if (data.user_type === 'mentor') {
-        localStorage.setItem("mentorId", data.profile_id || data.id);
+        clearRoleStorage('mentor');
+        if (data.profile_id) localStorage.setItem("mentorId", data.profile_id);
         localStorage.setItem("mentorEmail", data.email);
       } else if (data.user_type === 'mentee') {
-        localStorage.setItem("menteeId", data.profile_id || data.id);
+        clearRoleStorage('mentee');
+        if (data.profile_id) localStorage.setItem("menteeId", data.profile_id);
         localStorage.setItem("menteeEmail", data.email);
+      } else {
+        clearRoleStorage();
       }
       
       // Dispatch event to notify Navigation component of user registration
@@ -70,7 +78,13 @@ export default function Login() {
         title: t("auth.loginSuccess"),
         description: t("auth.welcomeBack"),
       });
-      setLocation("/");
+      if (data.user_type === 'mentor') {
+        setLocation(data.profile_id ? "/mentor-portal" : "/mentor-onboarding");
+      } else if (data.user_type === 'admin') {
+        setLocation("/admin");
+      } else {
+        setLocation("/");
+      }
     },
     onError: (error: Error) => {
       toast({

@@ -1,12 +1,11 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { mentorService } from "@/lib/services";
+import { useAuth } from "@/context/AuthContext";
 import type { Mentor, Booking } from "@/lib/database";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +13,6 @@ import { Switch } from "@/components/ui/switch";
 import {
   Calendar,
   Clock,
-  User,
   Mail,
   PauseCircle,
   PlayCircle,
@@ -31,11 +29,20 @@ export default function MentorDashboard() {
   const isRTL = i18n.language === 'ar';
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [email, setEmail] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("email") || localStorage.getItem("mentorEmail") || "";
-  });
-  const [inputEmail, setInputEmail] = useState(email);
+  const { user, isLoading: authLoading } = useAuth();
+
+  // Identity is the authenticated session's email — never a typed-in or stored
+  // address. Anyone who is not signed in as a mentor is sent to login.
+  const email = user?.user_type === 'mentor' ? user.email : "";
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setLocation('/login');
+    } else if (user.user_type !== 'mentor') {
+      setLocation('/');
+    }
+  }, [authLoading, user, setLocation]);
 
   const { data: mentor, isLoading: mentorLoading } = useQuery<Mentor | null>({
     queryKey: ["mentor", "email", email],
@@ -73,49 +80,17 @@ export default function MentorDashboard() {
     },
   });
 
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setEmail(inputEmail);
-    localStorage.setItem("mentorEmail", inputEmail);
-    setLocation(`/mentor-dashboard?email=${inputEmail}`);
-  };
-
   const handleToggleAvailability = () => {
     if (!mentor) return;
     toggleAvailabilityMutation.mutate(!mentor.is_available);
   };
 
-  if (!email) {
+  if (authLoading || !email) {
     return (
       <div className="min-h-screen py-12" dir={isRTL ? 'rtl' : 'ltr'}>
-        <div className="max-w-md mx-auto px-4">
-          <Card className="p-8">
-            <CardHeader>
-              <CardTitle>{t('mentorDashboard.accessDashboard')}</CardTitle>
-              <CardDescription>
-                {t('mentorDashboard.enterEmailDesc')}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">{t('mentorDashboard.enterEmail')}</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="mentor@example.com"
-                    value={inputEmail}
-                    onChange={(e) => setInputEmail(e.target.value)}
-                    data-testid="input-mentor-email"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" data-testid="button-access-dashboard">
-                  {t('mentorDashboard.accessBtn')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+        <div className="max-w-4xl mx-auto px-4 md:px-8">
+          <Skeleton className="h-10 w-48 mb-8" />
+          <Skeleton className="h-48" />
         </div>
       </div>
     );
@@ -150,15 +125,10 @@ export default function MentorDashboard() {
             <CardContent>
               <Button
                 variant="outline"
-                onClick={() => {
-                  localStorage.removeItem("mentorEmail");
-                  setEmail("");
-                  setInputEmail("");
-                  setLocation("/mentor-dashboard");
-                }}
+                onClick={() => setLocation("/mentor-onboarding")}
                 data-testid="button-try-again"
               >
-                {t('mentorDashboard.tryAgain')}
+                {t('mentorDashboard.completeProfile')}
               </Button>
             </CardContent>
           </Card>
@@ -190,16 +160,10 @@ export default function MentorDashboard() {
           <h1 className="text-3xl font-bold">{t('mentorDashboard.title')}</h1>
           <Button
             variant="outline"
-            onClick={() => {
-              localStorage.removeItem("mentorEmail");
-              setEmail("");
-              setInputEmail("");
-              setLocation("/mentor-dashboard");
-            }}
-            data-testid="button-change-email"
+            onClick={() => setLocation("/mentor-portal")}
+            data-testid="button-open-portal"
           >
-            <User className="w-4 h-4 mr-2" />
-            {t('mentorDashboard.changeEmail')}
+            {t('nav.mentorPortal')}
           </Button>
         </div>
 
