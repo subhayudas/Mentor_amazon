@@ -961,71 +961,9 @@ class DatabaseService {
     if (error) throw error;
     return data;
   }
-
-  // ==================== SEED DATABASE ====================
-
-  async seedDatabase(): Promise<{ seeded: boolean; mentorCount: number }> {
-    // Seed data is development-only and is not bundled for production.
-    if (!import.meta.env.DEV) {
-      return { seeded: false, mentorCount: 0 };
-    }
-    try {
-      // Check if mentors already exist
-      const { data: existingMentors, error: checkError } = await supabase
-        .from('mentors')
-        .select('id')
-        .limit(1);
-
-      if (checkError) throw checkError;
-
-      if (existingMentors && existingMentors.length > 0) {
-        return { seeded: false, mentorCount: 0 };
-      }
-
-      const { seedMentors } = await import('./seedMentors');
-
-      const now = new Date().toISOString();
-      const mentorsToInsert = seedMentors.map(mentor => ({
-        ...mentor,
-        id: generateId(),
-        average_rating: '0',
-        total_ratings: 0,
-        created_at: now,
-        updated_at: now,
-      }));
-
-      const { error: insertError } = await supabase
-        .from('mentors')
-        .insert(mentorsToInsert);
-
-      if (insertError) throw insertError;
-
-      return { seeded: true, mentorCount: seedMentors.length };
-    } catch (error) {
-      console.error('Error seeding database:', error);
-      throw error;
-    }
-  }
-
-  async checkAndSeed(): Promise<void> {
-    try {
-      const result = await this.seedDatabase();
-      if (result.seeded) {
-        console.log(`Database seeded with ${result.mentorCount} mentors`);
-      } else {
-        console.log('Database already has data, skipping seed');
-      }
-    } catch (error) {
-      console.error('Failed to seed database:', error);
-    }
-  }
 }
 
 // Export singleton instance
 export const db = new DatabaseService();
 
-// Auto-seed on module load (development only -- never in a deployed build)
-if (import.meta.env.DEV && typeof window !== 'undefined') {
-  db.checkAndSeed();
-}
 

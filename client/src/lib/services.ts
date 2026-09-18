@@ -462,23 +462,6 @@ export const uploadService = {
   },
 };
 
-// ==================== DATABASE SERVICES ====================
-
-export const databaseService = {
-  // Seed the database with initial mentor data
-  async seed(): Promise<{ seeded: boolean; mentorCount: number }> {
-    return db.seedDatabase();
-  },
-
-  // Check and seed if empty
-  async checkAndSeed(): Promise<void> {
-    return db.checkAndSeed();
-  },
-
-  // Direct access to database methods (for advanced use cases)
-  ...db,
-};
-
 // Export raw database instance for direct access
 export { db } from './database';
 
