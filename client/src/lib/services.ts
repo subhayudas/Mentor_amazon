@@ -4,9 +4,59 @@
  * These are designed to be used directly by React components via React Query
  */
 
-import { db, Mentor, Mentee, Booking, BookingNote, Notification, MentorTask, MentorAvailability, MentorDashboardStats } from './database';
+import {
+  db,
+  Mentor,
+  PublicMentor,
+  Mentee,
+  Booking,
+  BookingEvent,
+  BookingNote,
+  CompleteBookingOptions,
+  Notification,
+  MentorActivityLog,
+  MentorTask,
+  MentorAvailability,
+  MentorDashboardStats,
+} from './database';
 import { auth, AuthUser } from './auth';
 import { storage } from './storage';
+
+/**
+ * Notifications are written by the database (`notify_booking_event`), never by
+ * the client. A notification failure must not undo the action it announces,
+ * so this logs and moves on. Only the booking id and event name are logged.
+ */
+async function notify(bookingId: string, event: BookingEvent): Promise<void> {
+  try {
+    await db.notifyBookingEvent(bookingId, event);
+  } catch {
+    console.warn(`Notification "${event}" for booking ${bookingId} was not sent`);
+  }
+}
+
+/** Maps a legacy notification row shape onto the RPC event it corresponds to. */
+function bookingEventFor(type: Notification['type'], recipientType: Notification['recipient_type']): BookingEvent | null {
+  switch (type) {
+    case 'booking_request':
+    case 'booking_accepted':
+    case 'booking_rejected':
+    case 'booking_confirmed':
+    case 'booking_completed':
+    case 'booking_canceled':
+      return type;
+    case 'feedback_received':
+      return recipientType === 'mentor' ? 'feedback_received_by_mentor' : 'feedback_received_by_mentee';
+    default:
+      return null;
+  }
+}
+
+const STATUS_EVENTS: Partial<Record<Booking['status'], BookingEvent>> = {
+  confirmed: 'booking_confirmed',
+  completed: 'booking_completed',
+  canceled: 'booking_canceled',
+};
 
 // ==================== AUTH SERVICES ====================
 
@@ -23,19 +73,24 @@ export const authService = {
 // ==================== MENTOR SERVICES ====================
 
 export const mentorService = {
-  // Get all mentors with optional filters
-  async getAll(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<Mentor[]> {
+  // Public directory (mentors_public view: no contact or scheduling data)
+  async getAll(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<PublicMentor[]> {
     return db.getMentors(filters);
   },
 
-  // Get mentor by ID
-  async getById(id: string): Promise<Mentor | null> {
+  // Public profile by ID
+  async getById(id: string): Promise<PublicMentor | null> {
     return db.getMentor(id);
   },
 
-  // Get mentor by email
+  // Full row by email (RLS: only the owner or an admin gets it)
   async getByEmail(email: string): Promise<Mentor | null> {
     return db.getMentorByEmail(email);
+  },
+
+  // Full row for the signed-in mentor
+  async getOwn(): Promise<Mentor | null> {
+    return db.getOwnMentor();
   },
 
   // Create new mentor profile
@@ -106,14 +161,14 @@ export const mentorService = {
     return db.setMentorAvailability(mentorId, slots);
   },
 
-  // Get earnings
-  async getEarnings(mentorId: string) {
-    return db.getMentorEarnings(mentorId);
-  },
-
   // Get activity log
   async getActivityLog(mentorId: string, limit?: number) {
     return db.getMentorActivityLog(mentorId, limit);
+  },
+
+  // Log an activity entry (booking lifecycle entries are written by the database)
+  async logActivity(log: Omit<MentorActivityLog, 'id' | 'created_at'>): Promise<MentorActivityLog> {
+    return db.createActivityLog(log);
   },
 };
 
@@ -170,18 +225,24 @@ export const menteeService = {
 
   // Get or create mentee (useful for booking requests)
   async getOrCreate(email: string, name: string): Promise<Mentee> {
-    let mentee = await db.getMenteeByEmail(email);
-    if (!mentee) {
-      mentee = await db.createMentee({
-        name,
-        email,
-        user_type: 'individual',
-        timezone: 'UTC',
-        languages_spoken: ['English'],
-        areas_exploring: ['Career Development'],
-      });
-    }
-    return mentee;
+    const existing = await db.getMenteeByEmail(email);
+    if (existing) return existing;
+
+    // The caller may not be allowed to read the row (anonymous requester, or a
+    // mentor with no booking with this mentee yet), so resolve it server-side.
+    const id = await db.resolveMenteeIdForBooking(email, name);
+    const readable = await db.getMentee(id);
+    return readable ?? {
+      id,
+      name,
+      email,
+      user_type: 'individual',
+      verification_status: 'unverified',
+      timezone: 'UTC',
+      languages_spoken: ['English'],
+      areas_exploring: ['Career Development'],
+      created_at: new Date().toISOString(),
+    };
   },
 };
 
@@ -208,21 +269,9 @@ export const bookingService = {
     // Get or create mentee
     const mentee = await menteeService.getOrCreate(params.mentee_email, params.mentee_name);
     
-    // Create booking request
+    // Create booking request; the database notifies the mentor
     const booking = await db.createBookingRequest(params.mentor_id, mentee.id, params.goal);
-    
-    // Create notification for mentor
-    const mentor = await db.getMentor(params.mentor_id);
-    if (mentor) {
-      await db.createNotification({
-        recipient_email: mentor.email,
-        recipient_type: 'mentor',
-        type: 'booking_request',
-        title: 'New Booking Request',
-        message: `${mentee.name} has requested a mentorship session with you. Goal: ${params.goal}`,
-        booking_id: booking.id,
-      });
-    }
+    await notify(booking.id, 'booking_request');
     
     return booking;
   },
@@ -254,30 +303,7 @@ export const bookingService = {
       mentee_id: menteeId,
       status: 'pending',
     });
-    
-    // Create notifications
-    const mentor = await db.getMentor(params.mentor_id);
-    const mentee = await db.getMentee(menteeId);
-    
-    if (mentor && mentee) {
-      await db.createNotification({
-        recipient_email: mentor.email,
-        recipient_type: 'mentor',
-        type: 'booking_request',
-        title: 'New Session Booked',
-        message: `${mentee.name} has booked a mentorship session with you.`,
-        booking_id: booking.id,
-      });
-      
-      await db.createNotification({
-        recipient_email: mentee.email,
-        recipient_type: 'mentee',
-        type: 'booking_request',
-        title: 'Session Confirmed',
-        message: `Your session with ${mentor.name} has been booked successfully.`,
-        booking_id: booking.id,
-      });
-    }
+    await notify(booking.id, 'booking_request');
     
     return booking;
   },
@@ -289,22 +315,8 @@ export const bookingService = {
     if (booking.status !== 'pending') throw new Error('Booking is not in pending status');
     
     const acceptedBooking = await db.acceptBooking(bookingId);
-    
-    // Get mentor and mentee for notification
-    const mentor = await db.getMentor(booking.mentor_id);
-    const mentee = await db.getMentee(booking.mentee_id);
-    
-    if (mentor && mentee && acceptedBooking) {
-      const calLink = mentor.cal_link ? `https://cal.com/${mentor.cal_link}` : '';
-      await db.createNotification({
-        recipient_email: mentee.email,
-        recipient_type: 'mentee',
-        type: 'booking_accepted',
-        title: 'Booking Request Accepted',
-        message: `${mentor.name} has accepted your mentorship request.${calLink ? ` Schedule your session: ${calLink}` : ''}`,
-        booking_id: bookingId,
-      });
-    }
+    // The database builds the message (including the mentor's Cal.com link)
+    if (acceptedBooking) await notify(bookingId, 'booking_accepted');
     
     return acceptedBooking;
   },
@@ -316,28 +328,24 @@ export const bookingService = {
     if (booking.status !== 'pending') throw new Error('Booking is not in pending status');
     
     const declinedBooking = await db.declineBooking(bookingId);
-    
-    // Notify mentee
-    const mentor = await db.getMentor(booking.mentor_id);
-    const mentee = await db.getMentee(booking.mentee_id);
-    
-    if (mentor && mentee) {
-      await db.createNotification({
-        recipient_email: mentee.email,
-        recipient_type: 'mentee',
-        type: 'booking_rejected',
-        title: 'Booking Request Declined',
-        message: `${mentor.name} was unable to accept your mentorship request at this time.`,
-        booking_id: bookingId,
-      });
-    }
+    if (declinedBooking) await notify(bookingId, 'booking_rejected');
     
     return declinedBooking;
   },
 
-  // Update booking status
+  // Update booking status (notifies the other party for confirmed/completed/canceled)
   async updateStatus(bookingId: string, status: string): Promise<Booking | null> {
-    return db.updateBookingStatus(bookingId, status);
+    const updated = await db.updateBookingStatus(bookingId, status);
+    const event = STATUS_EVENTS[status as Booking['status']];
+    if (updated && event) await notify(bookingId, event);
+    return updated;
+  },
+
+  // Mark a session completed with its real duration (feeds volunteer hours)
+  async complete(bookingId: string, options: CompleteBookingOptions): Promise<Booking | null> {
+    const completed = await db.completeBooking(bookingId, options);
+    if (completed) await notify(bookingId, 'booking_completed');
+    return completed;
   },
 
   // Submit feedback from mentee to mentor
@@ -347,23 +355,9 @@ export const bookingService = {
     
     const updatedBooking = await db.submitMenteeFeedback(bookingId, rating, feedback);
     
-    // Update mentor's average rating
+    // Update mentor's average rating (a trigger does this too)
     await db.updateMentorRating(booking.mentor_id);
-    
-    // Create notification for mentor
-    const mentor = await db.getMentor(booking.mentor_id);
-    const mentee = await db.getMentee(booking.mentee_id);
-    
-    if (mentor && mentee) {
-      await db.createNotification({
-        recipient_email: mentor.email,
-        recipient_type: 'mentor',
-        type: 'feedback_received',
-        title: 'New Feedback Received',
-        message: `${mentee.name} has left you feedback and rated your session ${rating}/5 stars.${feedback ? ` Their feedback: "${feedback}"` : ''}`,
-        booking_id: bookingId,
-      });
-    }
+    if (updatedBooking) await notify(bookingId, 'feedback_received_by_mentor');
     
     return updatedBooking;
   },
@@ -374,21 +368,7 @@ export const bookingService = {
     if (!booking) throw new Error('Booking not found');
     
     const updatedBooking = await db.submitMentorFeedback(bookingId, rating, feedback);
-    
-    // Create notification for mentee
-    const mentor = await db.getMentor(booking.mentor_id);
-    const mentee = await db.getMentee(booking.mentee_id);
-    
-    if (mentor && mentee) {
-      await db.createNotification({
-        recipient_email: mentee.email,
-        recipient_type: 'mentee',
-        type: 'feedback_received',
-        title: 'New Feedback from Mentor',
-        message: `${mentor.name} has left you feedback and rated your session ${rating}/5 stars.${feedback ? ` Their feedback: "${feedback}"` : ''}`,
-        booking_id: bookingId,
-      });
-    }
+    if (updatedBooking) await notify(bookingId, 'feedback_received_by_mentee');
     
     return updatedBooking;
   },
@@ -437,9 +417,18 @@ export const notificationService = {
     return db.markAllNotificationsAsRead(email);
   },
 
-  // Create notification
-  async create(notification: Omit<Notification, 'id' | 'created_at' | 'is_read'>): Promise<Notification> {
-    return db.createNotification(notification);
+  /**
+   * Creates a notification for a booking event through the database RPC. The
+   * recipient and text are derived from the booking server-side, so only
+   * `type`, `recipient_type` and `booking_id` are used. Anything that is not a
+   * booking event (e.g. reminders) throws: there is no client write path.
+   */
+  async create(notification: Omit<Notification, 'id' | 'created_at' | 'is_read'>): Promise<string | null> {
+    const event = bookingEventFor(notification.type, notification.recipient_type);
+    if (!event || !notification.booking_id) {
+      throw new Error('Notifications can only be created for booking events');
+    }
+    return db.notifyBookingEvent(notification.booking_id, event);
   },
 };
 

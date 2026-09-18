@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
-import { Mentor } from "@shared/schema";
+import { mentorService } from "@/lib/services";
+import type { PublicMentor } from "@/lib/database";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Mail, Briefcase, Globe, Calendar, MapPin, Languages, Award } from "lucide-react";
+import { ArrowLeft, Briefcase, Globe, Languages, Award } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 export default function MentorProfileView() {
@@ -15,8 +16,10 @@ export default function MentorProfileView() {
   const [, params] = useRoute("/profile/mentor/:id");
   const mentorId = params?.id;
 
-  const { data: mentor, isLoading } = useQuery<Mentor>({
-    queryKey: ["/api/mentors", mentorId],
+  // Public view: reads the mentors_public projection, so no contact or scheduling data is shown here.
+  const { data: mentor, isLoading } = useQuery<PublicMentor | null>({
+    queryKey: ['mentor', mentorId],
+    queryFn: () => mentorService.getById(mentorId!),
     enabled: !!mentorId,
   });
 
@@ -158,13 +161,9 @@ export default function MentorProfileView() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{isArabic ? 'التواصل والتوفر' : 'Contact & Availability'}</CardTitle>
+            <CardTitle>{isArabic ? 'التوفر' : 'Availability'}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Mail className="w-5 h-5 text-muted-foreground" />
-              <span data-testid="text-mentor-email">{mentor.email}</span>
-            </div>
             <div className="flex items-center gap-3">
               <Globe className="w-5 h-5 text-muted-foreground" />
               <span data-testid="text-mentor-timezone">{mentor.timezone}</span>
@@ -179,20 +178,6 @@ export default function MentorProfileView() {
                 ))}
               </div>
             </div>
-            {mentor.cal_link && (
-              <div className="flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-muted-foreground" />
-                <a 
-                  href={`https://cal.com/${mentor.cal_link}`} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline"
-                  data-testid="link-calcom"
-                >
-                  View Cal.com Schedule
-                </a>
-              </div>
-            )}
           </CardContent>
         </Card>
 

@@ -1,12 +1,12 @@
 import { Link } from "wouter";
-import { Mentor } from "@shared/schema";
+import type { PublicMentor } from "@/lib/database";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowRight, Clock, Star, MapPin } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 interface MentorCardProps {
-  mentor: Mentor;
+  mentor: PublicMentor;
   accentColor?: 'pink' | 'mint' | 'purple' | 'coral' | 'blue';
 }
 

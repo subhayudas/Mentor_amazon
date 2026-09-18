@@ -6,11 +6,18 @@
 import { supabase } from './supabase';
 
 // Type definitions based on the database schema
+
+/**
+ * Full mentors row. Contact and scheduling fields are optional because RLS only
+ * returns them to the owning mentor and admins; public reads come back as
+ * `PublicMentor` (the `mentors_public` view), which is assignable to `Mentor`.
+ */
 export interface Mentor {
   id: string;
   name: string;
   name_ar?: string;
-  email: string;
+  /** Owner/admin only. */
+  email?: string;
   company?: string;
   company_ar?: string;
   position?: string;
@@ -20,8 +27,10 @@ export interface Mentor {
   photo_url?: string;
   bio: string;
   bio_ar?: string;
+  /** Owner/admin only. */
   linkedin_url?: string;
-  cal_link: string;
+  /** Owner/admin only; mentees receive it per booking via `mentor_scheduling_links`. */
+  cal_link?: string;
   cal_15min?: string;
   cal_30min?: string;
   cal_60min?: string;
@@ -30,16 +39,59 @@ export interface Mentor {
   industries: string[];
   industries_ar?: string[];
   languages_spoken: string[];
-  comms_owner: 'exec' | 'assistant';
+  /** Owner/admin only. */
+  comms_owner?: 'exec' | 'assistant';
+  /** Owner/admin only. */
   assistant_email?: string;
   mentorship_preference?: 'ongoing' | 'rotating' | 'either';
+  /** Owner/admin only. */
   why_joined?: string;
   is_available: boolean;
   average_rating?: string;
   total_ratings?: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
+
+/** Columns of the `mentors_public` view: everything a visitor may see about a mentor. */
+export type PublicMentor = Pick<
+  Mentor,
+  | 'id' | 'name' | 'name_ar' | 'company' | 'company_ar' | 'position' | 'position_ar'
+  | 'timezone' | 'country' | 'photo_url' | 'bio' | 'bio_ar' | 'expertise' | 'expertise_ar'
+  | 'industries' | 'industries_ar' | 'languages_spoken' | 'mentorship_preference'
+  | 'is_available' | 'average_rating' | 'total_ratings' | 'created_at'
+>;
+
+/** Row of the `mentor_scheduling_links` view (only the caller's schedulable bookings). */
+export interface MentorSchedulingLinks {
+  booking_id: string;
+  mentor_id: string;
+  cal_link?: string;
+  cal_15min?: string;
+  cal_30min?: string;
+  cal_60min?: string;
+}
+
+/** Events accepted by the `notify_booking_event` RPC, which derives recipient and text. */
+export type BookingEvent =
+  | 'booking_request'
+  | 'booking_accepted'
+  | 'booking_rejected'
+  | 'booking_confirmed'
+  | 'booking_completed'
+  | 'booking_canceled'
+  | 'feedback_received_by_mentor'
+  | 'feedback_received_by_mentee';
+
+export interface CompleteBookingOptions {
+  /** Actual session length in minutes (1..600); feeds volunteer hours. */
+  sessionDurationMinutes: number;
+  /** Reporting country; the database falls back to the mentor's country when omitted. */
+  country?: string;
+}
+
+/** `users` row without secrets, as returned to admins. */
+export type UserSummary = Pick<User, 'id' | 'email' | 'user_type' | 'profile_id' | 'amazon_alias' | 'is_verified' | 'created_at'>;
 
 export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
@@ -218,12 +270,35 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Whether a Supabase session is present (local check, no network). Anonymous
+ * visitors have no grant on `mentors`, so PostgREST embeds of it must be
+ * skipped for them.
+ */
+async function hasSession(): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  return !!data.session;
+}
+
+const SCHEDULABLE_STATUSES = new Set<Booking['status']>(['accepted', 'confirmed', 'completed']);
+
+/**
+ * Case-insensitive exact match for an email column. RLS compares emails with
+ * lower(), Supabase Auth lowercases sign-in emails, but profile rows keep the
+ * case typed at registration, so lookups must ignore case too. LIKE wildcards
+ * in the value are escaped so this stays an exact match.
+ */
+function escapeLikePattern(value: string): string {
+  return value.trim().replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 // Database Service Class
 class DatabaseService {
   // ==================== MENTORS ====================
   
-  async getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<Mentor[]> {
-    let query = supabase.from('mentors').select('*');
+  /** Public directory read. Goes through the `mentors_public` view (no contact data). */
+  async getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<PublicMentor[]> {
+    let query = supabase.from('mentors_public').select('*');
 
     if (filters?.search) {
       const searchPattern = `%${filters.search}%`;
@@ -247,9 +322,10 @@ class DatabaseService {
     return data || [];
   }
 
-  async getMentor(id: string): Promise<Mentor | null> {
+  /** Public profile read (directory + /mentor/:id). Use `getMentorByEmail`/`getOwnMentor` for full rows. */
+  async getMentor(id: string): Promise<PublicMentor | null> {
     const { data, error } = await supabase
-      .from('mentors')
+      .from('mentors_public')
       .select('*')
       .eq('id', id)
       .single();
@@ -258,15 +334,23 @@ class DatabaseService {
     return data;
   }
 
+  /** Full row; RLS only returns it to the owning mentor (session email) or an admin. */
   async getMentorByEmail(email: string): Promise<Mentor | null> {
     const { data, error } = await supabase
       .from('mentors')
       .select('*')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .single();
     
     if (error && error.code !== 'PGRST116') throw error;
     return data;
+  }
+
+  /** Full row for the signed-in mentor, or null when there is no session / no profile yet. */
+  async getOwnMentor(): Promise<Mentor | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) return null;
+    return this.getMentorByEmail(user.email);
   }
 
   async createMentor(mentor: Omit<Mentor, 'id' | 'created_at' | 'updated_at' | 'average_rating' | 'total_ratings'>): Promise<Mentor> {
@@ -307,25 +391,89 @@ class DatabaseService {
     return this.updateMentor(id, { is_available: isAvailable });
   }
 
+  /**
+   * Recomputes average_rating/total_ratings from all of the mentor's bookings.
+   * A database trigger already does this whenever a rating changes; this is a
+   * best-effort explicit call (a mentee cannot update the mentors table).
+   */
   async updateMentorRating(mentorId: string): Promise<void> {
-    const { data: bookings } = await supabase
-      .from('bookings')
-      .select('mentee_rating')
-      .eq('mentor_id', mentorId)
-      .not('mentee_rating', 'is', null);
+    const { error } = await supabase.rpc('recompute_mentor_rating', { p_mentor_id: mentorId });
+    if (error) console.warn('Mentor rating recompute deferred to the database trigger');
+  }
 
-    if (!bookings || bookings.length === 0) return;
+  // ==================== ADMIN ====================
+  // Plain reads/writes; RLS (`public.is_admin()`) is what authorizes them.
 
-    const totalRating = bookings.reduce((sum, b) => sum + (b.mentee_rating || 0), 0);
-    const avgRating = totalRating / bookings.length;
+  async getUsers(): Promise<UserSummary[]> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, user_type, profile_id, amazon_alias, is_verified, created_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
 
-    await supabase
-      .from('mentors')
-      .update({
-        average_rating: avgRating.toFixed(2),
-        total_ratings: bookings.length,
-      })
-      .eq('id', mentorId);
+  async getApprovedUsers(): Promise<ApprovedUser[]> {
+    const { data, error } = await supabase
+      .from('approved_users')
+      .select('*')
+      .order('approved_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async getAccessRequests(status?: AccessRequest['status']): Promise<AccessRequest[]> {
+    let query = supabase.from('access_requests').select('*');
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query.order('requested_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Insert or update the allow-list row for an alias (unique on amazon_alias, stored lowercase). */
+  async upsertApprovedUser(row: Omit<ApprovedUser, 'id' | 'approved_at'> & { id?: string; approved_at?: string }): Promise<ApprovedUser> {
+    const payload = {
+      ...row,
+      id: row.id || generateId(),
+      amazon_alias: row.amazon_alias.trim().toLowerCase(),
+      email: row.email?.trim().toLowerCase() || null,
+      approved_at: row.approved_at || new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from('approved_users')
+      .upsert(payload, { onConflict: 'amazon_alias' })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateAccessRequest(id: string, updates: Partial<AccessRequest>): Promise<AccessRequest | null> {
+    const { data, error } = await supabase
+      .from('access_requests')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  }
+
+  /**
+   * Admin-only (enforced by a database trigger). `note` is accepted for API
+   * stability but not persisted: mentees has no admin-note column yet.
+   */
+  async setMenteeVerification(menteeId: string, status: VerificationStatus, _note?: string): Promise<Mentee | null> {
+    return this.updateMentee(menteeId, { verification_status: status });
+  }
+
+  /** Hides the mentor from the directory and blocks new booking requests. */
+  async deactivateMentor(id: string): Promise<Mentor | null> {
+    return this.updateMentor(id, { is_available: false });
+  }
+
+  async getAllBookingsForAdmin(): Promise<Booking[]> {
+    return this.getBookings();
   }
 
   // ==================== MENTEES ====================
@@ -351,7 +499,7 @@ class DatabaseService {
     const { data, error } = await supabase
       .from('mentees')
       .select('*')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .single();
     
     if (error && error.code !== 'PGRST116') throw error;
@@ -359,20 +507,31 @@ class DatabaseService {
   }
 
   async createMentee(mentee: Omit<Mentee, 'id' | 'created_at'>): Promise<Mentee> {
-    const id = generateId();
-    const now = new Date().toISOString();
-    
-    const { data, error } = await supabase
-      .from('mentees')
-      .insert({
-        ...mentee,
-        id,
-        created_at: now,
-      })
-      .select()
-      .single();
+    const row: Mentee = {
+      ...mentee,
+      // Organisations queue for review; individuals are never verified.
+      verification_status: mentee.verification_status ?? (mentee.user_type === 'organization' ? 'pending' : 'unverified'),
+      id: generateId(),
+      created_at: new Date().toISOString(),
+    };
 
+    // No RETURNING: an anonymous requester has no SELECT policy on mentees, so
+    // `.select()` would fail after a successful insert. The row we sent is complete.
+    const { error } = await supabase.from('mentees').insert(row);
     if (error) throw error;
+    return row;
+  }
+
+  /**
+   * Resolves (or creates) the mentee row for a booking request and returns only
+   * its id, via a SECURITY DEFINER RPC. Needed when the caller cannot read the
+   * row: anonymous returning requesters, or a mentor recording a session with a
+   * mentee they have no booking with yet.
+   */
+  async resolveMenteeIdForBooking(email: string, name: string): Promise<string> {
+    const { data, error } = await supabase.rpc('get_or_create_mentee', { p_email: email.trim(), p_name: name.trim() });
+    if (error) throw error;
+    if (typeof data !== 'string' || !data) throw new Error('Could not resolve mentee');
     return data;
   }
 
@@ -429,44 +588,32 @@ class DatabaseService {
     return data;
   }
 
-  async createBooking(booking: Omit<Booking, 'id' | 'created_at'>): Promise<Booking> {
-    const id = generateId();
-    const now = new Date().toISOString();
-    
-    const { data, error } = await supabase
-      .from('bookings')
-      .insert({
-        ...booking,
-        id,
-        clicked_at: now,
-        created_at: now,
-      })
-      .select()
-      .single();
-
+  /**
+   * Inserts a booking and echoes the row we sent. No RETURNING: the caller may
+   * not be a party that can SELECT it (anonymous requester, or a signed-in user
+   * requesting for another email). The database stamps created_at itself and
+   * enforces status/mentor availability/rate limits.
+   */
+  private async insertBooking(row: Booking): Promise<Booking> {
+    const { error } = await supabase.from('bookings').insert(row);
     if (error) throw error;
-    return data;
+    return row;
+  }
+
+  async createBooking(booking: Omit<Booking, 'id' | 'created_at'>): Promise<Booking> {
+    const now = new Date().toISOString();
+    return this.insertBooking({ ...booking, id: generateId(), clicked_at: now, created_at: now });
   }
 
   async createBookingRequest(mentorId: string, menteeId: string, goal: string): Promise<Booking> {
-    const id = generateId();
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .insert({
-        id,
-        mentor_id: mentorId,
-        mentee_id: menteeId,
-        goal,
-        status: 'pending',
-        created_at: now,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return this.insertBooking({
+      id: generateId(),
+      mentor_id: mentorId,
+      mentee_id: menteeId,
+      goal,
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    });
   }
 
   async getMentorBookings(mentorId: string): Promise<Booking[]> {
@@ -495,10 +642,49 @@ class DatabaseService {
     return data || [];
   }
 
+  /**
+   * Attaches `mentor` to each of a mentee's bookings. The `mentors` embed only
+   * resolves for owners/admins under RLS, so the public profile comes from
+   * `mentors_public` and, for accepted/confirmed/completed bookings, the Cal.com
+   * links from `mentor_scheduling_links` (filtered server-side to the caller).
+   */
+  private async attachMentorsForMentee<T extends Booking & { mentor?: Mentor | null }>(rows: T[]): Promise<(Omit<T, 'mentor'> & { mentor?: Mentor })[]> {
+    if (rows.length === 0) return [];
+    const signedIn = await hasSession();
+    const mentorIds = Array.from(new Set(rows.map((r) => r.mentor_id)));
+    const schedulableIds = rows.filter((r) => SCHEDULABLE_STATUSES.has(r.status)).map((r) => r.id);
+
+    const [publicRes, linksRes] = await Promise.all([
+      supabase.from('mentors_public').select('*').in('id', mentorIds),
+      signedIn && schedulableIds.length > 0
+        ? supabase.from('mentor_scheduling_links').select('*').in('booking_id', schedulableIds)
+        : Promise.resolve({ data: [] as MentorSchedulingLinks[], error: null }),
+    ]);
+    if (publicRes.error) throw publicRes.error;
+    if (linksRes.error) throw linksRes.error;
+
+    const publicById = new Map<string, PublicMentor>((publicRes.data || []).map((m: PublicMentor) => [m.id, m]));
+    const linksByBooking = new Map<string, MentorSchedulingLinks>((linksRes.data || []).map((l: MentorSchedulingLinks) => [l.booking_id, l]));
+
+    return rows.map((row) => {
+      const { mentor: embedded, ...rest } = row;
+      const pub = publicById.get(row.mentor_id);
+      if (!embedded && !pub) return rest;
+      const links = linksByBooking.get(row.id);
+      const mentor: Mentor = {
+        ...(pub as Mentor),
+        ...(embedded || {}),
+        ...(links ? { cal_link: links.cal_link, cal_15min: links.cal_15min, cal_30min: links.cal_30min, cal_60min: links.cal_60min } : {}),
+      };
+      return { ...rest, mentor };
+    });
+  }
+
   async getMenteeBookings(menteeId: string, status?: string): Promise<(Booking & { mentor?: Mentor })[]> {
+    const embed = (await hasSession()) ? '*, mentor:mentors(*)' : '*';
     let query = supabase
       .from('bookings')
-      .select('*, mentor:mentors(*)')
+      .select(embed)
       .eq('mentee_id', menteeId);
 
     if (status) {
@@ -507,7 +693,8 @@ class DatabaseService {
 
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    // supabase-js cannot type a select string chosen at runtime
+    return this.attachMentorsForMentee((data || []) as unknown as (Booking & { mentor?: Mentor | null })[]);
   }
 
   async getPendingBookingsForMentor(mentorId: string): Promise<(Booking & { mentee?: Mentee })[]> {
@@ -520,6 +707,31 @@ class DatabaseService {
 
     if (error) throw error;
     return data || [];
+  }
+
+  /** Marks a session completed with its real duration (mentor or admin only, enforced by a trigger). */
+  async completeBooking(bookingId: string, options: CompleteBookingOptions): Promise<Booking | null> {
+    const minutes = Math.round(Number(options.sessionDurationMinutes));
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 600) {
+      throw new RangeError('Session duration must be between 1 and 600 minutes');
+    }
+    const update: Partial<Booking> = {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      session_duration_minutes: minutes,
+    };
+    const country = options.country?.trim();
+    if (country) update.country = country;
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .update(update)
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
   }
 
   async updateBookingStatus(bookingId: string, status: string): Promise<Booking | null> {
@@ -612,15 +824,16 @@ class DatabaseService {
   }
 
   async getMenteeFeedback(menteeId: string): Promise<(Booking & { mentor?: Mentor })[]> {
+    const embed = (await hasSession()) ? '*, mentor:mentors(*)' : '*';
     const { data, error } = await supabase
       .from('bookings')
-      .select('*, mentor:mentors(*)')
+      .select(embed)
       .eq('mentee_id', menteeId)
       .not('mentor_rating', 'is', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return this.attachMentorsForMentee((data || []) as unknown as (Booking & { mentor?: Mentor | null })[]);
   }
 
   async findAndConfirmAcceptedBooking(
@@ -716,11 +929,12 @@ class DatabaseService {
 
   // ==================== NOTIFICATIONS ====================
 
+  // Recipients are stored lowercase by notify_booking_event(); session emails are lowercase too.
   async getNotifications(email: string): Promise<Notification[]> {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .eq('recipient_email', email)
+      .eq('recipient_email', email.toLowerCase())
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -731,30 +945,24 @@ class DatabaseService {
     const { count, error } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
-      .eq('recipient_email', email)
+      .eq('recipient_email', email.toLowerCase())
       .eq('is_read', false);
 
     if (error) throw error;
     return count || 0;
   }
 
-  async createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'is_read'>): Promise<Notification> {
-    const id = generateId();
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        ...notification,
-        id,
-        is_read: false,
-        created_at: now,
-      })
-      .select()
-      .single();
-
+  /**
+   * The only way notifications are created. The SECURITY DEFINER RPC loads the
+   * booking, checks the caller is a party (anonymous callers may only announce a
+   * request they created in the last 10 minutes), verifies the event matches the
+   * booking's state and writes the recipient/title/message itself. Returns the
+   * notification id (an existing id when the same event was sent recently).
+   */
+  async notifyBookingEvent(bookingId: string, event: BookingEvent): Promise<string | null> {
+    const { data, error } = await supabase.rpc('notify_booking_event', { p_booking_id: bookingId, p_event: event });
     if (error) throw error;
-    return data;
+    return typeof data === 'string' ? data : null;
   }
 
   async markNotificationAsRead(id: string): Promise<Notification | null> {
@@ -773,7 +981,7 @@ class DatabaseService {
     await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('recipient_email', email);
+      .eq('recipient_email', email.toLowerCase());
   }
 
   // ==================== USERS ====================
@@ -782,7 +990,7 @@ class DatabaseService {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .single();
 
     if (error && error.code !== 'PGRST116') throw error;
@@ -956,6 +1164,10 @@ class DatabaseService {
 
   // ==================== MENTOR EARNINGS ====================
 
+  /**
+   * @deprecated The Amazon programme reports volunteer hours, not earnings; no UI
+   * reads this. Rows can only be written by the admin-only `record_mentor_earning` RPC.
+   */
   async getMentorEarnings(mentorId: string): Promise<MentorEarnings[]> {
     const { data, error } = await supabase
       .from('mentor_earnings')
@@ -981,22 +1193,22 @@ class DatabaseService {
     return data || [];
   }
 
+  /**
+   * Writes an activity entry through the `log_mentor_activity` RPC, which only
+   * accepts the mentor themself, a party to the referenced booking, or an admin.
+   * Booking lifecycle entries are written automatically by a database trigger.
+   */
   async createActivityLog(log: Omit<MentorActivityLog, 'id' | 'created_at'>): Promise<MentorActivityLog> {
-    const id = generateId();
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('mentor_activity_log')
-      .insert({
-        ...log,
-        id,
-        created_at: now,
-      })
-      .select()
-      .single();
-
+    const { data, error } = await supabase.rpc('log_mentor_activity', {
+      p_mentor_id: log.mentor_id,
+      p_activity_type: log.activity_type,
+      p_title: log.title,
+      p_description: log.description ?? null,
+      p_booking_id: log.booking_id ?? null,
+      p_mentee_id: log.mentee_id ?? null,
+    });
     if (error) throw error;
-    return data;
+    return { ...log, id: String(data), created_at: new Date().toISOString() };
   }
 }
 

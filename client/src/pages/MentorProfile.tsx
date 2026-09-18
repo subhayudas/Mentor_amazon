@@ -2,7 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute } from "wouter";
 import { useState } from "react";
 import { mentorService, bookingService } from "@/lib/services";
-import type { Mentor } from "@/lib/database";
+import type { PublicMentor } from "@/lib/database";
 import { queryClient } from "@/lib/queryClient";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,7 @@ export default function MentorProfile() {
   const { toast } = useToast();
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   
-  const { data: mentor, isLoading } = useQuery<Mentor | null>({
+  const { data: mentor, isLoading } = useQuery<PublicMentor | null>({
     queryKey: ['mentor', mentorId],
     queryFn: () => mentorService.getById(mentorId!),
     enabled: !!mentorId,
