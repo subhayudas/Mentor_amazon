@@ -1,12 +1,14 @@
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { authService } from "@/lib/services";
 import { clearRoleStorage } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
+import { safeNext, ssoErrorKey, ssoLoginHref } from "@/lib/ssoClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Form,
@@ -20,7 +22,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Mail, Lock } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, Mail, Lock, AlertCircle, ChevronDown, ShieldCheck } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -33,7 +37,16 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export default function Login() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
+  const searchString = useSearch();
   const { toast } = useToast();
+  const [passwordOpen, setPasswordOpen] = useState(false);
+
+  // api/auth/callback/amazon sends failures back here as ?error=sso_* (+ &reason= on integ).
+  const searchParams = new URLSearchParams(searchString);
+  const ssoErrorMessageKey = ssoErrorKey(searchParams.get("error"));
+  const ssoReason = searchParams.get("reason");
+  // RouteGuard / MentorOnboarding send anonymous visitors here with ?next=<same-origin path>.
+  const nextPath = safeNext(searchParams.get("next"), "");
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -69,15 +82,19 @@ export default function Login() {
       } else {
         clearRoleStorage();
       }
-      
+
       // Dispatch event to notify Navigation component of user registration
       window.dispatchEvent(new CustomEvent("userRegistered"));
-      
+
       queryClient.clear();
       toast({
         title: t("auth.loginSuccess"),
         description: t("auth.welcomeBack"),
       });
+      if (nextPath) {
+        setLocation(nextPath);
+        return;
+      }
       if (data.user_type === 'mentor') {
         setLocation(data.profile_id ? "/mentor-portal" : "/mentor-onboarding");
       } else if (data.user_type === 'admin') {
@@ -111,97 +128,150 @@ export default function Login() {
               {t("auth.loginDescription")}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-[#0F1111]">
-                        {t("auth.email")}
-                      </FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#565959]" />
-                          <Input
-                            {...field}
-                            type="email"
-                            placeholder={t("auth.emailPlaceholder")}
-                            className="pl-10 border-[#D5D9D9] rounded-md focus:border-[#FF9900] focus:ring-[#FF9900]"
-                            data-testid="input-email"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+          <CardContent className="space-y-5">
+            {ssoErrorMessageKey && (
+              <Alert variant="destructive" className="border-[#C40000]/40 text-[#C40000]" data-testid="alert-sso-error">
+                {/* Icon inside the title (not a direct child) so the Alert's physical left-4 rule does not fight RTL. */}
+                <AlertTitle className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                  {t("auth.sso.errorTitle")}
+                </AlertTitle>
+                <AlertDescription className="text-[#0F1111]">
+                  <p>{t(ssoErrorMessageKey)}</p>
+                  {ssoReason && (
+                    <p className="mt-1 font-mono text-xs text-[#565959]" data-testid="text-sso-error-reason">
+                      {t("auth.sso.errorReference", { reason: ssoReason })}
+                    </p>
                   )}
-                />
+                </AlertDescription>
+              </Alert>
+            )}
 
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-sm font-medium text-[#0F1111]">
-                        {t("auth.password")}
-                      </FormLabel>
-                      <FormControl>
-                        <div className="relative">
-                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#565959]" />
-                          <Input
-                            {...field}
-                            type="password"
-                            placeholder={t("auth.passwordPlaceholder")}
-                            className="pl-10 border-[#D5D9D9] rounded-md focus:border-[#FF9900] focus:ring-[#FF9900]"
-                            data-testid="input-password"
-                          />
-                        </div>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+            <div className="space-y-2">
+              <a
+                href={ssoLoginHref(nextPath)}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[#FF9900] px-6 py-3 text-sm font-semibold text-white hover:bg-[#E88B00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9900] focus-visible:ring-offset-2"
+                data-testid="link-amazon-sso"
+              >
+                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                {t("auth.sso.signInWithAmazon")}
+              </a>
+              <p className="text-center text-xs text-[#565959]">{t("auth.sso.amazonHint")}</p>
+            </div>
 
-                <FormField
-                  control={form.control}
-                  name="rememberMe"
-                  render={({ field }) => (
-                    <FormItem className="flex items-center space-x-2">
-                      <FormControl>
-                        <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          data-testid="checkbox-remember-me"
-                        />
-                      </FormControl>
-                      <FormLabel className="text-sm font-normal cursor-pointer">
-                        {t("auth.rememberMe")}
-                      </FormLabel>
-                    </FormItem>
-                  )}
-                />
+            <div className="flex items-center gap-3" aria-hidden="true">
+              <span className="h-px flex-1 bg-[#D5D9D9]" />
+              <span className="text-xs uppercase tracking-wide text-[#565959]">{t("auth.sso.or")}</span>
+              <span className="h-px flex-1 bg-[#D5D9D9]" />
+            </div>
 
-                <Button
-                  type="submit"
-                  className="w-full bg-[#FF9900] hover:bg-[#E88B00] text-white font-semibold rounded-md px-6 py-3"
-                  disabled={loginMutation.isPending}
-                  data-testid="button-login"
+            <Collapsible open={passwordOpen} onOpenChange={setPasswordOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-md border border-[#D5D9D9] px-4 py-2.5 text-sm font-medium text-[#0F1111] hover:bg-[#F7F8F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9900] focus-visible:ring-offset-2"
+                  data-testid="button-toggle-password-login"
                 >
-                  {loginMutation.isPending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("auth.loggingIn")}
-                    </>
-                  ) : (
-                    t("auth.loginButton")
-                  )}
-                </Button>
-              </form>
-            </Form>
+                  <span className="text-start">{t("auth.sso.passwordDisclosure")}</span>
+                  <ChevronDown
+                    className={`h-4 w-4 shrink-0 text-[#565959] transition-transform ${passwordOpen ? "rotate-180" : ""}`}
+                    aria-hidden="true"
+                  />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-4">
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-[#0F1111]">
+                            {t("auth.email")}
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Mail className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#565959]" />
+                              <Input
+                                {...field}
+                                type="email"
+                                placeholder={t("auth.emailPlaceholder")}
+                                className="ps-10 border-[#D5D9D9] rounded-md focus:border-[#FF9900] focus:ring-[#FF9900]"
+                                data-testid="input-email"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-            <div className="mt-6 text-center space-y-2">
+                    <FormField
+                      control={form.control}
+                      name="password"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-medium text-[#0F1111]">
+                            {t("auth.password")}
+                          </FormLabel>
+                          <FormControl>
+                            <div className="relative">
+                              <Lock className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#565959]" />
+                              <Input
+                                {...field}
+                                type="password"
+                                placeholder={t("auth.passwordPlaceholder")}
+                                className="ps-10 border-[#D5D9D9] rounded-md focus:border-[#FF9900] focus:ring-[#FF9900]"
+                                data-testid="input-password"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="rememberMe"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                              data-testid="checkbox-remember-me"
+                            />
+                          </FormControl>
+                          <FormLabel className="text-sm font-normal cursor-pointer">
+                            {t("auth.rememberMe")}
+                          </FormLabel>
+                        </FormItem>
+                      )}
+                    />
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-[#FF9900] hover:bg-[#E88B00] text-white font-semibold rounded-md px-6 py-3"
+                      disabled={loginMutation.isPending}
+                      data-testid="button-login"
+                    >
+                      {loginMutation.isPending ? (
+                        <>
+                          <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                          {t("auth.loggingIn")}
+                        </>
+                      ) : (
+                        t("auth.loginButton")
+                      )}
+                    </Button>
+                  </form>
+                </Form>
+              </CollapsibleContent>
+            </Collapsible>
+
+            <div className="text-center space-y-2">
               <Link
                 href="/forgot-password"
                 className="text-sm text-[#0066C0] hover:text-[#C45500] hover:underline"
