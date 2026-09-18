@@ -55,9 +55,11 @@ export default function MentorPortal() {
   const isMentorSession = !!user && user.user_type === 'mentor';
   const mentorId = isMentorSession ? user.profile_id : undefined;
 
+  // Own full row, read by the session email — the same predicate RLS uses
+  // for mentor ownership, so a spoofed id can never resolve to another mentor.
   const { data: mentor, isLoading: mentorLoading } = useQuery<Mentor | null>({
-    queryKey: ['mentor', mentorId],
-    queryFn: () => mentorService.getById(mentorId!),
+    queryKey: ['mentor', 'email', user?.email],
+    queryFn: () => mentorService.getByEmail(user!.email),
     enabled: !!mentorId,
   });
 

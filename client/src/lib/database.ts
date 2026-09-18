@@ -205,8 +205,10 @@ export interface MentorDashboardStats {
   totalSessions: number;
   completedSessions: number;
   averageRating: number;
-  totalEarnings: number;
-  monthlyEarnings: number;
+  /** Sum of session_duration_minutes across completed sessions (volunteer hours = /60). */
+  volunteerMinutes: number;
+  /** Volunteer minutes in the current calendar month. */
+  monthlyVolunteerMinutes: number;
   pendingBookings: number;
   feedbackCount: number;
 }
@@ -836,25 +838,21 @@ class DatabaseService {
       : 0;
     const feedbackCount = ratingsData.length;
 
-    const { data: earnings } = await supabase
-      .from('mentor_earnings')
-      .select('*')
-      .eq('mentor_id', mentorId);
-
-    const earningsData = earnings || [];
-    const totalEarnings = earningsData.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    // Amazon mentors are volunteers: the programme reports hours, not earnings.
+    const completed = allBookings.filter(b => b.status === 'completed');
+    const volunteerMinutes = completed.reduce((sum, b) => sum + (b.session_duration_minutes || 0), 0);
 
     const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthlyEarnings = earningsData
-      .filter(e => e.payout_month === currentMonth)
-      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const monthlyVolunteerMinutes = completed
+      .filter(b => (b.completed_at || b.scheduled_at || '').slice(0, 7) === currentMonth)
+      .reduce((sum, b) => sum + (b.session_duration_minutes || 0), 0);
 
     return {
       totalSessions,
       completedSessions,
       averageRating: Math.round(averageRating * 100) / 100,
-      totalEarnings,
-      monthlyEarnings,
+      volunteerMinutes,
+      monthlyVolunteerMinutes,
       pendingBookings,
       feedbackCount,
     };
