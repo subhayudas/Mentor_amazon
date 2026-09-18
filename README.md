@@ -32,9 +32,11 @@ Visit `http://localhost:5173`
 
 ## 📚 Documentation
 
-- **[Complete Setup Guide](./CLIENT_ONLY_SETUP.md)** - Detailed setup instructions, Supabase configuration, and RLS policies
+- **[Supabase setup](./supabase_setup_v2.sql)** - Schema additions, views, and Row Level Security policies (v2; `supabase_setup.sql` is the superseded v1 kept for reference)
 - **[Design Guidelines](./design_guidelines.md)** - UI/UX design system and component guidelines
-- **[Backend Services](./BACKEND_SERVICES.md)** - Original backend documentation (legacy)
+- **[Testing checklist](./TESTING.md)** - Smoke tests to run against every deployment
+- **[Security notes](./SECURITY.md)** - Data handling, RLS model, and security-review prep
+- **[Legacy server](./server-legacy/README.md)** - Original Express backend, not deployed
 
 ## 🏗️ Architecture
 
@@ -54,7 +56,7 @@ Visit `http://localhost:5173`
 - ✅ Set availability and preferences
 - ✅ Accept/decline booking requests
 - ✅ Integrated Cal.com scheduling
-- ✅ Track sessions and earnings
+- ✅ Track sessions and volunteer hours
 - ✅ Provide and receive feedback
 - ✅ Task management dashboard
 
@@ -103,8 +105,9 @@ MentorConnect/
 │   │   ├── context/       # React contexts
 │   │   └── hooks/         # Custom hooks
 │   └── public/            # Static assets
-├── shared/                # Shared types
-└── attached_assets/       # Media files
+├── api/                   # Vercel serverless functions (Amazon SSO)
+├── shared/                # Shared types (drizzle schema)
+└── server-legacy/         # Original Express backend (not deployed)
 ```
 
 ## 🚢 Deployment
@@ -153,8 +156,8 @@ dist
 ### 2. Run Database Migrations
 Use the SQL editor in Supabase dashboard to create tables (schema in `shared/schema.ts`)
 
-### 3. Enable Row Level Security
-See [CLIENT_ONLY_SETUP.md](./CLIENT_ONLY_SETUP.md) for RLS policy examples
+### 3. Apply schema additions and Row Level Security
+Run `supabase_setup_v2.sql` in the SQL editor (it is idempotent and supersedes `supabase_setup.sql`)
 
 ### 4. Create Storage Bucket
 - Create a bucket named `uploads`
@@ -189,5 +192,5 @@ This project is licensed under the MIT License.
 
 ---
 
-**Need Help?** Check out [CLIENT_ONLY_SETUP.md](./CLIENT_ONLY_SETUP.md) for detailed setup instructions.
+**Need Help?** See `supabase_setup_v2.sql` for the database setup and `TESTING.md` for the deployment smoke tests.
 

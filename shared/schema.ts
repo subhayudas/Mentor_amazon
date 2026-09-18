@@ -1,4 +1,4 @@
-import { pgTable, text, varchar, timestamp, integer, decimal, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, decimal, boolean, jsonb } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -166,6 +166,54 @@ export const usersRelations = relations(users, ({ one }) => ({
     references: [mentees.id],
   }),
 }));
+
+/**
+ * Access control for Amazon SSO users.
+ *
+ * Amazon restricts who can reach the app via internal groups, but the app
+ * still gates gracefully: an amazonAlias must appear in approved_users
+ * (active) before a session is issued. Everyone else lands on a
+ * "request access" screen and a row is written to access_requests for an
+ * admin to approve or reject from /admin.
+ */
+export const approvedUsers = pgTable("approved_users", {
+  id: varchar("id").primaryKey(),
+  amazon_alias: text("amazon_alias").notNull().unique(),
+  email: text("email"),
+  role: text("role", { enum: ["mentor", "admin"] }).notNull().default("mentor"),
+  /** Optional link to a pre-created mentors row; otherwise the mentor completes onboarding. */
+  mentor_id: varchar("mentor_id").references(() => mentors.id),
+  is_active: boolean("is_active").default(true).notNull(),
+  approved_by: text("approved_by"),
+  approved_at: timestamp("approved_at", { mode: "string" }).notNull(),
+  note: text("note"),
+});
+
+export const accessRequests = pgTable("access_requests", {
+  id: varchar("id").primaryKey(),
+  amazon_alias: text("amazon_alias").notNull(),
+  email: text("email"),
+  name: text("name"),
+  status: text("status", { enum: ["pending", "approved", "rejected"] }).notNull().default("pending"),
+  requested_at: timestamp("requested_at", { mode: "string" }).notNull(),
+  resolved_at: timestamp("resolved_at", { mode: "string" }),
+  resolved_by: text("resolved_by"),
+  note: text("note"),
+});
+
+/** External identity links (Amazon Federate today). One auth user may have several providers. */
+export const userIdentifiers = pgTable("user_identifiers", {
+  id: varchar("id").primaryKey(),
+  user_id: varchar("user_id").notNull().references(() => users.id),
+  provider: text("provider").notNull().default("amazon"),
+  /** OIDC subject — for Amazon Federate this is the amazonAlias claim. */
+  subject: text("subject").notNull(),
+  email: text("email"),
+  /** Raw (non-secret) claims from the last login, kept for the identity-team confirmation. */
+  claims: jsonb("claims"),
+  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  last_login_at: timestamp("last_login_at", { mode: "string" }),
+});
 
 export const mentorAvailability = pgTable("mentor_availability", {
   id: varchar("id").primaryKey(),
@@ -348,3 +396,6 @@ export type InsertMentorEarnings = z.infer<typeof insertMentorEarningsSchema>;
 export type MentorEarnings = typeof mentorEarnings.$inferSelect;
 export type InsertMentorActivityLog = z.infer<typeof insertMentorActivityLogSchema>;
 export type MentorActivityLog = typeof mentorActivityLog.$inferSelect;
+export type ApprovedUser = typeof approvedUsers.$inferSelect;
+export type AccessRequest = typeof accessRequests.$inferSelect;
+export type UserIdentifier = typeof userIdentifiers.$inferSelect;

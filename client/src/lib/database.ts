@@ -130,6 +130,30 @@ export interface User {
   created_at: string;
 }
 
+export interface ApprovedUser {
+  id: string;
+  amazon_alias: string;
+  email?: string;
+  role: 'mentor' | 'admin';
+  mentor_id?: string;
+  is_active: boolean;
+  approved_by?: string;
+  approved_at: string;
+  note?: string;
+}
+
+export interface AccessRequest {
+  id: string;
+  amazon_alias: string;
+  email?: string;
+  name?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_at: string;
+  resolved_at?: string;
+  resolved_by?: string;
+  note?: string;
+}
+
 export interface MentorAvailability {
   id: string;
   mentor_id: string;
