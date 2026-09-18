@@ -2,11 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { isRTL } from "@/lib/i18n";
-import { Booking, Mentor, Mentee } from "@shared/schema";
+import type { Booking, Mentor, Mentee } from "@/lib/database";
+import { bookingService, mentorService, menteeService } from "@/lib/services";
 import { MetricCard } from "@/components/MetricCard";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Select,
   SelectContent,
@@ -41,7 +43,7 @@ import {
 } from "recharts";
 import {
   Users, Calendar, TrendingUp, CheckCircle2, XCircle,
-  Clock, BarChart3, Activity, Filter, PieChart as PieChartIcon, Globe, User
+  Clock, BarChart3, Activity, Filter, PieChart as PieChartIcon, Globe, User, AlertTriangle
 } from "lucide-react";
 import {
   format,
@@ -187,21 +189,29 @@ export default function Analytics() {
   const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
   const [selectedExpertise, setSelectedExpertise] = useState<string>("all");
 
+  // These previously used legacy "/api/*" query keys with no queryFn, so the
+  // page never received real rows and silently rendered the mock dataset.
   const { data: bookings, isLoading: bookingsLoading } = useQuery<Booking[]>({
-    queryKey: ["/api/bookings"],
+    queryKey: ["analytics", "bookings"],
+    queryFn: () => bookingService.getAll(),
   });
 
   const { data: mentors, isLoading: mentorsLoading } = useQuery<Mentor[]>({
-    queryKey: ["/api/mentors"],
+    queryKey: ["analytics", "mentors"],
+    queryFn: () => mentorService.getAll(),
   });
 
   const { data: mentees, isLoading: menteesLoading } = useQuery<Mentee[]>({
-    queryKey: ["/api/mentees"],
+    queryKey: ["analytics", "mentees"],
+    queryFn: () => menteeService.getAll(),
   });
 
   const isLoading = bookingsLoading || mentorsLoading || menteesLoading;
 
-  const useMockData = !bookings || bookings.length < 5;
+  // Mock analytics are only ever shown behind an explicit, prominent banner.
+  // Below this threshold the charts are demo data, not programme metrics.
+  const MOCK_DATA_THRESHOLD = 5;
+  const useMockData = !isLoading && (!bookings || bookings.length < MOCK_DATA_THRESHOLD);
 
   const filterOptions = useMemo(() => {
     if (!bookings || !mentors || !mentees) {
@@ -398,8 +408,8 @@ export default function Analytics() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
 
-    // Show sample data if no real mentor data exists
-    if (mentorData.length === 0) {
+    // Sample geography only while the page is in demo mode (banner shown)
+    if (useMockData && mentorData.length === 0) {
       mentorData = [
         { name: "United Arab Emirates", value: 12, color: CHART_COLORS[0] },
         { name: "Egypt", value: 8, color: CHART_COLORS[1] },
@@ -420,8 +430,7 @@ export default function Analytics() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 7);
 
-    // Show sample data if no real mentee data exists
-    if (menteeData.length === 0) {
+    if (useMockData && menteeData.length === 0) {
       menteeData = [
         { name: "United Arab Emirates", value: 45, color: CHART_COLORS[0] },
         { name: "Saudi Arabia", value: 28, color: CHART_COLORS[1] },
@@ -434,7 +443,7 @@ export default function Analytics() {
     }
 
     return { mentorData, menteeData };
-  }, [mentors, mentees]);
+  }, [mentors, mentees, useMockData]);
 
   const totalBookings = useMockData ? MOCK_ANALYTICS_DATA.kpis.total_bookings : filteredBookings.length;
   const scheduledCount = useMockData ? MOCK_ANALYTICS_DATA.kpis.upcoming_meetings : filteredBookings.filter((b) => b.status === "confirmed").length;
@@ -474,6 +483,20 @@ export default function Analytics() {
             {t('analytics.subtitle')}
           </p>
         </div>
+
+        {useMockData && (
+          <Alert
+            className="border-[#FF9900] bg-[#FFF5E6] text-[#0F1111]"
+            role="status"
+            data-testid="banner-demo-data"
+          >
+            <AlertTriangle className="h-5 w-5 text-[#CC7A00]" />
+            <AlertTitle className="font-semibold">{t('analytics.demoBannerTitle')}</AlertTitle>
+            <AlertDescription>
+              {t('analytics.demoBannerBody', { count: bookings?.length ?? 0, threshold: MOCK_DATA_THRESHOLD })}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card className="p-6">
           <div className="flex items-center gap-2 mb-4">

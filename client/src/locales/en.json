@@ -94,7 +94,10 @@
     "resetPasswordError": "Failed to reset password. The link may have expired.",
     "error": "Error",
     "logout": "Logout",
-    "logoutSuccess": "Logged out successfully"
+    "logoutSuccess": "Logged out successfully",
+    "amazonEmployeeTitle": "Amazon employee?",
+    "amazonEmployeeHint": "Mentor accounts are created through Amazon sign-in, not this form.",
+    "signInWithAmazon": "Sign in with Amazon"
   },
   "nav": {
     "home": "Home",
@@ -108,7 +111,8 @@
     "myProfile": "My Profile",
     "mentorPortal": "Mentor Portal",
     "menteeDashboard": "Mentee Dashboard",
-    "language": "Language"
+    "language": "Language",
+    "admin": "Admin"
   },
   "hero": {
     "badge": "Amazon Mentorship Program",
@@ -315,7 +319,9 @@
       "clicked": "Clicked",
       "mentors": "Mentors",
       "mentees": "Mentees"
-    }
+    },
+    "demoBannerTitle": "Demo data — not programme metrics",
+    "demoBannerBody": "Fewer than {{threshold}} real bookings exist ({{count}} so far), so every number and chart on this page is illustrative sample data. Real metrics replace it automatically once bookings accumulate."
   },
   "booking": {
     "bookSession": "Book a Session",
@@ -448,7 +454,8 @@
     "completed": "Completed",
     "upcoming": "Upcoming",
     "upcomingSessions": "Upcoming Sessions",
-    "noUpcoming": "No upcoming sessions scheduled"
+    "noUpcoming": "No upcoming sessions scheduled",
+    "completeProfile": "Complete your mentor profile"
   },
   "myBookings": {
     "title": "My Bookings",
@@ -659,11 +666,9 @@
     "noteAdded": "Note Added",
     "noteAddedDesc": "Your note has been saved successfully.",
     "noteAddError": "Failed to add note. Please try again.",
-    "markComplete": "Mark Complete",
     "markIncomplete": "Mark Incomplete",
     "taskCompleted": "Task marked as completed",
     "taskIncomplete": "Task marked as incomplete",
-    "taskUpdateError": "Failed to update task",
     "deleteNote": "Delete",
     "noteDeleted": "Note deleted",
     "noteDeleteError": "Failed to delete note",
