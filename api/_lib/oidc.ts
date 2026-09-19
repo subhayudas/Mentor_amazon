@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { createRemoteJWKSet, decodeJwt, jwtVerify, type JWTPayload } from 'jose';
+import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 
 /**
  * OpenID Connect primitives for the Amazon Federate integration:
@@ -296,19 +296,19 @@ export async function fetchUserinfo(input: UserinfoInput): Promise<Record<string
   try {
     if (contentType.includes('application/jwt')) {
       const jwt = await response.text();
+      // Signed userinfo must verify against the issuer JWKS (aud optional:
+      // OIDC Core §5.3.2 does not require one on userinfo responses). An
+      // unverifiable response is discarded — never decoded and trusted.
       try {
         const { payload } = await jwtVerify(jwt, getJwks(input.jwksUri), {
           issuer: input.issuer,
-          audience: input.clientId,
           clockTolerance: 60,
         });
-        claims = payload as Record<string, unknown>;
+        const aud = payload.aud;
+        const audOk = aud === undefined || (Array.isArray(aud) ? aud.includes(input.clientId) : aud === input.clientId);
+        claims = audOk ? (payload as Record<string, unknown>) : null;
       } catch {
-        // Some providers sign userinfo without an aud. The response still came
-        // over TLS from the discovered endpoint with our access token, so fall
-        // back to the decoded payload as long as iss and (below) sub match.
-        const decoded = decodeJwt(jwt) as Record<string, unknown>;
-        claims = decoded.iss === input.issuer ? decoded : null;
+        claims = null;
       }
     } else {
       const parsed: unknown = await response.json();

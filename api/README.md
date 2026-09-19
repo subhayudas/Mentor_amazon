@@ -7,7 +7,7 @@ with secrets that must **never** be prefixed `VITE_` or imported from `client/`.
 | --- | --- | --- |
 | `GET /api/auth/login/amazon` | `auth/login/amazon.ts` | Start Amazon Federate sign-in (OIDC code + PKCE) |
 | `GET /api/auth/callback/amazon` | `auth/callback/amazon.ts` | Registered redirect URI — token exchange, allow-list, Supabase bridge |
-| `GET /api/auth/logout` | `auth/logout.ts` | Clear `mc_oidc*` cookies, 302 to `/login` |
+| `POST /api/auth/logout` | `auth/logout.ts` | Clear `mc_oidc*` cookies, 302 to `/login` |
 | `GET /api/auth/debug-claims` | `auth/debug-claims.ts` | Integ-only: show the claims from the last sign-in (404 unless `AMAZON_OIDC_DEBUG=true`) |
 
 Shared helpers live in `_lib/` (the leading underscore keeps Vercel from
@@ -89,11 +89,22 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 - `users` row is written with `id = auth user id`, `password = 'managed-by-amazon-sso'`,
   `is_verified = true`, `amazon_alias = alias`, `profile_id = approved.mentor_id`
   or the `mentors` row with the same email (else `null` → mentor completes onboarding).
-- An existing `users` row (found by alias, then by email) is reused; its
-  `amazon_alias`/`profile_id`/`is_verified` are filled in if empty. Its
-  `user_type` is **not** changed by SSO — admins edit that in `/admin`.
+- An existing `users` row found **by alias** is reused. A row found only **by
+  email** (no alias yet) is linked only when its `user_type` already equals
+  the approved role — i.e. an admin-provisioned mentor/admin row. A
+  self-registered `mentee` row is never promoted by SSO (`email_conflict`):
+  anyone could sign up with a colleague's corporate address ahead of time.
+  When a legacy row is linked its auth password is rotated so a credential set
+  before the link stops working.
+- If no `users` row exists but an auth user already owns the email, the bridge
+  binds to it only when that auth user was never confirmed and never signed in
+  (an orphan pre-registration): it is deleted and re-created. Anything that has
+  been used is somebody's account → `auth_user_conflict`; an admin merges by hand.
 - If the email is already bound to a *different* alias the login is refused
   (`sso_failed`, reason `alias_conflict`).
+- The bridge URL carries a `bind` nonce that must match the `mc_sso_bind`
+  cookie set by the callback, so the one-time token only works in the browser
+  that completed the Amazon round trip.
 - If the ID token has no email, `approved_users.email` is used; with neither
   the login fails (`no_email`).
 
@@ -211,7 +222,7 @@ curl -si "https://mentor-amazon.vercel.app/api/auth/callback/amazon?code=x&state
    `user_identifiers.claims` for approved users.
 
 5. Sign out from the app (calls `supabase.auth.signOut()`), then optionally
-   `curl -si https://mentor-amazon.vercel.app/api/auth/logout` — expect 302 to
+   `curl -si -X POST https://mentor-amazon.vercel.app/api/auth/logout` — expect 302 to
    `/login` with both cookies expired.
 
 ### 5. Turn debug off

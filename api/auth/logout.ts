@@ -4,9 +4,11 @@ import { clearAuthCookies } from '../_lib/cookies.js';
 import { logSso, noStore, sendMethodNotAllowed, sendMisconfigured, sendRedirect } from '../_lib/http.js';
 
 /**
- * GET /api/auth/logout
+ * POST /api/auth/logout
  *
  * Clears the `mc_oidc*` cookies and sends the browser to the login page.
+ * POST-only so a cross-site GET (an <img> or link) cannot wipe a visitor's
+ * in-flight OIDC state.
  * The Supabase session lives in the SPA (localStorage) and is ended there by
  * `auth.logout()` → `supabase.auth.signOut()`; this endpoint only removes the
  * server-side OIDC round-trip state. Amazon Federate does not advertise an
@@ -14,8 +16,8 @@ import { logSso, noStore, sendMethodNotAllowed, sendMisconfigured, sendRedirect 
  */
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   noStore(res);
-  if (req.method !== 'GET' && req.method !== 'HEAD' && req.method !== 'POST') {
-    sendMethodNotAllowed(res, ['GET', 'HEAD', 'POST']);
+  if (req.method !== 'POST') {
+    sendMethodNotAllowed(res, ['POST']);
     return;
   }
 

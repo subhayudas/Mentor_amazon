@@ -26,6 +26,21 @@ export interface SsoFragment {
   tokenHash: string | null;
   type: string;
   next: string;
+  /** Browser-binding nonce; must equal the `mc_sso_bind` cookie the callback set. */
+  bind: string | null;
+}
+
+const BIND_COOKIE = "mc_sso_bind";
+
+/** Read (and then expire) the browser-binding cookie the callback set. */
+export function takeBridgeBindCookie(): string | null {
+  const match = document.cookie
+    .split(";")
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${BIND_COOKIE}=`));
+  const value = match ? decodeURIComponent(match.slice(BIND_COOKIE.length + 1)) : null;
+  document.cookie = `${BIND_COOKIE}=; Path=/; Max-Age=0; Secure; SameSite=Lax`;
+  return value && value.length > 0 ? value : null;
 }
 
 /**
@@ -40,6 +55,7 @@ export function consumeSsoFragment(): SsoFragment {
     tokenHash: params.get("token_hash"),
     type: params.get("type") ?? "magiclink",
     next: safeNext(params.get("next")),
+    bind: params.get("bind"),
   };
   if (raw) {
     window.history.replaceState(null, "", window.location.pathname + window.location.search);

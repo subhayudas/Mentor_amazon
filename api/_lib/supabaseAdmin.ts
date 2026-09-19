@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /**
@@ -149,7 +149,8 @@ export interface CreateAuthUserInput {
 /**
  * Create the Supabase auth user for a first-time SSO login. Returns the new
  * id, or null when an auth user with that email already exists (the caller
- * then takes the id from the magic-link response instead).
+ * must then decide whether that pre-existing user may be bound — see the
+ * callback; it is never bound blindly).
  */
 export async function createAuthUser(sb: AdminClient, input: CreateAuthUserInput): Promise<string | null> {
   const { data, error } = await sb.auth.admin.createUser({
@@ -168,6 +169,59 @@ export async function createAuthUser(sb: AdminClient, input: CreateAuthUserInput
   }
   if (!data.user?.id) throw new SsoDataError('auth_create_user', 'no user returned');
   return data.user.id;
+}
+
+export interface ExistingAuthUser {
+  id: string;
+  emailConfirmedAt: string | null;
+  lastSignInAt: string | null;
+  providers: string[];
+}
+
+/**
+ * Look up the auth user that owns an email (used only after createUser reported
+ * `email_exists`). The Admin API has no lookup-by-email, so we page through
+ * listUsers with a narrow page size — the callback is a rare, single-user
+ * path, so the cost is acceptable.
+ */
+export async function findAuthUserByEmail(sb: AdminClient, email: string): Promise<ExistingAuthUser | null> {
+  const wanted = email.trim().toLowerCase();
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw new SsoDataError('auth_lookup', error.message);
+    const hit = data.users.find((u) => (u.email ?? '').toLowerCase() === wanted);
+    if (hit) {
+      const providers = (hit.app_metadata as { providers?: unknown } | undefined)?.providers;
+      return {
+        id: hit.id,
+        emailConfirmedAt: hit.email_confirmed_at ?? null,
+        lastSignInAt: hit.last_sign_in_at ?? null,
+        providers: Array.isArray(providers) ? providers.filter((p): p is string => typeof p === 'string') : [],
+      };
+    }
+    if (data.users.length < 200) break;
+  }
+  return null;
+}
+
+/**
+ * Remove an auth user that nobody has ever confirmed or signed in with — an
+ * orphan pre-registration (possibly an attacker squatting on a corporate
+ * address ahead of the real person's first SSO login).
+ */
+export async function deleteAuthUser(sb: AdminClient, id: string): Promise<void> {
+  const { error } = await sb.auth.admin.deleteUser(id);
+  if (error) throw new SsoDataError('auth_delete_user', error.message);
+}
+
+/**
+ * Invalidate any password on an auth user we are about to bind to an SSO
+ * identity, so a credential set before the link can no longer sign in as
+ * the privileged account.
+ */
+export async function rotateAuthPassword(sb: AdminClient, id: string): Promise<void> {
+  const { error } = await sb.auth.admin.updateUserById(id, { password: randomBytes(48).toString('base64url') });
+  if (error) throw new SsoDataError('auth_rotate_password', error.message);
 }
 
 /** Best-effort metadata sync for accounts that predate SSO; never fails the login. */

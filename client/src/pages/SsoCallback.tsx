@@ -6,12 +6,13 @@ import { supabase } from "@/lib/supabase";
 import { auth, syncRoleStorage, type AuthUser } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { consumeSsoFragment, ssoLoginHref, ssoDestination } from "@/lib/ssoClient";
+import { consumeSsoFragment, ssoLoginHref, ssoDestination, takeBridgeBindCookie } from "@/lib/ssoClient";
 
-type SsoErrorCode = "missing_token" | "verify_failed" | "no_user";
+type SsoErrorCode = "missing_token" | "bind_mismatch" | "verify_failed" | "no_user";
 
 const ERROR_KEYS: Record<SsoErrorCode, string> = {
   missing_token: "sso.callback.errors.missing_token",
+  bind_mismatch: "sso.callback.errors.bind_mismatch",
   verify_failed: "sso.callback.errors.verify_failed",
   no_user: "sso.callback.errors.no_user",
 };
@@ -33,6 +34,14 @@ function completeSignIn(): Promise<Outcome> {
     inflight = (async (): Promise<Outcome> => {
       const fragment = consumeSsoFragment();
       if (!fragment.tokenHash) return { ok: false, code: "missing_token" };
+
+      // The token is only redeemed in the browser that completed the Amazon
+      // round trip: the callback set a cookie whose value must match the
+      // fragment. A bridge URL pasted into another browser stops here.
+      const bindCookie = takeBridgeBindCookie();
+      if (!fragment.bind || !bindCookie || fragment.bind !== bindCookie) {
+        return { ok: false, code: "bind_mismatch" };
+      }
 
       const { error } = await supabase.auth.verifyOtp({
         token_hash: fragment.tokenHash,

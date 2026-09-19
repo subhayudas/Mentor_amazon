@@ -103,6 +103,24 @@ export function serializeCookie(name: string, value: string, opts: CookieOptions
   ].join('; ');
 }
 
+export const BRIDGE_BIND_COOKIE = 'mc_sso_bind';
+export const BRIDGE_BIND_MAX_AGE = 300;
+
+/**
+ * Readable by the SPA on purpose (not HttpOnly): /auth/sso compares it with
+ * the `bind` value in the bridge fragment before redeeming the magic-link
+ * token, so the token only works in the browser that completed OIDC.
+ */
+export function bridgeBindCookie(value: string): string {
+  return [
+    `${BRIDGE_BIND_COOKIE}=${encodeURIComponent(value)}`,
+    'Path=/',
+    `Max-Age=${BRIDGE_BIND_MAX_AGE}`,
+    'Secure',
+    'SameSite=Lax',
+  ].join('; ');
+}
+
 export function expiredCookie(name: string): string {
   return [
     `${name}=`,

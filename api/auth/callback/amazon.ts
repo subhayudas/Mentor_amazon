@@ -13,6 +13,7 @@ import {
   DEBUG_COOKIE_MAX_AGE,
   OIDC_COOKIE,
   OIDC_COOKIE_MAX_AGE,
+  bridgeBindCookie,
   type OidcCookiePayload,
 } from '../../_lib/cookies.js';
 import {
@@ -20,6 +21,7 @@ import {
   extractIdentity,
   fetchUserinfo,
   getDiscovery,
+  randomUrlSafe,
   stripTokenMaterial,
   verifyIdToken,
   OidcError,
@@ -27,12 +29,15 @@ import {
 import {
   createAdminClient,
   createAuthUser,
+  deleteAuthUser,
   findApprovedUser,
+  findAuthUserByEmail,
   findMentorIdByEmail,
   findUserByAlias,
   findUserByEmail,
   generateMagicLink,
   insertUsersRow,
+  rotateAuthPassword,
   syncAuthMetadata,
   updateUsersRow,
   upsertAccessRequest,
@@ -159,7 +164,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const returnTo = safeReturnTo(session.rt);
 
   if (providerError) {
-    fail('sso_failed', `provider_${providerError}`);
+    // Attacker-controllable query value: keep only a short token-safe slug before it reaches logs/URLs.
+    fail('sso_failed', `provider_${providerError.replace(/[^a-z0-9_-]/gi, '_').slice(0, 40)}`);
     return;
   }
   if (!code) {
@@ -278,22 +284,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
+    // An existing row matched by email only (no alias yet) is linked solely
+    // when it is the kind of account an admin provisions for this role. A
+    // self-registered mentee row must never be promoted by an SSO login —
+    // anyone can sign up with someone else's corporate address ahead of time.
+    if (user && !user.amazon_alias && user.user_type !== approved.role) {
+      fail('sso_failed', 'email_conflict', alias);
+      return;
+    }
+    const linkingLegacyRow = Boolean(user && !user.amazon_alias);
+
     // The session must belong to the account we found, even if Amazon now reports a different email.
     const sessionEmail = user ? user.email : email;
 
     let createdAuthId: string | null = null;
     if (!user) {
       createdAuthId = await createAuthUser(sb, { email, role: approved.role, alias, name: identity.name });
+      if (!createdAuthId) {
+        // An auth user already owns this email but has no users row. Bind to
+        // it only if nobody has ever confirmed or used it (an orphan
+        // pre-registration): delete it and start clean. Anything that has
+        // been signed into is somebody's account and needs an admin to merge.
+        const existing = await findAuthUserByEmail(sb, email);
+        if (!existing) {
+          fail('sso_failed', 'auth_user_conflict', alias);
+          return;
+        }
+        const neverUsed = !existing.emailConfirmedAt && !existing.lastSignInAt;
+        if (!neverUsed) {
+          logSso('callback.refused', { alias, reason: 'auth_user_conflict', providers: existing.providers.join('+') });
+          fail('sso_failed', 'auth_user_conflict', alias);
+          return;
+        }
+        await deleteAuthUser(sb, existing.id);
+        createdAuthId = await createAuthUser(sb, { email, role: approved.role, alias, name: identity.name });
+        if (!createdAuthId) {
+          fail('sso_failed', 'auth_user_conflict', alias);
+          return;
+        }
+        logSso('callback.orphan_replaced', { alias });
+      }
+    } else if (linkingLegacyRow) {
+      // A credential set on this account before the SSO link must not keep working.
+      await rotateAuthPassword(sb, user.id);
     }
 
     const link = await generateMagicLink(sb, sessionEmail);
 
     if (!user) {
+      if (!createdAuthId || link.userId !== createdAuthId) {
+        fail('sso_failed', 'auth_user_mismatch', alias);
+        return;
+      }
       const profileId = approved.mentor_id ?? (await findMentorIdByEmail(sb, email));
-      user = await insertUsersRow(sb, { id: createdAuthId ?? link.userId, email, role: approved.role, alias, profileId });
-      if (!createdAuthId) await syncAuthMetadata(sb, link.userId, { amazon_alias: alias, user_type: approved.role });
+      user = await insertUsersRow(sb, { id: createdAuthId, email, role: approved.role, alias, profileId });
       logSso('callback.user_created', { alias, role: approved.role, linked_profile: Boolean(profileId) });
     } else {
+      if (link.userId !== user.id) {
+        // The auth user that owns this email is not the account the users row
+        // describes; signing one in as the other would cross identities.
+        fail('sso_failed', 'auth_user_mismatch', alias);
+        return;
+      }
       const patch: Partial<Pick<UsersRow, 'amazon_alias' | 'profile_id' | 'is_verified'>> = {};
       if (!sameText(user.amazon_alias, alias)) patch.amazon_alias = alias;
       if (!user.profile_id) {
@@ -314,8 +366,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       claims: { id_token_claims: safeClaims, userinfo: safeUserinfo, token_auth_method: tokenAuthMethod },
     });
 
+    // Bind the bridge to this browser: the SPA only redeems the token when the
+    // fragment's nonce matches a cookie set here, so a captured bridge URL
+    // cannot log a different browser into this account (login CSRF).
+    const bind = randomUrlSafe(16);
+    appendSetCookie(res, bridgeBindCookie(bind));
+
     const bridge = new URL('/auth/sso', env.appOrigin);
-    bridge.hash = `token_hash=${encodeURIComponent(link.hashedToken)}&type=magiclink&next=${encodeURIComponent(returnTo)}`;
+    bridge.hash = `token_hash=${encodeURIComponent(link.hashedToken)}&type=magiclink&bind=${bind}&next=${encodeURIComponent(returnTo)}`;
     logSso('callback.success', { alias, role: user.user_type, returnTo });
     sendRedirect(res, bridge.toString());
   } catch (err) {
