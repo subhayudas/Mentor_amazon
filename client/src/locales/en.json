@@ -1050,7 +1050,7 @@
       "spamQuestion": "Will I get a lot of email?",
       "spamAnswer": "No. MentorConnect sends no marketing email. A mentor's reply appears under your bookings when you sign in with the email you used, and the only other messages come from the calendar tool you book a time with.",
       "commitmentQuestion": "How much time do mentors commit?",
-      "commitmentAnswer": "Mentors set their own pace. Most offer an hour or two a month, and they can pause new requests at any time — the card then says \"Not accepting requests\".",
+      "commitmentAnswer": "Mentors set their own pace and can pause new requests at any time — the card then says \"Not accepting requests\".",
       "matchingQuestion": "How are mentors and mentees matched?",
       "matchingAnswer": "You choose. Browse or search the directory, read what each mentor helps with, and send a request to the one whose experience fits. There is no automatic matching.",
       "cancelQuestion": "What if I need to cancel or reschedule?",
@@ -1141,7 +1141,10 @@
       "titleFilters": "No mentors match all of these filters",
       "titleBoth": "No mentors match “{{q}}” and these filters",
       "body": "Try fewer filters or a broader search term.",
+      "bodyQuery": "Try a broader term, or search by skill (e.g. Analytics).",
+      "bodyFilters": "Try fewer filters.",
       "clearFilters": "Clear filters",
+      "clearSearch": "Clear search",
       "searchAll": "Search everything instead"
     },
     "error": {

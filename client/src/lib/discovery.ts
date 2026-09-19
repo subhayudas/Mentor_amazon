@@ -31,8 +31,12 @@ export const NEAR_HOURS = 3;
 export const SORT_THRESHOLD = 12;
 /** Expertise chips shown on a card before the "+n" overflow (P1-15). */
 export const CARD_CHIP_LIMIT = 3;
-/** Example chips under the search box (spec §5). */
-export const EXAMPLE_CHIP_LIMIT = 5;
+/**
+ * Example chips under the search box (spec §5). Four, so the row never wraps
+ * in the hero's ~640px column and the skeleton (same count) has the loaded
+ * geometry by construction (F-06); phones show the first three.
+ */
+export const EXAMPLE_CHIP_LIMIT = 4;
 /** Cards on the landing preview (spec §5.2) and on the mobile scroller (P0-7). */
 export const PREVIEW_LIMIT = 6;
 export const PREVIEW_LIMIT_MOBILE = 4;
@@ -219,7 +223,7 @@ export interface FacetOption {
   value: string;
   /** Localized display label. */
   label: string;
-  /** Mentors carrying this value in the unfiltered list. */
+  /** Mentors carrying this value: in the unfiltered list (`facetCounts`) or under every other constraint (`facetedCounts`). */
   count: number;
 }
 
@@ -243,6 +247,34 @@ export function facetCounts(mentors: ReadonlyArray<PublicMentor>, field: FacetFi
       label: field === "languages_spoken" ? languageLabel(value, lang) : tagLabel(labelMap, value, lang),
     }))
     .sort((a, b) => b.count - a.count || collator.compare(a.label, b.label));
+}
+
+/**
+ * Standard faceting (F-26): each group's counts are computed over the list
+ * that every OTHER constraint (the other groups, the query, "accepting" and
+ * "near") already allows, so a count is the number of results a click will
+ * deliver. Option order and labels stay those of the unfiltered facets
+ * (`facetCounts`) so the rail never reorders while the visitor works it;
+ * options the current selection rules out come back with `count: 0` and are
+ * dimmed by the caller, never hidden.
+ */
+export function facetedCounts(
+  mentors: ReadonlyArray<PublicMentor>,
+  field: FacetField,
+  options: ReadonlyArray<FacetOption>,
+  state: DiscoveryState,
+  ctx: DiscoveryContext,
+): FacetOption[] {
+  const group: keyof DiscoveryState = field === "expertise" ? "expertise" : field === "industries" ? "industry" : "language";
+  const others = applyDiscovery(mentors, { ...state, [group]: [] }, ctx);
+  const counts = new Map<string, number>();
+  for (const m of others) {
+    Array.from(new Set(m[field] ?? [])).forEach((value) => {
+      const key = value.trim();
+      if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+  }
+  return options.map((o) => ({ ...o, count: counts.get(o.value) ?? 0 }));
 }
 
 /** The n most frequent tags of a field (example chips, spec §5). */

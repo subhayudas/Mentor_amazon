@@ -57,7 +57,7 @@ const sheetLinkClass = (active: boolean) =>
 
 export function Navigation() {
   const { t } = useTranslation();
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, error, logout } = useAuth();
   const [location, setLocationPath] = useLocation();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [menteeId, setMenteeId] = useState<string | null>(null);
@@ -156,7 +156,8 @@ export function Navigation() {
 
           {bellEmail && <NotificationBell email={bellEmail} />}
 
-          {!isLoading && !isLoggedIn && (
+          {/* Visitor CTAs never top the access-error card: with a session whose users row failed to load (F-02), the header stays neutral. */}
+          {!isLoading && !isLoggedIn && !error && (
             <>
               <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex" data-testid="link-sign-in">
                 <Link href={ROUTES.login}>{t("nav.signIn")}</Link>

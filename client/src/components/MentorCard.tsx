@@ -29,7 +29,10 @@ import { cn } from "@/lib/utils";
  *   1. min-h-14  avatar 48 · name (h3, `<bdi>`, plain text) · status Badge (text + colour; under the name below `sm`)
  *   2. h-6   credential: position · company, one line
  *   3. h-12  helps-with: first sentence of the bio, two lines, `text-pretty`
- *   4. ≥60px up to 3 expertise chips + a "+n" Popover button (keyboard/touch, no `title`)
+ *   4. min-h-8 (phones, single column) / ≥60px (md+, shared rows): up to 3
+ *      expertise chips, or 2 + a "+n" Popover button when there are more than
+ *      3 (F-25 — three chips plus "+n" orphaned the button onto a second row
+ *      in 380–410px columns; the popover lists the rest, keyboard/touch, no `title`)
  *   5. h-10  two caption lines: A languages · country; B tz offset · ★ rating (count)
  *   6. footer: ONE `outline` sm anchor "View profile" whose `after:` overlay makes
  *      the whole card one tab stop named "View profile: {name}". Nothing else on
@@ -64,8 +67,11 @@ function useCardFields(mentor: PublicMentor) {
       initials: initialsOf(name),
       helpsWith: firstSentence(localized(mentor, "bio", lang)),
       tags,
-      visibleTags: tags.slice(0, CARD_CHIP_LIMIT),
-      hiddenTags: tags.slice(CARD_CHIP_LIMIT),
+      // Up to CARD_CHIP_LIMIT chips fit one row; with more, two chips + "+n" do (F-25).
+      visibleTags: tags.slice(0, tags.length > CARD_CHIP_LIMIT ? CARD_CHIP_LIMIT - 1 : CARD_CHIP_LIMIT),
+      hiddenTags: tags.slice(tags.length > CARD_CHIP_LIMIT ? CARD_CHIP_LIMIT - 1 : CARD_CHIP_LIMIT),
+      // The compact card has no "+n", so it always shows the first three.
+      compactTags: tags.slice(0, CARD_CHIP_LIMIT),
       languages: languageLabels(mentor, lang),
       country: mentor.country ? localizeCountry(mentor.country, lang) : "",
       tz,
@@ -136,7 +142,7 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
 
       <p className="line-clamp-2 h-12 text-body-sm leading-6 text-foreground text-pretty">{f.helpsWith}</p>
 
-      <div className="flex min-h-[3.75rem] flex-wrap content-start gap-2">
+      <div className="flex min-h-8 flex-wrap content-start gap-2 md:min-h-[3.75rem]">
         {f.visibleTags.map((tag, i) => (
           <Badge key={tag.key} tone="neutral" className="max-w-full" data-testid={`badge-expertise-${i}`}>
             <span className="truncate">{tag.label}</span>
@@ -266,7 +272,7 @@ export function MentorCardCompact({ mentor, className }: MentorCardProps) {
         </div>
       </div>
       <div className="flex h-14 flex-wrap content-start gap-2 overflow-hidden">
-        {f.visibleTags.map((tag, i) => (
+        {f.compactTags.map((tag, i) => (
           <Badge key={tag.key} tone="neutral" className="max-w-full" data-testid={`badge-expertise-${i}`}>
             <span className="truncate">{tag.label}</span>
           </Badge>
@@ -293,7 +299,7 @@ export function MentorCardSkeleton({ className }: { className?: string }) {
       </div>
       <Skeleton className="h-6 w-2/3" />
       <Skeleton className="h-12 w-full" />
-      <div className="flex min-h-[3.75rem] flex-wrap content-start gap-2">
+      <div className="flex min-h-8 flex-wrap content-start gap-2 md:min-h-[3.75rem]">
         <Skeleton className="h-5 w-24 rounded-full" />
         <Skeleton className="h-5 w-28 rounded-full" />
         <Skeleton className="h-5 w-20 rounded-full" />

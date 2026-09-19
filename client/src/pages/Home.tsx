@@ -11,6 +11,7 @@ import { HowItHappens } from "@/components/discovery/HowItHappens";
 import { MentorPreview } from "@/components/discovery/MentorPreview";
 import { NeedsList } from "@/components/discovery/NeedsList";
 import { SearchIntent } from "@/components/discovery/SearchIntent";
+import { useAuth } from "@/context/AuthContext";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMentors } from "@/components/discovery/useMentors";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -30,9 +31,16 @@ import { ROUTES, discoveryUrl } from "@/lib/routes";
  * `mentors_public` list; nothing is invented, nothing renders as `0` before
  * data arrives.
  *
- * Phones get a separate composition (P0-7): three example chips on one line,
- * no visible submit, a snap scroller of four compact cards, the rail card
- * after the preview, needs as a 2 x 3 text grid.
+ * Phones get a separate composition (P0-7): three example chips in a snap
+ * scroller, no visible submit, the two hero links stacked, a snap scroller of
+ * four compact cards, the rail card after the preview, needs as a single
+ * column of one-line rows.
+ *
+ * Nothing below the search box shifts when the catalogue arrives (F-06):
+ * four chips fit the hero column on one reserved row, the trust line and the
+ * link rows reserve their heights, and on phones the links are stacked so the
+ * count arriving in "Browse all {n} mentors" cannot push the second link onto
+ * a new line.
  */
 const FAQ_KEYS = ["spam", "commitment", "matching", "cancel"] as const;
 /** The legacy directory search id lives on the hero input here and on the `/mentors` input there (one per page). */
@@ -62,6 +70,7 @@ export default function Home() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const isPhone = useIsPhone();
   const heroRef = React.useRef<HTMLDivElement>(null);
   useHeroEnter(heroRef);
@@ -127,27 +136,28 @@ export default function Home() {
               <p className="mt-3 min-h-5 text-caption text-muted-foreground tabular-nums" data-testid="text-trust-line">
                 {trustLine}
               </p>
-              <p className="mt-3 flex min-h-6 flex-wrap items-center gap-x-5 gap-y-1 text-body-sm">
-                <Link
-                  href={ROUTES.mentors}
-                  className="inline-flex min-h-6 items-center gap-1 font-medium text-secondary underline-offset-4 transition-colors duration-fast hover:underline"
-                  data-testid="link-browse-all"
-                >
-                  {stats ? t("landing.hero.browseAll", { count: stats.mentors }) : t("landing.hero.browseAllNoCount")}
-                  <ArrowRight className="size-4 rtl:-scale-x-100" strokeWidth={2} aria-hidden="true" />
-                </Link>
+              {/*
+                Both hero links share the `link` button vocabulary (F-22); the
+                arrow marks the one that navigates. On phones they stack
+                deliberately (one per line, each a 24px row) so the count
+                arriving never re-wraps the row (F-06).
+              */}
+              <p className="mt-3 flex min-h-6 flex-col items-start gap-1 text-body-sm">
+                <Button asChild variant="link" className="min-h-6 gap-1">
+                  <Link href={ROUTES.mentors} data-testid="link-browse-all">
+                    {stats ? t("landing.hero.browseAll", { count: stats.mentors }) : t("landing.hero.browseAllNoCount")}
+                    <ArrowRight className="rtl:-scale-x-100" strokeWidth={2} aria-hidden="true" />
+                  </Link>
+                </Button>
                 {isPhone && (
-                  <a
-                    href="#how-it-works"
-                    className="inline-flex min-h-6 items-center text-muted-foreground underline decoration-muted-foreground/50 underline-offset-4 transition-colors duration-fast hover:text-foreground hover:decoration-foreground"
-                  >
-                    {t("landing.hero.howItWorks")}
-                  </a>
+                  <Button asChild variant="link" className="min-h-6">
+                    <a href="#how-it-works">{t("landing.hero.howItWorks")}</a>
+                  </Button>
                 )}
               </p>
             </PageHeader>
           </div>
-          {!isPhone && <HowItHappens className="mt-10 lg:mt-0" />}
+          {!isPhone && <HowItHappens signedIn={!!user} className="mt-10 lg:mt-0" />}
         </Container>
       </section>
 
@@ -166,7 +176,7 @@ export default function Home() {
       {/* ===== Request rail (phones: after the preview, as a vertical list) ===== */}
       {isPhone && (
         <Container className="pb-6">
-          <HowItHappens size="sm" />
+          <HowItHappens size="sm" signedIn={!!user} />
         </Container>
       )}
 

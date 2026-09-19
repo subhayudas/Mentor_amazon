@@ -12,7 +12,10 @@ import { cn } from "@/lib/utils";
  *
  * Geometry: 2px navy line, stops filled `--brand-orange` for done/current
  * with a 2px navy ring, white for next; 12px stops on both sizes; md = 32px
- * gaps, sm = 20px gaps. No animation, no directional icons.
+ * gaps, sm = 20px gaps. No animation, no directional icons. Stop labels are
+ * body weight-500 (md) / body-sm weight-500 (sm): one step under the card
+ * title that carries the h3 role, so a rail card reads as one headline and
+ * three stops, not four headlines (F-21).
  *
  * A11y: an `<ol>` with `aria-current="step"` on the current stop, a Check
  * icon inside done stops and the state word in visually-hidden text, so the
@@ -90,7 +93,7 @@ export function RequestRail({ stops, size = "md", ariaLabel, className }: Reques
               )}
             </span>
             <div className="min-w-0">
-              <p className={cn("text-foreground", md ? "text-h3" : "text-body-sm font-medium")}>
+              <p className={cn("font-medium text-foreground", md ? "text-body" : "text-body-sm")}>
                 <span className="sr-only">{t(STATE_KEY[stop.state])}: </span>
                 {stop.label}
               </p>
