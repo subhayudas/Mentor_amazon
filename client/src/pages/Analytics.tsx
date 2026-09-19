@@ -61,6 +61,7 @@ import { MOCK_BOOKINGS, MOCK_MENTORS, MOCK_MENTEES } from "@/data/mockAnalytics"
 import { toCsv, downloadCsv, csvFilename, isoDate, type CsvValue } from "@/lib/csv";
 import {
   NOT_SPECIFIED,
+  localizeCountry,
   bookingCountry,
   countryOptions,
   groupByCountry,
@@ -92,6 +93,15 @@ import { DrilldownTable } from "@/components/analytics/DrilldownTable";
 import { CountryBreakdown } from "@/components/analytics/CountryBreakdown";
 import { SegmentLegend, type SegmentLegendItem } from "@/components/analytics/SegmentLegend";
 import { BookingsTable } from "@/components/analytics/BookingsTable";
+
+/**
+ * When a request was made. `clicked_at` is only set by the legacy direct
+ * booking path; product-created requests carry `created_at` alone, so
+ * filtering on clicked_at silently dropped every real booking.
+ */
+function requestedAt(booking: Pick<Booking, "clicked_at" | "created_at">): string {
+  return booking.clicked_at || booking.created_at;
+}
 
 type DateRange = "7" | "30" | "90" | "all";
 type GroupBy = "day" | "week" | "month";
@@ -160,7 +170,7 @@ function bucketKey(date: Date, groupBy: GroupBy): string {
 
 function oldestClickedAt(bookings: Booking[]): Date {
   return bookings.reduce((oldest, booking) => {
-    const bookingDate = booking.clicked_at ? new Date(booking.clicked_at) : new Date();
+    const bookingDate = new Date(requestedAt(booking));
     return bookingDate < oldest ? bookingDate : oldest;
   }, new Date());
 }
@@ -188,8 +198,7 @@ function aggregateBookingsByDate(bookings: Booking[], dateRange: DateRange): Tim
 
   const bookingsByDate: Record<string, TimeSeriesData> = {};
   bookings.forEach((booking) => {
-    if (!booking.clicked_at) return;
-    const bookingDate = new Date(booking.clicked_at);
+    const bookingDate = new Date(requestedAt(booking));
     if (!(isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime())) return;
 
     const key = bucketKey(bookingDate, groupBy);
@@ -239,7 +248,7 @@ function rowMatchesDrill(row: BookingRow, drill: Drill, groupBy: GroupBy): boole
 }
 
 export default function Analytics() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const rtl = isRTL();
   const [dateRange, setDateRange] = useState<DateRange>("30");
   const [selectedMentor, setSelectedMentor] = useState<string>("all");
@@ -282,9 +291,10 @@ export default function Analytics() {
   const menteesById = useMemo(() => new Map(sourceMentees.map((mentee) => [mentee.id, mentee])), [sourceMentees]);
 
   const notSpecifiedLabel = t("analytics.notSpecified");
+  const language = i18n.language;
   const displayCountry = useCallback(
-    (country: string) => (country === NOT_SPECIFIED ? notSpecifiedLabel : country),
-    [notSpecifiedLabel],
+    (country: string) => (country === NOT_SPECIFIED ? notSpecifiedLabel : localizeCountry(country, language)),
+    [notSpecifiedLabel, language],
   );
 
   const filterOptions = useMemo(() => {
@@ -315,8 +325,7 @@ export default function Analytics() {
     const startDate = rangeStart(dateRange, sourceBookings);
 
     return sourceBookings.filter((booking) => {
-      if (!booking.clicked_at) return false;
-      const bookingDate = new Date(booking.clicked_at);
+      const bookingDate = new Date(requestedAt(booking));
       if (!(isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime())) {
         return false;
       }
@@ -491,8 +500,7 @@ export default function Analytics() {
     const start = startOfDay(parseISO(from));
     const end = endOfDay(parseISO(to));
     const inRange = sourceBookings.filter((booking) => {
-      if (!booking.clicked_at) return false;
-      const clicked = new Date(booking.clicked_at);
+      const clicked = new Date(requestedAt(booking));
       return clicked >= start && clicked <= end;
     });
     const rangeRows = toBookingRows(inRange, sourceMentors, sourceMentees).sort(

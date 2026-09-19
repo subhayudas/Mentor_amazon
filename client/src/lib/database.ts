@@ -346,11 +346,31 @@ class DatabaseService {
     return data;
   }
 
-  /** Full row for the signed-in mentor, or null when there is no session / no profile yet. */
-  async getOwnMentor(): Promise<Mentor | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) return null;
-    return this.getMentorByEmail(user.email);
+  /**
+   * Full row for the signed-in mentor, or null when there is no session / no
+   * profile yet. Matches by session email, or by the users.profile_id link an
+   * admin created (the mentors row may carry a different address than the
+   * Amazon identity). RLS enforces both predicates server-side.
+   */
+  async getOwnMentor(identity?: { email: string; profileId?: string }): Promise<Mentor | null> {
+    let email = identity?.email;
+    let profileId = identity?.profileId;
+    if (!email) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) return null;
+      email = user.email;
+      profileId = profileId ?? (user.user_metadata?.profile_id as string | undefined);
+    }
+    const byEmail = await this.getMentorByEmail(email);
+    if (byEmail || !profileId) return byEmail;
+
+    const { data, error } = await supabase
+      .from('mentors')
+      .select('*')
+      .eq('id', profileId)
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
   }
 
   async createMentor(mentor: Omit<Mentor, 'id' | 'created_at' | 'updated_at' | 'average_rating' | 'total_ratings'>): Promise<Mentor> {
@@ -606,13 +626,15 @@ class DatabaseService {
   }
 
   async createBookingRequest(mentorId: string, menteeId: string, goal: string): Promise<Booking> {
+    const now = new Date().toISOString();
     return this.insertBooking({
       id: generateId(),
       mentor_id: mentorId,
       mentee_id: menteeId,
       goal,
       status: 'pending',
-      created_at: new Date().toISOString(),
+      clicked_at: now,
+      created_at: now,
     });
   }
 
@@ -727,6 +749,27 @@ class DatabaseService {
       .from('bookings')
       .update(update)
       .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  }
+
+  /** Mentee scheduled the accepted request through Cal.com: accepted -> confirmed. */
+  async confirmBooking(bookingId: string, details: { scheduledAt?: string; calEventUri?: string } = {}): Promise<Booking | null> {
+    const updateData: Partial<Booking> = {
+      status: 'confirmed',
+      responded_at: new Date().toISOString(),
+    };
+    if (details.scheduledAt) updateData.scheduled_at = details.scheduledAt;
+    if (details.calEventUri) updateData.cal_event_uri = details.calEventUri;
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .update(updateData)
+      .eq('id', bookingId)
+      .eq('status', 'accepted')
       .select()
       .single();
 

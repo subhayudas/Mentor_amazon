@@ -14,12 +14,22 @@ export function loadCalApi(options?: { embedJsUrl?: string; namespace?: string }
   return import("@calcom/embed-react").then((m) => m.getCalApi(options));
 }
 
+/** What Cal.com hands back when a slot is booked through the embed. */
+export interface CalBookingSuccess {
+  /** ISO start time of the scheduled slot, when Cal.com provides it. */
+  startTime?: string;
+  /** Cal.com booking uid, when provided. */
+  uid?: string;
+}
+
 interface CalEmbedProps {
   calLink: string;
   mentorName: string;
   bookingId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Fired once when Cal.com reports `bookingSuccessful` while this dialog is open. */
+  onBookingSuccessful?: (detail: CalBookingSuccess) => void;
 }
 
 function CalDialogSkeleton() {
@@ -31,10 +41,35 @@ function CalDialogSkeleton() {
   );
 }
 
-export function CalEmbed({ calLink, mentorName, bookingId, open, onOpenChange }: CalEmbedProps) {
+export function CalEmbed({ calLink, mentorName, bookingId, open, onOpenChange, onBookingSuccessful }: CalEmbedProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   const calUsername = extractCalUsername(calLink);
+
+  // Listen for the embed's bookingSuccessful event so the app can move the
+  // booking from accepted to confirmed without a server-side webhook.
+  useEffect(() => {
+    if (!open || !onBookingSuccessful) return;
+    let disposed = false;
+    let fired = false;
+    const handler = (e: { detail?: { data?: Record<string, unknown> } }) => {
+      if (disposed || fired) return;
+      fired = true;
+      const data = (e?.detail?.data ?? {}) as Record<string, unknown>;
+      const booking = (data.booking ?? {}) as Record<string, unknown>;
+      const startTime = [data.startTime, booking.startTime, data.date].find((v) => typeof v === "string") as string | undefined;
+      const uid = [booking.uid, data.uid, data.bookingId].find((v) => typeof v === "string") as string | undefined;
+      onBookingSuccessful({ startTime, uid });
+    };
+    loadCalApi().then((cal) => {
+      if (disposed) return;
+      cal("on", { action: "bookingSuccessful", callback: handler as never });
+    });
+    return () => {
+      disposed = true;
+      loadCalApi().then((cal) => cal("off", { action: "bookingSuccessful", callback: handler as never })).catch(() => undefined);
+    };
+  }, [open, onBookingSuccessful, bookingId]);
 
   useEffect(() => {
     if (!open) {

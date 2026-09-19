@@ -63,12 +63,30 @@ function Router() {
         <Route path="/mentors/:id" component={MentorProfile} />
         <Route path="/profile/mentor/:id" component={MentorProfileView} />
         <Route path="/profile/mentee/:id" component={MenteeProfileView} />
-        <Route path="/mentee-registration" component={MenteeRegistration} />
-        <Route path="/my-bookings" component={MyBookings} />
-        <Route path="/mentee-dashboard" component={MenteeDashboard} />
-        <Route path="/mentee-dashboard/:rest*" component={MenteeDashboard} />
 
         {/* Any signed-in session */}
+        {/* Mentee surfaces read the caller's own rows under RLS, so a session is required;
+            registration is gated too so the created mentee row matches the session email. */}
+        <Route path="/mentee-registration">
+          <RequireAuth redirectTo="/signup">
+            <MenteeRegistration />
+          </RequireAuth>
+        </Route>
+        <Route path="/my-bookings">
+          <RequireAuth>
+            <MyBookings />
+          </RequireAuth>
+        </Route>
+        <Route path="/mentee-dashboard">
+          <RequireAuth>
+            <MenteeDashboard />
+          </RequireAuth>
+        </Route>
+        <Route path="/mentee-dashboard/:rest*">
+          <RequireAuth>
+            <MenteeDashboard />
+          </RequireAuth>
+        </Route>
         <Route path="/analytics">
           <RequireAuth>
             <Analytics />

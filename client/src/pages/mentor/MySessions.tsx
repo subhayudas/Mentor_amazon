@@ -34,6 +34,7 @@ import {
   MAX_SESSION_MINUTES,
   MIN_SESSION_MINUTES,
   REPORTING_COUNTRIES,
+  localizeCountry,
   SESSION_MINUTE_PRESETS,
 } from "@/lib/reporting";
 
@@ -230,12 +231,18 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
     },
   });
 
+  // "Upcoming" covers accepted requests still waiting for the mentee to pick a
+  // slot on Cal.com as well as confirmed slots in the future. Without the
+  // accepted group a session could never be completed (and no volunteer
+  // hours recorded) when the Cal.com confirmation never reaches the app.
   const upcomingSessions = bookings?.filter(b =>
-    b.status === 'confirmed' && b.scheduled_at && isFuture(parseISO(b.scheduled_at))
+    b.status === 'accepted' ||
+    (b.status === 'confirmed' && (!b.scheduled_at || isFuture(parseISO(b.scheduled_at))))
   ) ?? [];
 
   const completedSessions = bookings?.filter(b =>
-    b.status === 'completed' || (b.scheduled_at && isPast(parseISO(b.scheduled_at)))
+    b.status === 'completed' ||
+    (b.status === 'confirmed' && b.scheduled_at && isPast(parseISO(b.scheduled_at)))
   ) ?? [];
 
   const handleMarkComplete = (booking: Booking) => {
@@ -414,7 +421,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
             {t('mentorPortal.viewNotes')}
           </Button>
 
-          {showActions && booking.status === 'confirmed' && (
+          {showActions && (booking.status === 'confirmed' || booking.status === 'accepted') && (
             <>
               <Button
                 size="sm"
@@ -602,7 +609,7 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
                   <SelectItem value={NO_COUNTRY}>{t('mentorPortal.sessionCountryNone')}</SelectItem>
                   {countryChoices.map((country) => (
                     <SelectItem key={country} value={country}>
-                      {country}
+                      {localizeCountry(country, i18n.language)}
                     </SelectItem>
                   ))}
                 </SelectContent>

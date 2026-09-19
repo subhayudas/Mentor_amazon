@@ -89,8 +89,8 @@ export const mentorService = {
   },
 
   // Full row for the signed-in mentor
-  async getOwn(): Promise<Mentor | null> {
-    return db.getOwnMentor();
+  async getOwn(identity?: { email: string; profileId?: string }): Promise<Mentor | null> {
+    return db.getOwnMentor(identity);
   },
 
   // Create new mentor profile
@@ -339,6 +339,13 @@ export const bookingService = {
     const event = STATUS_EVENTS[status as Booking['status']];
     if (updated && event) await notify(bookingId, event);
     return updated;
+  },
+
+  // Mentee booked a slot via Cal.com for an accepted request
+  async confirm(bookingId: string, details: { scheduledAt?: string; calEventUri?: string } = {}): Promise<Booking | null> {
+    const confirmed = await db.confirmBooking(bookingId, details);
+    if (confirmed) await notify(bookingId, 'booking_confirmed');
+    return confirmed;
   },
 
   // Mark a session completed with its real duration (feeds volunteer hours)

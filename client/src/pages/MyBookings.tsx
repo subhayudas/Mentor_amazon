@@ -5,7 +5,7 @@ import { menteeService, mentorService, bookingService } from "@/lib/services";
 import type { Booking, Mentor, BookingNote } from "@/lib/database";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -34,6 +34,8 @@ import {
 import { format, parseISO, isFuture } from "date-fns";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { MenteeFeedbackDialog, StarRating } from "@/components/MenteeFeedbackDialog";
+import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "react-i18next";
 
 export default function MyBookings() {
@@ -41,17 +43,14 @@ export default function MyBookings() {
   const isRTL = i18n.language === 'ar';
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [email, setEmail] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("email") || localStorage.getItem("menteeEmail") || "";
-  });
-  const [inputEmail, setInputEmail] = useState(email);
+  // Identity is the signed-in session's email (route is behind RequireAuth);
+  // RLS only ever returns the caller's own bookings.
+  const { user } = useAuth();
+  const email = user?.email ?? "";
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [newNote, setNewNote] = useState("");
   const [noteType, setNoteType] = useState<"note" | "task">("note");
   const [feedbackBooking, setFeedbackBooking] = useState<Booking | null>(null);
-  const [feedbackRating, setFeedbackRating] = useState(0);
-  const [feedbackText, setFeedbackText] = useState("");
   const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
 
   const { data: mentee } = useQuery({
@@ -104,38 +103,6 @@ export default function MyBookings() {
     },
   });
 
-  // Submit feedback mutation
-  const submitFeedbackMutation = useMutation({
-    mutationFn: async (data: { bookingId: string; rating: number; feedback: string }) => {
-      return bookingService.submitMenteeFeedback(data.bookingId, data.rating, data.feedback);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mentee', mentee?.id, 'bookings'] });
-      setFeedbackDialogOpen(false);
-      setFeedbackBooking(null);
-      setFeedbackRating(0);
-      setFeedbackText("");
-      toast({
-        title: t('myBookings.feedbackSubmitted'),
-        description: t('myBookings.feedbackSubmittedDesc'),
-      });
-    },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('myBookings.feedbackSubmitError'),
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleEmailSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setEmail(inputEmail);
-    localStorage.setItem("menteeEmail", inputEmail);
-    setLocation(`/my-bookings?email=${inputEmail}`);
-  };
-
   const handleAddNote = () => {
     if (!selectedBooking || !newNote.trim()) return;
 
@@ -147,75 +114,17 @@ export default function MyBookings() {
     });
   };
 
-  const handleSubmitFeedback = () => {
-    if (!feedbackBooking || feedbackRating === 0) return;
-
-    submitFeedbackMutation.mutate({
-      bookingId: feedbackBooking.id,
-      rating: feedbackRating,
-      feedback: feedbackText.trim(),
-    });
-  };
-
   const openFeedbackDialog = (booking: Booking) => {
     setFeedbackBooking(booking);
-    setFeedbackRating(booking.mentee_rating || 0);
-    setFeedbackText(booking.mentee_feedback || "");
     setFeedbackDialogOpen(true);
   };
 
-  const StarRating = ({ rating, onRate, readonly = false }: { rating: number; onRate?: (r: number) => void; readonly?: boolean }) => {
-    return (
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            onClick={() => !readonly && onRate?.(star)}
-            disabled={readonly}
-            className={`${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}
-            data-testid={`star-${star}`}
-          >
-            <Star
-              className={`w-6 h-6 ${star <= rating
-                  ? 'fill-yellow-400 text-yellow-400'
-                  : 'text-muted-foreground'
-                }`}
-            />
-          </button>
-        ))}
-      </div>
-    );
-  };
 
   if (!email) {
     return (
       <div className="min-h-screen py-12" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="max-w-md mx-auto px-4">
-          <Card className="p-8">
-            <CardHeader>
-              <CardTitle>{t('myBookings.viewBookings')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleEmailSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">{t('myBookings.enterEmail')}</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@example.com"
-                    value={inputEmail}
-                    onChange={(e) => setInputEmail(e.target.value)}
-                    data-testid="input-mentee-email"
-                    required
-                  />
-                </div>
-                <Button type="submit" className="w-full" data-testid="button-view-bookings">
-                  {t('myBookings.viewMyBookings')}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+          <Skeleton className="h-40" />
         </div>
       </div>
     );
@@ -438,16 +347,11 @@ export default function MyBookings() {
           <h1 className="text-3xl font-bold">{t('myBookings.title')}</h1>
           <Button
             variant="outline"
-            onClick={() => {
-              localStorage.removeItem("menteeEmail");
-              setEmail("");
-              setInputEmail("");
-              setLocation("/my-bookings");
-            }}
-            data-testid="button-change-email"
+            onClick={() => setLocation("/mentee-dashboard")}
+            data-testid="button-open-dashboard"
           >
-            <User className="w-4 h-4 mr-2" />
-            {t('myBookings.changeEmail')}
+            <User className="w-4 h-4 me-2" />
+            {t('nav.menteeDashboard')}
           </Button>
         </div>
 
@@ -485,93 +389,12 @@ export default function MyBookings() {
       </div>
 
       {/* Feedback Dialog */}
-      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {feedbackBooking?.mentee_rating
-                ? t('myBookings.sessionFeedback')
-                : t('myBookings.giveFeedbackTitle')}
-            </DialogTitle>
-            <DialogDescription>
-              {feedbackBooking?.mentee_rating
-                ? t('myBookings.feedbackViewDesc')
-                : t('myBookings.feedbackGiveDesc')}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 mt-4">
-            {/* Your Feedback Section */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-base">{t('myBookings.yourFeedback')}</h4>
-
-              {feedbackBooking?.mentee_rating ? (
-                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{t('myBookings.yourRating')}:</span>
-                    <StarRating rating={feedbackBooking.mentee_rating} readonly />
-                  </div>
-                  {feedbackBooking.mentee_feedback && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">{t('myBookings.yourComment')}:</span>
-                      <p className="mt-1 text-sm">{feedbackBooking.mentee_feedback}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4 p-4 border rounded-lg">
-                  <div className="space-y-2">
-                    <Label>{t('myBookings.rateSession')}</Label>
-                    <StarRating rating={feedbackRating} onRate={setFeedbackRating} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>{t('myBookings.writeFeedback')}</Label>
-                    <Textarea
-                      placeholder={t('myBookings.feedbackPlaceholder')}
-                      value={feedbackText}
-                      onChange={(e) => setFeedbackText(e.target.value)}
-                      className="min-h-24"
-                      data-testid="input-feedback-text"
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSubmitFeedback}
-                    disabled={feedbackRating === 0 || submitFeedbackMutation.isPending}
-                    className="w-full"
-                    data-testid="button-submit-feedback"
-                  >
-                    {submitFeedbackMutation.isPending ? t('common.loading') : t('myBookings.submitFeedback')}
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            {/* Mentor's Feedback Section */}
-            <div className="space-y-4">
-              <h4 className="font-medium text-base">{t('myBookings.mentorFeedback')}</h4>
-
-              {feedbackBooking?.mentor_rating ? (
-                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{t('myBookings.mentorRating')}:</span>
-                    <StarRating rating={feedbackBooking.mentor_rating} readonly />
-                  </div>
-                  {feedbackBooking.mentor_feedback && (
-                    <div>
-                      <span className="text-sm text-muted-foreground">{t('myBookings.mentorComment')}:</span>
-                      <p className="mt-1 text-sm">{feedbackBooking.mentor_feedback}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground py-4 text-center border rounded-lg">
-                  {t('myBookings.noMentorFeedback')}
-                </p>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <MenteeFeedbackDialog
+        booking={feedbackBooking}
+        open={feedbackDialogOpen}
+        onOpenChange={setFeedbackDialogOpen}
+        invalidateKeys={[['mentee', mentee?.id, 'bookings']]}
+      />
     </div>
   );
 }

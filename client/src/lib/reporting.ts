@@ -48,6 +48,59 @@ export const REPORTING_COUNTRIES: readonly string[] = [
   "Other",
 ];
 
+/** ISO 3166-1 alpha-2 codes for the stored English country names, for localized display. */
+const COUNTRY_CODES: Record<string, string> = {
+  "United Arab Emirates": "AE",
+  "Saudi Arabia": "SA",
+  Egypt: "EG",
+  Kuwait: "KW",
+  Qatar: "QA",
+  Bahrain: "BH",
+  Oman: "OM",
+  Jordan: "JO",
+  Lebanon: "LB",
+  Morocco: "MA",
+  Tunisia: "TN",
+  Algeria: "DZ",
+  Iraq: "IQ",
+  Syria: "SY",
+  Palestine: "PS",
+  Turkey: "TR",
+  Pakistan: "PK",
+  India: "IN",
+  Bangladesh: "BD",
+  "United Kingdom": "GB",
+  "United States": "US",
+  Germany: "DE",
+  France: "FR",
+};
+
+const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
+
+/**
+ * Localized name for a stored English country value (the stored value is the
+ * data key; the UI shows it in the active language). Unknown values and the
+ * sentinels fall back to the stored string.
+ */
+export function localizeCountry(country: string, language: string): string {
+  const code = COUNTRY_CODES[country];
+  if (!code) return country;
+  let names = displayNamesCache.get(language);
+  if (names === undefined) {
+    try {
+      names = new Intl.DisplayNames([language], { type: "region" });
+    } catch {
+      names = null;
+    }
+    displayNamesCache.set(language, names);
+  }
+  try {
+    return names?.of(code) ?? country;
+  } catch {
+    return country;
+  }
+}
+
 export type StatusGroup = "clicked" | "scheduled" | "completed" | "canceled";
 
 /** Collapses the six booking statuses into the four groups the charts use. */
@@ -249,7 +302,7 @@ export function toBookingRows(
       menteeCountry: mentee?.country?.trim() || fallback,
       status: booking.status,
       statusGroup: statusGroup(booking.status),
-      clickedAt: booking.clicked_at,
+      clickedAt: booking.clicked_at || booking.created_at,
       scheduledAt: booking.scheduled_at,
       completedAt: booking.completed_at,
       durationMinutes: booking.session_duration_minutes,

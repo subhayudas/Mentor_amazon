@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useParams } from "wouter";
 import { useState } from "react";
 import { mentorService, bookingService } from "@/lib/services";
 import type { PublicMentor } from "@/lib/database";
@@ -47,8 +47,9 @@ type BookingRequestFormData = z.infer<typeof bookingRequestFormSchema>;
 export default function MentorProfile() {
   const { t, i18n } = useTranslation();
   const isArabic = i18n.language === 'ar';
-  const [, params] = useRoute("/mentor/:id");
-  const mentorId = params?.id;
+  // Both /mentor/:id and /mentors/:id route here; useParams reads whichever matched.
+  const params = useParams<{ id?: string }>();
+  const mentorId = params.id;
   const { toast } = useToast();
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   
@@ -75,10 +76,8 @@ export default function MentorProfile() {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast({
-        title: isArabic ? "تم إرسال طلبك" : "Request Sent Successfully!",
-        description: isArabic 
-          ? "تم إرسال طلبك إلى المرشد. سيتم إعلامك عبر البريد الإلكتروني بمجرد ردهم."
-          : "Your request has been sent to the mentor. You'll receive an email notification once they respond. Check your mentee dashboard for updates.",
+        title: t("booking.requestSentTitle"),
+        description: t("booking.requestSentBody"),
       });
       setShowBookingDialog(false);
       form.reset({
@@ -89,10 +88,8 @@ export default function MentorProfile() {
     },
     onError: () => {
       toast({
-        title: isArabic ? "فشل الإرسال" : "Request Failed",
-        description: isArabic 
-          ? "فشل إرسال طلبك. يرجى المحاولة مرة أخرى."
-          : "Failed to send your request. Please try again.",
+        title: t("booking.requestFailedTitle"),
+        description: t("booking.requestFailedBody"),
         variant: "destructive",
       });
     },

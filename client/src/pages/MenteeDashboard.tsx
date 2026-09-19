@@ -62,11 +62,13 @@ import {
   CalendarPlus,
   ShieldX,
 } from "lucide-react";
-import { menteeService } from "@/lib/services";
+import { menteeService, bookingService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { CalEmbed } from "@/components/CalEmbed";
+import { useAuth } from "@/context/AuthContext";
+import { CalEmbed, type CalBookingSuccess } from "@/components/CalEmbed";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { MenteeFeedbackDialog } from "@/components/MenteeFeedbackDialog";
 import type { Mentee, Booking, Mentor } from "@/lib/database";
 
 // Optional programme contact surfaced on the "not approved" banner; falls back to a generic line.
@@ -155,7 +157,28 @@ function OrganizationVerificationStatus({ mentee }: { mentee: Mentee }) {
   );
 }
 
+/**
+ * When Cal.com reports a successful booking inside the embed, move the
+ * accepted request to confirmed (with the slot time) so both dashboards and
+ * the analytics see a scheduled session — no server-side webhook needed.
+ */
+function useConfirmOnCalBooking(menteeId: string) {
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const confirmMutation = useMutation({
+    mutationFn: ({ bookingId, detail }: { bookingId: string; detail: CalBookingSuccess }) =>
+      bookingService.confirm(bookingId, { scheduledAt: detail.startTime, calEventUri: detail.uid }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['mentee', menteeId, 'bookings'] });
+      queryClient.invalidateQueries({ queryKey: ['mentee', menteeId, 'stats'] });
+      toast({ title: t('menteePortal.sessionConfirmedToast'), description: t('menteePortal.sessionScheduledDesc') });
+    },
+  });
+  return (bookingId: string) => (detail: CalBookingSuccess) => confirmMutation.mutate({ bookingId, detail });
+}
+
 function MenteeDashboardHome({ menteeId, mentee }: { menteeId: string; mentee: Mentee }) {
+  const onCalBooked = useConfirmOnCalBooking(menteeId);
   const { t } = useTranslation();
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -391,6 +414,7 @@ function MenteeDashboardHome({ menteeId, mentee }: { menteeId: string; mentee: M
           bookingId={selectedBooking.id}
           open={showCalendar}
           onOpenChange={handleCalendarClose}
+          onBookingSuccessful={onCalBooked(selectedBooking.id)}
         />
       )}
     </div>
@@ -399,6 +423,22 @@ function MenteeDashboardHome({ menteeId, mentee }: { menteeId: string; mentee: M
 
 function MenteeBookings({ menteeId }: { menteeId: string }) {
   const { t } = useTranslation();
+  const onCalBooked = useConfirmOnCalBooking(menteeId);
+  const [feedbackBooking, setFeedbackBooking] = useState<BookingWithMentor | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const openFeedback = (booking: BookingWithMentor) => {
+    setFeedbackBooking(booking);
+    setFeedbackOpen(true);
+  };
+  // Anchored feedback: after submitting, scroll to and highlight the rated card.
+  const onFeedbackSubmitted = (bookingId: string) => {
+    setHighlightedId(bookingId);
+    window.setTimeout(() => {
+      document.querySelector<HTMLElement>(`[data-booking-card="${bookingId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 50);
+    window.setTimeout(() => setHighlightedId((current) => (current === bookingId ? null : current)), 2500);
+  };
   const [selectedBooking, setSelectedBooking] = useState<BookingWithMentor | null>(null);
   const [showCalendar, setShowCalendar] = useState(false);
   // Use a ref to track dismissed bookings to avoid re-triggering useEffect
@@ -663,7 +703,12 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
           ) : (
             <div className="space-y-4">
               {completedBookings.map((booking) => (
-                <div key={booking.id} className="flex items-center justify-between gap-4 p-4 border rounded-lg" data-testid={`booking-completed-${booking.id}`}>
+                <div
+                  key={booking.id}
+                  data-booking-card={booking.id}
+                  className={`flex items-center justify-between gap-4 p-4 border rounded-lg transition-shadow duration-500 ${highlightedId === booking.id ? "ring-2 ring-[#FF9900] bg-[#FFF5E6]" : ""}`}
+                  data-testid={`booking-completed-${booking.id}`}
+                >
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
                       <AvatarImage src={booking.mentor?.photo_url || undefined} />
@@ -686,12 +731,24 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
                   <div className="flex items-center gap-2 flex-wrap">
                     {getStatusBadge(booking.status)}
                     {booking.mentee_rating ? (
-                      <Badge variant="outline">
-                        <Star className="w-3 h-3 mr-1 fill-yellow-400 text-yellow-400" />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openFeedback(booking)}
+                        data-testid={`button-view-feedback-${booking.id}`}
+                      >
+                        <Star className="w-3 h-3 me-1 fill-[#FF9900] text-[#FF9900]" />
                         {booking.mentee_rating}/5
-                      </Badge>
+                      </Button>
                     ) : (
-                      <Button variant="outline" size="sm">{t('menteePortal.giveFeedback')}</Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openFeedback(booking)}
+                        data-testid={`button-give-feedback-${booking.id}`}
+                      >
+                        {t('menteePortal.giveFeedback')}
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -701,6 +758,14 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
         </CardContent>
       </Card>
 
+      <MenteeFeedbackDialog
+        booking={feedbackBooking}
+        open={feedbackOpen}
+        onOpenChange={setFeedbackOpen}
+        invalidateKeys={[['mentee', menteeId, 'bookings'], ['mentee', menteeId, 'feedback'], ['mentee', menteeId, 'stats']]}
+        onSubmitted={onFeedbackSubmitted}
+      />
+
       {selectedBooking && selectedBooking.mentor?.cal_link && (
         <CalEmbed
           calLink={selectedBooking.mentor.cal_link}
@@ -708,6 +773,7 @@ function MenteeBookings({ menteeId }: { menteeId: string }) {
           bookingId={selectedBooking.id}
           open={showCalendar}
           onOpenChange={handleCalendarClose}
+          onBookingSuccessful={onCalBooked(selectedBooking.id)}
         />
       )}
     </div>
@@ -1188,16 +1254,12 @@ function MenteeProfileSettings({ mentee }: { mentee: Mentee }) {
 export default function MenteeDashboard() {
   const { t, i18n } = useTranslation();
   const isRTL = i18n.language === 'ar';
-  const [location] = useLocation();
-  const [menteeEmail, setMenteeEmail] = useState("");
-  const [storedEmail, setStoredEmail] = useState<string | null>(null);
-
-  useEffect(() => {
-    const email = localStorage.getItem("menteeEmail");
-    if (email) {
-      setStoredEmail(email);
-    }
-  }, []);
+  const [location, setLocation] = useLocation();
+  // Identity is the signed-in session's email (the route is behind
+  // RequireAuth). RLS only returns a mentee's own row, so a typed or stored
+  // address could never load anyone else's dashboard anyway.
+  const { user } = useAuth();
+  const storedEmail = user?.email ?? null;
 
   const { data: mentee, isLoading: menteeLoading, error } = useQuery<Mentee | null>({
     queryKey: ['mentee', 'email', storedEmail],
@@ -1208,54 +1270,10 @@ export default function MenteeDashboard() {
     staleTime: 30000,
   });
 
-  const handleAccessDashboard = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (menteeEmail.trim()) {
-      localStorage.setItem("menteeEmail", menteeEmail.trim());
-      setStoredEmail(menteeEmail.trim());
-    }
-  };
+  // Signed in but no mentee profile yet: finish registration first.
+  const handleChangeEmail = () => setLocation('/mentee-registration');
 
-  const handleChangeEmail = () => {
-    localStorage.removeItem("menteeEmail");
-    setStoredEmail(null);
-    setMenteeEmail("");
-  };
-
-  if (!storedEmail) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4" dir={isRTL ? 'rtl' : 'ltr'}>
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center">
-              {t('menteePortal.accessPortal')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAccessDashboard} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">{t('menteePortal.enterEmail')}</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={menteeEmail}
-                  onChange={(e) => setMenteeEmail(e.target.value)}
-                  placeholder={t('menteePortal.emailPlaceholder')}
-                  data-testid="input-mentee-email"
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" data-testid="button-access-mentee-portal">
-                {t('menteePortal.accessBtn')}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (menteeLoading) {
+  if (!storedEmail || menteeLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="space-y-4 w-full max-w-md p-4">
@@ -1278,10 +1296,10 @@ export default function MenteeDashboard() {
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <p className="text-muted-foreground">
-              {t('menteePortal.notFoundDesc')}
+              {t('menteePortal.noProfileDesc')}
             </p>
             <Button onClick={handleChangeEmail} data-testid="button-try-again">
-              {t('menteePortal.tryAgain')}
+              {t('menteePortal.completeRegistration')}
             </Button>
           </CardContent>
         </Card>
