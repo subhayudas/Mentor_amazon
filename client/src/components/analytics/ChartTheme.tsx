@@ -80,9 +80,18 @@ interface ValueLabelProps {
 export function ValueLabel({ value, viewBox, placement, minSize, isRTL = false, format }: ValueLabelProps) {
   const numeric = typeof value === "number" ? value : Number(value ?? 0);
   if (!viewBox || !Number.isFinite(numeric) || numeric <= 0) return null;
-  const { x = 0, y = 0, width = 0, height = 0 } = viewBox;
+  // A reversed axis (Arabic horizontal bars) hands recharts a negative width:
+  // normalise to a left edge + positive size before measuring anything.
+  const rawX = viewBox.x ?? 0;
+  const rawY = viewBox.y ?? 0;
+  const rawWidth = viewBox.width ?? 0;
+  const rawHeight = viewBox.height ?? 0;
+  const x = Math.min(rawX, rawX + rawWidth);
+  const y = Math.min(rawY, rawY + rawHeight);
+  const width = Math.abs(rawWidth);
+  const height = Math.abs(rawHeight);
   const text = format(numeric);
-  const size = placement === "top" ? width : placement === "end" ? height : width;
+  const size = placement === "end" ? height : width;
   if (size < minSize) return null;
 
   if (placement === "top") {
@@ -93,6 +102,7 @@ export function ValueLabel({ value, viewBox, placement, minSize, isRTL = false, 
     );
   }
   if (placement === "end") {
+    // The data end is the left edge when the bar grows toward the inline-start (RTL).
     const anchorX = isRTL ? x - 6 : x + width + 6;
     return (
       <text x={anchorX} y={y + height / 2} dy={4} textAnchor={isRTL ? "end" : "start"} fill={MUTED_INK} fontSize={12} style={TABULAR}>

@@ -6,10 +6,9 @@ import { StatTile } from "@/components/StatTile";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UNAVAILABLE, formatNumber } from "@/lib/format";
 import { delta, type Period, type PeriodSummary } from "@/lib/reporting";
-import { deltaLine, previousPhrase, type Scope } from "./labels";
+import { deltaLine, previousPhrase } from "./labels";
 
 interface KpiTilesProps {
-  scope: Scope;
   current: PeriodSummary;
   /** The previous window's summary when the comparison is on; null hides the delta lines. */
   previous: PeriodSummary | null;
@@ -27,13 +26,13 @@ function DeltaText({ diff, children }: { diff: number; children: ReactNode }) {
 }
 
 /**
- * The four tiles (spec §9, P2-15): requests received, sessions completed,
- * volunteer hours, answer rate. Values are 24px tabular numerals; a missing
+ * The four admin tiles (spec §9, P2-15, P1-26): requests received, sessions
+ * completed, volunteer hours, answer rate. Values are 24px tabular numerals; a missing
  * value is "—" with a reason, a real zero is 0; every tile carries a visible
  * definition footnote. All numbers come from the same `summarize()` call as
  * the summary sentence, so they reconcile.
  */
-export function KpiTiles({ scope, current, previous, period }: KpiTilesProps) {
+export function KpiTiles({ current, previous, period }: KpiTilesProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const previousLabel = previousPhrase(period, t);
@@ -47,8 +46,12 @@ export function KpiTiles({ scope, current, previous, period }: KpiTilesProps) {
 
   const hoursDelta = () => {
     if (!compare) return undefined;
-    const d = delta(current.hours.minutes, previous.hours.minutes);
-    return <DeltaText diff={d.diff}>{deltaLine(d, previous.hours.minutes, previousLabel, t, lang, "hours")}</DeltaText>;
+    // The difference is kept in minutes (formatted as hours); the P2-15
+    // threshold for showing a percentage is the previous value in HOURS.
+    const diff = current.hours.minutes - previous.hours.minutes;
+    const previousHours = previous.hours.hours;
+    const d = { diff, percent: previousHours >= 10 && previous.hours.minutes > 0 ? diff / previous.hours.minutes : null };
+    return <DeltaText diff={d.diff}>{deltaLine(d, previousHours, previousLabel, t, lang, "hours")}</DeltaText>;
   };
 
   const rateDelta = () => {
@@ -65,21 +68,21 @@ export function KpiTiles({ scope, current, previous, period }: KpiTilesProps) {
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <StatTile
-        title={t(`analyticsV2.tiles.requests.title.${scope}`)}
+        title={t("analyticsV2.tiles.requests.title")}
         value={formatNumber(current.requests, lang)}
         delta={countDelta(current.requests, previous?.requests ?? 0)}
-        definition={t(`analyticsV2.tiles.requests.definition.${scope}`)}
+        definition={t("analyticsV2.tiles.requests.definition")}
         testId="metric-requests"
       />
       <StatTile
         title={t("analyticsV2.tiles.completed.title")}
         value={formatNumber(current.completed, lang)}
         delta={countDelta(current.completed, previous?.completed ?? 0)}
-        definition={t(`analyticsV2.tiles.completed.definition.${scope}`)}
+        definition={t("analyticsV2.tiles.completed.definition")}
         testId="metric-completed"
       />
       <StatTile
-        title={t(`analyticsV2.tiles.hours.title.${scope}`)}
+        title={t("analyticsV2.tiles.hours.title")}
         value={hoursUnavailable ? UNAVAILABLE : formatNumber(current.hours.hours, lang, { maximumFractionDigits: 1 })}
         unit={hoursUnavailable ? undefined : t("analytics.hoursUnit")}
         delta={hoursUnavailable ? undefined : hoursDelta()}
@@ -98,7 +101,7 @@ export function KpiTiles({ scope, current, previous, period }: KpiTilesProps) {
         value={current.answer.rate === null ? UNAVAILABLE : formatNumber(current.answer.rate, lang, { style: "percent", maximumFractionDigits: 0 })}
         delta={rateDelta()}
         caveat={current.answer.rate === null ? t("analyticsV2.tiles.noRequests") : undefined}
-        definition={t(`analyticsV2.tiles.answerRate.definition.${scope}`)}
+        definition={t("analyticsV2.tiles.answerRate.definition")}
         testId="metric-answer-rate"
       />
     </div>

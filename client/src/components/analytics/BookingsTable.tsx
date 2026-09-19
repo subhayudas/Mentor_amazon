@@ -28,7 +28,7 @@ export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table
   const visible = typeof limit === "number" ? rows.slice(0, limit) : rows;
   const displayCountry = (country: string) => (country === NOT_SPECIFIED ? t("analytics.notSpecified") : localizeCountry(country, lang));
   const duration = (minutes: number | undefined) =>
-    typeof minutes === "number" ? formatNumber(minutes, lang, { style: "unit", unit: "minute", unitDisplay: "narrow" }) : UNAVAILABLE;
+    typeof minutes === "number" ? formatNumber(minutes, lang, { style: "unit", unit: "minute", unitDisplay: "short" }) : UNAVAILABLE;
 
   if (visible.length === 0) {
     return (
@@ -61,7 +61,7 @@ export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table
                 </TableCell>
               )}
               {showMentee && (
-                <TableCell data-testid={`text-mentee-${row.id}`}>
+                <TableCell className="whitespace-nowrap" data-testid={`text-mentee-${row.id}`}>
                   <div className="leading-tight">
                     <div className="text-foreground">
                       <bdi>{row.menteeName || t("analytics.unknown")}</bdi>

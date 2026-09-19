@@ -4,7 +4,7 @@ import { Globe, Info } from "lucide-react";
 import { EmptyState } from "@/components/EmptyState";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { formatHours, formatNumber } from "@/lib/format";
+import { UNAVAILABLE, formatHours, formatNumber } from "@/lib/format";
 import { NOT_SPECIFIED, localizeCountry, type CountryBreakdownRow } from "@/lib/reporting";
 import { cn } from "@/lib/utils";
 
@@ -66,7 +66,10 @@ export function CountryTable({ rows, activeCountry, onSelect }: CountryTableProp
                       type="button"
                       aria-pressed={active}
                       onClick={() => onSelect(active ? null : row.country)}
-                      className={cn("rounded-sm text-start text-foreground underline-offset-4 transition-colors duration-fast hover:underline", active && "underline")}
+                      className={cn(
+                        "rounded-sm text-start text-secondary underline decoration-border underline-offset-4 transition-colors duration-fast hover:decoration-secondary",
+                        active && "decoration-secondary",
+                      )}
                     >
                       {displayCountry(row.country)}
                     </button>
@@ -75,7 +78,7 @@ export function CountryTable({ rows, activeCountry, onSelect }: CountryTableProp
                   <TableCell className="text-end tabular-nums">{formatNumber(row.completed, lang)}</TableCell>
                   <TableCell className="text-end tabular-nums">
                     <span className="inline-flex items-center justify-end gap-1">
-                      {formatHours(row.volunteerMinutes, lang)}
+                      {row.completed > 0 && row.volunteerMinutes === 0 ? UNAVAILABLE : formatHours(row.volunteerMinutes, lang)}
                       {caveat && (
                         <Tooltip>
                           <TooltipTrigger asChild>

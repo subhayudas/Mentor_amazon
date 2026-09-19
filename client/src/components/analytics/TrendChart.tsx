@@ -82,12 +82,11 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
     latestCompleted: t("analyticsV2.counts.completed", { count: latest?.completed ?? 0 }),
   });
 
-  const legendItems: SegmentLegendItem[] = data.map((point) => ({
-    key: point.key,
-    label: point.label,
-    value: formatNumber(drillCounts.get(point.key) ?? 0, lang),
-    color: SERIES.completed,
-  }));
+  // Label only: a per-bucket count would match neither bar (a drill lists
+  // rows requested OR completed in the bucket), so it would not reconcile.
+  const legendItems: SegmentLegendItem[] = data
+    .filter((point) => (drillCounts.get(point.key) ?? 0) > 0)
+    .map((point) => ({ key: point.key, label: point.label, color: SERIES.completed }));
 
   const seriesNames = { requests: t("analyticsV2.trend.requests"), completed: t("analyticsV2.trend.completed") };
   const isEmpty = totals.requests === 0 && totals.completed === 0;
@@ -111,8 +110,8 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
       <thead>
         <tr className="text-caption text-muted-foreground">
           <th scope="col" className="py-1 text-start font-medium">{t(`analyticsV2.trend.table.${bucket}`)}</th>
-          <th scope="col" className="py-1 text-end font-medium">{t("analyticsV2.trend.table.requests")}</th>
-          <th scope="col" className="py-1 text-end font-medium">{t("analyticsV2.trend.table.completed")}</th>
+          <th scope="col" className="w-32 py-1 text-end font-medium">{t("analyticsV2.trend.table.requests")}</th>
+          <th scope="col" className="w-40 py-1 text-end font-medium">{t("analyticsV2.trend.table.completed")}</th>
         </tr>
       </thead>
       <tbody>

@@ -26,12 +26,12 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
 
   if (!wide) {
     return (
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex w-full min-w-0 flex-col gap-1">
         <Label htmlFor={id} className="text-caption text-muted-foreground">
           {label}
         </Label>
         <Select value={value} onValueChange={(next) => onChange(next as Period)}>
-          <SelectTrigger id={id} data-testid="select-date-range">
+          <SelectTrigger id={id} className="h-11" data-testid="select-date-range">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

@@ -647,8 +647,24 @@ export function countryBreakdown(
   const rows = new Map<string, CountryBreakdownRow>(
     groupByCountry(completedRows, mentors, fallback).map((row) => [row.country, { ...row, requests: 0 }]),
   );
-  requestRows.forEach((booking) => {
+  // Mentors/mentees are counted over every row the period touches (requested
+  // or completed), so a country with requests but no completed session never
+  // reads as "0 mentors, 0 mentees".
+  const people = new Map<string, { mentors: Set<string>; mentees: Set<string> }>();
+  const touch = (booking: Booking) => {
     const country = bookingCountry(booking, mentorsById.get(booking.mentor_id), fallback);
+    let entry = people.get(country);
+    if (!entry) {
+      entry = { mentors: new Set(), mentees: new Set() };
+      people.set(country, entry);
+    }
+    entry.mentors.add(booking.mentor_id);
+    entry.mentees.add(booking.mentee_id);
+    return country;
+  };
+  completedRows.forEach(touch);
+  requestRows.forEach((booking) => {
+    const country = touch(booking);
     let row = rows.get(country);
     if (!row) {
       row = { country, bookings: 0, completed: 0, volunteerMinutes: 0, volunteerHours: 0, uniqueMentors: 0, uniqueMentees: 0, withoutDuration: 0, requests: 0 };
@@ -656,9 +672,12 @@ export function countryBreakdown(
     }
     row.requests += 1;
   });
-  return Array.from(rows.values()).sort(
-    (a, b) => b.completed - a.completed || b.volunteerMinutes - a.volunteerMinutes || b.requests - a.requests || a.country.localeCompare(b.country),
-  );
+  return Array.from(rows.values())
+    .map((row) => {
+      const entry = people.get(row.country);
+      return { ...row, uniqueMentors: entry?.mentors.size ?? row.uniqueMentors, uniqueMentees: entry?.mentees.size ?? row.uniqueMentees };
+    })
+    .sort((a, b) => b.completed - a.completed || b.volunteerMinutes - a.volunteerMinutes || b.requests - a.requests || a.country.localeCompare(b.country));
 }
 
 export interface MentorPerformanceRow {

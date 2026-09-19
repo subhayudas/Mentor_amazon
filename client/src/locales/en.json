@@ -388,7 +388,7 @@
     "allLanguages": "All languages",
     "expertise": "Expertise",
     "allExpertise": "All expertise",
-    "demoBannerTitle": "Demo data — not program metrics",
+    "demoBannerTitle": "Demo data — not programme metrics",
     "demoBannerBody": "Fewer than {{threshold}} real bookings exist ({{count}} so far), so every number and chart on this page is illustrative sample data. Real metrics replace it automatically once bookings accumulate.",
     "tabs": {
       "overview": "Overview",
@@ -1293,40 +1293,20 @@
     },
     "tiles": {
       "requests": {
-        "title": {
-          "admin": "Requests received",
-          "mentor": "Requests received",
-          "mentee": "Requests sent"
-        },
-        "definition": {
-          "admin": "Every request sent in the period, whatever happened to it afterwards.",
-          "mentor": "Every request sent to you in the period, whatever happened to it afterwards.",
-          "mentee": "Every request you sent in the period, whatever happened to it afterwards."
-        }
+        "title": "Requests received",
+        "definition": "Every request sent in the period, whatever happened to it afterwards."
       },
       "completed": {
         "title": "Sessions completed",
-        "definition": {
-          "admin": "Sessions a mentor marked complete in the period.",
-          "mentor": "Sessions you marked complete in the period.",
-          "mentee": "Sessions your mentor marked complete in the period."
-        }
+        "definition": "Sessions a mentor marked complete in the period."
       },
       "hours": {
-        "title": {
-          "admin": "Volunteer hours",
-          "mentor": "Volunteer hours",
-          "mentee": "Mentoring hours"
-        },
+        "title": "Volunteer hours",
         "definition": "Recorded durations of the completed sessions, added up. Sessions without a duration are listed but not counted."
       },
       "answerRate": {
         "title": "Answer rate",
-        "definition": {
-          "admin": "Requests a mentor accepted or declined, as a share of the requests received in the period.",
-          "mentor": "Requests you accepted or declined, as a share of the requests you received in the period.",
-          "mentee": "Requests that were accepted or declined, as a share of the requests you sent in the period."
-        }
+        "definition": "Requests a mentor accepted or declined, as a share of the requests received in the period."
       },
       "delta": "{{delta}} vs {{previous}}",
       "deltaPercent": "{{delta}} ({{percent}}) vs {{previous}}",

@@ -402,7 +402,7 @@ export default function Analytics() {
           <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
             <PeriodControl value={period} onChange={changePeriod} />
             <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} />
-            {isAdmin && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
+            {isAdmin && !isError && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
             {updatedAt > 0 && !isError && (
               <p className="ms-auto self-center text-caption text-muted-foreground" data-testid="analytics-updated">
                 {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
@@ -461,9 +461,9 @@ export default function Analytics() {
               <div role="status" aria-busy="true" className="space-y-6">
                 <span className="sr-only">{t("analyticsV2.loading")}</span>
                 <SummarySentenceSkeleton />
-                <KpiTilesSkeleton />
+                {isAdmin && <KpiTilesSkeleton />}
                 <TrendChartSkeleton />
-                <div className={isAdmin ? "grid grid-cols-1 gap-6 lg:grid-cols-2" : ""}>
+                <div className={isAdmin ? "grid grid-cols-1 items-start gap-6 lg:grid-cols-2" : ""}>
                   <OutcomesBarSkeleton />
                   {isAdmin && <CountryBreakdownSkeleton />}
                 </div>
@@ -471,7 +471,8 @@ export default function Analytics() {
             ) : (
               <>
                 <SummarySentence scope={scope} period={period} current={current} previous={previousSummary} />
-                <KpiTiles scope={scope} current={current} previous={previousSummary} period={period} />
+                {/* Tiles are the admin's decision numbers; a personal view keeps the sentence, the trend and the outcomes only (P1-26). */}
+                {isAdmin && <KpiTiles current={current} previous={previousSummary} period={period} />}
                 <div className="space-y-3">
                   <TrendChart series={series} bucket={bucket} period={period} drillCounts={drillCounts} activeKey={activeDrill("bucket")} onSelect={selectBucket} />
                   {renderDrill("bucket", "drilldown-date")}

@@ -59,16 +59,31 @@ export function MentorTable({ rows, activeMentor, onSelect }: MentorTableProps) 
                       type="button"
                       aria-pressed={active}
                       onClick={() => onSelect(active ? null : { id: mentor.id, label: name })}
-                      className={cn("rounded-sm text-start text-foreground underline-offset-4 transition-colors duration-fast hover:underline", active && "underline")}
+                      className={cn(
+                        "rounded-sm text-start text-secondary underline decoration-border underline-offset-4 transition-colors duration-fast hover:decoration-secondary",
+                        active && "decoration-secondary",
+                      )}
                     >
                       <bdi>{name}</bdi>
                     </button>
                   </TableCell>
                   <TableCell className="text-end tabular-nums">{formatNumber(mentor.completed, lang)}</TableCell>
-                  <TableCell className="text-end tabular-nums">{formatHours(mentor.volunteerMinutes, lang)}</TableCell>
+                  <TableCell className="text-end tabular-nums">
+                    {mentor.completed > 0 && mentor.volunteerMinutes === 0 ? (
+                      <>
+                        {UNAVAILABLE}
+                        <span className="sr-only">{t("analyticsV2.tiles.notRecordedCount", { count: mentor.withoutDuration })}</span>
+                      </>
+                    ) : (
+                      formatHours(mentor.volunteerMinutes, lang)
+                    )}
+                  </TableCell>
                   <TableCell className="text-end tabular-nums">
                     {mentor.avgRating === null ? (
-                      <span aria-label={t("analyticsV2.mentors.noRating")}>{UNAVAILABLE}</span>
+                      <>
+                        {UNAVAILABLE}
+                        <span className="sr-only">{t("analyticsV2.mentors.noRating")}</span>
+                      </>
                     ) : (
                       formatNumber(mentor.avgRating, lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
                     )}

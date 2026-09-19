@@ -41,11 +41,11 @@ export function SummarySentence({ scope, period, current, previous }: SummarySen
     // duration: "for 0 hours" would misreport an unknown as a zero.
     const hours =
       current.hours.withDuration > 0
-        ? t(own ? "analyticsV2.summary.hoursOwn" : "analyticsV2.summary.hoursAdmin", {
+        ? t(scope === "mentee" ? "analyticsV2.summary.hoursOwn" : "analyticsV2.summary.hoursAdmin", {
             hours: formatNumber(current.hours.minutes / 60, lang, { style: "unit", unit: "hour", unitDisplay: "long", maximumFractionDigits: 1 }),
           })
         : "";
-    const countries = scope !== "mentee" && current.countries > 0 ? t("analyticsV2.summary.countries", { count: current.countries }) : "";
+    const countries = !own && current.countries > 0 ? t("analyticsV2.summary.countries", { count: current.countries }) : "";
     sentence = t(own ? "analyticsV2.summary.own" : "analyticsV2.summary.admin", {
       count: current.completed,
       period: periodPhrase(period, t),

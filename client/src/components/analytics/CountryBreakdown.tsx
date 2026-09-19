@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, Cell, LabelList, Tooltip, XAxis, YAxis } from "recharts";
 import { Globe } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -10,7 +10,7 @@ import { ChartContainer } from "@/components/ui/chart";
 import { useDirection } from "@/hooks/useDirection";
 import { formatHours, formatNumber } from "@/lib/format";
 import { NOT_SPECIFIED, localizeCountry, type CountryBreakdownRow, type Period } from "@/lib/reporting";
-import { AXIS_TICK, BrandTooltip, CURSOR_FILL, GRID_STROKE, SERIES, SURFACE, ValueLabel, horizontalBarRadius, markOpacity } from "./ChartTheme";
+import { AXIS_TICK, BrandTooltip, CURSOR_FILL, SERIES, SURFACE, ValueLabel, horizontalBarRadius, markOpacity } from "./ChartTheme";
 import { ChartFigure } from "./ChartFigure";
 
 interface CountryBreakdownProps {
@@ -72,7 +72,6 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
       <p className="mb-1 text-caption text-muted-foreground">{name}</p>
       <ChartContainer config={{ [dataKey]: { label: name } }} className="aspect-auto w-full" style={{ height: chartHeight }}>
         <BarChart data={data} layout="vertical" accessibilityLayer title={name} desc={summary} margin={{ top: 0, right: 40, bottom: 0, left: 0 }} barCategoryGap={6}>
-          <CartesianGrid horizontal={false} stroke={GRID_STROKE} />
           <XAxis type="number" hide reversed={isRTL} allowDecimals={dataKey === "volunteerHours"} />
           <YAxis type="category" dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} width={112} orientation={isRTL ? "right" : "left"} />
           <Tooltip

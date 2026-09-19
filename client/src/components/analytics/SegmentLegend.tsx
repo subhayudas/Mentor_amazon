@@ -6,8 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 export interface SegmentLegendItem {
   key: string;
   label: string;
-  /** Already formatted for display. */
-  value: string;
+  /** Already formatted for display; omit when the chip should carry the label only. */
+  value?: string;
   /** CSS colour of the mark this item stands for (a token string such as `hsl(var(--chart-1))`). */
   color: string;
 }
@@ -46,7 +46,7 @@ export function SegmentLegend({ items, activeKey, onSelect, label, testId, maxBu
             <SelectItem value="__none">{t("analytics.allSegments")}</SelectItem>
             {items.map((item) => (
               <SelectItem key={item.key} value={item.key}>
-                {t("analyticsV2.filters.chip", { filter: item.label, value: item.value })}
+                {item.value ? t("analyticsV2.filters.chip", { filter: item.label, value: item.value }) : item.label}
               </SelectItem>
             ))}
           </SelectContent>
