@@ -14,7 +14,59 @@
     "all": "الكل",
     "required": "مطلوب",
     "optional": "اختياري",
-    "refresh": "تحديث"
+    "refresh": "تحديث",
+    "close": "إغلاق",
+    "clearAll": "مسح الكل",
+    "clearSearch": "مسح البحث",
+    "tryAgain": "حاول مرة أخرى",
+    "reloadPage": "إعادة تحميل الصفحة",
+    "somethingWentWrong": "حدث خطأ ما",
+    "unexpectedError": "حدث خطأ غير متوقع. حاول مرة أخرى أو أعد تحميل الصفحة.",
+    "loadingLanguage": "جارٍ تحميل اللغة…",
+    "toggleNavigation": "إظهار أو إخفاء التنقل",
+    "sidebar": "التنقل",
+    "sidebarDescription": "التنقل بين الأقسام",
+    "rail": {
+      "title": "كيف تتم الجلسة",
+      "step1": "أرسل طلبًا يتضمن هدفك — لا يلزم إنشاء حساب",
+      "step2": "يردّ المرشد؛ سجّل الدخول بنفس البريد الإلكتروني لرؤية الرد",
+      "step3": "اختر وقتًا عبر رابط تقويم المرشد"
+    }
+  },
+  "status": {
+    "pending": "بانتظار المرشد",
+    "accepted": "مقبول",
+    "confirmed": "مجدول",
+    "completed": "مكتمل",
+    "canceled": "ملغى",
+    "rejected": "مرفوض"
+  },
+  "a11y": {
+    "skipToContent": "الانتقال إلى المحتوى",
+    "railLabel": "كيف تتم الجلسة",
+    "stepDone": "تم",
+    "stepCurrent": "الخطوة الحالية",
+    "stepNext": "التالي",
+    "activeFilters": "الفلاتر النشطة",
+    "removeFilter": "إزالة الفلتر: {{label}}"
+  },
+  "format": {
+    "tzSame": "نفس منطقتك الزمنية",
+    "tzAhead_zero": "{{hours}} ساعة قبلك",
+    "tzAhead_one": "ساعة واحدة قبلك",
+    "tzAhead_two": "ساعتان قبلك",
+    "tzAhead_few": "{{hours}} ساعات قبلك",
+    "tzAhead_many": "{{hours}} ساعة قبلك",
+    "tzAhead_other": "{{hours}} ساعة قبلك",
+    "tzBehind_zero": "{{hours}} ساعة بعدك",
+    "tzBehind_one": "ساعة واحدة بعدك",
+    "tzBehind_two": "ساعتان بعدك",
+    "tzBehind_few": "{{hours}} ساعات بعدك",
+    "tzBehind_many": "{{hours}} ساعة بعدك",
+    "tzBehind_other": "{{hours}} ساعة بعدك",
+    "mentorsTime": "بتوقيت المرشد",
+    "availabilitySummary": "متاح عادةً {{days}} (بتوقيت المرشد)",
+    "availabilitySummaryTz": "متاح عادةً {{days}} (بتوقيت المرشد، {{tz}})"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -120,14 +172,41 @@
     "navigation": "التنقل",
     "browseMentors": "تصفح المرشدين",
     "analytics": "التحليلات",
-    "becomeMentor": "كن مرشداً",
+    "becomeMentor": "كن مرشدًا",
     "joinMentee": "انضم كمتدرب",
     "myBookings": "حجوزاتي",
     "myProfile": "ملفي الشخصي",
     "mentorPortal": "بوابة المرشد",
     "menteeDashboard": "لوحة المتدرب",
     "language": "اللغة",
-    "admin": "لوحة الإدارة"
+    "admin": "لوحة الإدارة",
+    "mentors": "المرشدون",
+    "signIn": "تسجيل الدخول",
+    "homeLink": "الصفحة الرئيسية لـ MentorConnect",
+    "openMenu": "فتح القائمة",
+    "accountMenu": "قائمة الحساب",
+    "switchLanguage": "English — switch to English",
+    "titles": {
+      "home": "الإرشاد من أمازون",
+      "mentors": "ابحث عن مرشد",
+      "mentor": "الملف الشخصي للمرشد",
+      "login": "تسجيل الدخول",
+      "signup": "إنشاء حساب",
+      "forgotPassword": "نسيت كلمة المرور",
+      "resetPassword": "إعادة تعيين كلمة المرور",
+      "sso": "جارٍ تسجيل دخولك",
+      "requestAccess": "طلب الوصول",
+      "menteeRegistration": "تسجيل المتدرب",
+      "myBookings": "حجوزاتي",
+      "menteeDashboard": "لوحة المتدرب",
+      "menteeProfile": "الملف الشخصي للمتدرب",
+      "analytics": "التحليلات",
+      "mentorOnboarding": "انضمام المرشد",
+      "mentorDashboard": "لوحة المرشد",
+      "mentorPortal": "بوابة المرشد",
+      "admin": "لوحة الإدارة",
+      "notFound": "الصفحة غير موجودة"
+    }
   },
   "hero": {
     "badge": "برنامج الإرشاد من أمازون",
@@ -1178,5 +1257,26 @@
     "contactLine": "تواصل مع فريق برنامج MentorConnect لتحديث بياناتك أو طلب مراجعة أخرى.",
     "mentorNoteUnverified": "لم يتم التحقق من هذه المنظمة من قبل البرنامج بعد.",
     "mentorNoteRejected": "لم يوافق فريق البرنامج على التحقق من هذه المنظمة."
+  },
+  "landing": {
+    "_owner": "A"
+  },
+  "discovery": {
+    "_owner": "A"
+  },
+  "mentorCard": {
+    "_owner": "A"
+  },
+  "mentorProfile": {
+    "_owner": "B"
+  },
+  "bookingRequest": {
+    "_owner": "B"
+  },
+  "dashboardV2": {
+    "_owner": "D"
+  },
+  "analyticsV2": {
+    "_owner": "C"
   }
 }

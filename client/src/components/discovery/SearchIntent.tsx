@@ -1,0 +1,149 @@
+import * as React from "react";
+import { Search, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
+
+import { Button } from "@/components/ui/button";
+import { useDirection } from "@/hooks/useDirection";
+import { cn } from "@/lib/utils";
+
+/**
+ * Outcome-led search box (spec §3/§5, P2-6, P2-7): a `role="search"` form with
+ * a labelled input, leading Search icon, inset clear button (32px, radius 4 —
+ * concentric with the radius-8 input) and an optional visible submit button.
+ * `primaryAction` makes that submit the page's single orange fill (landing hero
+ * only); everywhere else it is navy. Enter submits (implicit submission).
+ * The input is `dir="auto"` so Arabic and English queries align correctly.
+ * Callers own the behaviour: on `/` Enter navigates to `/mentors?q=`, on
+ * `/mentors` filtering is live and Enter moves focus to the results heading.
+ */
+export interface SearchIntentProps {
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: (value: string) => void;
+  onClear?: () => void;
+  /** Translated visible-hidden label and placeholder. */
+  label: string;
+  placeholder: string;
+  /** Translated submit label; when omitted there is no visible submit button. */
+  submitLabel?: string;
+  /** The submit is the page's orange primary (landing hero only). */
+  primaryAction?: boolean;
+  size?: "md" | "lg";
+  /** Example chips rendered under the input (one row, scrollable on mobile). */
+  chips?: React.ReactNode;
+  className?: string;
+  id?: string;
+  autoFocus?: boolean;
+  inputProps?: Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "id" | "type">;
+}
+
+export const SearchIntent = React.forwardRef<HTMLInputElement, SearchIntentProps>(function SearchIntent(
+  {
+    value,
+    onChange,
+    onSubmit,
+    onClear,
+    label,
+    placeholder,
+    submitLabel,
+    primaryAction = false,
+    size = "md",
+    chips,
+    className,
+    id,
+    autoFocus,
+    inputProps,
+  },
+  ref,
+) {
+  const { t } = useTranslation();
+  const { isRTL } = useDirection();
+  const generatedId = React.useId();
+  const inputId = id ?? `search-intent-${generatedId}`;
+  const innerRef = React.useRef<HTMLInputElement | null>(null);
+  const setRefs = (node: HTMLInputElement | null) => {
+    innerRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
+  };
+  const hasSubmit = Boolean(submitLabel);
+  const lg = size === "lg";
+  // The input is `dir="auto"`, so its own logical paddings would follow the
+  // typed text's direction, not the page's. The icon and inset controls are
+  // positioned by the PAGE direction, so the two paddings are resolved here
+  // from it (the one deliberate physical value in this component).
+  const padStart = lg ? 48 : 44;
+  const padEnd = hasSubmit ? (value ? 152 : 112) : value ? 48 : 16;
+  const padding = isRTL
+    ? { paddingLeft: padEnd, paddingRight: padStart }
+    : { paddingLeft: padStart, paddingRight: padEnd };
+
+  const handleClear = () => {
+    onChange("");
+    onClear?.();
+    innerRef.current?.focus();
+  };
+
+  return (
+    <form
+      role="search"
+      className={cn("w-full", className)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(value.trim());
+      }}
+    >
+      <label htmlFor={inputId} className="sr-only">
+        {label}
+      </label>
+      <div className="relative flex items-center">
+        <Search
+          className={cn("pointer-events-none absolute start-4 text-muted-foreground", lg ? "size-5" : "size-4")}
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+        <input
+          {...inputProps}
+          ref={setRefs}
+          id={inputId}
+          type="text"
+          inputMode="search"
+          enterKeyHint="search"
+          autoComplete="off"
+          autoFocus={autoFocus}
+          dir="auto"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          style={padding}
+          className={cn(
+            "w-full rounded-lg border border-input bg-card text-base text-foreground transition-colors duration-fast placeholder:text-muted-foreground",
+            lg ? "h-12 md:h-14" : "h-11",
+          )}
+        />
+        <div className="absolute end-2 flex items-center gap-1">
+          {value && (
+            <button
+              type="button"
+              onClick={handleClear}
+              aria-label={t("common.clearSearch")}
+              className="grid size-8 place-items-center rounded-sm text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground coarse:after:absolute coarse:after:-inset-1.5 coarse:after:content-[''] relative"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          )}
+          {hasSubmit && (
+            <Button type="submit" variant={primaryAction ? "primary" : "secondary"} size="md" className="rounded-sm">
+              {submitLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+      {chips && (
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] md:flex-wrap md:overflow-visible md:pb-0">
+          {chips}
+        </div>
+      )}
+    </form>
+  );
+});

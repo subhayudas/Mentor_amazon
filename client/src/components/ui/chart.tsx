@@ -8,6 +8,19 @@ import { cn } from "@/lib/utils"
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
 
+/**
+ * Series colours read from the design tokens (P0-2): navy, burnt orange
+ * (#C45500, 4.52:1 on white and 3:1 against navy), teal, slate, brown.
+ * Use them as `color` in a ChartConfig; never a JS palette or #FF9900.
+ */
+export const CHART_SERIES = {
+  1: "hsl(var(--chart-1))",
+  2: "hsl(var(--chart-2))",
+  3: "hsl(var(--chart-3))",
+  4: "hsl(var(--chart-4))",
+  5: "hsl(var(--chart-5))",
+} as const
+
 export type ChartConfig = {
   [k in string]: {
     label?: React.ReactNode
@@ -51,8 +64,9 @@ const ChartContainer = React.forwardRef<
       <div
         data-chart={chartId}
         ref={ref}
+        dir="ltr"
         className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          "chart-container flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
           className
         )}
         {...props}
@@ -363,3 +377,4 @@ export {
   ChartLegendContent,
   ChartStyle,
 }
+

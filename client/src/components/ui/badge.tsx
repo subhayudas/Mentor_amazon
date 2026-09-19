@@ -3,35 +3,49 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * Badge (spec §3, P1-6, P2-2): a static pill that always carries text, never
+ * icon-only and never focusable — anything clickable is a FilterChip or Button.
+ * Tones: neutral, accent, success, warning, danger, info, outline. The legacy
+ * shadcn names stay as aliases: default → accent, secondary → neutral,
+ * destructive → danger. Every text/tint pair is >= 4.5:1 (see index.css).
+ */
 const badgeVariants = cva(
-  // Whitespace-nowrap: Badges should never wrap.
-  "whitespace-nowrap inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2" +
-  " hover-elevate " ,
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-transparent px-2.5 py-0.5 text-caption [&>svg]:size-3.5 [&>svg]:shrink-0",
   {
     variants: {
       variant: {
-        default:
-          "border-transparent bg-primary text-primary-foreground shadow-xs",
-        secondary: "border-transparent bg-secondary text-secondary-foreground",
-        destructive:
-          "border-transparent bg-destructive text-destructive-foreground shadow-xs",
-
-        outline: " border [border-color:var(--badge-outline)] shadow-xs",
+        neutral: "bg-muted text-foreground",
+        accent: "border-brand-orange-100 bg-accent text-accent-foreground",
+        success: "bg-success-soft text-success-soft-foreground [&>svg]:text-success",
+        warning: "border-warning-border bg-warning text-warning-foreground [&>svg]:text-warning-icon",
+        danger: "bg-destructive-soft text-destructive",
+        info: "bg-info text-info-foreground",
+        outline: "border-input bg-card text-foreground",
+        // aliases
+        default: "border-brand-orange-100 bg-accent text-accent-foreground",
+        secondary: "bg-muted text-foreground",
+        destructive: "bg-destructive-soft text-destructive",
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "neutral",
     },
   },
 )
 
-export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof badgeVariants> {}
+export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>["variant"]>
 
-function Badge({ className, variant, ...props }: BadgeProps) {
+export interface BadgeProps
+  extends React.HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof badgeVariants> {
+  /** Alias of `variant` using the tone vocabulary; wins when both are set. */
+  tone?: BadgeTone
+}
+
+function Badge({ className, variant, tone, ...props }: BadgeProps) {
   return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+    <span className={cn(badgeVariants({ variant: tone ?? variant }), className)} {...props} />
   );
 }
 

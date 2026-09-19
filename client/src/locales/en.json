@@ -14,7 +14,59 @@
     "all": "All",
     "required": "Required",
     "optional": "Optional",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "close": "Close",
+    "clearAll": "Clear all",
+    "clearSearch": "Clear search",
+    "tryAgain": "Try again",
+    "reloadPage": "Reload page",
+    "somethingWentWrong": "Something went wrong",
+    "unexpectedError": "An unexpected error occurred. Try again, or reload the page.",
+    "loadingLanguage": "Loading Arabic…",
+    "toggleNavigation": "Toggle navigation",
+    "sidebar": "Navigation",
+    "sidebarDescription": "Section navigation",
+    "rail": {
+      "title": "How a session happens",
+      "step1": "Send a request with your goal — no account needed",
+      "step2": "The mentor replies; sign in with the same email to see it",
+      "step3": "Pick a time on their calendar link"
+    }
+  },
+  "status": {
+    "pending": "Awaiting mentor",
+    "accepted": "Accepted",
+    "confirmed": "Scheduled",
+    "completed": "Completed",
+    "canceled": "Cancelled",
+    "rejected": "Declined"
+  },
+  "a11y": {
+    "skipToContent": "Skip to content",
+    "railLabel": "How a session happens",
+    "stepDone": "Done",
+    "stepCurrent": "Current step",
+    "stepNext": "Next",
+    "activeFilters": "Active filters",
+    "removeFilter": "Remove filter: {{label}}"
+  },
+  "format": {
+    "tzSame": "Same time zone as you",
+    "tzAhead_zero": "{{hours}} h ahead of you",
+    "tzAhead_one": "{{hours}} h ahead of you",
+    "tzAhead_two": "{{hours}} h ahead of you",
+    "tzAhead_few": "{{hours}} h ahead of you",
+    "tzAhead_many": "{{hours}} h ahead of you",
+    "tzAhead_other": "{{hours}} h ahead of you",
+    "tzBehind_zero": "{{hours}} h behind you",
+    "tzBehind_one": "{{hours}} h behind you",
+    "tzBehind_two": "{{hours}} h behind you",
+    "tzBehind_few": "{{hours}} h behind you",
+    "tzBehind_many": "{{hours}} h behind you",
+    "tzBehind_other": "{{hours}} h behind you",
+    "mentorsTime": "mentor's time",
+    "availabilitySummary": "Usually available {{days}} (mentor's time)",
+    "availabilitySummaryTz": "Usually available {{days}} (mentor's time, {{tz}})"
   },
   "auth": {
     "login": "Login",
@@ -118,16 +170,43 @@
     "home": "Home",
     "menu": "Menu",
     "navigation": "Navigation",
-    "browseMentors": "Browse Mentors",
+    "browseMentors": "Browse mentors",
     "analytics": "Analytics",
-    "becomeMentor": "Become a Mentor",
-    "joinMentee": "Join as Mentee",
-    "myBookings": "My Bookings",
-    "myProfile": "My Profile",
-    "mentorPortal": "Mentor Portal",
-    "menteeDashboard": "Mentee Dashboard",
+    "becomeMentor": "Become a mentor",
+    "joinMentee": "Join as mentee",
+    "myBookings": "My bookings",
+    "myProfile": "My profile",
+    "mentorPortal": "Mentor portal",
+    "menteeDashboard": "Mentee dashboard",
     "language": "Language",
-    "admin": "Admin"
+    "admin": "Admin",
+    "mentors": "Mentors",
+    "signIn": "Sign in",
+    "homeLink": "MentorConnect home",
+    "openMenu": "Open menu",
+    "accountMenu": "Account menu",
+    "switchLanguage": "عربي — التبديل إلى العربية",
+    "titles": {
+      "home": "Amazon mentorship",
+      "mentors": "Find a mentor",
+      "mentor": "Mentor profile",
+      "login": "Sign in",
+      "signup": "Create an account",
+      "forgotPassword": "Forgot password",
+      "resetPassword": "Reset password",
+      "sso": "Signing you in",
+      "requestAccess": "Request access",
+      "menteeRegistration": "Mentee registration",
+      "myBookings": "My bookings",
+      "menteeDashboard": "Mentee dashboard",
+      "menteeProfile": "Mentee profile",
+      "analytics": "Analytics",
+      "mentorOnboarding": "Mentor onboarding",
+      "mentorDashboard": "Mentor dashboard",
+      "mentorPortal": "Mentor portal",
+      "admin": "Admin",
+      "notFound": "Page not found"
+    }
   },
   "hero": {
     "badge": "Amazon Mentorship Program",
@@ -1178,5 +1257,26 @@
     "contactLine": "Contact the MentorConnect program team to update your details or ask for another review.",
     "mentorNoteUnverified": "This organization has not been verified by the program yet.",
     "mentorNoteRejected": "The program team did not approve this organization's verification."
+  },
+  "landing": {
+    "_owner": "A"
+  },
+  "discovery": {
+    "_owner": "A"
+  },
+  "mentorCard": {
+    "_owner": "A"
+  },
+  "mentorProfile": {
+    "_owner": "B"
+  },
+  "bookingRequest": {
+    "_owner": "B"
+  },
+  "dashboardV2": {
+    "_owner": "D"
+  },
+  "analyticsV2": {
+    "_owner": "C"
   }
 }

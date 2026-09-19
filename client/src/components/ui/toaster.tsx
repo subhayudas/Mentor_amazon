@@ -8,11 +8,12 @@ import {
   ToastViewport,
 } from "@/components/ui/toast"
 
+/** Renderer for the legacy `useToast()` reducer; mounted next to the sonner Toaster in App.tsx. */
 export function Toaster() {
   const { toasts } = useToast()
 
   return (
-    <ToastProvider>
+    <ToastProvider duration={6000}>
       {toasts.map(function ({ id, title, description, action, ...props }) {
         return (
           <Toast key={id} {...props}>
