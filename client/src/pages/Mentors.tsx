@@ -22,6 +22,7 @@ import {
   SORT_THRESHOLD,
   applyDiscovery,
   facetCounts,
+  facetedCounts,
   type FacetOption,
 } from "@/lib/discovery";
 import { viewerTimeZone } from "@/lib/format";
@@ -121,6 +122,7 @@ export default function Mentors() {
     [mentors, urlState, ctx],
   );
 
+  // Unfiltered facets: option order, labels and the example chips.
   const facets = React.useMemo<FilterFacets>(
     () => ({
       expertise: facetCounts(mentors ?? [], "expertise", lang),
@@ -129,6 +131,19 @@ export default function Mentors() {
     }),
     [mentors, lang],
   );
+  // F-26: the counts the rail and the drawer show are faceted — computed
+  // over what every OTHER constraint allows — so they agree with the result
+  // count. They follow the URL state (the announced count's source), not the
+  // per-keystroke query, and the drawer re-facets against its own draft.
+  const facetsFor = React.useCallback(
+    (state: DiscoveryState): FilterFacets => ({
+      expertise: facetedCounts(mentors ?? [], "expertise", facets.expertise, state, ctx),
+      language: facetedCounts(mentors ?? [], "languages_spoken", facets.language, state, ctx),
+      industry: facetedCounts(mentors ?? [], "industries", facets.industry, state, ctx),
+    }),
+    [mentors, facets, ctx],
+  );
+  const railFacets = React.useMemo(() => facetsFor(urlState), [facetsFor, urlState]);
   const exampleTags = facets.expertise.slice(0, EXAMPLE_CHIP_LIMIT);
   const total = mentors?.length ?? 0;
   const filterCount = activeFilterCount(urlState);
@@ -266,7 +281,7 @@ export default function Mentors() {
           )
         ) : isDesktop ? (
           <FilterRail
-            facets={facets}
+            facets={railFacets}
             value={pickFilters(urlState)}
             activeCount={filterCount}
             onChange={(patch) => pushState(patch)}
@@ -275,7 +290,7 @@ export default function Mentors() {
         ) : (
           <div className="mb-4">
             <FilterDrawer
-              facets={facets}
+              facetsFor={(draft) => facetsFor({ ...urlState, ...draft })}
               value={pickFilters(urlState)}
               activeCount={filterCount}
               countFor={countFor}

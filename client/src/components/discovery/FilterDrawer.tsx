@@ -27,7 +27,8 @@ import { FilterGroups, EMPTY_FILTERS, type FilterFacets, type FilterValue } from
  * header's inline-end so dismissal never depends on the swipe gesture.
  */
 export interface FilterDrawerProps {
-  facets: FilterFacets;
+  /** Facets for a candidate filter set, so option counts follow the draft the same way the apply button does (F-26). */
+  facetsFor: (draft: FilterValue) => FilterFacets;
   value: FilterValue;
   activeCount: number;
   /** Result count for a candidate filter set, so the apply button can say "Show 5 mentors". */
@@ -36,7 +37,7 @@ export interface FilterDrawerProps {
   className?: string;
 }
 
-export function FilterDrawer({ facets, value, activeCount, countFor, onApply, className }: FilterDrawerProps) {
+export function FilterDrawer({ facetsFor, value, activeCount, countFor, onApply, className }: FilterDrawerProps) {
   const { t } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const [draft, setDraft] = React.useState<FilterValue>(value);
@@ -47,6 +48,7 @@ export function FilterDrawer({ facets, value, activeCount, countFor, onApply, cl
   };
 
   const count = countFor(draft);
+  const facets = facetsFor(draft);
 
   return (
     <Drawer open={open} onOpenChange={handleOpenChange} shouldScaleBackground={false}>

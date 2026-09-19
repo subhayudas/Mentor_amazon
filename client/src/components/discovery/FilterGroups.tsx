@@ -14,9 +14,12 @@ import { cn } from "@/lib/utils";
  * Expertise, Language and "Accepting requests" by default; Industry and
  * "Within 3 hours of my time zone" under a collapsed "More filters" that
  * opens itself when one of those is active. Options are checkboxes (real
- * `<label for>` rows, 36px tall, 44px on touch) with the count of mentors in
- * the unfiltered list. Labels arrive localized from `lib/discovery.ts`; the
- * values written to the URL are the stored EN keys.
+ * `<label for>` rows, 36px tall, 44px on touch) with the count of mentors a
+ * click will deliver (faceted against every other constraint, F-26); an
+ * option the current selection rules out is dimmed, never hidden, and stays
+ * checkable so a visitor can swap one constraint for another. Labels arrive
+ * localized from `lib/discovery.ts`; the values written to the URL are the
+ * stored EN keys.
  *
  * The legacy test ids survive on the group containers:
  * `select-expertise-filter`, `select-language-filter`, `select-industry-filter`.
@@ -69,10 +72,17 @@ interface CheckRowProps {
 
 function CheckRow({ id, label, count, checked, onCheckedChange }: CheckRowProps) {
   const { t, i18n } = useTranslation();
+  // Zero under the other constraints: dimmed (text only — the checkbox keeps
+  // its contrast and stays operable), never disabled or hidden.
+  const dimmed = count === 0 && !checked;
   return (
     <label
       htmlFor={id}
-      className="flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md py-1 pe-1 text-body-sm text-foreground coarse:min-h-11"
+      data-dimmed={dimmed || undefined}
+      className={cn(
+        "flex min-h-9 cursor-pointer items-center gap-2.5 rounded-md py-1 pe-1 text-body-sm transition-colors duration-fast coarse:min-h-11",
+        dimmed ? "text-muted-foreground" : "text-foreground",
+      )}
     >
       <Checkbox id={id} checked={checked} onCheckedChange={(next) => onCheckedChange(next === true)} />
       <span className="min-w-0 flex-1">{label}</span>
