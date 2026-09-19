@@ -400,11 +400,7 @@
     "allCountries": "كل الدول",
     "notSpecified": "غير محدد",
     "unknown": "غير معروف",
-    "volunteerHours": "ساعات التطوع",
     "hoursUnit": "س",
-    "hoursShort": "{{count}} س",
-    "minutesShort": "{{count}} د",
-    "sessionsWithoutDuration": "جلسات بدون مدة مسجلة: {{count}}",
     "noSegmentRows": "لا توجد حجوزات في هذا الجزء.",
     "rowCount": "عدد الحجوزات: {{count}}",
     "showingRows": "عرض {{shown}} من أصل {{total}} حجز",
@@ -1452,6 +1448,13 @@
     "error": {
       "title": "تعذّر تحميل التحليلات",
       "body": "لم يتم جلب البيانات. تحقق من اتصالك وحاول مرة أخرى."
+    },
+    "nothingYet": {
+      "menteeTitle": "لا توجد جلسات بعد",
+      "menteeBody": "بمجرد أن ترسل طلبًا، سيظهر هنا مع كل ما يليه.",
+      "mentorTitle": "لا توجد طلبات بعد",
+      "mentorBody": "الطلبات التي يرسلها إليك المتدربون تظهر هنا مع الجلسات التي تليها.",
+      "browse": "تصفح المرشدين"
     }
   }
 }

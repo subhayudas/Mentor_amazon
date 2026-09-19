@@ -400,11 +400,7 @@
     "allCountries": "All countries",
     "notSpecified": "Not specified",
     "unknown": "Unknown",
-    "volunteerHours": "Volunteer hours",
     "hoursUnit": "h",
-    "hoursShort": "{{count}} h",
-    "minutesShort": "{{count}} min",
-    "sessionsWithoutDuration": "Sessions without a recorded duration: {{count}}",
     "noSegmentRows": "No bookings in this segment.",
     "rowCount": "Bookings: {{count}}",
     "showingRows": "Showing {{shown}} of {{total}} bookings",
@@ -1452,6 +1448,13 @@
     "error": {
       "title": "Unable to load analytics",
       "body": "The data could not be fetched. Check your connection and try again."
+    },
+    "nothingYet": {
+      "menteeTitle": "No sessions yet",
+      "menteeBody": "Once you send a request, it appears here together with everything that follows it.",
+      "mentorTitle": "No requests yet",
+      "mentorBody": "Requests mentees send you appear here, with the sessions that follow.",
+      "browse": "Browse mentors"
     }
   }
 }

@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, CalendarDays, Globe, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CalendarDays, Globe, Inbox, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
 import { bookingService, menteeService, mentorService } from "@/lib/services";
 import { formatTime } from "@/lib/format";
 import { csvFilename, downloadCsv, isoDate, toCsv, type CsvValue } from "@/lib/csv";
+import { ROUTES } from "@/lib/routes";
 import {
   NOT_SPECIFIED,
   bookingCountry,
@@ -365,6 +367,8 @@ export default function Analytics() {
 
   // ---- Render -------------------------------------------------------------
   const title = t(isAdmin ? "analyticsV2.title.admin" : "analyticsV2.title.own");
+  // A personal view with no rows at all (any period) points forward instead of showing empty frames.
+  const nothingYet = !isAdmin && !isLoading && !isError && sourceBookings.length === 0;
 
   const tabs: Array<{ key: TabKey; icon: LucideIcon; label: string; adminOnly?: boolean }> = [
     { key: "overview", icon: LayoutDashboard, label: t("analytics.tabs.overview") },
@@ -398,25 +402,27 @@ export default function Analytics() {
           </>
         }
       >
-        <div className="mt-6 flex flex-col gap-4">
-          <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-            <PeriodControl value={period} onChange={changePeriod} />
-            <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} />
-            {isAdmin && !isError && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
-            {updatedAt > 0 && !isError && (
-              <p className="ms-auto self-center text-caption text-muted-foreground" data-testid="analytics-updated">
-                {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
-              </p>
+        {!nothingYet && (
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+              <PeriodControl value={period} onChange={changePeriod} />
+              <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} />
+              {isAdmin && !isError && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
+              {updatedAt > 0 && !isError && (
+                <p className="ms-auto self-center text-caption text-muted-foreground" data-testid="analytics-updated">
+                  {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
+                </p>
+              )}
+            </div>
+            {isAdmin && (
+              <ActiveFilters
+                filters={activeFilters}
+                onRemove={(key) => changeFilters({ ...filters, [key]: ALL })}
+                onClearAll={() => changeFilters(EMPTY_FILTERS)}
+              />
             )}
           </div>
-          {isAdmin && (
-            <ActiveFilters
-              filters={activeFilters}
-              onRemove={(key) => changeFilters({ ...filters, [key]: ALL })}
-              onClearAll={() => changeFilters(EMPTY_FILTERS)}
-            />
-          )}
-        </div>
+        )}
       </PageHeader>
 
       {useMockData && (
@@ -427,7 +433,23 @@ export default function Analytics() {
         </Alert>
       )}
 
-      {isError && !isLoading ? (
+      {nothingYet ? (
+        <div className="rounded-lg border border-border bg-card" data-testid="analytics-nothing-yet">
+          <EmptyState
+            icon={Inbox}
+            title={t(scope === "mentor" ? "analyticsV2.nothingYet.mentorTitle" : "analyticsV2.nothingYet.menteeTitle")}
+            description={t(scope === "mentor" ? "analyticsV2.nothingYet.mentorBody" : "analyticsV2.nothingYet.menteeBody")}
+            role="status"
+            action={
+              scope === "mentee" ? (
+                <Button variant="secondary" asChild>
+                  <Link href={ROUTES.mentors}>{t("analyticsV2.nothingYet.browse")}</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
+      ) : isError && !isLoading ? (
         <div className="rounded-lg border border-border bg-card" data-testid="analytics-error">
           <EmptyState
             icon={AlertTriangle}
