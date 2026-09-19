@@ -70,13 +70,9 @@ class AuthService {
    * Sign up a new user
    */
   async signup(data: SignupData): Promise<AuthUser> {
-    // Check if user already exists in our database
-    const existingUser = await db.getUserByEmail(data.email);
-    if (existingUser) {
-      throw new Error('User with this email already exists');
-    }
+    // No pre-check against `users`: anonymous callers cannot read that table
+    // (RLS v2), and Supabase Auth already rejects duplicate emails itself.
 
-    // Create user in Supabase Auth
     // Self-service signup is mentee-only. Mentor identities come from Amazon
     // SSO (amazonAlias) plus an approved mentor record — never a self-selected role.
     if (data.user_type !== 'mentee') {
@@ -102,19 +98,11 @@ class AuthService {
       throw new Error('Failed to create user');
     }
 
-    // Also create user in our database for profile management
-    // Note: In Supabase, we store a hashed version of the password
-    // but for frontend-only, we'll let Supabase handle password storage
-    try {
-      await db.createUser({
-        id: authData.user.id,
-        email: data.email,
-        password: 'managed-by-supabase-auth', // Placeholder - actual auth handled by Supabase
-        user_type: data.user_type,
-      });
-    } catch (dbError) {
-      // If database creation fails, the user can still sign in via Supabase Auth
-      console.warn('Could not create user record in database:', dbError);
+    // The `users` row can only be inserted by an authenticated session (RLS).
+    // With email confirmation on there is no session yet, so the row is
+    // created lazily on the first signed-in resolveAuthUser() instead.
+    if (authData.session) {
+      await this.ensureUsersRow(authData.user.id, data.email, 'mentee');
     }
 
     return {
@@ -161,7 +149,13 @@ class AuthService {
     let userType: UserRole = (metadata.user_type as UserRole) || 'mentee';
     let profileId: string | undefined;
 
-    const dbUser = await db.getUserByEmail(email);
+    let dbUser = await db.getUserByEmail(email);
+    if (!dbUser) {
+      // Password signups that confirmed their email never had a session at
+      // signup time, so their row is created here on first sign-in. The RLS
+      // insert policy only allows a mentee row for one's own id/email.
+      dbUser = await this.ensureUsersRow(user.id, email, 'mentee');
+    }
     if (dbUser) {
       userType = dbUser.user_type;
       profileId = dbUser.profile_id || undefined;
@@ -190,6 +184,29 @@ class AuthService {
       profile_id: profileId,
       amazon_alias: (dbUser?.amazon_alias || (metadata.amazon_alias as string | undefined)) || undefined,
     };
+  }
+
+  /**
+   * Create the app-level users row for a signed-in account if it is missing.
+   * Never throws: identity resolution falls back to auth metadata.
+   */
+  private async ensureUsersRow(id: string, email: string, userType: 'mentee'): Promise<DbUser | null> {
+    try {
+      return await db.createUser({
+        id,
+        email,
+        password: 'managed-by-supabase-auth', // placeholder; Supabase Auth owns credentials
+        user_type: userType,
+      });
+    } catch (dbError) {
+      // Duplicate (concurrent first sign-in) or RLS-denied: re-read, else fall back.
+      try {
+        return await db.getUserByEmail(email);
+      } catch {
+        console.warn('Could not create user record in database:', dbError);
+        return null;
+      }
+    }
   }
 
   /**
@@ -272,13 +289,26 @@ class AuthService {
    */
   onAuthStateChange(callback: (user: AuthUser | null) => void): () => void {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (session?.user) {
-          const user = await this.getCurrentUser();
-          callback(user);
-        } else {
+      (_event, session) => {
+        // auth-js holds its lock while it awaits this callback, so no other
+        // Supabase call (getUser, PostgREST reads that need the session) may
+        // be awaited in here or the client deadlocks — updateUser() and the
+        // token auto-refresh both emit events from inside the lock. Resolve
+        // the identity on the next tick, outside the lock, using the session
+        // user that was handed to us.
+        if (!session?.user) {
           callback(null);
+          return;
         }
+        const sessionUser = session.user;
+        setTimeout(() => {
+          this.resolveAuthUser(sessionUser)
+            .then(callback)
+            .catch((error) => {
+              console.error('Auth state resolution error:', error);
+              callback(null);
+            });
+        }, 0);
       }
     );
 
