@@ -12,7 +12,7 @@ import { FilterRail } from "@/components/discovery/FilterRail";
 import { MentorGrid } from "@/components/discovery/MentorGrid";
 import { SearchIntent } from "@/components/discovery/SearchIntent";
 import { ZeroResults } from "@/components/discovery/ZeroResults";
-import { useIsDesktop } from "@/components/discovery/useMediaQuery";
+import { useIsDesktop, useIsPhone } from "@/components/discovery/useMediaQuery";
 import { useMentors } from "@/components/discovery/useMentors";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -86,6 +86,7 @@ export default function Mentors() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const isDesktop = useIsDesktop();
+  const isPhone = useIsPhone();
   const sortId = React.useId();
 
   const [urlState, write] = useDiscoveryUrlState();
@@ -241,7 +242,7 @@ export default function Mentors() {
           onSubmit={onSubmit}
           onClear={onClearQuery}
           label={t("discovery.searchLabel")}
-          placeholder={t("discovery.searchPlaceholder")}
+          placeholder={isPhone ? t("discovery.searchPlaceholderShort") : t("discovery.searchPlaceholder")}
           chips={exampleChips}
           inputProps={SEARCH_INPUT_PROPS}
         />
@@ -251,7 +252,17 @@ export default function Mentors() {
         {/* Filters exist only once there is a catalogue to filter: a rail skeleton while
             loading (desktop), nothing on error (the results column carries the retry). */}
         {!mentors ? (
-          mentorsQuery.isLoading ? <FilterRailSkeleton /> : <div className="hidden lg:block" aria-hidden="true" />
+          mentorsQuery.isLoading ? (
+            isDesktop ? (
+              <FilterRailSkeleton />
+            ) : (
+              <div className="mb-4" aria-hidden="true">
+                <Skeleton className="h-11 w-full rounded-md sm:w-32" />
+              </div>
+            )
+          ) : (
+            <div className="hidden lg:block" aria-hidden="true" />
+          )
         ) : isDesktop ? (
           <FilterRail
             facets={facets}
@@ -289,7 +300,7 @@ export default function Mentors() {
                     {t("discovery.sort.label")}
                   </Label>
                   <Select value={urlState.sort} onValueChange={(value) => pushState({ sort: value as DiscoverySort })}>
-                    <SelectTrigger id={sortId} className="w-44" data-testid="select-sort">
+                    <SelectTrigger id={sortId} className="w-auto min-w-44" data-testid="select-sort">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

@@ -111,7 +111,7 @@ export default function Home() {
                   onChange={setQuery}
                   onSubmit={(value) => navigate(discoveryUrl({ q: value }))}
                   label={t("landing.hero.searchLabel")}
-                  placeholder={t("landing.hero.searchPlaceholder")}
+                  placeholder={isPhone ? t("landing.hero.searchPlaceholderShort") : t("landing.hero.searchPlaceholder")}
                   submitLabel={isPhone ? undefined : t("landing.hero.search")}
                   primaryAction
                   inputProps={SEARCH_INPUT_PROPS}
@@ -139,7 +139,7 @@ export default function Home() {
                 {isPhone && (
                   <a
                     href="#how-it-works"
-                    className="inline-flex min-h-6 items-center text-muted-foreground underline-offset-4 transition-colors duration-fast hover:text-foreground hover:underline"
+                    className="inline-flex min-h-6 items-center text-muted-foreground underline decoration-muted-foreground/50 underline-offset-4 transition-colors duration-fast hover:text-foreground hover:decoration-foreground"
                   >
                     {t("landing.hero.howItWorks")}
                   </a>

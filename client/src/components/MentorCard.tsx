@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
  * Mentor result card (spec §5 as amended by P1-15, P1-16, P1-21, P1-27, P1-6).
  *
  * Anatomy, fixed row heights so `MentorCardSkeleton` shares the geometry:
- *   1. h-14  avatar 48 · name (h3, `<bdi>`, plain text) · status Badge (text + colour)
+ *   1. min-h-14  avatar 48 · name (h3, `<bdi>`, plain text) · status Badge (text + colour; under the name below `sm`)
  *   2. h-6   credential: position · company, one line
  *   3. h-12  helps-with: first sentence of the bio, two lines, `text-pretty`
  *   4. ≥60px up to 3 expertise chips + a "+n" Popover button (keyboard/touch, no `title`)
@@ -102,21 +102,34 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
       data-testid={`card-mentor-${mentor.id}`}
       className={cn(cardSurface, "transition-colors duration-fast hover:border-muted-foreground/40", className)}
     >
-      <div className="flex h-14 items-center gap-3">
+      {/*
+        Header row. Below `sm` the status badge sits under the name instead of
+        beside it, so at 320px the name keeps the full width (the badge would
+        otherwise leave it ~90px and clip mid-word); from `sm` the badge trails
+        the name on one line. `min-h-14` (not `h-14`) lets the stacked variant
+        grow; the skeleton mirrors the same structure.
+      */}
+      <div className="flex min-h-14 items-center gap-3">
         <Avatar className="size-12">
           <AvatarImage src={mentor.photo_url || undefined} alt="" />
           <AvatarFallback className="bg-muted text-base font-medium text-foreground">{f.initials}</AvatarFallback>
         </Avatar>
-        <h3
-          id={nameId}
-          data-testid={`text-mentor-name-${mentor.id}`}
-          className="line-clamp-2 min-w-0 flex-1 text-base leading-snug text-foreground [font-weight:var(--heading-weight,600)] [overflow-wrap:anywhere]"
-        >
-          <bdi>{f.name}</bdi>
-        </h3>
-        <Badge tone={mentor.is_available ? "success" : "neutral"} className="shrink-0" data-status={mentor.is_available ? "accepting" : "closed"}>
-          {f.statusLabel}
-        </Badge>
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <h3
+            id={nameId}
+            data-testid={`text-mentor-name-${mentor.id}`}
+            className="line-clamp-2 min-w-0 text-base leading-snug text-foreground [font-weight:var(--heading-weight,600)] [overflow-wrap:anywhere] sm:flex-1"
+          >
+            <bdi>{f.name}</bdi>
+          </h3>
+          <Badge
+            tone={mentor.is_available ? "success" : "neutral"}
+            className="self-start sm:self-auto sm:shrink-0"
+            data-status={mentor.is_available ? "accepting" : "closed"}
+          >
+            {f.statusLabel}
+          </Badge>
+        </div>
       </div>
 
       <Credential position={f.position} company={f.company} className="h-6 leading-6" />
@@ -271,10 +284,12 @@ export function MentorCardCompact({ mentor, className }: MentorCardProps) {
 export function MentorCardSkeleton({ className }: { className?: string }) {
   return (
     <div className={cn(cardSurface, className)} aria-hidden="true">
-      <div className="flex h-14 items-center gap-3">
+      <div className="flex min-h-14 items-center gap-3">
         <Skeleton className="size-12 rounded-full" />
-        <Skeleton className="h-5 flex-1" />
-        <Skeleton className="h-5 w-24 rounded-full" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <Skeleton className="h-5 w-2/3 sm:flex-1" />
+          <Skeleton className="h-5 w-24 rounded-full" />
+        </div>
       </div>
       <Skeleton className="h-6 w-2/3" />
       <Skeleton className="h-12 w-full" />
