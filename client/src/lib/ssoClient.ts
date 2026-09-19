@@ -63,11 +63,16 @@ export function consumeSsoFragment(): SsoFragment {
   return fragment;
 }
 
-/** Post-login destination by role, per the SSO contract. */
+/**
+ * Post-login destination by role, per the SSO contract. Mentees without a
+ * `next` land on their dashboard when a mentees row exists (`profile_id`),
+ * otherwise on the directory (P1-1) — never on the marketing landing.
+ */
 export function ssoDestination(user: AuthUser, next: string): string {
   if (user.user_type === "admin") return "/admin";
   if (user.user_type === "mentor") return user.profile_id ? "/mentor-portal" : "/mentor-onboarding";
-  return next || "/";
+  if (next && next !== "/") return next;
+  return user.profile_id ? "/mentee-dashboard" : "/mentors";
 }
 
 /** Maps `?error=sso_*` codes from api/auth/callback to translation keys. */

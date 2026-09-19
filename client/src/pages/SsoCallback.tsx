@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { auth, syncRoleStorage, type AuthUser } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ROUTES } from "@/lib/routes";
+import { buttonVariants } from "@/components/ui/button";
+import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { consumeSsoFragment, ssoLoginHref, ssoDestination, takeBridgeBindCookie } from "@/lib/ssoClient";
 
 type SsoErrorCode = "missing_token" | "bind_mismatch" | "verify_failed" | "no_user";
@@ -101,48 +103,37 @@ export default function SsoCallback() {
   }, [setLocation]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-      <div className="w-full max-w-md mx-auto">
-        {error ? (
-          <Card className="border border-[#D5D9D9] rounded-lg" data-testid="card-sso-error">
-            <CardHeader className="space-y-2">
-              <div className="flex items-center gap-2 text-[#C40000]">
-                <AlertCircle className="h-5 w-5 shrink-0" aria-hidden="true" />
-                <CardTitle className="text-xl font-bold text-[#0F1111]">
-                  {t("sso.callback.errorTitle")}
-                </CardTitle>
-              </div>
-              <CardDescription className="text-[#565959]">{t(ERROR_KEYS[error])}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3">
-              <a
-                href={ssoLoginHref()}
-                className="inline-flex w-full items-center justify-center rounded-md bg-[#FF9900] px-6 py-3 text-sm font-semibold text-white hover:bg-[#E88B00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF9900] focus-visible:ring-offset-2"
-                data-testid="link-sso-retry"
-              >
+    <StatusPage>
+      {error ? (
+        <StatusCard
+          titleAs="h1"
+          tone="danger"
+          icon={AlertCircle}
+          title={t("sso.callback.errorTitle")}
+          description={t(ERROR_KEYS[error])}
+          focusKey={error}
+          data-testid="card-sso-error"
+          actions={
+            <>
+              <a href={ssoLoginHref()} className={buttonVariants({ variant: "primary" })} data-testid="link-sso-retry">
                 {t("sso.callback.tryAgain")}
               </a>
-              <a
-                href="/login"
-                className="text-center text-sm text-[#0066C0] hover:text-[#C45500] hover:underline"
-                data-testid="link-sso-use-password"
-              >
+              <a href={ROUTES.login} className={buttonVariants({ variant: "outline" })} data-testid="link-sso-use-password">
                 {t("sso.callback.usePassword")}
               </a>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="border border-[#D5D9D9] rounded-lg" data-testid="card-sso-working" aria-busy="true">
-            <CardHeader className="items-center text-center space-y-3">
-              <Loader2 className="h-8 w-8 animate-spin text-[#FF9900]" aria-hidden="true" />
-              <CardTitle className="text-xl font-bold text-[#232F3E]">{t("sso.callback.title")}</CardTitle>
-              <CardDescription className="text-[#565959]" role="status">
-                {t("sso.callback.working")}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        )}
-      </div>
-    </div>
+            </>
+          }
+        />
+      ) : (
+        <StatusCard
+          titleAs="h1"
+          tone="busy"
+          title={t("sso.callback.title")}
+          description={<span role="status">{t("sso.callback.working")}</span>}
+          aria-busy="true"
+          data-testid="card-sso-working"
+        />
+      )}
+    </StatusPage>
   );
 }

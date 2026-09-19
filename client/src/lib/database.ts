@@ -649,10 +649,16 @@ class DatabaseService {
     return data || [];
   }
 
-  async getMentorBookingsWithStatus(mentorId: string, status?: string): Promise<Booking[]> {
+  /**
+   * The mentor's bookings with the mentee embedded (name, organisation,
+   * verification) so the portal never shows a raw mentee id. The same
+   * `mentees_select` policy that serves pending rows lets the booked mentor
+   * read these rows.
+   */
+  async getMentorBookingsWithStatus(mentorId: string, status?: string): Promise<(Booking & { mentee?: Mentee })[]> {
     let query = supabase
       .from('bookings')
-      .select('*')
+      .select('*, mentee:mentees(*)')
       .eq('mentor_id', mentorId);
 
     if (status) {
@@ -661,7 +667,7 @@ class DatabaseService {
 
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as (Booking & { mentee?: Mentee })[];
   }
 
   /**

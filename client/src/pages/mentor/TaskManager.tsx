@@ -1,354 +1,208 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Plus, ListTodo, Clock, CheckCircle2 } from "lucide-react";
-import { format, parseISO } from "date-fns";
-import { mentorService } from "@/lib/services";
-import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { useId, useState, type FormEvent } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { CheckCircle2, Clock, ListTodo, Plus } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
+import { EmptyState } from "@/components/EmptyState";
+import { useToast } from "@/hooks/use-toast";
 import type { MentorTask } from "@/lib/database";
+import { formatDate } from "@/lib/format";
+import { queryClient } from "@/lib/queryClient";
+import { mentorService } from "@/lib/services";
+import { cn } from "@/lib/utils";
+import { BookingsError, PanelSection } from "@/pages/mentee/shared";
 
-interface TaskManagerProps {
-  mentorId: string;
-}
+type Priority = "low" | "medium" | "high";
+const PRIORITY_TONE: Record<Priority, "danger" | "warning" | "neutral"> = { high: "danger", medium: "warning", low: "neutral" };
 
-export default function TaskManager({ mentorId }: TaskManagerProps) {
+/**
+ * Personal follow-ups (mentor_tasks). Aligned: dates via lib/format, unique
+ * label ids, checkboxes named by the task title, no nested scroll container,
+ * an EmptyState per list, an error state with retry.
+ */
+export default function TaskManager({ mentorId }: { mentorId: string }) {
   const { t, i18n } = useTranslation();
-  const isRTL = i18n.language === 'ar';
   const { toast } = useToast();
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newTask, setNewTask] = useState({
-    title: "",
-    description: "",
-    priority: "medium" as "low" | "medium" | "high",
-    due_date: "",
-  });
+  const ids = useId();
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState({ title: "", description: "", priority: "medium" as Priority, due_date: "" });
 
-  const { data: tasks, isLoading } = useQuery<MentorTask[]>({
-    queryKey: ['mentor', mentorId, 'tasks'],
+  const tasksQuery = useQuery<MentorTask[]>({
+    queryKey: ["mentor", mentorId, "tasks"],
     queryFn: () => mentorService.getTasks(mentorId),
-    enabled: !!mentorId,
   });
 
-  const createTaskMutation = useMutation({
-    mutationFn: async (task: typeof newTask) => {
-      return mentorService.createTask({
+  const createTask = useMutation({
+    mutationFn: () =>
+      mentorService.createTask({
         mentor_id: mentorId,
-        title: task.title,
-        description: task.description || undefined,
-        priority: task.priority,
-        due_date: task.due_date ? new Date(task.due_date).toISOString() : undefined,
-        status: 'pending',
-      });
-    },
+        title: draft.title.trim(),
+        description: draft.description.trim() || undefined,
+        priority: draft.priority,
+        due_date: draft.due_date ? new Date(draft.due_date).toISOString() : undefined,
+        status: "pending",
+      }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'tasks'] });
-      setIsDialogOpen(false);
-      setNewTask({ title: "", description: "", priority: "medium", due_date: "" });
-      toast({
-        title: t('common.success'),
-        description: t('mentorPortal.taskCreated'),
-      });
+      queryClient.invalidateQueries({ queryKey: ["mentor", mentorId, "tasks"] });
+      setOpen(false);
+      setDraft({ title: "", description: "", priority: "medium", due_date: "" });
+      toast({ title: t("dashboardV2.tasks.created") });
     },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.taskCreateError'),
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.tasks.createError"), variant: "destructive" }),
   });
 
-  const updateTaskMutation = useMutation({
-    mutationFn: async ({ taskId, updates }: { taskId: string; updates: Partial<MentorTask> }) => {
-      return mentorService.updateTask(taskId, updates);
+  const toggleTask = useMutation({
+    mutationFn: (task: MentorTask) => {
+      const next = task.status === "completed" ? "pending" : "completed";
+      return mentorService.updateTask(task.id, { status: next, completed_at: next === "completed" ? new Date().toISOString() : undefined });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'tasks'] });
-      toast({
-        title: t('common.success'),
-        description: t('mentorPortal.taskUpdated'),
-      });
-    },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.taskUpdateError'),
-        variant: "destructive",
-      });
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mentor", mentorId, "tasks"] }),
+    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.tasks.updateError"), variant: "destructive" }),
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTask.title.trim()) return;
-    createTaskMutation.mutate(newTask);
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (draft.title.trim()) createTask.mutate();
   };
 
-  const handleToggleComplete = (task: MentorTask) => {
-    const newStatus = task.status === 'completed' ? 'pending' : 'completed';
-    updateTaskMutation.mutate({
-      taskId: task.id,
-      updates: { 
-        status: newStatus,
-        completed_at: newStatus === 'completed' ? new Date().toISOString() : undefined,
-      },
-    });
-  };
+  const tasks = tasksQuery.data ?? [];
+  const pending = tasks.filter((x) => x.status !== "completed" && x.status !== "canceled");
+  const done = tasks.filter((x) => x.status === "completed");
 
-  const getPriorityBadge = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return <Badge variant="destructive">{t('mentorPortal.priorityHigh')}</Badge>;
-      case 'medium':
-        return <Badge variant="secondary">{t('mentorPortal.priorityMedium')}</Badge>;
-      case 'low':
-        return <Badge variant="outline">{t('mentorPortal.priorityLow')}</Badge>;
-      default:
-        return null;
-    }
+  const renderTask = (task: MentorTask) => {
+    const completed = task.status === "completed";
+    const titleId = `${ids}-task-${task.id}`;
+    return (
+      <li key={task.id} className={cn("flex items-start gap-3 rounded-lg border border-border bg-card p-3", completed && "bg-muted/40")} data-testid={completed ? `task-completed-${task.id}` : `task-${task.id}`}>
+        <Checkbox
+          checked={completed}
+          onCheckedChange={() => toggleTask.mutate(task)}
+          aria-labelledby={titleId}
+          className="mt-1"
+          data-testid={completed ? `checkbox-task-completed-${task.id}` : `checkbox-task-${task.id}`}
+        />
+        <div className="min-w-0 flex-1">
+          <p id={titleId} dir="auto" className={cn("text-body-sm font-medium text-foreground", completed && "text-muted-foreground line-through")}>
+            {task.title}
+          </p>
+          {task.description && !completed && (
+            <p dir="auto" className="text-body-sm text-muted-foreground text-pretty">
+              {task.description}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-caption text-muted-foreground">
+            {!completed && <Badge tone={PRIORITY_TONE[task.priority as Priority] ?? "neutral"}>{t(`dashboardV2.tasks.priority.${task.priority}`)}</Badge>}
+            {!completed && task.due_date && (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="size-3.5" aria-hidden="true" />
+                {t("dashboardV2.tasks.due", { date: formatDate(task.due_date, i18n.language) })}
+              </span>
+            )}
+            {completed && task.completed_at && <span>{t("dashboardV2.tasks.completedOn", { date: formatDate(task.completed_at, i18n.language) })}</span>}
+          </div>
+        </div>
+      </li>
+    );
   };
-
-  const pendingTasks = tasks?.filter(t => t.status !== 'completed' && t.status !== 'canceled') ?? [];
-  const completedTasks = tasks?.filter(t => t.status === 'completed') ?? [];
 
   return (
-    <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold" data-testid="text-task-manager-title">
-            {t('mentorPortal.tasksFollowups')}
-          </h1>
-          <p className="text-muted-foreground">
-            {t('mentorPortal.tasksSubtitle')}
-          </p>
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-body-sm text-muted-foreground">{t("dashboardV2.tasks.intro")}</p>
+        <Button variant="secondary" size="sm" onClick={() => setOpen(true)} data-testid="button-add-task">
+          <Plus aria-hidden="true" />
+          {t("dashboardV2.tasks.add")}
+        </Button>
+      </div>
+
+      {tasksQuery.isLoading ? (
+        <div role="status" aria-busy="true" className="space-y-3">
+          <span className="sr-only">{t("common.loading")}</span>
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
         </div>
-
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="button-add-task">
-              <Plus className="w-4 h-4 mr-2" />
-              {t('mentorPortal.addTask')}
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{t('mentorPortal.newTask')}</DialogTitle>
-              <DialogDescription>
-                {t('mentorPortal.newTaskDescription')}
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="title">{t('mentorPortal.taskTitle')}</Label>
-                <Input
-                  id="title"
-                  value={newTask.title}
-                  onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                  placeholder={t('mentorPortal.taskTitlePlaceholder')}
-                  data-testid="input-task-title"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">{t('mentorPortal.taskDescription')}</Label>
-                <Textarea
-                  id="description"
-                  value={newTask.description}
-                  onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                  placeholder={t('mentorPortal.taskDescriptionPlaceholder')}
-                  data-testid="input-task-description"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="priority">{t('mentorPortal.priority')}</Label>
-                  <Select
-                    value={newTask.priority}
-                    onValueChange={(value: "low" | "medium" | "high") => 
-                      setNewTask({ ...newTask, priority: value })
-                    }
-                  >
-                    <SelectTrigger data-testid="select-priority">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">{t('mentorPortal.priorityLow')}</SelectItem>
-                      <SelectItem value="medium">{t('mentorPortal.priorityMedium')}</SelectItem>
-                      <SelectItem value="high">{t('mentorPortal.priorityHigh')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="due_date">{t('mentorPortal.dueDate')}</Label>
-                  <Input
-                    id="due_date"
-                    type="date"
-                    value={newTask.due_date}
-                    onChange={(e) => setNewTask({ ...newTask, due_date: e.target.value })}
-                    data-testid="input-due-date"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  {t('common.cancel')}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={createTaskMutation.isPending}
-                  data-testid="button-submit-task"
-                >
-                  {createTaskMutation.isPending ? t('common.loading') : t('mentorPortal.createTask')}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ListTodo className="w-5 h-5" />
-              {t('mentorPortal.pendingTasks')}
-              {pendingTasks.length > 0 && (
-                <Badge variant="secondary">{pendingTasks.length}</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16" />
-                ))}
-              </div>
-            ) : pendingTasks.length > 0 ? (
-              <div className="space-y-3">
-                {pendingTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-start gap-3 p-3 border rounded-lg"
-                    data-testid={`task-${task.id}`}
-                  >
-                    <Checkbox
-                      checked={task.status === 'completed'}
-                      onCheckedChange={() => handleToggleComplete(task)}
-                      data-testid={`checkbox-task-${task.id}`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium">{task.title}</p>
-                      {task.description && (
-                        <p className="text-sm text-muted-foreground truncate">
-                          {task.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        {getPriorityBadge(task.priority)}
-                        {task.due_date && (
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="w-3 h-3" />
-                            {format(parseISO(task.due_date), 'MMM d, yyyy')}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      ) : tasksQuery.isError ? (
+        <BookingsError onRetry={() => tasksQuery.refetch()} />
+      ) : (
+        <>
+          <PanelSection id="tasks-open" title={t("dashboardV2.tasks.open", { count: pending.length })}>
+            {pending.length === 0 ? (
+              <EmptyState icon={ListTodo} title={t("dashboardV2.tasks.emptyOpenTitle")} description={t("dashboardV2.tasks.emptyOpenBody")} className="py-8" />
             ) : (
-              <div className="text-center py-8">
-                <ListTodo className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {t('mentorPortal.noPendingTasks')}
-                </p>
-              </div>
+              <ul className="space-y-2">{pending.map(renderTask)}</ul>
             )}
-          </CardContent>
-        </Card>
+          </PanelSection>
+          {done.length > 0 && (
+            <PanelSection id="tasks-done" title={t("dashboardV2.tasks.done", { count: done.length })}>
+              <ul className="space-y-2">{done.map(renderTask)}</ul>
+            </PanelSection>
+          )}
+        </>
+      )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5" />
-              {t('mentorPortal.completedTasks')}
-              {completedTasks.length > 0 && (
-                <Badge variant="secondary">{completedTasks.length}</Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="space-y-3">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <Skeleton key={i} className="h-16" />
-                ))}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("dashboardV2.tasks.newTitle")}</DialogTitle>
+            <DialogDescription>{t("dashboardV2.tasks.newDesc")}</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={submit} className="space-y-4" noValidate>
+            <div className="space-y-2">
+              <Label htmlFor={`${ids}-title`}>{t("dashboardV2.tasks.titleLabel")}</Label>
+              <Input
+                id={`${ids}-title`}
+                dir="auto"
+                value={draft.title}
+                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                required
+                data-testid="input-task-title"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${ids}-desc`}>{t("dashboardV2.tasks.descLabel")}</Label>
+              <Textarea id={`${ids}-desc`} dir="auto" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} data-testid="input-task-description" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor={`${ids}-priority`}>{t("dashboardV2.tasks.priorityLabel")}</Label>
+                <Select value={draft.priority} onValueChange={(value) => setDraft({ ...draft, priority: value as Priority })}>
+                  <SelectTrigger id={`${ids}-priority`} data-testid="select-priority">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["low", "medium", "high"] as Priority[]).map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {t(`dashboardV2.tasks.priority.${p}`)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : completedTasks.length > 0 ? (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {completedTasks.map((task) => (
-                  <div
-                    key={task.id}
-                    className="flex items-start gap-3 p-3 border rounded-lg opacity-60"
-                    data-testid={`task-completed-${task.id}`}
-                  >
-                    <Checkbox
-                      checked={true}
-                      onCheckedChange={() => handleToggleComplete(task)}
-                      data-testid={`checkbox-task-completed-${task.id}`}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium line-through">{task.title}</p>
-                      {task.completed_at && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {t('mentorPortal.completedOn')} {format(parseISO(task.completed_at), 'MMM d, yyyy')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="space-y-2">
+                <Label htmlFor={`${ids}-due`}>{t("dashboardV2.tasks.dueLabel")}</Label>
+                <Input id={`${ids}-due`} type="date" value={draft.due_date} onChange={(e) => setDraft({ ...draft, due_date: e.target.value })} data-testid="input-due-date" />
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {t('mentorPortal.noCompletedTasks')}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                {t("common.cancel")}
+              </Button>
+              <Button type="submit" variant="secondary" loading={createTask.isPending} data-testid="button-submit-task">
+                {t("dashboardV2.tasks.create")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

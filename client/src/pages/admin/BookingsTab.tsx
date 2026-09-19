@@ -3,20 +3,22 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { BarChart3, Star } from "lucide-react";
+import { formatNumber, UNAVAILABLE } from "@/lib/format";
+import { localizeCountry } from "@/lib/reporting";
+import { FilterChip } from "@/components/discovery/FilterChip";
 import { adminQueryKeys, adminService, type AdminBooking } from "@/lib/adminService";
 import type { Booking } from "@/lib/database";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
 import {
   BookingStatusBadge,
   DetailField,
   EmptyRow,
   LoadingRows,
+  QueueError,
   SearchBox,
-  errorMessage,
   useFormatters,
 } from "@/pages/admin/shared";
 
@@ -24,19 +26,19 @@ const COLS = 7;
 const STATUSES: Booking["status"][] = ["pending", "accepted", "confirmed", "completed", "rejected", "canceled"];
 type Filter = "all" | Booking["status"];
 
-function Rating({ value }: { value?: number | null }) {
-  if (!value) return <>—</>;
+function Rating({ value, lang }: { value?: number | null; lang: string }) {
+  const { t } = useTranslation();
+  if (!value) return <>{UNAVAILABLE}</>;
   return (
-    <span className="inline-flex items-center gap-1">
-      <Star className="w-3.5 h-3.5 text-[#FF9900] fill-[#FF9900]" aria-hidden="true" />
-      {value}/5
+    <span className="inline-flex items-center gap-1 tabular-nums" dir="ltr">
+      <Star className="size-3.5 fill-brand-orange text-brand-orange" aria-hidden="true" />
+      {t("admin.bookings.ratingOf", { value: formatNumber(value, lang) })}
     </span>
   );
 }
 
 export default function BookingsTab() {
   const { t, i18n } = useTranslation();
-  const isRTL = i18n.language === "ar";
   const { formatDate, formatDateTime } = useFormatters();
 
   const [search, setSearch] = useState("");
@@ -68,36 +70,33 @@ export default function BookingsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-center gap-3 justify-between">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("admin.bookings.filterLabel")}>
+      <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
+        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("admin.bookings.filterLabel")}>
           {chips.map((chip) => (
-            <button
+            <FilterChip
               key={chip}
-              type="button"
-              onClick={() => setFilter(chip)}
-              aria-pressed={filter === chip}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                filter === chip
-                  ? "bg-[#232F3E] text-white border-[#232F3E]"
-                  : "bg-background text-muted-foreground border-[#D5D9D9] hover:text-foreground hover:bg-muted",
-              )}
+              role="radio"
+              selected={filter === chip}
+              onToggle={() => setFilter(chip)}
+              count={formatNumber(counts[chip], i18n.language)}
               data-testid={`chip-booking-${chip}`}
             >
-              {chip === "all" ? t("common.all") : t(`admin.bookingStatus.${chip}`)}
-              <span className={cn("tabular-nums", filter === chip ? "text-white/80" : "text-muted-foreground")}>{counts[chip]}</span>
-            </button>
+              {chip === "all" ? t("common.all") : t(`status.${chip}`)}
+            </FilterChip>
           ))}
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <SearchBox value={search} onChange={setSearch} placeholder={t("admin.bookings.searchPlaceholder")} testId="input-booking-search" />
           <Button asChild variant="outline" className="shrink-0" data-testid="link-open-analytics">
-            <Link href="/analytics"><BarChart3 className="w-4 h-4 me-2" />{t("admin.bookings.openAnalytics")}</Link>
+            <Link href="/analytics"><BarChart3 aria-hidden="true" />{t("admin.bookings.openAnalytics")}</Link>
           </Button>
         </div>
       </div>
 
-      <Card className="overflow-x-auto">
+      {bookingsQuery.isError ? (
+        <QueueError queue={t("admin.queues.bookings")} onRetry={() => bookingsQuery.refetch()} />
+      ) : (
+      <Card className="overflow-x-auto" aria-busy={bookingsQuery.isLoading || undefined}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -113,8 +112,6 @@ export default function BookingsTab() {
           <TableBody>
             {bookingsQuery.isLoading ? (
               <LoadingRows colSpan={COLS} />
-            ) : bookingsQuery.isError ? (
-              <EmptyRow colSpan={COLS}>{errorMessage(bookingsQuery.error, t("errors.somethingWentWrong"))}</EmptyRow>
             ) : bookings.length === 0 ? (
               <EmptyRow colSpan={COLS}>{search || filter !== "all" ? t("admin.noMatches") : t("admin.bookings.empty")}</EmptyRow>
             ) : (
@@ -125,34 +122,43 @@ export default function BookingsTab() {
                     onClick={() => setDetail(booking)}
                     data-testid={`row-booking-${booking.id}`}
                   >
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDate(booking.created_at)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDate(booking.created_at)}</TableCell>
                     <TableCell>
-                      <p className="font-semibold text-foreground truncate max-w-[12rem]">{booking.mentor?.name || "—"}</p>
-                      <p className="text-xs text-muted-foreground truncate max-w-[12rem]">{booking.mentor?.email}</p>
+                      <p className="max-w-[12rem] truncate font-medium text-foreground">
+                        <bdi>{booking.mentor?.name || UNAVAILABLE}</bdi>
+                      </p>
+                      <p className="max-w-[12rem] truncate text-caption text-muted-foreground">
+                        <bdi dir="ltr">{booking.mentor?.email}</bdi>
+                      </p>
                     </TableCell>
                     <TableCell>
-                      <p className="font-semibold text-foreground truncate max-w-[12rem]">{booking.mentee?.organization_name || booking.mentee?.name || "—"}</p>
-                      <p className="text-xs text-muted-foreground truncate max-w-[12rem]">{booking.mentee?.organization_name ? booking.mentee.name : booking.mentee?.email}</p>
+                      <p className="max-w-[12rem] truncate font-medium text-foreground">
+                        <bdi>{booking.mentee?.organization_name || booking.mentee?.name || UNAVAILABLE}</bdi>
+                      </p>
+                      <p className="max-w-[12rem] truncate text-caption text-muted-foreground">
+                        <bdi dir={booking.mentee?.organization_name ? undefined : "ltr"}>{booking.mentee?.organization_name ? booking.mentee.name : booking.mentee?.email}</bdi>
+                      </p>
                     </TableCell>
                     <TableCell><BookingStatusBadge status={booking.status} /></TableCell>
-                    <TableCell className="text-sm whitespace-nowrap">{formatDateTime(booking.scheduled_at)}</TableCell>
-                    <TableCell className="text-sm text-end tabular-nums">{booking.session_duration_minutes ?? "—"}</TableCell>
-                    <TableCell className="text-sm">{booking.country || booking.mentor?.country || "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap text-body-sm tabular-nums">{formatDateTime(booking.scheduled_at)}</TableCell>
+                    <TableCell className="text-end text-body-sm tabular-nums">{booking.session_duration_minutes != null ? formatNumber(booking.session_duration_minutes, i18n.language) : UNAVAILABLE}</TableCell>
+                    <TableCell className="text-body-sm">{localizeCountry(booking.country || booking.mentor?.country || "", i18n.language) || UNAVAILABLE}</TableCell>
                   </TableRow>
               ))
             )}
           </TableBody>
         </Table>
       </Card>
+      )}
 
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
-        <SheetContent side={isRTL ? "left" : "right"} className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent side="end" className="w-full overflow-y-auto sm:max-w-lg">
           {detail && (
             <>
               <SheetHeader className="text-start">
                 <SheetTitle>{t("admin.bookings.detailTitle")}</SheetTitle>
                 <SheetDescription>
-                  {detail.mentor?.name || "—"} · {detail.mentee?.organization_name || detail.mentee?.name || "—"}
+                  <bdi>{detail.mentor?.name || UNAVAILABLE}</bdi> · <bdi>{detail.mentee?.organization_name || detail.mentee?.name || UNAVAILABLE}</bdi>
                 </SheetDescription>
                 <div className="pt-2"><BookingStatusBadge status={detail.status} /></div>
               </SheetHeader>
@@ -160,13 +166,23 @@ export default function BookingsTab() {
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <DetailField label={t("admin.bookings.colMentor")}>
                   {detail.mentor ? (
-                    <Link href={`/mentor/${detail.mentor.id}`} className="text-primary hover:underline">{detail.mentor.name}</Link>
+                    <Link href={`/mentor/${detail.mentor.id}`} className="font-medium text-secondary underline-offset-4 hover:underline">
+                      <bdi>{detail.mentor.name}</bdi>
+                    </Link>
                   ) : undefined}
-                  {detail.mentor?.email && <p className="text-xs text-muted-foreground">{detail.mentor.email}</p>}
+                  {detail.mentor?.email && (
+                    <p className="text-caption text-muted-foreground">
+                      <bdi dir="ltr">{detail.mentor.email}</bdi>
+                    </p>
+                  )}
                 </DetailField>
                 <DetailField label={t("admin.bookings.colMentee")}>
-                  {detail.mentee?.organization_name || detail.mentee?.name}
-                  {detail.mentee?.email && <p className="text-xs text-muted-foreground">{detail.mentee.email}</p>}
+                  <bdi>{detail.mentee?.organization_name || detail.mentee?.name}</bdi>
+                  {detail.mentee?.email && (
+                    <p className="text-caption text-muted-foreground">
+                      <bdi dir="ltr">{detail.mentee.email}</bdi>
+                    </p>
+                  )}
                 </DetailField>
                 <DetailField label={t("admin.bookings.colCreated")}>{formatDateTime(detail.created_at)}</DetailField>
                 <DetailField label={t("admin.bookings.colScheduled")}>{formatDateTime(detail.scheduled_at)}</DetailField>
@@ -175,20 +191,20 @@ export default function BookingsTab() {
                 <DetailField label={t("admin.bookings.colDuration")}>
                   {detail.session_duration_minutes ? t("admin.bookings.minutes", { count: detail.session_duration_minutes }) : undefined}
                 </DetailField>
-                <DetailField label={t("admin.colCountry")}>{detail.country || detail.mentor?.country}</DetailField>
+                <DetailField label={t("admin.colCountry")}>{localizeCountry(detail.country || detail.mentor?.country || "", i18n.language) || undefined}</DetailField>
                 <div className="sm:col-span-2">
-                  <DetailField label={t("admin.bookings.goal")}><p className="whitespace-pre-line">{detail.goal}</p></DetailField>
+                  <DetailField label={t("admin.bookings.goal")}><p dir="auto" className="whitespace-pre-line">{detail.goal}</p></DetailField>
                 </div>
-                <DetailField label={t("admin.bookings.menteeRating")}><Rating value={detail.mentee_rating} /></DetailField>
-                <DetailField label={t("admin.bookings.mentorRating")}><Rating value={detail.mentor_rating} /></DetailField>
+                <DetailField label={t("admin.bookings.menteeRating")}><Rating value={detail.mentee_rating} lang={i18n.language} /></DetailField>
+                <DetailField label={t("admin.bookings.mentorRating")}><Rating value={detail.mentor_rating} lang={i18n.language} /></DetailField>
                 {detail.mentee_feedback && (
                   <div className="sm:col-span-2">
-                    <DetailField label={t("admin.bookings.menteeFeedback")}><p className="whitespace-pre-line">{detail.mentee_feedback}</p></DetailField>
+                    <DetailField label={t("admin.bookings.menteeFeedback")}><p dir="auto" className="whitespace-pre-line">{detail.mentee_feedback}</p></DetailField>
                   </div>
                 )}
                 {detail.mentor_feedback && (
                   <div className="sm:col-span-2">
-                    <DetailField label={t("admin.bookings.mentorFeedback")}><p className="whitespace-pre-line">{detail.mentor_feedback}</p></DetailField>
+                    <DetailField label={t("admin.bookings.mentorFeedback")}><p dir="auto" className="whitespace-pre-line">{detail.mentor_feedback}</p></DetailField>
                   </div>
                 )}
               </div>

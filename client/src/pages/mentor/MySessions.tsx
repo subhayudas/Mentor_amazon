@@ -1,573 +1,305 @@
-import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect, useId, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+import { CalendarClock, CheckCircle2, FileText, MessageSquare, Timer, XCircle } from "lucide-react";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Calendar, Clock, User, CheckCircle, XCircle, FileText, Plus, Trash2, Star, MessageSquare, Timer } from "lucide-react";
-import { format, parseISO, isFuture, isPast } from "date-fns";
-import { mentorService, bookingService } from "@/lib/services";
-import { queryClient } from "@/lib/queryClient";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { FilterChip } from "@/components/discovery/FilterChip";
+import { EmptyState } from "@/components/EmptyState";
+import { StarRating } from "@/components/MenteeFeedbackDialog";
+import { StatusBadge } from "@/components/StatusBadge";
+import { VerificationBadge } from "@/components/VerificationBadge";
+import { BookingNotes } from "@/components/dashboard/BookingNotes";
 import { useToast } from "@/hooks/use-toast";
-import { useTranslation } from "react-i18next";
-import type { Booking, BookingNote, Mentor } from "@/lib/database";
-import { cn } from "@/lib/utils";
+import type { Booking, Mentee, Mentor } from "@/lib/database";
+import { bidi, formatDateTime, formatNumber, viewerTimeZone } from "@/lib/format";
+import { initialsOf } from "@/lib/localized";
+import { isFuture } from "@/lib/menteeBookings";
+import { queryClient } from "@/lib/queryClient";
 import {
   completeSession,
   getMentorCountry,
+  localizeCountry,
   MAX_SESSION_MINUTES,
   MIN_SESSION_MINUTES,
   REPORTING_COUNTRIES,
-  localizeCountry,
   SESSION_MINUTE_PRESETS,
 } from "@/lib/reporting";
+import { bookingService, mentorService } from "@/lib/services";
+import { cn } from "@/lib/utils";
+import { ARIA_DISABLED_CLASS, BookingsError } from "@/pages/mentee/shared";
 
 /** Radix Select cannot hold an empty-string value, so "no country" is this sentinel. */
 const NO_COUNTRY = "__none";
+const HIGHLIGHT_MS = 2000;
+
+type SessionBooking = Booking & { mentee?: Mentee };
 
 interface MySessionsProps {
   mentorId: string;
   mentorEmail?: string;
+  mentor: Mentor;
 }
 
-export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
+/**
+ * Mentor sessions (matrix row 23): Upcoming (accepted requests still waiting
+ * for the mentee to pick a time, plus confirmed future sessions) and
+ * Completed (completed, plus confirmed sessions whose time passed and still
+ * need a duration). Every row shows the mentee (embedded, never a UUID) and
+ * a StatusBadge; completing records the real duration for volunteer hours;
+ * cancelling confirms first.
+ */
+export default function MySessions({ mentorId, mentorEmail, mentor }: MySessionsProps) {
   const { t, i18n } = useTranslation();
-  const isRTL = i18n.language === 'ar';
   const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState("upcoming");
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
-  const [notesDialogOpen, setNotesDialogOpen] = useState(false);
-  const [noteContent, setNoteContent] = useState("");
-  const [noteType, setNoteType] = useState<"note" | "task">("note");
-  const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
-  const [feedbackDialogOpen, setFeedbackDialogOpen] = useState(false);
-  const [feedbackBooking, setFeedbackBooking] = useState<Booking | null>(null);
-  const [feedbackRating, setFeedbackRating] = useState<number>(0);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [completeBooking, setCompleteBooking] = useState<Booking | null>(null);
-  const [minutesInput, setMinutesInput] = useState<string>("30");
-  const [sessionCountry, setSessionCountry] = useState<string>("");
+  const viewerTz = viewerTimeZone();
+  const [activeTab, setActiveTab] = useState<"upcoming" | "completed">("upcoming");
+  const [notesFor, setNotesFor] = useState<SessionBooking | null>(null);
+  const [feedbackFor, setFeedbackFor] = useState<SessionBooking | null>(null);
+  const [completeFor, setCompleteFor] = useState<SessionBooking | null>(null);
+  const [cancelFor, setCancelFor] = useState<SessionBooking | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
 
-  const { data: bookings, isLoading } = useQuery<Booking[]>({
-    queryKey: ['mentor', mentorId, 'bookings'],
+  const bookingsQuery = useQuery<SessionBooking[]>({
+    queryKey: ["mentor", mentorId, "bookings"],
     queryFn: () => mentorService.getBookings(mentorId),
-    enabled: !!mentorId,
   });
 
-  // The mentor's own row: its country pre-fills the reporting country when completing a session.
-  const { data: mentorProfile } = useQuery<Mentor | null>({
-    queryKey: ['mentor', mentorId, 'profile', mentorEmail],
-    queryFn: () => mentorService.getByEmail(mentorEmail!),
-    enabled: !!mentorEmail,
-  });
-
-  // Anchored feedback: after completing, scroll to the card and ring it for 2s.
   useEffect(() => {
     if (!highlightedId) return;
-    const card = document.querySelector<HTMLElement>(`[data-testid="session-card-${highlightedId}"]`);
+    const card = document.querySelector<HTMLElement>(`[data-testid="session-card-${CSS.escape(highlightedId)}"]`);
     card?.scrollIntoView({ behavior: "smooth", block: "center" });
-    const timer = window.setTimeout(() => setHighlightedId(null), 2000);
+    const timer = window.setTimeout(() => setHighlightedId(null), HIGHLIGHT_MS);
     return () => window.clearTimeout(timer);
-  }, [highlightedId, bookings]);
+  }, [highlightedId, bookingsQuery.data]);
 
-  const { data: notes, isLoading: notesLoading } = useQuery<BookingNote[]>({
-    queryKey: ['bookings', selectedBooking?.id, 'notes'],
-    queryFn: () => bookingService.getNotes(selectedBooking!.id),
-    enabled: !!selectedBooking?.id && notesDialogOpen,
-  });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["mentor", mentorId] });
+    queryClient.invalidateQueries({ queryKey: ["notifications"] });
+  };
 
-  const updateBookingMutation = useMutation({
-    mutationFn: async ({ bookingId, status }: { bookingId: string; status: string }) => {
-      return bookingService.updateStatus(bookingId, status);
-    },
+  const cancelMutation = useMutation({
+    mutationFn: (bookingId: string) => bookingService.updateStatus(bookingId, "canceled"),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'dashboard'] });
-      toast({
-        title: t('common.success'),
-        description: t('mentorPortal.sessionUpdated'),
-      });
+      invalidate();
+      toast({ title: t("dashboardV2.sessions.cancelledToast") });
     },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.sessionUpdateError'),
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.sessions.updateError"), variant: "destructive" }),
   });
 
-  const completeSessionMutation = useMutation({
-    mutationFn: async ({ bookingId, minutes, country }: { bookingId: string; minutes: number; country?: string }) => {
-      return completeSession(bookingId, { minutes, country });
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId] });
-      setCompleteBooking(null);
+  const completeMutation = useMutation({
+    mutationFn: ({ bookingId, minutes, country }: { bookingId: string; minutes: number; country?: string }) =>
+      completeSession(bookingId, { minutes, country }),
+    onSuccess: (_row, variables) => {
+      invalidate();
+      setCompleteFor(null);
       setActiveTab("completed");
       setHighlightedId(variables.bookingId);
-      toast({
-        title: t('common.success'),
-        description: t('mentorPortal.sessionCompleted', { minutes: variables.minutes }),
-      });
+      toast({ title: t("common.success"), description: t("mentorPortal.sessionCompleted", { minutes: variables.minutes }) });
     },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.sessionUpdateError'),
-        variant: "destructive",
-      });
-    },
+    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.sessions.updateError"), variant: "destructive" }),
   });
 
-  const addNoteMutation = useMutation({
-    mutationFn: async (data: { booking_id: string; author_type: string; author_email: string; note_type: string; content: string; due_date?: string }) => {
-      return bookingService.addNote({
-        booking_id: data.booking_id,
-        author_type: data.author_type as 'mentor' | 'mentee',
-        author_email: data.author_email,
-        note_type: data.note_type as 'note' | 'task',
-        content: data.content,
-        due_date: data.due_date,
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings', selectedBooking?.id, 'notes'] });
-      setNoteContent("");
-      setNoteType("note");
-      setDueDate(undefined);
-      toast({
-        title: t('mentorPortal.noteAdded'),
-        description: t('mentorPortal.noteAddedDesc'),
-      });
-    },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.noteAddError'),
-        variant: "destructive",
-      });
-    },
-  });
+  const { upcoming, completed } = useMemo(() => {
+    const rows = bookingsQuery.data ?? [];
+    // Upcoming: soonest scheduled first, then accepted requests still waiting for a time.
+    const bySoonest = (a: SessionBooking, b: SessionBooking) =>
+      (a.scheduled_at ?? "\uffff").localeCompare(b.scheduled_at ?? "\uffff") || (b.created_at ?? "").localeCompare(a.created_at ?? "");
+    const byRecent = (a: SessionBooking, b: SessionBooking) =>
+      (b.completed_at ?? b.scheduled_at ?? b.created_at ?? "").localeCompare(a.completed_at ?? a.scheduled_at ?? a.created_at ?? "");
+    return {
+      upcoming: rows.filter((b) => b.status === "accepted" || (b.status === "confirmed" && (!b.scheduled_at || isFuture(b.scheduled_at)))).sort(bySoonest),
+      completed: rows.filter((b) => b.status === "completed" || (b.status === "confirmed" && !!b.scheduled_at && !isFuture(b.scheduled_at))).sort(byRecent),
+    };
+  }, [bookingsQuery.data]);
 
-  const updateNoteMutation = useMutation({
-    mutationFn: async ({ noteId, is_completed }: { noteId: string; is_completed: boolean }) => {
-      return bookingService.updateNote(noteId, { is_completed });
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['bookings', selectedBooking?.id, 'notes'] });
-      toast({
-        title: t('common.success'),
-        description: variables.is_completed ? t('mentorPortal.taskCompleted') : t('mentorPortal.taskIncomplete'),
-      });
-    },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.taskUpdateError'),
-        variant: "destructive",
-      });
-    },
-  });
-
-  const deleteNoteMutation = useMutation({
-    mutationFn: async (noteId: string) => {
-      return bookingService.deleteNote(noteId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings', selectedBooking?.id, 'notes'] });
-      toast({
-        title: t('common.success'),
-        description: t('mentorPortal.noteDeleted'),
-      });
-    },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.noteDeleteError'),
-        variant: "destructive",
-      });
-    },
-  });
-
-  const submitFeedbackMutation = useMutation({
-    mutationFn: async ({ bookingId, mentor_rating, mentor_feedback }: { bookingId: string; mentor_rating: number; mentor_feedback: string }) => {
-      return bookingService.submitMentorFeedback(bookingId, mentor_rating, mentor_feedback);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mentor', mentorId, 'bookings'] });
-      setFeedbackDialogOpen(false);
-      setFeedbackBooking(null);
-      setFeedbackRating(0);
-      setFeedbackText("");
-      toast({
-        title: t('common.success'),
-        description: t('mentorPortal.feedbackSubmitted'),
-      });
-    },
-    onError: () => {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.feedbackSubmitError'),
-        variant: "destructive",
-      });
-    },
-  });
-
-  // "Upcoming" covers accepted requests still waiting for the mentee to pick a
-  // slot on Cal.com as well as confirmed slots in the future. Without the
-  // accepted group a session could never be completed (and no volunteer
-  // hours recorded) when the Cal.com confirmation never reaches the app.
-  const upcomingSessions = bookings?.filter(b =>
-    b.status === 'accepted' ||
-    (b.status === 'confirmed' && (!b.scheduled_at || isFuture(parseISO(b.scheduled_at))))
-  ) ?? [];
-
-  const completedSessions = bookings?.filter(b =>
-    b.status === 'completed' ||
-    (b.status === 'confirmed' && b.scheduled_at && isPast(parseISO(b.scheduled_at)))
-  ) ?? [];
-
-  const handleMarkComplete = (booking: Booking) => {
-    setMinutesInput("30");
-    setSessionCountry(booking.country || getMentorCountry(mentorProfile) || "");
-    setCompleteBooking(booking);
-  };
-
-  const parsedMinutes = Number.parseInt(minutesInput, 10);
-  const minutesValid =
-    Number.isInteger(parsedMinutes) && parsedMinutes >= MIN_SESSION_MINUTES && parsedMinutes <= MAX_SESSION_MINUTES;
-
-  const handleConfirmComplete = () => {
-    if (!completeBooking || !minutesValid) return;
-    completeSessionMutation.mutate({
-      bookingId: completeBooking.id,
-      minutes: parsedMinutes,
-      country: sessionCountry || undefined,
-    });
-  };
-
-  const countryChoices = sessionCountry && !REPORTING_COUNTRIES.includes(sessionCountry)
-    ? [sessionCountry, ...REPORTING_COUNTRIES]
-    : REPORTING_COUNTRIES;
-
-  const handleCancel = (bookingId: string) => {
-    updateBookingMutation.mutate({ bookingId, status: 'canceled' });
-  };
-
-  const handleOpenNotes = (booking: Booking) => {
-    setSelectedBooking(booking);
-    setNotesDialogOpen(true);
-  };
-
-  const handleAddNote = () => {
-    if (!noteContent.trim() || !selectedBooking) return;
-
-    addNoteMutation.mutate({
-      booking_id: selectedBooking.id,
-      author_type: "mentor",
-      author_email: mentorEmail || "",
-      note_type: noteType,
-      content: noteContent.trim(),
-      due_date: dueDate ? dueDate.toISOString() : undefined,
-    });
-  };
-
-  const handleToggleComplete = (note: BookingNote) => {
-    updateNoteMutation.mutate({ noteId: note.id, is_completed: !note.is_completed });
-  };
-
-  const handleDeleteNote = (noteId: string) => {
-    deleteNoteMutation.mutate(noteId);
-  };
-
-  const handleOpenFeedback = (booking: Booking) => {
-    setFeedbackBooking(booking);
-    setFeedbackRating(booking.mentor_rating || 0);
-    setFeedbackText(booking.mentor_feedback || "");
-    setFeedbackDialogOpen(true);
-  };
-
-  const handleSubmitFeedback = () => {
-    if (!feedbackBooking || feedbackRating === 0) {
-      toast({
-        title: t('common.error'),
-        description: t('mentorPortal.selectRating'),
-        variant: "destructive",
-      });
-      return;
-    }
-    submitFeedbackMutation.mutate({
-      bookingId: feedbackBooking.id,
-      mentor_rating: feedbackRating,
-      mentor_feedback: feedbackText.trim(),
-    });
-  };
-
-  const renderStars = (rating: number, interactive: boolean = false) => {
+  const renderCard = (booking: SessionBooking) => {
+    const mentee = booking.mentee;
+    const name = mentee?.name || t("dashboardV2.inbox.unknownMentee");
+    const busy = cancelMutation.isPending && cancelMutation.variables === booking.id;
+    const canAct = booking.status === "confirmed" || booking.status === "accepted";
+    const sessionOver = booking.status === "completed" || (!!booking.scheduled_at && !isFuture(booking.scheduled_at));
     return (
-      <div className="flex items-center gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            disabled={!interactive}
-            className={cn(
-              "focus:outline-none transition-colors",
-              interactive && "cursor-pointer hover:scale-110"
-            )}
-            onClick={() => interactive && setFeedbackRating(star)}
-            data-testid={interactive ? `button-star-${star}` : `star-display-${star}`}
-          >
-            <Star
-              className={cn(
-                "w-5 h-5",
-                star <= rating
-                  ? "fill-yellow-400 text-yellow-400"
-                  : "text-muted-foreground"
-              )}
-            />
-          </button>
-        ))}
-      </div>
-    );
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'confirmed':
-        return <Badge variant="default">{t('mentorPortal.statusScheduled')}</Badge>;
-      case 'completed':
-        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400">{t('mentorPortal.statusCompleted')}</Badge>;
-      case 'canceled':
-        return <Badge variant="destructive">{t('mentorPortal.statusCanceled')}</Badge>;
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
-
-  const SessionCard = ({ booking, showActions = false }: { booking: Booking; showActions?: boolean }) => (
-    <Card
-      className={cn(
-        "transition-shadow duration-500",
-        highlightedId === booking.id && "ring-2 ring-[#FF9900] ring-offset-2",
-      )}
-      data-testid={`session-card-${booking.id}`}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Avatar className="w-10 h-10">
-              <AvatarFallback>
-                <User className="w-5 h-5" />
-              </AvatarFallback>
+      <li
+        key={booking.id}
+        className={cn(
+          "scroll-mt-32 rounded-lg border border-border bg-card p-4 transition-shadow duration-slow",
+          highlightedId === booking.id && "ring-2 ring-brand-orange ring-offset-2 ring-offset-background",
+        )}
+        data-testid={`session-card-${booking.id}`}
+      >
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex min-w-0 items-start gap-3">
+            <Avatar className="size-10">
+              {mentee?.photo_url ? <AvatarImage src={mentee.photo_url} alt="" /> : null}
+              <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(name)}</AvatarFallback>
             </Avatar>
-            <div>
-              <p className="font-medium">Mentee</p>
-              <p className="text-sm text-muted-foreground">{booking.mentee_id}</p>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <h3 className="text-body font-medium text-foreground" data-testid={`text-session-mentee-${booking.id}`}>
+                  <bdi>{name}</bdi>
+                </h3>
+                <VerificationBadge status={mentee?.verification_status} type={mentee?.user_type} size="sm" />
+              </div>
+              {mentee?.user_type === "organization" && mentee.organization_name && (
+                <p className="text-body-sm text-muted-foreground">
+                  <bdi>{mentee.organization_name}</bdi>
+                </p>
+              )}
+              {booking.goal && (
+                <p dir="auto" className="mt-1 line-clamp-2 text-body-sm text-foreground text-pretty">
+                  {booking.goal}
+                </p>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {getStatusBadge(booking.status)}
-          </div>
+          <StatusBadge status={booking.status} />
         </div>
 
-        <div className="mt-4 flex items-center gap-4 flex-wrap text-sm text-muted-foreground">
-          {booking.scheduled_at && (
-            <>
-              <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
-                {format(parseISO(booking.scheduled_at), 'MMM d, yyyy')}
-              </div>
-              <div className="flex items-center gap-1">
-                <Clock className="w-4 h-4" />
-                {format(parseISO(booking.scheduled_at), 'h:mm a')}
-              </div>
-            </>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-body-sm text-muted-foreground tabular-nums">
+          {booking.scheduled_at ? (
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarClock className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              {formatDateTime(booking.scheduled_at, i18n.language, viewerTz)} · {t("dashboardV2.time.yourZone", { tz: viewerTz })}
+            </span>
+          ) : booking.status === "accepted" ? (
+            <span>{t("dashboardV2.sessions.waitingForTime")}</span>
+          ) : (
+            <span>{t("dashboardV2.row.timeNotRecorded")}</span>
           )}
-          {booking.status === 'completed' && typeof booking.session_duration_minutes === 'number' && (
-            <div className="flex items-center gap-1" data-testid={`text-duration-${booking.id}`}>
-              <Timer className="w-4 h-4" />
-              {t('mentorPortal.durationMinutes', { count: booking.session_duration_minutes })}
-            </div>
+          {booking.status === "completed" && typeof booking.session_duration_minutes === "number" && (
+            <span className="inline-flex items-center gap-1.5" data-testid={`text-duration-${booking.id}`}>
+              <Timer className="size-4" strokeWidth={1.75} aria-hidden="true" />
+              {t("mentorPortal.durationMinutes", { count: booking.session_duration_minutes })}
+            </span>
           )}
+          {booking.status === "confirmed" && sessionOver && <span>{t("dashboardV2.sessions.needsDuration")}</span>}
         </div>
 
-        <div className="mt-4 flex items-center gap-2 flex-wrap">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => handleOpenNotes(booking)}
-            data-testid={`button-notes-${booking.id}`}
-          >
-            <FileText className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
-            {t('mentorPortal.viewNotes')}
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {canAct && (
+            <Button variant="secondary" size="sm" onClick={() => openComplete(booking)} data-testid={`button-complete-${booking.id}`}>
+              <CheckCircle2 aria-hidden="true" />
+              {t("dashboardV2.sessions.markComplete")}
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => setNotesFor(booking)} data-testid={`button-notes-${booking.id}`}>
+            <FileText aria-hidden="true" />
+            {t("dashboardV2.sessions.notes")}
           </Button>
-
-          {showActions && (booking.status === 'confirmed' || booking.status === 'accepted') && (
-            <>
-              <Button
-                size="sm"
-                onClick={() => handleMarkComplete(booking)}
-                disabled={updateBookingMutation.isPending || completeSessionMutation.isPending}
-                data-testid={`button-complete-${booking.id}`}
-              >
-                <CheckCircle className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
-                {t('mentorPortal.markComplete')}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleCancel(booking.id)}
-                disabled={updateBookingMutation.isPending}
-                data-testid={`button-cancel-${booking.id}`}
-              >
-                <XCircle className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
-                {t('mentorPortal.cancelSession')}
-              </Button>
-            </>
+          {sessionOver && (
+            <Button variant="outline" size="sm" onClick={() => setFeedbackFor(booking)} data-testid={`button-feedback-${booking.id}`}>
+              <MessageSquare aria-hidden="true" />
+              {booking.mentor_rating ? t("dashboardV2.sessions.viewFeedback") : t("dashboardV2.sessions.giveFeedback")}
+            </Button>
           )}
-
-          {(booking.status === 'completed' || (booking.scheduled_at && isPast(parseISO(booking.scheduled_at)))) && (
-            <Button
-              size="sm"
-              variant={booking.mentor_rating ? "secondary" : "default"}
-              onClick={() => handleOpenFeedback(booking)}
-              data-testid={`button-feedback-${booking.id}`}
-            >
-              <MessageSquare className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
-              {booking.mentor_rating ? t('mentorPortal.viewFeedback') : t('mentorPortal.giveFeedback')}
+          {canAct && (
+            <Button variant="ghost" size="sm" loading={busy} onClick={() => setCancelFor(booking)} data-testid={`button-cancel-${booking.id}`}>
+              <XCircle aria-hidden="true" />
+              {t("dashboardV2.sessions.cancel")}
             </Button>
           )}
         </div>
-      </CardContent>
-    </Card>
-  );
+      </li>
+    );
+  };
+
+  // ----- complete dialog state -----
+  const [minutesInput, setMinutesInput] = useState("30");
+  const [sessionCountry, setSessionCountry] = useState("");
+  const parsedMinutes = Number.parseInt(minutesInput, 10);
+  const minutesValid = Number.isInteger(parsedMinutes) && parsedMinutes >= MIN_SESSION_MINUTES && parsedMinutes <= MAX_SESSION_MINUTES;
+  const ids = useId();
+
+  const openComplete = (booking: SessionBooking) => {
+    setMinutesInput("30");
+    setSessionCountry(booking.country || getMentorCountry(mentor) || "");
+    setCompleteFor(booking);
+  };
+  const confirmComplete = () => {
+    if (!completeFor || !minutesValid) return;
+    completeMutation.mutate({ bookingId: completeFor.id, minutes: parsedMinutes, country: sessionCountry || undefined });
+  };
+  const countryChoices = sessionCountry && !REPORTING_COUNTRIES.includes(sessionCountry) ? [sessionCountry, ...REPORTING_COUNTRIES] : REPORTING_COUNTRIES;
+
+  const renderList = (rows: SessionBooking[], emptyTitle: string, emptyBody: string) =>
+    bookingsQuery.isLoading ? (
+      <div role="status" aria-busy="true" className="space-y-3">
+        <span className="sr-only">{t("common.loading")}</span>
+        {Array.from({ length: 2 }, (_, i) => (
+          <Skeleton key={i} className="h-36 w-full rounded-lg" />
+        ))}
+      </div>
+    ) : bookingsQuery.isError ? (
+      <BookingsError onRetry={() => bookingsQuery.refetch()} />
+    ) : rows.length === 0 ? (
+      <EmptyState icon={CalendarClock} title={emptyTitle} description={emptyBody} />
+    ) : (
+      <ul className="space-y-3">{rows.map(renderCard)}</ul>
+    );
 
   return (
-    <div className="space-y-6" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div>
-        <h1 className="text-2xl font-bold" data-testid="text-my-sessions-title">
-          {t('mentorPortal.mySessions')}
-        </h1>
-        <p className="text-muted-foreground">
-          {t('mentorPortal.mySessionsSubtitle')}
-        </p>
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab} dir={isRTL ? 'rtl' : 'ltr'}>
-        <TabsList>
+    <div className="space-y-6">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "upcoming" | "completed")}>
+        <TabsList variant="pill" className="w-full sm:w-auto">
           <TabsTrigger value="upcoming" data-testid="tab-upcoming">
-            {t('mentorPortal.upcoming')}
-            {upcomingSessions.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{upcomingSessions.length}</Badge>
-            )}
+            {t("dashboardV2.sessions.upcoming")}
+            {upcoming.length > 0 && <Badge tone="neutral">{formatNumber(upcoming.length, i18n.language)}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="completed" data-testid="tab-completed">
-            {t('mentorPortal.completed')}
-            {completedSessions.length > 0 && (
-              <Badge variant="secondary" className="ml-2">{completedSessions.length}</Badge>
-            )}
+            {t("dashboardV2.sessions.completed")}
+            {completed.length > 0 && <Badge tone="neutral">{formatNumber(completed.length, i18n.language)}</Badge>}
           </TabsTrigger>
         </TabsList>
-
-        <TabsContent value="upcoming" className="mt-6">
-          {isLoading ? (
-            <div className="grid gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-32" />
-              ))}
-            </div>
-          ) : upcomingSessions.length > 0 ? (
-            <div className="grid gap-4">
-              {upcomingSessions.map((session) => (
-                <SessionCard key={session.id} booking={session} showActions />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Calendar className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {t('mentorPortal.noUpcomingSessions')}
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="upcoming">
+          {renderList(upcoming, t("dashboardV2.sessions.emptyUpcomingTitle"), t("dashboardV2.sessions.emptyUpcomingBody"))}
         </TabsContent>
-
-        <TabsContent value="completed" className="mt-6">
-          {isLoading ? (
-            <div className="grid gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-32" />
-              ))}
-            </div>
-          ) : completedSessions.length > 0 ? (
-            <div className="grid gap-4">
-              {completedSessions.map((session) => (
-                // Past-due sessions still 'confirmed' land here; they need the
-                // complete action too, since durations are recorded after the fact.
-                <SessionCard key={session.id} booking={session} showActions />
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <CheckCircle className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  {t('mentorPortal.noCompletedSessions')}
-                </p>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="completed">
+          {renderList(completed, t("dashboardV2.sessions.emptyCompletedTitle"), t("dashboardV2.sessions.emptyCompletedBody"))}
         </TabsContent>
       </Tabs>
 
-      <Dialog open={!!completeBooking} onOpenChange={(open) => { if (!open) setCompleteBooking(null); }}>
+      {/* Complete session */}
+      <Dialog open={!!completeFor} onOpenChange={(open) => !open && setCompleteFor(null)}>
         <DialogContent className="max-w-md" data-testid="dialog-complete-session">
           <DialogHeader>
-            <DialogTitle>{t('mentorPortal.completeSessionTitle')}</DialogTitle>
-            <DialogDescription>{t('mentorPortal.completeSessionDesc')}</DialogDescription>
+            <DialogTitle>{t("mentorPortal.completeSessionTitle")}</DialogTitle>
+            <DialogDescription>{t("mentorPortal.completeSessionDesc")}</DialogDescription>
           </DialogHeader>
-
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="input-session-minutes">{t('mentorPortal.sessionDuration')}</Label>
-              <div className="flex flex-wrap gap-2" role="group" aria-label={t('mentorPortal.sessionDuration')}>
-                {SESSION_MINUTE_PRESETS.map((preset) => {
-                  const selected = parsedMinutes === preset;
-                  return (
-                    <Button
-                      key={preset}
-                      type="button"
-                      size="sm"
-                      variant={selected ? "default" : "outline"}
-                      aria-pressed={selected}
-                      onClick={() => setMinutesInput(String(preset))}
-                      data-testid={`button-minutes-${preset}`}
-                    >
-                      {t('mentorPortal.durationMinutes', { count: preset })}
-                    </Button>
-                  );
-                })}
+              <Label htmlFor="input-session-minutes">{t("mentorPortal.sessionDuration")}</Label>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("mentorPortal.sessionDuration")}>
+                {SESSION_MINUTE_PRESETS.map((preset) => (
+                  <FilterChip
+                    key={preset}
+                    role="radio"
+                    selected={parsedMinutes === preset}
+                    onToggle={() => setMinutesInput(String(preset))}
+                    data-testid={`button-minutes-${preset}`}
+                  >
+                    {t("mentorPortal.durationMinutes", { count: preset })}
+                  </FilterChip>
+                ))}
               </div>
               <div className="flex items-center gap-2">
                 <Input
@@ -578,35 +310,30 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
                   max={MAX_SESSION_MINUTES}
                   value={minutesInput}
                   onChange={(event) => setMinutesInput(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === "Enter") handleConfirmComplete(); }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") confirmComplete();
+                  }}
                   aria-invalid={!minutesValid}
-                  aria-describedby="session-minutes-hint"
+                  aria-describedby={`${ids}-minutes-hint`}
                   className="w-28"
                   data-testid="input-session-minutes"
                 />
-                <span className="text-sm text-muted-foreground">{t('mentorPortal.minutesLabel')}</span>
+                <span className="text-body-sm text-muted-foreground">{t("mentorPortal.minutesLabel")}</span>
               </div>
-              <p
-                id="session-minutes-hint"
-                className={cn("text-xs", minutesValid ? "text-muted-foreground" : "text-destructive")}
-              >
+              <p id={`${ids}-minutes-hint`} className={cn("text-caption", minutesValid ? "text-muted-foreground" : "text-destructive")}>
                 {minutesValid
-                  ? t('mentorPortal.minutesHint', { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })
-                  : t('mentorPortal.invalidDuration', { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })}
+                  ? t("mentorPortal.minutesHint", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })
+                  : t("mentorPortal.invalidDuration", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })}
               </p>
             </div>
-
             <div className="space-y-2">
-              <Label htmlFor="select-session-country">{t('mentorPortal.sessionCountry')}</Label>
-              <Select
-                value={sessionCountry || NO_COUNTRY}
-                onValueChange={(value) => setSessionCountry(value === NO_COUNTRY ? "" : value)}
-              >
+              <Label htmlFor="select-session-country">{t("mentorPortal.sessionCountry")}</Label>
+              <Select value={sessionCountry || NO_COUNTRY} onValueChange={(value) => setSessionCountry(value === NO_COUNTRY ? "" : value)}>
                 <SelectTrigger id="select-session-country" data-testid="select-session-country">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={NO_COUNTRY}>{t('mentorPortal.sessionCountryNone')}</SelectItem>
+                  <SelectItem value={NO_COUNTRY}>{t("mentorPortal.sessionCountryNone")}</SelectItem>
                   {countryChoices.map((country) => (
                     <SelectItem key={country} value={country}>
                       {localizeCountry(country, i18n.language)}
@@ -614,298 +341,218 @@ export default function MySessions({ mentorId, mentorEmail }: MySessionsProps) {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">{t('mentorPortal.sessionCountryHint')}</p>
+              <p className="text-caption text-muted-foreground">{t("mentorPortal.sessionCountryHint")}</p>
             </div>
           </div>
-
-          <DialogFooter className="gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setCompleteBooking(null)}
-              disabled={completeSessionMutation.isPending}
-              data-testid="button-cancel-complete"
-            >
-              {t('common.cancel')}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setCompleteFor(null)} disabled={completeMutation.isPending} data-testid="button-cancel-complete">
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
-              onClick={handleConfirmComplete}
-              disabled={!minutesValid || completeSessionMutation.isPending}
+              variant="primary"
+              className={ARIA_DISABLED_CLASS}
+              onClick={confirmComplete}
+              aria-disabled={!minutesValid || undefined}
+              aria-describedby={!minutesValid ? `${ids}-minutes-hint` : undefined}
+              loading={completeMutation.isPending}
               data-testid="button-confirm-complete"
             >
-              <CheckCircle className="w-4 h-4" />
-              {completeSessionMutation.isPending ? t('common.loading') : t('mentorPortal.confirmComplete')}
+              <CheckCircle2 aria-hidden="true" />
+              {t("mentorPortal.confirmComplete")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={notesDialogOpen} onOpenChange={setNotesDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      {/* Notes */}
+      <Dialog open={!!notesFor} onOpenChange={(open) => !open && setNotesFor(null)}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle data-testid="text-notes-dialog-title">{t('mentorPortal.sessionNotes')}</DialogTitle>
-            <p className="text-sm text-muted-foreground">{t('mentorPortal.sessionNotesDesc')}</p>
+            <DialogTitle data-testid="text-notes-dialog-title">{t("dashboardV2.sessions.notesTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("dashboardV2.sessions.notesDesc", { name: bidi(notesFor?.mentee?.name || t("dashboardV2.inbox.unknownMentee")) })}
+            </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-3 p-4 bg-muted/50 rounded-lg">
-              <Label data-testid="label-add-note">{t('mentorPortal.addNoteOrTask')}</Label>
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  variant={noteType === "note" ? "default" : "outline"}
-                  onClick={() => setNoteType("note")}
-                  data-testid="button-type-note"
-                >
-                  {t('mentorPortal.noteType')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={noteType === "task" ? "default" : "outline"}
-                  onClick={() => setNoteType("task")}
-                  data-testid="button-type-task"
-                >
-                  {t('mentorPortal.taskType')}
-                </Button>
-              </div>
-
-              <Textarea
-                placeholder={noteType === "note" ? t('mentorPortal.notePlaceholder') : t('mentorPortal.taskPlaceholder')}
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                className="min-h-[80px]"
-                data-testid="input-note-content"
-              />
-
-              {noteType === "task" && (
-                <div className="flex items-center gap-2">
-                  <Label className="text-sm">{t('mentorPortal.dueDateOptional')}</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={cn(!dueDate && "text-muted-foreground")}
-                        data-testid="button-due-date"
-                      >
-                        <Calendar className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
-                        {dueDate ? format(dueDate, "MMM d, yyyy") : t('mentorPortal.dueDateLabel')}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <CalendarComponent
-                        mode="single"
-                        selected={dueDate}
-                        onSelect={setDueDate}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  {dueDate && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setDueDate(undefined)}
-                      data-testid="button-clear-due-date"
-                    >
-                      {t('common.clear')}
-                    </Button>
-                  )}
-                </div>
-              )}
-
-              <Button
-                onClick={handleAddNote}
-                disabled={!noteContent.trim() || addNoteMutation.isPending}
-                className="w-full"
-                data-testid="button-add-note"
-              >
-                <Plus className="w-4 h-4 ltr:mr-1 rtl:ml-1" />
-                {t('mentorPortal.addNoteBtn')}
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              <Label data-testid="label-existing-notes">{t('mentorPortal.existingNotes')}</Label>
-
-              {notesLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-16" />
-                  <Skeleton className="h-16" />
-                </div>
-              ) : notes && notes.length > 0 ? (
-                <div className="space-y-2">
-                  {notes.map((note) => (
-                    <div
-                      key={note.id}
-                      className={cn(
-                        "p-3 rounded-lg border",
-                        note.note_type === "task" && note.is_completed && "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800"
-                      )}
-                      data-testid={`note-item-${note.id}`}
-                    >
-                      <div className="flex items-start gap-2">
-                        {note.note_type === "task" && (
-                          <Checkbox
-                            checked={note.is_completed || false}
-                            onCheckedChange={() => handleToggleComplete(note)}
-                            className="mt-1"
-                            data-testid={`checkbox-task-${note.id}`}
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className={cn(
-                            "text-sm",
-                            note.note_type === "task" && note.is_completed && "line-through text-muted-foreground"
-                          )}>
-                            {note.content}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
-                            <Badge variant="outline" className="text-xs">
-                              {note.author_type === "mentor" ? t('mentorPortal.fromYou') : t('mentorPortal.fromMentee')}
-                            </Badge>
-                            <span>{note.created_at ? format(parseISO(note.created_at), 'MMM d, yyyy') : ''}</span>
-                            {note.note_type === "task" && note.due_date && (
-                              <span className="text-orange-600 dark:text-orange-400">
-                                {t('mentorPortal.dueDateLabel')}: {format(parseISO(note.due_date), 'MMM d')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {note.author_type === "mentor" && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDeleteNote(note.id)}
-                            disabled={deleteNoteMutation.isPending}
-                            data-testid={`button-delete-note-${note.id}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-4" data-testid="text-no-notes">
-                  {t('mentorPortal.noNotes')}
-                </p>
-              )}
-            </div>
-          </div>
+          {notesFor && <BookingNotes bookingId={notesFor.id} authorType="mentor" authorEmail={mentorEmail || ""} extended />}
         </DialogContent>
       </Dialog>
 
-      <Dialog open={feedbackDialogOpen} onOpenChange={setFeedbackDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle data-testid="text-feedback-dialog-title">
-              {t('mentorPortal.feedbackDialogTitle')}
-            </DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              {t('mentorPortal.feedbackDialogDesc')}
-            </p>
-          </DialogHeader>
+      {/* Cancel confirmation */}
+      <AlertDialog open={!!cancelFor} onOpenChange={(open) => !open && setCancelFor(null)}>
+        <AlertDialogContent data-testid="dialog-cancel-session">
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("dashboardV2.sessions.cancelTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("dashboardV2.sessions.cancelBody", { name: bidi(cancelFor?.mentee?.name || t("dashboardV2.inbox.unknownMentee")) })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("dashboardV2.sessions.cancelKeep")}</AlertDialogCancel>
+            <AlertDialogAction
+              className={buttonVariants({ variant: "destructive" })}
+              onClick={() => {
+                if (cancelFor) cancelMutation.mutate(cancelFor.id);
+                setCancelFor(null);
+              }}
+              data-testid="button-cancel-session-confirm"
+            >
+              {t("dashboardV2.sessions.cancelConfirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          <div className="space-y-6">
-            <div className="space-y-4 p-4 bg-muted/50 rounded-lg">
-              <div>
-                <Label className="text-base font-semibold" data-testid="label-your-feedback">
-                  {t('mentorPortal.yourFeedback')}
-                </Label>
-              </div>
+      <MentorFeedbackDialog
+        booking={feedbackFor}
+        open={!!feedbackFor}
+        onOpenChange={(open) => !open && setFeedbackFor(null)}
+        mentorId={mentorId}
+      />
+    </div>
+  );
+}
 
-              <div className="space-y-2">
-                <Label className="text-sm">{t('mentorPortal.ratingLabel')}</Label>
-                {feedbackBooking?.mentor_rating ? (
-                  <div className="flex items-center gap-2">
-                    {renderStars(feedbackBooking.mentor_rating, false)}
-                    <span className="text-sm text-muted-foreground">
-                      ({feedbackBooking.mentor_rating} {t('mentorPortal.stars')})
-                    </span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2">
-                    {renderStars(feedbackRating, true)}
-                    {feedbackRating > 0 && (
-                      <span className="text-sm text-muted-foreground">
-                        ({feedbackRating} {t('mentorPortal.stars')})
-                      </span>
-                    )}
-                  </div>
+/** Mentor-side feedback: rate the mentee once, read what the mentee wrote. */
+function MentorFeedbackDialog({
+  booking,
+  open,
+  onOpenChange,
+  mentorId,
+}: {
+  booking: SessionBooking | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mentorId: string;
+}) {
+  const { t } = useTranslation();
+  const { toast } = useToast();
+  const [rating, setRating] = useState(0);
+  const [text, setText] = useState("");
+  const [showRatingError, setShowRatingError] = useState(false);
+  const ids = useId();
+
+  useEffect(() => {
+    if (open && booking) {
+      setRating(booking.mentor_rating || 0);
+      setText(booking.mentor_feedback || "");
+      setShowRatingError(false);
+    }
+  }, [open, booking]);
+
+  const submit = useMutation({
+    mutationFn: ({ bookingId, mentor_rating, mentor_feedback }: { bookingId: string; mentor_rating: number; mentor_feedback: string }) =>
+      bookingService.submitMentorFeedback(bookingId, mentor_rating, mentor_feedback),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mentor", mentorId, "bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      onOpenChange(false);
+      toast({ title: t("dashboardV2.feedback.submitted") });
+    },
+    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.feedback.submitError"), variant: "destructive" }),
+  });
+
+  const alreadyRated = !!booking?.mentor_rating;
+  const menteeName = booking?.mentee?.name || t("dashboardV2.inbox.unknownMentee");
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle data-testid="text-feedback-dialog-title">{t("dashboardV2.sessions.feedbackTitle")}</DialogTitle>
+          <DialogDescription>{t("dashboardV2.sessions.feedbackDesc", { name: bidi(menteeName) })}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6">
+          <section aria-labelledby={`${ids}-yours`} className="space-y-3">
+            <h3 id={`${ids}-yours`} className="text-body-sm font-medium text-foreground">
+              {t("dashboardV2.feedback.yourFeedback")}
+            </h3>
+            {alreadyRated && booking ? (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-4">
+                <StarRating rating={booking.mentor_rating ?? 0} readonly />
+                {booking.mentor_feedback && (
+                  <p dir="auto" className="text-body-sm text-foreground" data-testid="text-mentor-feedback">
+                    {booking.mentor_feedback}
+                  </p>
                 )}
               </div>
-
-              {!feedbackBooking?.mentor_rating ? (
-                <>
+            ) : (
+              <div className="space-y-4 rounded-lg border border-border p-4">
+                <div className="space-y-2">
+                  <p className="text-body-sm text-foreground">{t("dashboardV2.sessions.rateMentee")}</p>
+                  <StarRating
+                    rating={rating}
+                    label={t("dashboardV2.sessions.rateMentee")}
+                    onRate={(value) => {
+                      setRating(value);
+                      setShowRatingError(false);
+                    }}
+                  />
+                  {showRatingError && (
+                    <p role="alert" className="text-caption text-destructive">
+                      {t("dashboardV2.feedback.ratingRequired")}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={`${ids}-text`}>{t("dashboardV2.feedback.commentLabel")}</Label>
                   <Textarea
-                    placeholder={t('mentorPortal.feedbackPlaceholder')}
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    className="min-h-[100px]"
+                    id={`${ids}-text`}
+                    dir="auto"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder={t("dashboardV2.sessions.feedbackPlaceholder")}
+                    className="min-h-24"
                     data-testid="input-feedback-text"
                   />
-
-                  <Button
-                    onClick={handleSubmitFeedback}
-                    disabled={feedbackRating === 0 || submitFeedbackMutation.isPending}
-                    className="w-full"
-                    data-testid="button-submit-feedback"
-                  >
-                    {submitFeedbackMutation.isPending ? t('common.loading') : t('mentorPortal.submitFeedback')}
-                  </Button>
-                </>
-              ) : (
-                <div className="space-y-2">
-                  <Label className="text-sm">{t('mentorPortal.feedback')}</Label>
-                  <p className="text-sm p-3 bg-background rounded border" data-testid="text-mentor-feedback">
-                    {feedbackBooking.mentor_feedback || '-'}
-                  </p>
                 </div>
-              )}
-            </div>
-
-            <div className="space-y-4 p-4 rounded-lg border">
-              <div>
-                <Label className="text-base font-semibold" data-testid="label-mentee-feedback">
-                  {t('mentorPortal.menteeFeedback')}
-                </Label>
               </div>
-
-              {feedbackBooking?.mentee_rating ? (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-sm">{t('mentorPortal.ratingLabel')}</Label>
-                    <div className="flex items-center gap-2">
-                      {renderStars(feedbackBooking.mentee_rating, false)}
-                      <span className="text-sm text-muted-foreground">
-                        ({feedbackBooking.mentee_rating} {t('mentorPortal.stars')})
-                      </span>
-                    </div>
-                  </div>
-
-                  {feedbackBooking.mentee_feedback && (
-                    <div className="space-y-2">
-                      <Label className="text-sm">{t('mentorPortal.feedback')}</Label>
-                      <p className="text-sm p-3 bg-muted/50 rounded" data-testid="text-mentee-feedback">
-                        {feedbackBooking.mentee_feedback}
-                      </p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground py-2" data-testid="text-no-mentee-feedback">
-                  {t('mentorPortal.noMenteeFeedback')}
-                </p>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+            )}
+          </section>
+          <section aria-labelledby={`${ids}-theirs`} className="space-y-3">
+            <h3 id={`${ids}-theirs`} className="text-body-sm font-medium text-foreground">
+              {t("dashboardV2.sessions.menteeFeedback")}
+            </h3>
+            {booking?.mentee_rating ? (
+              <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-4">
+                <StarRating rating={booking.mentee_rating} readonly />
+                {booking.mentee_feedback && (
+                  <p dir="auto" className="text-body-sm text-foreground" data-testid="text-mentee-feedback">
+                    {booking.mentee_feedback}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="rounded-lg border border-border p-4 text-body-sm text-muted-foreground" data-testid="text-no-mentee-feedback">
+                {t("dashboardV2.sessions.noMenteeFeedback")}
+              </p>
+            )}
+          </section>
+        </div>
+        {!alreadyRated && (
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={submit.isPending}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              loading={submit.isPending}
+              onClick={() => {
+                if (!booking) return;
+                if (rating === 0) {
+                  setShowRatingError(true);
+                  return;
+                }
+                submit.mutate({ bookingId: booking.id, mentor_rating: rating, mentor_feedback: text.trim() });
+              }}
+              data-testid="button-submit-feedback"
+            >
+              {t("dashboardV2.feedback.submit")}
+            </Button>
+          </DialogFooter>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

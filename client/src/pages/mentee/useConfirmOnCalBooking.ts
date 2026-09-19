@@ -1,0 +1,35 @@
+import { useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
+
+import type { CalBookingSuccess } from "@/components/CalEmbed";
+import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
+import { bookingService } from "@/lib/services";
+
+/**
+ * When Cal.com reports a successful booking inside the embed, move the
+ * accepted request to confirmed (with the slot time) so both dashboards and
+ * the analytics see a scheduled session — no server-side webhook needed.
+ * Failure is reported (the row stays "Accepted" so the person can retry).
+ */
+export function useConfirmOnCalBooking(menteeId: string) {
+  const { toast } = useToast();
+  const { t } = useTranslation();
+  const confirmMutation = useMutation({
+    mutationFn: ({ bookingId, detail }: { bookingId: string; detail: CalBookingSuccess }) =>
+      bookingService.confirm(bookingId, { scheduledAt: detail.startTime, calEventUri: detail.uid }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["mentee", menteeId, "bookings"] });
+      queryClient.invalidateQueries({ queryKey: ["mentee", menteeId, "stats"] });
+      toast({ title: t("menteePortal.sessionConfirmedToast"), description: t("menteePortal.sessionScheduledDesc") });
+    },
+    onError: () => {
+      toast({ title: t("common.error"), description: t("dashboardV2.cal.confirmError"), variant: "destructive" });
+    },
+  });
+  return useCallback(
+    (bookingId: string) => (detail: CalBookingSuccess) => confirmMutation.mutate({ bookingId, detail }),
+    [confirmMutation],
+  );
+}

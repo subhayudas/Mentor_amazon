@@ -4,12 +4,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { ExternalLink, KeyRound, MoreHorizontal, Star, UserCheck, UserX, Eye } from "lucide-react";
+import { formatNumber } from "@/lib/format";
+import { initialsOf, localizedField } from "@/lib/localized";
+import { localizeCountry } from "@/lib/reporting";
 import { useAuth } from "@/context/AuthContext";
 import { adminQueryKeys, adminService, aliasFromEmail, normalizeAlias } from "@/lib/adminService";
 import type { Mentor, ApprovedUser } from "@/lib/database";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,13 +36,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { bidi, UNAVAILABLE } from "@/lib/format";
 import {
   ActiveBadge,
   DetailField,
   EmptyRow,
   LoadingRows,
+  QueueError,
   SearchBox,
   errorMessage,
   useFormatters,
@@ -55,7 +59,6 @@ function approvalFor(mentor: Mentor, approved: ApprovedUser[]): ApprovedUser | u
 
 export default function MentorsTab() {
   const { t, i18n } = useTranslation();
-  const isRTL = i18n.language === "ar";
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { formatDate } = useFormatters();
@@ -90,7 +93,7 @@ export default function MentorsTab() {
       toast.success(updated.is_available ? t("admin.mentors.reactivated", { name: updated.name }) : t("admin.mentors.deactivated", { name: updated.name }));
       highlight(updated.id);
     },
-    onError: (error) => toast.error(errorMessage(error, t("errors.somethingWentWrong"))),
+    onError: (error) => toast.error(errorMessage(error, t)),
   });
 
   const approveMutation = useMutation({
@@ -108,7 +111,7 @@ export default function MentorsTab() {
       toast.success(t("admin.mentors.accessApproved", { alias: row.amazon_alias }));
       highlight(mentor.id);
     },
-    onError: (error) => toast.error(errorMessage(error, t("errors.somethingWentWrong"))),
+    onError: (error) => toast.error(errorMessage(error, t)),
   });
 
   const openApprove = (mentor: Mentor) => {
@@ -117,36 +120,36 @@ export default function MentorsTab() {
     setApproving(mentor);
   };
 
-  const displayName = (m: Mentor) => (isRTL && m.name_ar ? m.name_ar : m.name);
-  const displayPosition = (m: Mentor) => (isRTL && m.position_ar ? m.position_ar : m.position);
+  const displayName = (m: Mentor) => localizedField(m, "name", i18n.language) || m.name;
+  const displayPosition = (m: Mentor) => localizedField(m, "position", i18n.language) || m.position;
 
   const renderActions = (mentor: Mentor) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={t("admin.actions")} data-testid={`button-mentor-actions-${mentor.id}`} onClick={(e) => e.stopPropagation()}>
-          <MoreHorizontal className="w-4 h-4" />
+        <Button variant="ghost" size="icon" aria-label={t("admin.actionsFor", { name: displayName(mentor) })} data-testid={`button-mentor-actions-${mentor.id}`} onClick={(e) => e.stopPropagation()}>
+          <MoreHorizontal aria-hidden="true" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={isRTL ? "start" : "end"} onClick={(e) => e.stopPropagation()}>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
         <DropdownMenuItem onSelect={() => setDetail(mentor)}>
-          <Eye className="w-4 h-4 me-2" /> {t("admin.viewDetails")}
+          <Eye className="size-4" aria-hidden="true" /> {t("admin.viewDetails")}
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href={`/mentor/${mentor.id}`}>
-            <ExternalLink className="w-4 h-4 me-2" /> {t("admin.mentors.openProfile")}
+            <ExternalLink className="size-4 rtl:-scale-x-100" aria-hidden="true" /> {t("admin.mentors.openProfile")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => openApprove(mentor)}>
-          <KeyRound className="w-4 h-4 me-2" /> {t("admin.mentors.approveAccess")}
+          <KeyRound className="size-4" aria-hidden="true" /> {t("admin.mentors.approveAccess")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {mentor.is_available ? (
-          <DropdownMenuItem className="text-[#C40000] focus:text-[#C40000]" onSelect={() => setDeactivating(mentor)}>
-            <UserX className="w-4 h-4 me-2" /> {t("admin.mentors.deactivate")}
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => setDeactivating(mentor)}>
+            <UserX className="size-4" aria-hidden="true" /> {t("admin.mentors.deactivate")}
           </DropdownMenuItem>
         ) : (
           <DropdownMenuItem onSelect={() => availabilityMutation.mutate({ id: mentor.id, isAvailable: true })}>
-            <UserCheck className="w-4 h-4 me-2" /> {t("admin.mentors.reactivate")}
+            <UserCheck className="size-4" aria-hidden="true" /> {t("admin.mentors.reactivate")}
           </DropdownMenuItem>
         )}
       </DropdownMenuContent>
@@ -155,14 +158,19 @@ export default function MentorsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <SearchBox value={search} onChange={setSearch} placeholder={t("admin.mentors.searchPlaceholder")} testId="input-mentor-search" />
-        <p className="text-sm text-muted-foreground" data-testid="text-mentor-count">
+        {!mentorsQuery.isError && (
+        <p className="text-body-sm text-muted-foreground" role="status" data-testid="text-mentor-count">
           {t("admin.showingCount", { shown: mentors.length, total: mentorsQuery.data?.length ?? 0 })}
         </p>
+        )}
       </div>
 
-      <Card className="overflow-x-auto">
+      {mentorsQuery.isError ? (
+        <QueueError queue={t("admin.queues.mentors")} onRetry={() => mentorsQuery.refetch()} />
+      ) : (
+      <Card className="overflow-x-auto" aria-busy={mentorsQuery.isLoading || undefined}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -178,8 +186,6 @@ export default function MentorsTab() {
           <TableBody>
             {mentorsQuery.isLoading ? (
               <LoadingRows colSpan={COLS} />
-            ) : mentorsQuery.isError ? (
-              <EmptyRow colSpan={COLS}>{errorMessage(mentorsQuery.error, t("errors.somethingWentWrong"))}</EmptyRow>
             ) : mentors.length === 0 ? (
               <EmptyRow colSpan={COLS}>{search ? t("admin.noMatches") : t("admin.mentors.empty")}</EmptyRow>
             ) : (
@@ -196,44 +202,46 @@ export default function MentorsTab() {
                     data-testid={`row-mentor-${mentor.id}`}
                   >
                     <TableCell>
-                      <div className="flex items-center gap-3 min-w-[12rem]">
-                        <Avatar className="w-9 h-9">
+                      <div className="flex min-w-[12rem] items-center gap-3">
+                        <Avatar className="size-9">
                           <AvatarImage src={mentor.photo_url || undefined} alt="" />
-                          <AvatarFallback>{mentor.name.charAt(0).toUpperCase()}</AvatarFallback>
+                          <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(mentor.name)}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
-                          <p className="font-semibold text-foreground truncate">{displayName(mentor)}</p>
-                          <p className="text-xs text-muted-foreground truncate">{displayPosition(mentor) || mentor.company || "—"}</p>
+                          <p className="truncate font-medium text-foreground">
+                            <bdi>{displayName(mentor)}</bdi>
+                          </p>
+                          <p className="truncate text-caption text-muted-foreground">{displayPosition(mentor) || mentor.company || UNAVAILABLE}</p>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{mentor.email}</TableCell>
-                    <TableCell className="text-sm">{mentor.country || "—"}</TableCell>
+                    <TableCell className="text-body-sm text-muted-foreground">
+                      <bdi dir="ltr">{mentor.email}</bdi>
+                    </TableCell>
+                    <TableCell className="text-body-sm">{mentor.country ? localizeCountry(mentor.country, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <ActiveBadge active={mentor.is_available} activeLabel={t("admin.mentors.available")} inactiveLabel={t("admin.mentors.inactive")} />
                         {approval?.is_active && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Badge variant="outline" className="font-medium">{t("admin.mentors.ssoApproved")}</Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>{t("admin.mentors.ssoApprovedHint", { alias: approval.amazon_alias })}</TooltipContent>
-                          </Tooltip>
+                          <Badge tone="info">
+                            {t("admin.mentors.ssoApproved")}
+                            <span dir="ltr" className="font-mono">({approval.amazon_alias})</span>
+                          </Badge>
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">
+                    <TableCell className="text-body-sm">
                       {mentor.total_ratings ? (
-                        <span className="inline-flex items-center gap-1">
-                          <Star className="w-3.5 h-3.5 text-[#FF9900] fill-[#FF9900]" aria-hidden="true" />
-                          {rating.toFixed(1)}
-                          <span className="text-muted-foreground">({mentor.total_ratings})</span>
+                        <span className="inline-flex items-center gap-1 tabular-nums" dir="ltr">
+                          <Star className="size-3.5 fill-brand-orange text-brand-orange" aria-hidden="true" />
+                          {formatNumber(rating, i18n.language, { maximumFractionDigits: 1 })}
+                          <span className="text-muted-foreground">({formatNumber(mentor.total_ratings, i18n.language)})</span>
                         </span>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-muted-foreground">{UNAVAILABLE}</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDate(mentor.created_at)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDate(mentor.created_at)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{renderActions(mentor)}</TableCell>
                   </TableRow>
                 );
@@ -242,17 +250,18 @@ export default function MentorsTab() {
           </TableBody>
         </Table>
       </Card>
+      )}
 
       {/* Detail sheet */}
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
-        <SheetContent side={isRTL ? "left" : "right"} className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent side="end" className="w-full overflow-y-auto sm:max-w-lg">
           {detail && (
             <>
               <SheetHeader className="text-start">
                 <div className="flex items-center gap-3">
-                  <Avatar className="w-12 h-12">
+                  <Avatar className="size-12">
                     <AvatarImage src={detail.photo_url || undefined} alt="" />
-                    <AvatarFallback>{detail.name.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(detail.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
                     <SheetTitle className="truncate">{displayName(detail)}</SheetTitle>
@@ -264,13 +273,19 @@ export default function MentorsTab() {
               </SheetHeader>
 
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <DetailField label={t("admin.colEmail")}>{detail.email}</DetailField>
-                <DetailField label={t("admin.colCountry")}>{detail.country}</DetailField>
-                <DetailField label={t("admin.mentors.timezone")}>{detail.timezone}</DetailField>
+                <DetailField label={t("admin.colEmail")}>
+                  <bdi dir="ltr">{detail.email}</bdi>
+                </DetailField>
+                <DetailField label={t("admin.colCountry")}>{detail.country ? localizeCountry(detail.country, i18n.language) : undefined}</DetailField>
+                <DetailField label={t("admin.mentors.timezone")}>
+                  <span dir="ltr">{detail.timezone}</span>
+                </DetailField>
                 <DetailField label={t("admin.mentors.colJoined")}>{formatDate(detail.created_at)}</DetailField>
-                <DetailField label={t("admin.mentors.calLink")}>{detail.cal_link}</DetailField>
+                <DetailField label={t("admin.mentors.calLink")}>
+                  <span dir="ltr">{detail.cal_link}</span>
+                </DetailField>
                 <DetailField label={t("admin.mentors.commsOwner")}>
-                  {detail.comms_owner === "assistant" ? `${t("admin.mentors.assistant")}: ${detail.assistant_email || "—"}` : t("admin.mentors.mentorThemselves")}
+                  {detail.comms_owner === "assistant" ? t("admin.mentors.assistantWithEmail", { email: detail.assistant_email || UNAVAILABLE }) : t("admin.mentors.mentorThemselves")}
                 </DetailField>
                 <DetailField label={t("admin.mentors.languages")}>{detail.languages_spoken?.join(", ")}</DetailField>
                 <DetailField label={t("admin.mentors.preference")}>{detail.mentorship_preference ? t(`admin.mentors.preferenceValue.${detail.mentorship_preference}`) : undefined}</DetailField>
@@ -278,7 +293,7 @@ export default function MentorsTab() {
                   <DetailField label={t("admin.mentors.expertise")}>
                     {detail.expertise?.length ? (
                       <div className="flex flex-wrap gap-1.5">
-                        {detail.expertise.map((x) => <Badge key={x} variant="secondary">{x}</Badge>)}
+                        {detail.expertise.map((x) => <Badge key={x} tone="neutral">{x}</Badge>)}
                       </div>
                     ) : undefined}
                   </DetailField>
@@ -287,33 +302,34 @@ export default function MentorsTab() {
                   <DetailField label={t("admin.mentors.industries")}>{detail.industries?.join(", ")}</DetailField>
                 </div>
                 <div className="sm:col-span-2">
-                  <DetailField label={t("admin.mentors.bio")}><p className="whitespace-pre-line">{detail.bio}</p></DetailField>
+                  <DetailField label={t("admin.mentors.bio")}>{detail.bio ? <p dir="auto" className="whitespace-pre-line">{detail.bio}</p> : undefined}</DetailField>
                 </div>
                 {detail.why_joined && (
                   <div className="sm:col-span-2">
-                    <DetailField label={t("admin.mentors.whyJoined")}><p className="whitespace-pre-line">{detail.why_joined}</p></DetailField>
+                    <DetailField label={t("admin.mentors.whyJoined")}>{detail.why_joined ? <p dir="auto" className="whitespace-pre-line">{detail.why_joined}</p> : undefined}</DetailField>
                   </div>
                 )}
               </div>
 
-              <SheetFooter className="mt-8 flex-col sm:flex-row sm:justify-start gap-2">
+              <SheetFooter className="mt-8 flex-col gap-2 sm:flex-row sm:justify-start">
                 <Button asChild variant="outline" data-testid="button-sheet-open-profile">
-                  <Link href={`/mentor/${detail.id}`}><ExternalLink className="w-4 h-4 me-2" />{t("admin.mentors.openProfile")}</Link>
+                  <Link href={`/mentor/${detail.id}`}><ExternalLink className="rtl:-scale-x-100" aria-hidden="true" />{t("admin.mentors.openProfile")}</Link>
                 </Button>
                 <Button variant="outline" onClick={() => openApprove(detail)} data-testid="button-sheet-approve-access">
-                  <KeyRound className="w-4 h-4 me-2" />{t("admin.mentors.approveAccess")}
+                  <KeyRound aria-hidden="true" />{t("admin.mentors.approveAccess")}
                 </Button>
                 {detail.is_available ? (
                   <Button variant="destructive" onClick={() => setDeactivating(detail)} data-testid="button-sheet-deactivate">
-                    <UserX className="w-4 h-4 me-2" />{t("admin.mentors.deactivate")}
+                    <UserX aria-hidden="true" />{t("admin.mentors.deactivate")}
                   </Button>
                 ) : (
                   <Button
+                    variant="secondary"
                     onClick={() => availabilityMutation.mutate({ id: detail.id, isAvailable: true })}
-                    disabled={availabilityMutation.isPending}
+                    loading={availabilityMutation.isPending}
                     data-testid="button-sheet-reactivate"
                   >
-                    <UserCheck className="w-4 h-4 me-2" />{t("admin.mentors.reactivate")}
+                    <UserCheck aria-hidden="true" />{t("admin.mentors.reactivate")}
                   </Button>
                 )}
               </SheetFooter>
@@ -326,13 +342,13 @@ export default function MentorsTab() {
       <AlertDialog open={!!deactivating} onOpenChange={(open) => !open && setDeactivating(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("admin.mentors.deactivateTitle", { name: deactivating ? displayName(deactivating) : "" })}</AlertDialogTitle>
+            <AlertDialogTitle>{t("admin.mentors.deactivateTitle", { name: deactivating ? bidi(displayName(deactivating)) : "" })}</AlertDialogTitle>
             <AlertDialogDescription>{t("admin.mentors.deactivateBody")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-deactivate-cancel">{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-[#C40000] hover:bg-[#a30000] text-white"
+              className={buttonVariants({ variant: "destructive" })}
               onClick={() => {
                 if (deactivating) availabilityMutation.mutate({ id: deactivating.id, isAvailable: false });
                 setDeactivating(null);
@@ -350,7 +366,7 @@ export default function MentorsTab() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("admin.mentors.approveAccess")}</DialogTitle>
-            <DialogDescription>{t("admin.mentors.approveAccessBody", { email: approving?.email ?? "" })}</DialogDescription>
+            <DialogDescription>{t("admin.mentors.approveAccessBody", { email: bidi(approving?.email ?? "") })}</DialogDescription>
           </DialogHeader>
           <form
             className="space-y-4"
@@ -367,19 +383,22 @@ export default function MentorsTab() {
                 onChange={(e) => setAlias(e.target.value)}
                 autoComplete="off"
                 spellCheck={false}
+                dir="ltr"
+                className="text-start"
                 required
+                aria-describedby="approve-alias-hint"
                 data-testid="input-approve-alias"
               />
-              <p className="text-xs text-muted-foreground">{t("admin.mentors.aliasHint")}</p>
+              <p id="approve-alias-hint" className="text-caption text-muted-foreground">{t("admin.mentors.aliasHint")}</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="approve-email">{t("admin.colEmail")}</Label>
-              <Input id="approve-email" value={approving?.email ?? ""} readOnly disabled data-testid="input-approve-email" />
+              <Input id="approve-email" value={approving?.email ?? ""} readOnly dir="ltr" className="text-start" data-testid="input-approve-email" />
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setApproving(null)}>{t("common.cancel")}</Button>
-              <Button type="submit" disabled={approveMutation.isPending || !normalizeAlias(alias)} data-testid="button-approve-confirm">
-                {approveMutation.isPending ? t("admin.saving") : t("admin.access.approve")}
+              <Button type="submit" variant="secondary" loading={approveMutation.isPending} aria-disabled={!normalizeAlias(alias) || undefined} data-testid="button-approve-confirm">
+                {t("admin.access.approve")}
               </Button>
             </DialogFooter>
           </form>

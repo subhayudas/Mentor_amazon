@@ -3,6 +3,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { BadgeCheck, Ban, Building2, User as UserIcon } from "lucide-react";
+import { bidi, UNAVAILABLE } from "@/lib/format";
+import { initialsOf } from "@/lib/localized";
+import { localizeCountry } from "@/lib/reporting";
 import { adminQueryKeys, adminService } from "@/lib/adminService";
 import type { Mentee, VerificationStatus } from "@/lib/database";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -17,6 +20,7 @@ import {
   DetailField,
   EmptyRow,
   LoadingRows,
+  QueueError,
   SearchBox,
   VerificationBadge,
   errorMessage,
@@ -30,7 +34,6 @@ type Filter = (typeof FILTERS)[number];
 
 export default function MenteesTab() {
   const { t, i18n } = useTranslation();
-  const isRTL = i18n.language === "ar";
   const queryClient = useQueryClient();
   const { formatDate } = useFormatters();
   const { highlight, rowProps } = useRowHighlight();
@@ -70,8 +73,8 @@ export default function MenteesTab() {
       setDetail(null);
       toast.success(
         updated.verification_status === "verified"
-          ? t("admin.mentees.markedVerified", { name: updated.organization_name || updated.name })
-          : t("admin.mentees.markedRejected", { name: updated.organization_name || updated.name }),
+          ? t("admin.mentees.markedVerified", { name: bidi(updated.organization_name || updated.name) })
+          : t("admin.mentees.markedRejected", { name: bidi(updated.organization_name || updated.name) }),
       );
       // Keep the changed row on screen: an active status filter would drop it
       // and the anchored highlight would have nothing to point at.
@@ -80,13 +83,13 @@ export default function MenteesTab() {
       }
       highlight(updated.id);
     },
-    onError: (error) => toast.error(errorMessage(error, t("errors.somethingWentWrong"))),
+    onError: (error) => toast.error(errorMessage(error, t)),
   });
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
-        <div className="flex flex-col sm:flex-row gap-3 sm:items-center w-full sm:w-auto">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
           <SearchBox value={search} onChange={setSearch} placeholder={t("admin.mentees.searchPlaceholder")} testId="input-mentee-search" />
           <Select value={filter} onValueChange={(v) => setFilter(v as Filter)}>
             <SelectTrigger className="w-full sm:w-56" aria-label={t("admin.mentees.filterLabel")} data-testid="select-verification-filter">
@@ -101,12 +104,17 @@ export default function MenteesTab() {
             </SelectContent>
           </Select>
         </div>
-        <p className="text-sm text-muted-foreground" data-testid="text-mentee-count">
+        {!menteesQuery.isError && (
+        <p className="text-body-sm text-muted-foreground" role="status" data-testid="text-mentee-count">
           {t("admin.showingCount", { shown: mentees.length, total: menteesQuery.data?.length ?? 0 })}
         </p>
+        )}
       </div>
 
-      <Card className="overflow-x-auto">
+      {menteesQuery.isError ? (
+        <QueueError queue={t("admin.queues.mentees")} onRetry={() => menteesQuery.refetch()} />
+      ) : (
+      <Card className="overflow-x-auto" aria-busy={menteesQuery.isLoading || undefined}>
         <Table>
           <TableHeader>
             <TableRow>
@@ -121,8 +129,6 @@ export default function MenteesTab() {
           <TableBody>
             {menteesQuery.isLoading ? (
               <LoadingRows colSpan={COLS} />
-            ) : menteesQuery.isError ? (
-              <EmptyRow colSpan={COLS}>{errorMessage(menteesQuery.error, t("errors.somethingWentWrong"))}</EmptyRow>
             ) : mentees.length === 0 ? (
               <EmptyRow colSpan={COLS}>{search || filter !== "all" ? t("admin.noMatches") : t("admin.mentees.empty")}</EmptyRow>
             ) : (
@@ -138,27 +144,31 @@ export default function MenteesTab() {
                     data-testid={`row-mentee-${mentee.id}`}
                   >
                     <TableCell>
-                      <div className="flex items-center gap-3 min-w-[12rem]">
-                        <Avatar className="w-9 h-9">
+                      <div className="flex min-w-[12rem] items-center gap-3">
+                        <Avatar className="size-9">
                           <AvatarImage src={mentee.photo_url || undefined} alt="" />
-                          <AvatarFallback>{mentee.name.charAt(0).toUpperCase()}</AvatarFallback>
+                          <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(mentee.name)}</AvatarFallback>
                         </Avatar>
                         <div className="min-w-0">
-                          <p className="font-semibold text-foreground truncate">{mentee.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{mentee.email}</p>
+                          <p className="truncate font-medium text-foreground">
+                            <bdi>{mentee.name}</bdi>
+                          </p>
+                          <p className="truncate text-caption text-muted-foreground">
+                            <bdi dir="ltr">{mentee.email}</bdi>
+                          </p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-sm">
-                        {isOrg ? <Building2 className="w-4 h-4 text-muted-foreground" aria-hidden="true" /> : <UserIcon className="w-4 h-4 text-muted-foreground" aria-hidden="true" />}
+                      <span className="inline-flex items-center gap-1.5 text-body-sm">
+                        {isOrg ? <Building2 className="size-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" /> : <UserIcon className="size-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />}
                         {t(`admin.mentees.type.${mentee.user_type}`)}
                       </span>
                     </TableCell>
-                    <TableCell className="text-sm">{mentee.organization_name || "—"}</TableCell>
-                    <TableCell className="text-sm">{mentee.country || "—"}</TableCell>
+                    <TableCell className="text-body-sm">{mentee.organization_name ? <bdi>{mentee.organization_name}</bdi> : UNAVAILABLE}</TableCell>
+                    <TableCell className="text-body-sm">{mentee.country ? localizeCountry(mentee.country, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell><VerificationBadge status={mentee.verification_status} /></TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{formatDate(mentee.created_at)}</TableCell>
+                    <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDate(mentee.created_at)}</TableCell>
                   </TableRow>
                 );
               })
@@ -166,39 +176,47 @@ export default function MenteesTab() {
           </TableBody>
         </Table>
       </Card>
+      )}
 
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
-        <SheetContent side={isRTL ? "left" : "right"} className="w-full sm:max-w-lg overflow-y-auto">
+        <SheetContent side="end" className="w-full overflow-y-auto sm:max-w-lg">
           {detail && (
             <>
               <SheetHeader className="text-start">
                 <div className="flex items-center gap-3">
-                  <Avatar className="w-12 h-12">
+                  <Avatar className="size-12">
                     <AvatarImage src={detail.photo_url || undefined} alt="" />
-                    <AvatarFallback>{detail.name.charAt(0).toUpperCase()}</AvatarFallback>
+                    <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(detail.name)}</AvatarFallback>
                   </Avatar>
                   <div className="min-w-0">
-                    <SheetTitle className="truncate">{detail.organization_name || detail.name}</SheetTitle>
+                    <SheetTitle className="truncate">
+                      <bdi>{detail.organization_name || detail.name}</bdi>
+                    </SheetTitle>
                     <SheetDescription className="truncate">
-                      {detail.organization_name ? `${detail.name} · ${detail.email}` : detail.email}
+                      {detail.organization_name && (
+                        <>
+                          <bdi>{detail.name}</bdi> ·{" "}
+                        </>
+                      )}
+                      <bdi dir="ltr">{detail.email}</bdi>
                     </SheetDescription>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-1.5 pt-2">
-                  <Badge variant="secondary">{t(`admin.mentees.type.${detail.user_type}`)}</Badge>
+                  <Badge tone="neutral">{t(`admin.mentees.type.${detail.user_type}`)}</Badge>
                   <VerificationBadge status={detail.verification_status} />
                 </div>
               </SheetHeader>
 
               <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <DetailField label={t("admin.colCountry")}>{detail.country}</DetailField>
+                <DetailField label={t("admin.colCountry")}>{detail.country ? localizeCountry(detail.country, i18n.language) : undefined}</DetailField>
                 <DetailField label={t("admin.mentees.colRegistered")}>{formatDate(detail.created_at)}</DetailField>
                 {detail.user_type === "organization" && (
                   <>
                     <DetailField label={t("admin.mentees.reference")}>{detail.verification_reference}</DetailField>
                     <DetailField label={t("admin.mentees.website")}>
                       {detail.organization_website ? (
-                        <a href={detail.organization_website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">
+                        <a href={detail.organization_website} target="_blank" rel="noopener noreferrer" dir="ltr" className="break-all font-medium text-secondary underline-offset-4 hover:underline">
                           {detail.organization_website}
                         </a>
                       ) : undefined}
@@ -206,10 +224,10 @@ export default function MenteesTab() {
                     <DetailField label={t("admin.mentees.sector")}>{detail.organization_sector}</DetailField>
                     <DetailField label={t("admin.mentees.size")}>{detail.organization_size}</DetailField>
                     <div className="sm:col-span-2">
-                      <DetailField label={t("admin.mentees.mission")}><p className="whitespace-pre-line">{detail.organization_mission}</p></DetailField>
+                      <DetailField label={t("admin.mentees.mission")}>{detail.organization_mission ? <p dir="auto" className="whitespace-pre-line">{detail.organization_mission}</p> : undefined}</DetailField>
                     </div>
                     <div className="sm:col-span-2">
-                      <DetailField label={t("admin.mentees.needs")}><p className="whitespace-pre-line">{detail.organization_needs}</p></DetailField>
+                      <DetailField label={t("admin.mentees.needs")}>{detail.organization_needs ? <p dir="auto" className="whitespace-pre-line">{detail.organization_needs}</p> : undefined}</DetailField>
                     </div>
                   </>
                 )}
@@ -217,40 +235,46 @@ export default function MenteesTab() {
                   <DetailField label={t("admin.mentees.areasExploring")}>
                     {detail.areas_exploring?.length ? (
                       <div className="flex flex-wrap gap-1.5">
-                        {detail.areas_exploring.map((x) => <Badge key={x} variant="secondary">{x}</Badge>)}
+                        {detail.areas_exploring.map((x) => <Badge key={x} tone="neutral">{x}</Badge>)}
                       </div>
                     ) : undefined}
                   </DetailField>
                 </div>
                 <div className="sm:col-span-2">
-                  <DetailField label={t("admin.mentees.goals")}><p className="whitespace-pre-line">{detail.goals}</p></DetailField>
+                  <DetailField label={t("admin.mentees.goals")}>{detail.goals ? <p dir="auto" className="whitespace-pre-line">{detail.goals}</p> : undefined}</DetailField>
                 </div>
                 {detail.bio && (
                   <div className="sm:col-span-2">
-                    <DetailField label={t("admin.mentors.bio")}><p className="whitespace-pre-line">{detail.bio}</p></DetailField>
+                    <DetailField label={t("admin.mentors.bio")}>{detail.bio ? <p dir="auto" className="whitespace-pre-line">{detail.bio}</p> : undefined}</DetailField>
                   </div>
                 )}
               </div>
 
               {detail.user_type === "organization" && (
-                <SheetFooter className="mt-8 flex-col sm:flex-row sm:justify-start gap-2">
-                  <Button
-                    onClick={() => verifyMutation.mutate({ id: detail.id, status: "verified" })}
-                    disabled={verifyMutation.isPending || detail.verification_status === "verified"}
-                    className="bg-[#067D62] hover:bg-[#05654f] text-white"
-                    data-testid="button-mark-verified"
-                  >
-                    <BadgeCheck className="w-4 h-4 me-2" />{t("admin.mentees.markVerified")}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => verifyMutation.mutate({ id: detail.id, status: "rejected" })}
-                    disabled={verifyMutation.isPending || detail.verification_status === "rejected"}
-                    className="text-[#C40000] border-[#C40000]/40 hover:bg-[#FDECEC]"
-                    data-testid="button-mark-rejected"
-                  >
-                    <Ban className="w-4 h-4 me-2" />{t("admin.mentees.markRejected")}
-                  </Button>
+                <SheetFooter className="mt-8 flex-col gap-2 sm:flex-row sm:justify-start">
+                  {detail.verification_status !== "verified" && (
+                    <Button
+                      variant="secondary"
+                      onClick={() => verifyMutation.mutate({ id: detail.id, status: "verified" })}
+                      loading={verifyMutation.isPending && verifyMutation.variables?.status === "verified"}
+                      disabled={verifyMutation.isPending}
+                      data-testid="button-mark-verified"
+                    >
+                      <BadgeCheck aria-hidden="true" />{t("admin.mentees.markVerified")}
+                    </Button>
+                  )}
+                  {detail.verification_status !== "rejected" && (
+                    <Button
+                      variant="outline"
+                      onClick={() => verifyMutation.mutate({ id: detail.id, status: "rejected" })}
+                      loading={verifyMutation.isPending && verifyMutation.variables?.status === "rejected"}
+                      disabled={verifyMutation.isPending}
+                      className="border-destructive/40 text-destructive hover:bg-destructive-soft"
+                      data-testid="button-mark-rejected"
+                    >
+                      <Ban aria-hidden="true" />{t("admin.mentees.markRejected")}
+                    </Button>
+                  )}
                 </SheetFooter>
               )}
             </>

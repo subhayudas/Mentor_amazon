@@ -116,8 +116,8 @@ export const mentorService = {
     return db.updateMentorAvailability(id, isAvailable);
   },
 
-  // Get mentor bookings
-  async getBookings(mentorId: string, status?: string): Promise<Booking[]> {
+  // Get mentor bookings (mentee identity embedded for the portal)
+  async getBookings(mentorId: string, status?: string): Promise<(Booking & { mentee?: Mentee })[]> {
     return db.getMentorBookingsWithStatus(mentorId, status);
   },
 
@@ -206,6 +206,21 @@ export const menteeService = {
   // Update mentee profile
   async update(id: string, updates: Partial<Mentee>): Promise<Mentee | null> {
     return db.updateMentee(id, updates);
+  },
+
+  /**
+   * Finish a profile that `get_or_create_mentee` auto-created during an
+   * anonymous request (name = email prefix, timezone 'UTC'). Updates the
+   * caller's own row (RLS: mentees.email = session email) and links it to the
+   * users row the same way `create` does.
+   */
+  async completeProfile(id: string, updates: Partial<Mentee>): Promise<Mentee | null> {
+    const updated = await db.updateMentee(id, updates);
+    const currentUser = await auth.getCurrentUser();
+    if (currentUser && updated) {
+      await auth.updateProfileId(currentUser.id, updated.id);
+    }
+    return updated;
   },
 
   // Get bookings
