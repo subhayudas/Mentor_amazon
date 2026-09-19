@@ -30,6 +30,7 @@
       "title": "How a session happens",
       "step1": "Send a request with your goal — no account needed",
       "step2": "The mentor replies; sign in with the same email to see it",
+      "step2SignedIn": "The mentor replies; you'll see it under Bookings",
       "step3": "Pick a time on their calendar link"
     }
   },

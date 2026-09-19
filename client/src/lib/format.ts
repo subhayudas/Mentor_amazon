@@ -161,3 +161,67 @@ export function bidi(value: string | number | null | undefined): string {
   if (value == null) return "";
   return `\u2068${String(value)}\u2069`;
 }
+
+// ---------------------------------------------------------------------------
+// Lists, language names and relative time (moved here from the profile and
+// dashboard passes so every Intl formatter lives in this module).
+// ---------------------------------------------------------------------------
+
+/** "English, Arabic" / "الإنجليزية والعربية" — a locale-correct conjunction list. */
+export function formatList(items: readonly string[], lang?: string): string {
+  const clean = items.filter((s) => s && s.trim());
+  if (clean.length === 0) return "";
+  try {
+    return new Intl.ListFormat(intlLocale(lang), { style: "long", type: "conjunction" }).format(clean);
+  } catch {
+    return clean.join(", ");
+  }
+}
+
+/** English language names as the forms store them → BCP-47 codes for `Intl.DisplayNames`. */
+const LANGUAGE_CODES: Record<string, string> = {
+  english: "en", arabic: "ar", french: "fr", spanish: "es", german: "de", italian: "it", portuguese: "pt",
+  dutch: "nl", greek: "el", turkish: "tr", russian: "ru", hindi: "hi", urdu: "ur", bengali: "bn", punjabi: "pa",
+  tamil: "ta", telugu: "te", malayalam: "ml", kannada: "kn", marathi: "mr", gujarati: "gu", sinhala: "si",
+  nepali: "ne", mandarin: "zh", chinese: "zh", cantonese: "yue", japanese: "ja", korean: "ko", persian: "fa",
+  farsi: "fa", kurdish: "ku", pashto: "ps", hebrew: "he", swahili: "sw", amharic: "am", somali: "so",
+  tagalog: "tl", filipino: "fil", indonesian: "id", malay: "ms", thai: "th", vietnamese: "vi",
+};
+
+const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
+
+/** The stored language name in the active language ("Arabic" → "العربية"); unknown values pass through. */
+export function languageName(stored: string, lang?: string): string {
+  const code = LANGUAGE_CODES[stored.trim().toLowerCase()];
+  if (!code) return stored;
+  const locale = intlLocale(lang);
+  let names = displayNamesCache.get(locale);
+  if (names === undefined) {
+    try {
+      names = new Intl.DisplayNames([locale], { type: "language" });
+    } catch {
+      names = null;
+    }
+    displayNamesCache.set(locale, names);
+  }
+  try {
+    return names?.of(code) ?? stored;
+  } catch {
+    return stored;
+  }
+}
+
+/** "3 hours ago" / "in 2 days" for feeds and notification rows; bad input shows the placeholder. */
+export function formatRelativeTime(iso: string | null | undefined, lang?: string, now: Date = new Date()): string {
+  if (!iso) return UNAVAILABLE;
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return UNAVAILABLE;
+  const diffSeconds = Math.round((then - now.getTime()) / 1000);
+  const abs = Math.abs(diffSeconds);
+  const rtf = new Intl.RelativeTimeFormat(intlLocale(lang), { numeric: "auto" });
+  if (abs < 60) return rtf.format(diffSeconds, "second");
+  if (abs < 3600) return rtf.format(Math.round(diffSeconds / 60), "minute");
+  if (abs < 86_400) return rtf.format(Math.round(diffSeconds / 3600), "hour");
+  if (abs < 86_400 * 30) return rtf.format(Math.round(diffSeconds / 86_400), "day");
+  return rtf.format(Math.round(diffSeconds / (86_400 * 30)), "month");
+}

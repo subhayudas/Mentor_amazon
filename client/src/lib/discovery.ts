@@ -14,7 +14,7 @@
  */
 import type { PublicMentor } from "@/lib/database";
 import type { DiscoverySort, DiscoveryState } from "@/lib/discoveryState";
-import { tzOffsetMinutes } from "@/lib/format";
+import { languageName, tzOffsetMinutes } from "@/lib/format";
 import { matchesQuery, normalizeForSearch } from "@/lib/search";
 
 export interface DiscoveryContext {
@@ -269,41 +269,9 @@ export function countMatching(mentors: ReadonlyArray<PublicMentor>, term: string
   return mentors.reduce((n, m) => n + (matchesMentor(m, term) ? 1 : 0), 0);
 }
 
-/**
- * Stored language names → BCP-47 codes for `Intl.DisplayNames`. Exactly the
- * six options MentorOnboarding offers (the only known set); any other stored
- * value is displayed as stored rather than guessed (spec §10).
- */
-const LANGUAGE_CODES: Record<string, string> = {
-  english: "en",
-  arabic: "ar",
-  french: "fr",
-  german: "de",
-  spanish: "es",
-  turkish: "tr",
-};
-
-const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
-
-/** "English" → "الإنجليزية" in Arabic, the stored string when the name is unknown. */
+/** "English" → "الإنجليزية" in Arabic; unknown stored values display as stored (spec §10). */
 export function languageLabel(stored: string, lang: string): string {
-  const code = LANGUAGE_CODES[stored.trim().toLowerCase()];
-  if (!code) return stored;
-  const locale = isArabic(lang) ? "ar" : "en";
-  let names = displayNamesCache.get(locale);
-  if (names === undefined) {
-    try {
-      names = new Intl.DisplayNames([locale], { type: "language" });
-    } catch {
-      names = null;
-    }
-    displayNamesCache.set(locale, names);
-  }
-  try {
-    return names?.of(code) ?? stored;
-  } catch {
-    return stored;
-  }
+  return languageName(stored, lang);
 }
 
 /** Localized, de-duplicated language names for a card's meta line. */

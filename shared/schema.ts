@@ -330,13 +330,6 @@ export const insertBookingSchema = createInsertSchema(bookings).omit({
   created_at: true,
 });
 
-export const bookingRequestSchema = z.object({
-  mentor_id: z.string(),
-  mentee_name: z.string().min(1, "Name is required"),
-  mentee_email: z.string().email("Valid email is required"),
-  goal: z.string().min(10, "Please describe your goals in at least 10 characters"),
-});
-
 export const insertBookingNoteSchema = createInsertSchema(bookingNotes).omit({
   id: true,
   created_at: true,

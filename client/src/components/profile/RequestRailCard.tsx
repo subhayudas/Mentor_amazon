@@ -62,7 +62,7 @@ export function RequestRailCard({
       )}
 
       <p className="mt-5 text-caption text-muted-foreground">{t("common.rail.title")}</p>
-      <RequestRail size="sm" stops={DEFAULT_STOPS(t)} className="mt-3" />
+      <RequestRail size="sm" stops={DEFAULT_STOPS(t, undefined, { signedIn })} className="mt-3" />
 
       {mentor.is_available && (
         <TimeZoneNote mentorName={mentorName} mentorTz={mentor.timezone} className="mt-5" />

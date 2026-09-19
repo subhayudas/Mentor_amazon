@@ -47,7 +47,6 @@ export default defineConfig({
             return "vendor-react";
           }
           if (id.includes("node_modules/@supabase/")) return "vendor-supabase";
-          if (id.includes("node_modules/framer-motion/")) return "vendor-motion";
           if (/node_modules\/(i18next|react-i18next|i18next-browser-languagedetector|html-parse-stringify|void-elements)\//.test(id)) {
             return "vendor-i18n";
           }

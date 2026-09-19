@@ -80,7 +80,7 @@ Use a mentee (org type) and a mentor whose profile has a Cal.com link.
 
 | # | Steps | Expected |
 | --- | --- | --- |
-| e1 | Mentee: `/` → open a mentor card → "Request session" (`button-request-session`) → fill goal → submit | Toast ("sign in with the same email to follow it"); signed in, `/mentee-dashboard` lists the request as **pending** (anonymous visitors are sent to `/login?next=…`). Mentor: reload any page → the bell (`button-notification-bell`) shows +1 with a "new booking request" notification (the bell refreshes on reload/navigation, it does not poll). |
+| e1 | Mentee: `/mentors` → open a mentor card (`link-mentor-<id>`) → "Request a session" (`button-request-session`) → fill the goal (≥ 20 characters) → "Send request" | The dialog shows an in-place success state ("Request sent to <name>") and the profile's request card becomes the anchored "Request sent" block; the legacy toast ("sign in with the same email to follow it") still fires. Anonymous visitors get "Sign in" (`/login?next=%2Fmentee-dashboard%2Fbookings`) / "Create an account" buttons in the success state, never a redirect before the request. Signed in, `/mentee-dashboard` lists the request under "Waiting for a reply" as **Awaiting mentor**. Mentor: reload any page → the bell (`button-notification-bell`) shows +1 with a "new booking request" notification (the bell refreshes on reload/navigation, it does not poll). |
 | e2 | Mentee (org, pending verification): dashboard header | Org name with the amber "Verification pending" badge and the "Verification in review" banner; browsing/requesting still works. |
 | e3 | Mentor: `/mentor-portal/requests` | The request row shows the mentee name, the org name and an amber "Verification pending" badge with the muted "not verified yet" note. |
 | e4 | Mentor: click **Accept** | Row highlights, turns green with an "Accepted" pill for ~2.5 s, then leaves the pending list; toast fires. |
@@ -91,22 +91,22 @@ Use a mentee (org type) and a mentor whose profile has a Cal.com link.
 | e8b | Mentee: in the Cal.com dialog (e5) actually book a slot | On Cal.com's success screen the app toasts "Session confirmed" and, after closing, the booking shows as **confirmed** with the slot time (no webhook involved). If Cal.com is blocked, the mentor can still complete the *accepted* session from `/mentor-portal/sessions`. |
 | e9 | Mentor: `/mentor-portal/feedback` → leave feedback for the mentee | Toast; mentee (after reload) sees a "feedback received" notification and the mentor's feedback on their dashboard. |
 | e10 | Mentor: Decline a second request | Row turns muted red with "Declined" pill; mentee (after reload) sees **rejected** and a notification. |
-| e11 | Repeat e1 six times quickly with the same mentee email | The 6th request fails with a rate-limit error toast (DB trigger: 5 per mentee per hour). |
+| e11 | Repeat e1 six times quickly with the same mentee email | The 6th request fails with the inline `booking-error` alert (`role="alert"`, `data-kind="rateLimited"`): "You've reached the limit of requests for now. Try again in an hour." Input is preserved (DB trigger: 5 per mentee per hour). |
 
 ## (f) EN/AR toggle and RTL at 375 / 768 / 1440 px
 
-Toggle with the globe button (`button-language-toggle`). For each page below, in **both** languages and at each of the three widths (DevTools device toolbar): no horizontal scrollbar, no clipped text, icons sit on the correct side (they flip in RTL), tabs stay uniform width, nothing glued to the viewport edge, `<html dir="rtl" lang="ar">` in Arabic.
+Toggle with the text button in the header (`button-language-toggle`; it reads "عربي" in English and "English" in Arabic). For each page below, in **both** languages and at each of the three widths (DevTools device toolbar): no horizontal scrollbar, no clipped text, icons sit on the correct side (they flip in RTL), tabs stay uniform width, nothing glued to the viewport edge, `<html dir="rtl" lang="ar">` in Arabic.
 
 | # | Page | Extra checks |
 | --- | --- | --- |
-| f1 | `/` (directory + filters) | Filter selects open on the correct side; mentor cards keep their arrow on the trailing side. |
+| f1 | `/` (landing) and `/mentors` (directory + filters) | Hero search submit is the only orange fill above the fold; on `/mentors` the filter rail sits at the inline-start on ≥ 1024 and the "Filters (n)" drawer opens on phones; example chips scroll on one line with a peek; cards keep their status badge on the trailing edge. `button-book-<id>` is the label span inside the single `link-mentor-<id>` anchor. |
 | f2 | `/login` (incl. `?error=sso_state`) | SSO CTA, divider, collapsible form; icons inside inputs sit at the start edge. |
 | f3 | `/auth/sso` (error state) and `/request-access?alias=x` | Cards centred; buttons wrap on 375. |
 | f4 | `/mentee-registration` (individual **and** organisation) | Verification section + amber note; after an org submit the "Verification in review" card is at the top and focused. |
 | f5 | `/mentee-dashboard` (org mentee) | Badge + banner; Schedule-now dialog opens and closes at 375. |
 | f6 | `/mentor-onboarding` (approved mentor, no profile) | Read-only email; gate cards (not approved / mentors only). |
-| f7 | `/mentor-portal` home, `/requests`, `/sessions` (complete dialog) | Six stat tiles reflow to 1 column at 375; verification badges; duration presets. |
-| f8 | `/analytics` (as any signed-in user) | Tabs are RTL-aware (Radix `dir` fix), horizontal bar charts mirror, legends readable, CSV export popover opens. |
+| f7 | `/mentor-portal` (Inbox tab; `/mentor-portal/requests` is an alias), `/mentor-portal/sessions` (complete dialog) | No sidebar: `PageHeader` + tab row (icon + ≤ 2 words) that is sticky under the header on phones; the two tiles reflow to one column at 375; verification badges; duration presets. |
+| f8 | `/analytics` (admin sees "Programme analytics"; mentors/mentees see "Your sessions") | Tabs are RTL-aware (DirectionProvider), horizontal bar charts mirror (value axis grows toward the inline-end), the weekly trend never mirrors, legends are text lists, "View as table" exposes exact values, CSV export popover opens (admin). |
 | f9 | `/admin`, `/admin/mentees`, `/admin/bookings`, `/admin/access` | Stat strip, tables scroll horizontally *inside* the table only, detail Sheets open from the trailing side, dialogs usable at 375. |
 | f10 | Reload any page while in Arabic | Language persists (localStorage `language`), direction applied before first paint (no LTR flash). |
 
@@ -116,7 +116,7 @@ Toggle with the globe button (`button-language-toggle`). For each page below, in
 | --- | --- | --- |
 | g1 | On a project with **fewer than 5** bookings, sign in and open `/analytics` | Amber "demo data" banner (`banner-demo-data`) at the top naming the real count and the threshold (5), plus a "Demo" badge (`badge-demo-data`) in the header; charts show the seeded demo rows; CSV downloads are prefixed `DEMO-` and start with a `# DEMO DATA` row. |
 | g2 | Same page after 5 or more real bookings exist | Banner and badge gone; KPIs, Countries, Mentors and Bookings tabs show the real rows; "Volunteer hours" equals sum(completed minutes)/60. |
-| g3 | Click any bar / pie slice / legend entry | "Showing: <segment> · Clear" chip and a details table appear under the chart; Clear restores. |
+| g3 | Click any bar, bar segment, legend chip or ranked-table name (there are no pie/donut charts) | "Showing: <segment> · Clear" chip and a details table appear under the chart; Clear restores. |
 
 ## (h) Security headers
 

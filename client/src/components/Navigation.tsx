@@ -151,7 +151,7 @@ export function Navigation() {
           </ul>
         </nav>
 
-        <div className="ms-auto flex items-center gap-1 sm:gap-2">
+        <div className="ms-auto flex min-w-0 items-center gap-0.5 sm:gap-2">
           <LanguageToggle />
 
           {bellEmail && <NotificationBell email={bellEmail} />}

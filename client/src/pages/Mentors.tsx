@@ -292,6 +292,7 @@ export default function Mentors() {
                 onRemove={removeFilter}
                 onClearAll={clearFilters}
                 focusFallbackRef={resultsHeadingRef}
+                hideClearAll={isDesktop}
                 className="min-w-0"
               />
               {showSort && (

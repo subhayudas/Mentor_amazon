@@ -24,10 +24,12 @@ export interface ActiveFiltersProps {
   onClearAll: () => void;
   /** Where focus lands when the last chip and Clear all are gone. */
   focusFallbackRef?: React.RefObject<HTMLElement>;
+  /** Omit the trailing "Clear all" when the surrounding UI already offers one (the desktop filter rail). */
+  hideClearAll?: boolean;
   className?: string;
 }
 
-export function ActiveFilters({ filters, onRemove, onClearAll, focusFallbackRef, className }: ActiveFiltersProps) {
+export function ActiveFilters({ filters, onRemove, onClearAll, focusFallbackRef, hideClearAll = false, className }: ActiveFiltersProps) {
   const { t } = useTranslation();
   const chipRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const clearRef = React.useRef<HTMLButtonElement | null>(null);
@@ -72,18 +74,20 @@ export function ActiveFilters({ filters, onRemove, onClearAll, focusFallbackRef,
           </li>
         ))}
       </ul>
-      <Button
-        ref={clearRef}
-        type="button"
-        variant="link"
-        size="sm"
-        onClick={() => {
-          pendingFocus.current = -1;
-          onClearAll();
-        }}
-      >
-        {t("common.clearAll")}
-      </Button>
+      {!hideClearAll && (
+        <Button
+          ref={clearRef}
+          type="button"
+          variant="link"
+          size="sm"
+          onClick={() => {
+            pendingFocus.current = -1;
+            onClearAll();
+          }}
+        >
+          {t("common.clearAll")}
+        </Button>
+      )}
     </div>
   );
 }

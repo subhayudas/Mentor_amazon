@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
  * concentric with the radius-8 input) and an optional visible submit button.
  * `primaryAction` makes that submit the page's single orange fill (landing hero
  * only); everywhere else it is navy. Enter submits (implicit submission).
- * The input is `dir="auto"` so Arabic and English queries align correctly.
+ * The input is `dir="auto"` once it has text so Arabic and English queries align; while empty it
+ * inherits the page direction so the placeholder is never clipped at its start in RTL.
  * Callers own the behaviour: on `/` Enter navigates to `/mentors?q=`, on
  * `/mentors` filtering is live and Enter moves focus to the results heading.
  */
@@ -111,7 +112,7 @@ export const SearchIntent = React.forwardRef<HTMLInputElement, SearchIntentProps
           enterKeyHint="search"
           autoComplete="off"
           autoFocus={autoFocus}
-          dir="auto"
+          dir={value ? "auto" : undefined}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}

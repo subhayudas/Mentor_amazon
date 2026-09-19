@@ -31,9 +31,6 @@ const MentorProfile = lazy(() => import("@/pages/MentorProfile"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
 const MentorOnboarding = lazy(() => import("@/pages/MentorOnboarding"));
 const MenteeRegistration = lazy(() => import("@/pages/MenteeRegistration"));
-const MenteeProfileView = lazy(() => import("@/pages/MenteeProfileView"));
-const MyBookings = lazy(() => import("@/pages/MyBookings"));
-const MentorDashboard = lazy(() => import("@/pages/MentorDashboard"));
 const MentorPortal = lazy(() => import("@/pages/MentorPortal"));
 const MenteeDashboard = lazy(() => import("@/pages/MenteeDashboard"));
 const SsoCallback = lazy(() => import("@/pages/SsoCallback"));
@@ -117,7 +114,11 @@ function Router() {
         <Route path="/profile/mentor/:id">
           {(params) => <Redirect to={`/mentor/${params.id}`} replace />}
         </Route>
-        <Route path="/profile/mentee/:id" component={MenteeProfileView} />
+        {/* Mentee rows are readable only by their owner, the booked mentors and admins,
+            so the legacy public mentee profile now opens the caller's own profile tab. */}
+        <Route path="/profile/mentee/:id">
+          <Redirect to="/mentee-dashboard/profile" replace />
+        </Route>
 
         {/* Any signed-in session */}
         {/* Mentee surfaces read the caller's own rows under RLS, so a session is required;
@@ -127,10 +128,9 @@ function Router() {
             <MenteeRegistration />
           </RequireAuth>
         </Route>
+        {/* Folded into the mentee dashboard (bookings tab carries the notes dialog too). */}
         <Route path="/my-bookings">
-          <RequireAuth>
-            <MyBookings />
-          </RequireAuth>
+          <Redirect to="/mentee-dashboard/bookings" replace />
         </Route>
         <Route path="/mentee-dashboard">
           <RequireAuth>
@@ -155,10 +155,9 @@ function Router() {
         </Route>
 
         {/* Mentors only */}
+        {/* Legacy duplicate of the portal; its availability toggle lives in the portal's Profile tab. */}
         <Route path="/mentor-dashboard">
-          <RequireRole role="mentor">
-            <MentorDashboard />
-          </RequireRole>
+          <Redirect to="/mentor-portal/profile" replace />
         </Route>
         <Route path="/mentor-portal">
           <RequireRole role="mentor">

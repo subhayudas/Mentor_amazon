@@ -373,7 +373,7 @@ export function BookingRequestDialog({
             </p>
             <RequestRail
               size="sm"
-              stops={DEFAULT_STOPS(t, ["done", "next", "next"])}
+              stops={DEFAULT_STOPS(t, ["done", "next", "next"], { signedIn })}
               ariaLabel={t("bookingRequest.whatNext")}
               className="w-full max-w-sm text-start"
             />
@@ -567,7 +567,7 @@ export function BookingRequestDialog({
                 <p className="text-caption text-muted-foreground">{t("bookingRequest.whatNext")}</p>
                 <RequestRail
                   size="sm"
-                  stops={DEFAULT_STOPS(t)}
+                  stops={DEFAULT_STOPS(t, undefined, { signedIn })}
                   ariaLabel={t("bookingRequest.whatNext")}
                   className="mt-2"
                 />

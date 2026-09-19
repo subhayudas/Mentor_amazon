@@ -45,10 +45,12 @@ const STATE_KEY: Record<RailStopState, string> = {
 export function DEFAULT_STOPS(
   t: TFunction,
   states: [RailStopState, RailStopState, RailStopState] = ["next", "next", "next"],
+  options: { signedIn?: boolean } = {},
 ): RailStop[] {
   return [
     { label: t("common.rail.step1"), state: states[0] },
-    { label: t("common.rail.step2"), state: states[1] },
+    // Signed-in readers see their reply under Bookings; visitors are told how the reply reaches them.
+    { label: t(options.signedIn ? "common.rail.step2SignedIn" : "common.rail.step2"), state: states[1] },
     { label: t("common.rail.step3"), state: states[2] },
   ];
 }

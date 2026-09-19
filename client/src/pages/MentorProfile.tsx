@@ -277,7 +277,7 @@ export default function MentorProfile() {
               <h2 id="profile-rail-title" className="text-h2-sm text-foreground md:text-h2">
                 {t("common.rail.title")}
               </h2>
-              <RequestRail size="sm" stops={DEFAULT_STOPS(t)} className="mt-4" />
+              <RequestRail size="sm" stops={DEFAULT_STOPS(t, undefined, { signedIn })} className="mt-4" />
             </section>
           )}
           {!isDesktop && windows.length > 0 && (

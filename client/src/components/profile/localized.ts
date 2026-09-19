@@ -1,8 +1,6 @@
 /**
  * Display helpers for the public mentor profile. Pure and locale-aware; every
- * date, time and number still goes through lib/format.ts. The list and
- * language-name helpers are local copies until lib/format.ts grows them
- * (integrator ticket): keep them dependency-free.
+ * date, time, number, list and language name goes through lib/format.ts.
  */
 import type { PublicMentor } from "@/lib/database";
 import { MONDAY_FIRST, weekdayLabels } from "@/lib/availability";
@@ -53,85 +51,7 @@ export function initials(name: string): string {
     .toLocaleUpperCase();
 }
 
-/** English language names as stored on mentors → BCP-47 codes for Intl.DisplayNames. */
-const LANGUAGE_CODES: Record<string, string> = {
-  english: "en",
-  arabic: "ar",
-  french: "fr",
-  spanish: "es",
-  german: "de",
-  italian: "it",
-  portuguese: "pt",
-  dutch: "nl",
-  greek: "el",
-  turkish: "tr",
-  russian: "ru",
-  hindi: "hi",
-  urdu: "ur",
-  bengali: "bn",
-  punjabi: "pa",
-  tamil: "ta",
-  telugu: "te",
-  malayalam: "ml",
-  kannada: "kn",
-  marathi: "mr",
-  gujarati: "gu",
-  sinhala: "si",
-  nepali: "ne",
-  mandarin: "zh",
-  chinese: "zh",
-  cantonese: "yue",
-  japanese: "ja",
-  korean: "ko",
-  persian: "fa",
-  farsi: "fa",
-  kurdish: "ku",
-  pashto: "ps",
-  hebrew: "he",
-  swahili: "sw",
-  amharic: "am",
-  somali: "so",
-  tagalog: "tl",
-  filipino: "fil",
-  indonesian: "id",
-  malay: "ms",
-  thai: "th",
-  vietnamese: "vi",
-};
-
-const displayNames = new Map<string, Intl.DisplayNames | null>();
-
-/** The stored language name in the active language ("Arabic" → "العربية"); unknown values pass through. */
-export function languageName(stored: string, lang: string): string {
-  const code = LANGUAGE_CODES[stored.trim().toLowerCase()];
-  if (!code) return stored;
-  const locale = intlLocale(lang);
-  let names = displayNames.get(locale);
-  if (names === undefined) {
-    try {
-      names = new Intl.DisplayNames([locale], { type: "language" });
-    } catch {
-      names = null;
-    }
-    displayNames.set(locale, names);
-  }
-  try {
-    return names?.of(code) ?? stored;
-  } catch {
-    return stored;
-  }
-}
-
-/** "English, Arabic" / "الإنجليزية والعربية" — a locale-correct conjunction list. */
-export function formatList(items: readonly string[], lang: string): string {
-  const clean = items.filter((s) => s && s.trim());
-  if (clean.length === 0) return "";
-  try {
-    return new Intl.ListFormat(intlLocale(lang), { style: "long", type: "conjunction" }).format(clean);
-  } catch {
-    return clean.join(", ");
-  }
-}
+export { formatList, languageName } from "@/lib/format";
 
 /** Anchor a "HH:MM" wall-clock time on a fixed UTC day so Intl prints it unchanged. */
 function wallClock(hhmm: string): Date | null {

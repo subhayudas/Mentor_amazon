@@ -816,7 +816,7 @@ export default function MenteeRegistration() {
             {t("menteeRegistration.contextTitle")}
           </h2>
           <p className="mt-2 text-body-sm text-muted-foreground text-pretty">{t("menteeRegistration.contextDescription")}</p>
-          <RequestRail size="sm" className="mt-5" stops={DEFAULT_STOPS(t)} />
+          <RequestRail size="sm" className="mt-5" stops={DEFAULT_STOPS(t, undefined, { signedIn: true })} />
           <ul className="mt-5 space-y-3 border-t border-border pt-5">
             {(["benefit1", "benefit2", "benefit3"] as const).map((key) => (
               <li key={key}>
