@@ -68,17 +68,26 @@ export function activeTabFor(tabs: RouteTab[], pathname: string): RouteTab {
  * until the row fits again, so the active label is never the one that clips
  * (F-03 at 320px). Pure, so it is testable and re-runs on every resize
  * without touching the DOM.
+ *
+ * Measured widths are rounded UP and the available width DOWN before the
+ * comparison, and there is no tolerance: an exact-fit row (123.98 + 91.47 +
+ * 72.95 = 288.40 against 288 at 320px Arabic) used to pass on a +0.5px
+ * allowance and then flex-shrank the active trigger into an ellipsis (N-11).
+ * Case: widths summing to available + 0.4 → the last tab goes behind More.
  */
 export function splitTabsForRow<T>(
   items: T[],
-  widths: number[],
-  available: number,
-  moreWidth: number,
+  measuredWidths: number[],
+  measuredAvailable: number,
+  measuredMoreWidth: number,
   activeIndex: number,
 ): { row: T[]; overflow: T[] } {
+  const widths = measuredWidths.map((w) => Math.ceil(w));
+  const available = Math.floor(measuredAvailable);
+  const moreWidth = Math.ceil(measuredMoreWidth);
   const total = widths.reduce((sum, w) => sum + w, 0);
-  if (total <= available + 0.5) return { row: items, overflow: [] };
-  const budget = available - moreWidth + 0.5;
+  if (total <= available) return { row: items, overflow: [] };
+  const budget = available - moreWidth;
   let fitted = 0;
   let used = 0;
   while (fitted < items.length && used + widths[fitted] <= budget) used += widths[fitted++];
