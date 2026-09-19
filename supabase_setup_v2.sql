@@ -146,9 +146,18 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
   SELECT public.is_admin() OR public.is_service_context();
 $$;
 
+-- An admin can link an approved alias to an existing mentors row whose email
+-- differs from the Amazon identity email; users.profile_id records that link.
+CREATE OR REPLACE FUNCTION public.owns_profile(p_profile_id text)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT auth.uid() IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.users u WHERE u.id = auth.uid()::text AND u.profile_id = p_profile_id);
+$$;
+
 CREATE OR REPLACE FUNCTION public.owns_mentor(p_mentor_id text)
 RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
-  SELECT EXISTS (SELECT 1 FROM public.mentors m WHERE m.id = p_mentor_id AND lower(m.email) = public.current_email());
+  SELECT EXISTS (SELECT 1 FROM public.mentors m WHERE m.id = p_mentor_id AND lower(m.email) = public.current_email())
+      OR public.owns_profile(p_mentor_id);
 $$;
 
 CREATE OR REPLACE FUNCTION public.owns_mentee(p_mentee_id text)
@@ -190,7 +199,7 @@ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, p
 $$;
 
 GRANT EXECUTE ON FUNCTION public.current_email(), public.is_admin(), public.is_service_context(),
-  public.is_privileged(), public.owns_mentor(text), public.owns_mentee(text),
+  public.is_privileged(), public.owns_profile(text), public.owns_mentor(text), public.owns_mentee(text),
   public.mentor_has_booking_with(text), public.is_approved_mentor(),
   public.mentor_is_bookable(text), public.mentee_exists(text)
   TO anon, authenticated, service_role;
@@ -275,12 +284,12 @@ CREATE POLICY users_update ON public.users FOR UPDATE TO authenticated
 
 -- ---- mentors: full rows only for the owner and admins (directory = view) ----
 CREATE POLICY mentors_select ON public.mentors FOR SELECT TO authenticated
-  USING (lower(email) = public.current_email() OR public.is_admin());
+  USING (lower(email) = public.current_email() OR public.owns_profile(id) OR public.is_admin());
 CREATE POLICY mentors_insert ON public.mentors FOR INSERT TO authenticated
   WITH CHECK (lower(email) = public.current_email() AND public.is_approved_mentor());
 CREATE POLICY mentors_update ON public.mentors FOR UPDATE TO authenticated
-  USING (lower(email) = public.current_email() OR public.is_admin())
-  WITH CHECK (lower(email) = public.current_email() OR public.is_admin());
+  USING (lower(email) = public.current_email() OR public.owns_profile(id) OR public.is_admin())
+  WITH CHECK (lower(email) = public.current_email() OR public.owns_profile(id) OR public.is_admin());
 CREATE POLICY mentors_delete ON public.mentors FOR DELETE TO authenticated
   USING (public.is_admin());
 
@@ -303,8 +312,9 @@ CREATE POLICY bookings_select ON public.bookings FOR SELECT TO authenticated
   USING (public.owns_mentor(mentor_id) OR public.owns_mentee(mentee_id) OR public.is_admin());
 CREATE POLICY bookings_insert ON public.bookings FOR INSERT TO public
   WITH CHECK (status = 'pending' AND public.mentor_is_bookable(mentor_id) AND public.mentee_exists(mentee_id)
-              AND completed_at IS NULL AND session_duration_minutes IS NULL
-              AND mentee_rating IS NULL AND mentor_rating IS NULL);
+              AND completed_at IS NULL AND session_duration_minutes IS NULL AND country IS NULL
+              AND mentee_rating IS NULL AND mentor_rating IS NULL
+              AND mentee_feedback IS NULL AND mentor_feedback IS NULL);
 CREATE POLICY bookings_update ON public.bookings FOR UPDATE TO authenticated
   USING (public.owns_mentor(mentor_id) OR public.owns_mentee(mentee_id) OR public.is_admin())
   WITH CHECK (public.owns_mentor(mentor_id) OR public.owns_mentee(mentee_id) OR public.is_admin());
@@ -378,6 +388,12 @@ BEGIN
   IF TG_OP = 'UPDATE' AND (NEW.user_type IS DISTINCT FROM OLD.user_type OR NEW.amazon_alias IS DISTINCT FROM OLD.amazon_alias) THEN
     RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'user_type/amazon_alias may only be changed by an admin';
   END IF;
+  -- email is the ownership key everywhere (RLS, first-admin bootstrap, SSO
+  -- linking); letting a user rewrite it would let them claim someone else's
+  -- promotion. Only admins / the service role may change it.
+  IF TG_OP = 'UPDATE' AND lower(NEW.email) IS DISTINCT FROM lower(OLD.email) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'email may only be changed by an admin';
+  END IF;
   RETURN NEW;
 END $$;
 DROP TRIGGER IF EXISTS users_guard_role_columns ON public.users;
@@ -401,6 +417,26 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+-- average_rating / total_ratings are derived by recompute_mentor_rating();
+-- a mentor must not be able to type their own score.
+CREATE OR REPLACE FUNCTION public.guard_mentor_derived_columns()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF public.is_privileged() OR current_setting('mc.internal_write', true) = 'on' THEN RETURN NEW; END IF;
+  IF TG_OP = 'INSERT' THEN
+    NEW.average_rating := 0;
+    NEW.total_ratings := 0;
+    RETURN NEW;
+  END IF;
+  IF NEW.average_rating IS DISTINCT FROM OLD.average_rating OR NEW.total_ratings IS DISTINCT FROM OLD.total_ratings THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'ratings are computed from mentee feedback';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS mentors_guard_derived ON public.mentors;
+CREATE TRIGGER mentors_guard_derived BEFORE INSERT OR UPDATE ON public.mentors
+  FOR EACH ROW EXECUTE FUNCTION public.guard_mentor_derived_columns();
+
 DROP TRIGGER IF EXISTS mentees_guard_verification ON public.mentees;
 CREATE TRIGGER mentees_guard_verification BEFORE INSERT OR UPDATE ON public.mentees
   FOR EACH ROW EXECUTE FUNCTION public.guard_mentee_verification_columns();
@@ -419,6 +455,39 @@ BEGIN
        AND (NEW.session_duration_minutes IS DISTINCT FROM OLD.session_duration_minutes
             OR NEW.country IS DISTINCT FROM OLD.country) THEN
       RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'only the mentor records session duration and country';
+    END IF;
+    -- Status transitions are role-bound. A mentee may only cancel (or confirm
+    -- an accepted request after scheduling); accepting/rejecting/completing is
+    -- the mentor's call. Without this a mentee could self-accept a request and
+    -- read the mentor's Cal.com links through mentor_scheduling_links.
+    IF NEW.status IS DISTINCT FROM OLD.status THEN
+      IF public.owns_mentor(OLD.mentor_id) THEN
+        IF NOT (
+          (OLD.status = 'pending'   AND NEW.status IN ('accepted', 'rejected', 'canceled')) OR
+          (OLD.status = 'accepted'  AND NEW.status IN ('confirmed', 'completed', 'canceled')) OR
+          (OLD.status = 'confirmed' AND NEW.status IN ('completed', 'canceled'))
+        ) THEN
+          RAISE EXCEPTION 'forbidden_status_transition' USING ERRCODE = '42501',
+            DETAIL = format('mentor may not move a booking from %s to %s', OLD.status, NEW.status);
+        END IF;
+      ELSE
+        IF NOT (
+          (OLD.status IN ('pending', 'accepted', 'confirmed') AND NEW.status = 'canceled') OR
+          (OLD.status = 'accepted' AND NEW.status = 'confirmed')
+        ) THEN
+          RAISE EXCEPTION 'forbidden_status_transition' USING ERRCODE = '42501',
+            DETAIL = format('mentee may not move a booking from %s to %s', OLD.status, NEW.status);
+        END IF;
+      END IF;
+    END IF;
+    -- Each side rates the other; nobody edits the rating written about them.
+    IF public.owns_mentor(OLD.mentor_id) AND NOT public.owns_mentee(OLD.mentee_id)
+       AND (NEW.mentee_rating IS DISTINCT FROM OLD.mentee_rating OR NEW.mentee_feedback IS DISTINCT FROM OLD.mentee_feedback) THEN
+      RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'only the mentee writes mentee_rating/mentee_feedback';
+    END IF;
+    IF public.owns_mentee(OLD.mentee_id) AND NOT public.owns_mentor(OLD.mentor_id)
+       AND (NEW.mentor_rating IS DISTINCT FROM OLD.mentor_rating OR NEW.mentor_feedback IS DISTINCT FROM OLD.mentor_feedback) THEN
+      RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'only the mentor writes mentor_rating/mentor_feedback';
     END IF;
   END IF;
   IF NEW.status = 'completed' AND nullif(trim(coalesce(NEW.country, '')), '') IS NULL THEN
@@ -537,9 +606,11 @@ BEGIN
   IF p_booking_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.bookings b WHERE b.id = p_booking_id AND b.mentor_id = p_mentor_id) THEN
     RAISE EXCEPTION 'booking_mentor_mismatch' USING ERRCODE = '22023';
   END IF;
-  v_party := p_booking_id IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.bookings b WHERE b.id = p_booking_id AND public.owns_mentee(b.mentee_id));
-  IF NOT (public.is_privileged() OR public.owns_mentor(p_mentor_id) OR v_party) THEN
+  -- Only the mentor (or admin / service role) writes to the mentor's own feed.
+  -- Booking-driven entries are produced by the bookings_activity_log trigger,
+  -- so the counterpart never needs (and never gets) to write free text here.
+  v_party := false;
+  IF NOT (public.is_privileged() OR public.owns_mentor(p_mentor_id)) THEN
     RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
   END IF;
   v_id := gen_random_uuid()::text;
@@ -580,12 +651,17 @@ CREATE TRIGGER bookings_activity_log AFTER INSERT OR UPDATE ON public.bookings
 
 -- ---- Mentor rating: recomputed server-side (a mentee cannot update mentors) ----
 CREATE OR REPLACE FUNCTION public.recompute_mentor_rating(p_mentor_id text)
-RETURNS void LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  -- Transaction-local flag lets guard_mentor_derived_columns() tell this
+  -- trusted recompute apart from a mentor typing their own score.
+  PERFORM set_config('mc.internal_write', 'on', true);
   UPDATE public.mentors m SET
     average_rating = coalesce((SELECT round(avg(mentee_rating)::numeric, 2) FROM public.bookings b WHERE b.mentor_id = m.id AND b.mentee_rating IS NOT NULL), 0),
     total_ratings  = (SELECT count(*) FROM public.bookings b WHERE b.mentor_id = m.id AND b.mentee_rating IS NOT NULL)
   WHERE m.id = p_mentor_id;
-$$;
+  PERFORM set_config('mc.internal_write', 'off', true);
+END $$;
 GRANT EXECUTE ON FUNCTION public.recompute_mentor_rating(text) TO authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.bookings_recompute_rating()
