@@ -707,7 +707,10 @@
     "goToYourArea": "Go to your dashboard",
     "switchAccount": "Sign in with a different account",
     "backHome": "Back to home",
-    "checkingAccess": "Checking your access…"
+    "checkingAccess": "Checking your access…",
+    "errorTitle": "We couldn't check your access",
+    "errorBody": "You are signed in, but your account details could not be loaded. Try again, or sign out and sign in later.",
+    "signOut": "Sign out"
   },
   "access": {
     "title": "Access not yet approved",

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { auth, type AuthUser, type UserRole } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
 
-export type GuardStatus = "loading" | "anonymous" | "forbidden" | "ok";
+export type GuardStatus = "loading" | "anonymous" | "forbidden" | "error" | "ok";
 
 /** How long to wait for AuthContext to resolve a session that already exists before treating the visitor as anonymous. */
 const SESSION_GRACE_MS = 4000;
@@ -25,11 +25,13 @@ function currentPath(location: string): string {
  * Resolves the session against an optional required role. Anonymous visitors
  * are redirected to `redirectTo` with `?next=` set to the current page; the
  * wrong role is reported as `forbidden` (never silently redirected, so a
- * mentor landing on /admin understands why). Identity comes from useAuth()
- * only — never from localStorage.
+ * mentor landing on /admin understands why); a session whose users-row lookup
+ * failed is reported as `error` (F-02) and is never redirected — signing in
+ * again would only re-run the same failing read. Identity comes from
+ * useAuth() only — never from localStorage.
  */
 export function useRequireRole(role?: UserRole, redirectTo = "/login"): { status: GuardStatus; user: AuthUser | null } {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, error } = useAuth();
   const [location, setLocation] = useLocation();
 
   // Right after an SSO sign-in the Supabase session exists before AuthContext
@@ -47,22 +49,28 @@ export function useRequireRole(role?: UserRole, redirectTo = "/login"): { status
     auth.getSession().then((session) => {
       if (!cancelled) setSessionPresent(!!session);
     });
-    // If the context never resolves (e.g. the users row lookup failed), stop waiting.
-    const giveUp = window.setTimeout(() => {
-      if (!cancelled) setSessionPresent(false);
-    }, SESSION_GRACE_MS);
+    // If the context never resolves, stop waiting. A failed lookup is not
+    // "never resolves": the context reports it as `error` and the guard shows
+    // the error state instead.
+    const giveUp = error
+      ? undefined
+      : window.setTimeout(() => {
+          if (!cancelled) setSessionPresent(false);
+        }, SESSION_GRACE_MS);
     return () => {
       cancelled = true;
-      window.clearTimeout(giveUp);
+      if (giveUp !== undefined) window.clearTimeout(giveUp);
     };
-  }, [isLoading, user]);
+  }, [isLoading, user, error]);
 
   const status: GuardStatus = isLoading
     ? "loading"
     : !user
       ? sessionPresent === false
         ? "anonymous"
-        : "loading"
+        : sessionPresent === true && error
+          ? "error"
+          : "loading"
       : role && user.user_type !== role
         ? "forbidden"
         : "ok";
@@ -76,17 +84,65 @@ export function useRequireRole(role?: UserRole, redirectTo = "/login"): { status
   return { status, user: user ?? null };
 }
 
+/**
+ * Shell skeleton shown while the session resolves (F-15): the geometry of the
+ * app-shell pages it precedes — PageHeader block (eyebrow, title, one meta
+ * line) at the inline-start of `.container-page`, the tab row on its hairline,
+ * then two card blocks — so nothing moves when the page mounts. Announced
+ * once through the sr-only text; the bars are decorative.
+ */
 export function GuardSkeleton() {
   const { t } = useTranslation();
   return (
-    <div className="container-page flex min-h-[60vh] items-center justify-center" role="status" aria-busy="true">
-      <div className="w-full max-w-md space-y-3">
-        <Skeleton className="h-24 w-full" />
-        <Skeleton className="h-6 w-2/3" />
-        <Skeleton className="h-6 w-1/2" />
-        <p className="pt-2 text-center text-caption text-muted-foreground">{t("guard.checkingAccess")}</p>
+    <div className="container-page pb-16" role="status" aria-busy="true" data-testid="guard-skeleton">
+      <span className="sr-only">{t("guard.checkingAccess")}</span>
+      <div className="py-8 md:py-10" aria-hidden="true">
+        <Skeleton className="mb-2 h-4 w-28" />
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="mt-2 h-4 w-64" />
+      </div>
+      <div className="flex min-h-11 items-center gap-6 border-b border-border" aria-hidden="true">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-5 w-20" />
+        ))}
+      </div>
+      <div className="mt-6 space-y-4" aria-hidden="true">
+        <Skeleton className="h-36 w-full rounded-lg" />
+        <Skeleton className="h-36 w-full rounded-lg" />
       </div>
     </div>
+  );
+}
+
+/**
+ * A session exists but the app could not read the account (F-02): explain,
+ * offer a retry that re-runs the lookup, and a sign-out — never a redirect to
+ * /login, which would loop the person through the same failing read.
+ */
+export function AccessErrorCard() {
+  const { t } = useTranslation();
+  const { retry, logout, isLoading } = useAuth();
+  return (
+    <StatusPage>
+      <StatusCard
+        titleAs="h1"
+        tone="danger"
+        icon={TriangleAlert}
+        title={t("guard.errorTitle")}
+        description={t("guard.errorBody")}
+        data-testid="card-access-error"
+        actions={
+          <>
+            <Button variant="secondary" onClick={retry} loading={isLoading} data-testid="button-access-retry">
+              {t("common.tryAgain")}
+            </Button>
+            <Button variant="outline" onClick={() => logout().catch(() => undefined)} data-testid="button-access-sign-out">
+              {t("guard.signOut")}
+            </Button>
+          </>
+        }
+      />
+    </StatusPage>
   );
 }
 
@@ -132,6 +188,7 @@ export function AccessDeniedCard({ role, user }: { role: UserRole; user: AuthUse
 export function RequireAuth({ children, redirectTo = "/login" }: { children: ReactNode; redirectTo?: string }) {
   const { status } = useRequireRole(undefined, redirectTo);
   if (status === "ok") return <>{children}</>;
+  if (status === "error") return <AccessErrorCard />;
   return <GuardSkeleton />;
 }
 
@@ -150,5 +207,6 @@ export function RequireRole({
   const { status, user } = useRequireRole(role, redirectTo);
   if (status === "ok") return <>{children}</>;
   if (status === "forbidden") return <>{fallback ?? <AccessDeniedCard role={role} user={user} />}</>;
+  if (status === "error") return <AccessErrorCard />;
   return <GuardSkeleton />;
 }

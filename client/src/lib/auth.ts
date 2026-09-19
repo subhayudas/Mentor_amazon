@@ -285,9 +285,12 @@ class AuthService {
   }
 
   /**
-   * Listen for auth state changes
+   * Listen for auth state changes. `error` is set when a session exists but
+   * the app identity could not be resolved (users-row read failed); the
+   * caller then shows an error state with retry instead of treating the
+   * person as signed out (F-02).
    */
-  onAuthStateChange(callback: (user: AuthUser | null) => void): () => void {
+  onAuthStateChange(callback: (user: AuthUser | null, error?: unknown) => void): () => void {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         // auth-js holds its lock while it awaits this callback, so no other
@@ -306,7 +309,7 @@ class AuthService {
             .then(callback)
             .catch((error) => {
               console.error('Auth state resolution error:', error);
-              callback(null);
+              callback(null, error);
             });
         }, 0);
       }
