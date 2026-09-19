@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CalendarRange, Download } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,12 +13,19 @@ interface ExportBarProps {
   onExportRange: (from: string, to: string) => void;
   defaultFrom: string;
   defaultTo: string;
+  /** In-flight: the rows are still loading, so there is nothing to export yet. */
   disabled?: boolean;
 }
 
-/** "Export current view" + a popover with two date inputs for "Export date range". */
+/**
+ * "Export current view" + a popover with two date inputs for "Export date
+ * range" (admins only — the CSV carries mentee e-mails). The confirm button
+ * stays focusable with `aria-disabled` and a visible reason while the range
+ * is invalid (P1-18).
+ */
 export function ExportBar({ onExportView, onExportRange, defaultFrom, defaultTo, disabled }: ExportBarProps) {
   const { t } = useTranslation();
+  const id = useId();
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
@@ -40,32 +48,27 @@ export function ExportBar({ onExportView, onExportRange, defaultFrom, defaultTo,
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="export-bar">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onExportView}
-        disabled={disabled}
-        data-testid="button-export-view"
-      >
-        <Download className="h-4 w-4" aria-hidden="true" />
+      <Button type="button" variant="outline" size="sm" onClick={onExportView} disabled={disabled} data-testid="button-export-view">
+        <Download aria-hidden="true" strokeWidth={1.5} />
         {t("analytics.exportView")}
       </Button>
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" disabled={disabled} data-testid="button-export-range">
-            <CalendarRange className="h-4 w-4" aria-hidden="true" />
+          <Button type="button" variant="outline" size="sm" disabled={disabled} data-testid="button-export-range">
+            <CalendarRange aria-hidden="true" strokeWidth={1.5} />
             {t("analytics.exportRange")}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 space-y-3" data-testid="popover-export-range">
-          <p className="text-xs text-muted-foreground">{t("analytics.exportRangeHint")}</p>
+        <PopoverContent align="end" className="w-[calc(100vw-2rem)] max-w-xs space-y-3" data-testid="popover-export-range">
+          <p className="text-caption text-muted-foreground">{t("analytics.exportRangeHint")}</p>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label htmlFor="export-from" className="text-xs">{t("analytics.exportFrom")}</Label>
+              <Label htmlFor={`${id}-from`} className="text-caption text-muted-foreground">{t("analytics.exportFrom")}</Label>
               <Input
-                id="export-from"
+                id={`${id}-from`}
                 type="date"
+                dir="ltr"
                 value={from}
                 max={to || undefined}
                 onChange={(event) => setFrom(event.target.value)}
@@ -73,10 +76,11 @@ export function ExportBar({ onExportView, onExportRange, defaultFrom, defaultTo,
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="export-to" className="text-xs">{t("analytics.exportTo")}</Label>
+              <Label htmlFor={`${id}-to`} className="text-caption text-muted-foreground">{t("analytics.exportTo")}</Label>
               <Input
-                id="export-to"
+                id={`${id}-to`}
                 type="date"
+                dir="ltr"
                 value={to}
                 min={from || undefined}
                 onChange={(event) => setTo(event.target.value)}
@@ -84,14 +88,22 @@ export function ExportBar({ onExportView, onExportRange, defaultFrom, defaultTo,
               />
             </div>
           </div>
+          {!rangeValid && (
+            <p id={`${id}-help`} className="text-caption text-muted-foreground">
+              {t("analyticsV2.export.rangeHelp")}
+            </p>
+          )}
           <Button
+            type="button"
+            variant="secondary"
             size="sm"
             className="w-full"
             onClick={handleRangeExport}
-            disabled={!rangeValid}
+            aria-disabled={!rangeValid || undefined}
+            aria-describedby={!rangeValid ? `${id}-help` : undefined}
             data-testid="button-export-range-confirm"
           >
-            <Download className="h-4 w-4" aria-hidden="true" />
+            <Download aria-hidden="true" strokeWidth={1.5} />
             {t("analytics.exportRangeConfirm")}
           </Button>
         </PopoverContent>

@@ -401,7 +401,7 @@
     "scheduled": "مجدولة",
     "completed": "مكتملة",
     "canceled": "ملغاة",
-    "clicked": "نقرات",
+    "clicked": "مطلوبة",
     "bookingsOverTime": "الحجوزات عبر الزمن",
     "statusBreakdown": "تفصيل الحالة",
     "topMentorPerformance": "أداء أفضل المرشدين",
@@ -422,7 +422,7 @@
       "mentor": "المرشد",
       "mentee": "المتدرب",
       "status": "الحالة",
-      "clickedAt": "وقت النقر",
+      "clickedAt": "تاريخ الطلب",
       "scheduledAt": "موعد الجلسة",
       "bookings": "الحجوزات",
       "completed": "مكتملة",
@@ -438,7 +438,7 @@
       "scheduled": "مجدولة",
       "completed": "مكتملة",
       "canceled": "ملغاة",
-      "clicked": "نقرات",
+      "clicked": "مطلوبة",
       "mentors": "المرشدون",
       "mentees": "المتدربين",
       "completedSessions": "الجلسات المكتملة",
@@ -493,7 +493,9 @@
       "durationMinutes": "المدة (بالدقائق)",
       "country": "الدولة",
       "menteeRating": "تقييم المتدرب",
-      "mentorRating": "تقييم المرشد"
+      "mentorRating": "تقييم المرشد",
+      "statusLabel": "الحالة (نص)",
+      "menteeTypeLabel": "نوع المتدرب (نص)"
     }
   },
   "booking": {
@@ -1285,6 +1287,242 @@
     "_owner": "D"
   },
   "analyticsV2": {
-    "_owner": "C"
+    "title": {
+      "admin": "تحليلات البرنامج",
+      "own": "جلساتك"
+    },
+    "scope": {
+      "admin": "جميع جلسات البرنامج",
+      "own": "الجلسات التي تشارك فيها"
+    },
+    "updated": "آخر تحديث {{time}}",
+    "demoBadge": "بيانات تجريبية",
+    "loading": "جارٍ تحميل التحليلات",
+    "period": {
+      "30": "آخر 30 يومًا",
+      "90": "آخر 90 يومًا",
+      "365": "آخر 12 شهرًا",
+      "label": "الفترة",
+      "all": "كل الوقت",
+      "phrase": {
+        "30": "خلال آخر 30 يومًا",
+        "90": "خلال آخر 90 يومًا",
+        "365": "خلال آخر 12 شهرًا",
+        "all": "على مدار الفترة كاملة"
+      },
+      "previous": {
+        "30": "30 يومًا السابقة",
+        "90": "90 يومًا السابقة",
+        "365": "12 شهرًا السابقة"
+      }
+    },
+    "compare": {
+      "label": "قارن بالفترة السابقة",
+      "unavailable": "غير متاح لخيار «كل الوقت». اختر فترة محددة للمقارنة."
+    },
+    "filters": {
+      "button": "الفلاتر",
+      "buttonCount": "الفلاتر ({{count}})",
+      "title": "تصفية الجلسات",
+      "clear": "مسح الفلاتر",
+      "chip": "{{filter}}: {{value}}"
+    },
+    "summary": {
+      "admin_zero": "{{period}}، لم تكتمل أي جلسة{{delta}}.",
+      "admin_one": "{{period}}، اكتملت جلسة واحدة{{delta}} بإجمالي {{hours}} من التطوع{{countries}}.",
+      "admin_two": "{{period}}، اكتملت جلستان{{delta}} بإجمالي {{hours}} من التطوع{{countries}}.",
+      "admin_few": "{{period}}، اكتملت {{count}} جلسات{{delta}} بإجمالي {{hours}} من التطوع{{countries}}.",
+      "admin_many": "{{period}}، اكتملت {{count}} جلسة{{delta}} بإجمالي {{hours}} من التطوع{{countries}}.",
+      "admin_other": "{{period}}، اكتملت {{count}} جلسة{{delta}} بإجمالي {{hours}} من التطوع{{countries}}.",
+      "adminNone": "{{period}}، لم تكتمل أي جلسة{{delta}}.",
+      "own_zero": "{{period}}، لم تشارك في أي جلسة مكتملة{{delta}}.",
+      "own_one": "{{period}}، شاركت في جلسة مكتملة واحدة{{delta}} بإجمالي {{hours}} من الإرشاد{{countries}}.",
+      "own_two": "{{period}}، شاركت في جلستين مكتملتين{{delta}} بإجمالي {{hours}} من الإرشاد{{countries}}.",
+      "own_few": "{{period}}، شاركت في {{count}} جلسات مكتملة{{delta}} بإجمالي {{hours}} من الإرشاد{{countries}}.",
+      "own_many": "{{period}}، شاركت في {{count}} جلسة مكتملة{{delta}} بإجمالي {{hours}} من الإرشاد{{countries}}.",
+      "own_other": "{{period}}، شاركت في {{count}} جلسة مكتملة{{delta}} بإجمالي {{hours}} من الإرشاد{{countries}}.",
+      "ownNone": "{{period}}، لم تشارك في أي جلسة مكتملة{{delta}}.",
+      "delta": " ({{delta}} مقارنةً بالـ {{previous}})",
+      "deltaNoChange": " (دون تغيير مقارنةً بالـ {{previous}})",
+      "countries_one": " في دولة واحدة",
+      "countries_two": " في دولتين",
+      "countries_few": " في {{count}} دول",
+      "countries_many": " في {{count}} دولة",
+      "countries_other": " في {{count}} دولة"
+    },
+    "tiles": {
+      "requests": {
+        "title": {
+          "admin": "الطلبات المستلمة",
+          "mentor": "الطلبات المستلمة",
+          "mentee": "الطلبات المرسلة"
+        },
+        "definition": {
+          "admin": "كل طلب أُرسل خلال الفترة، بغض النظر عمّا حدث له لاحقًا.",
+          "mentor": "كل طلب أُرسل إليك خلال الفترة، بغض النظر عمّا حدث له لاحقًا.",
+          "mentee": "كل طلب أرسلته خلال الفترة، بغض النظر عمّا حدث له لاحقًا."
+        }
+      },
+      "completed": {
+        "title": "الجلسات المكتملة",
+        "definition": {
+          "admin": "الجلسات التي حدّد المرشد اكتمالها خلال الفترة.",
+          "mentor": "الجلسات التي حدّدت اكتمالها خلال الفترة.",
+          "mentee": "الجلسات التي حدّد مرشدك اكتمالها خلال الفترة."
+        }
+      },
+      "hours": {
+        "title": {
+          "admin": "ساعات التطوع",
+          "mentor": "ساعات التطوع",
+          "mentee": "ساعات الإرشاد"
+        },
+        "definition": "مجموع المدد المسجّلة للجلسات المكتملة. الجلسات بلا مدة مسجّلة تُذكر ولا تُحتسب."
+      },
+      "answerRate": {
+        "title": "نسبة الرد",
+        "definition": {
+          "admin": "الطلبات التي قبلها المرشد أو رفضها، كنسبة من الطلبات المستلمة خلال الفترة.",
+          "mentor": "الطلبات التي قبلتها أو رفضتها، كنسبة من الطلبات التي استلمتها خلال الفترة.",
+          "mentee": "الطلبات التي قُبلت أو رُفضت، كنسبة من الطلبات التي أرسلتها خلال الفترة."
+        }
+      },
+      "delta": "{{delta}} مقارنةً بالـ {{previous}}",
+      "deltaPercent": "{{delta}} ({{percent}}) مقارنةً بالـ {{previous}}",
+      "deltaPoints": "{{delta}} نقطة مقارنةً بالـ {{previous}}",
+      "noChange": "دون تغيير مقارنةً بالـ {{previous}}",
+      "notRecorded": "غير مسجّل",
+      "noRequests": "لا توجد طلبات في هذه الفترة",
+      "withoutDuration_zero": "لا جلسات بدون مدة مسجّلة",
+      "withoutDuration_one": "جلسة واحدة بدون مدة مسجّلة",
+      "withoutDuration_two": "جلستان بدون مدة مسجّلة",
+      "withoutDuration_few": "{{count}} جلسات بدون مدة مسجّلة",
+      "withoutDuration_many": "{{count}} جلسة بدون مدة مسجّلة",
+      "withoutDuration_other": "{{count}} جلسة بدون مدة مسجّلة"
+    },
+    "counts": {
+      "requests_zero": "لا طلبات",
+      "requests_one": "طلب واحد",
+      "requests_two": "طلبان",
+      "requests_few": "{{count}} طلبات",
+      "requests_many": "{{count}} طلبًا",
+      "requests_other": "{{count}} طلب",
+      "completed_zero": "لا جلسات مكتملة",
+      "completed_one": "جلسة مكتملة واحدة",
+      "completed_two": "جلستان مكتملتان",
+      "completed_few": "{{count}} جلسات مكتملة",
+      "completed_many": "{{count}} جلسة مكتملة",
+      "completed_other": "{{count}} جلسة مكتملة",
+      "countries_zero": "لا دول",
+      "countries_one": "دولة واحدة",
+      "countries_two": "دولتان",
+      "countries_few": "{{count}} دول",
+      "countries_many": "{{count}} دولة",
+      "countries_other": "{{count}} دولة"
+    },
+    "chart": {
+      "viewTable": "عرض كجدول",
+      "hideTable": "إخفاء الجدول",
+      "tableCaption": "القيم وراء الرسم البياني",
+      "series": "السلاسل",
+      "hint": "اختر شريطًا أو عنصرًا من المفتاح لعرض حجوزاته."
+    },
+    "trend": {
+      "title": "الطلبات والجلسات المكتملة",
+      "unit": {
+        "week": "أسبوعيًا",
+        "month": "شهريًا"
+      },
+      "definition": {
+        "week": "الطلبات حسب أسبوع إرسالها؛ الجلسات المكتملة حسب أسبوع تحديد المرشد لاكتمالها.",
+        "month": "الطلبات حسب شهر إرسالها؛ الجلسات المكتملة حسب شهر تحديد المرشد لاكتمالها."
+      },
+      "requests": "الطلبات",
+      "completed": "الجلسات المكتملة",
+      "weekOf": "أسبوع {{date}}",
+      "empty": "لا توجد جلسات في هذه الفترة",
+      "summary": {
+        "week": "الإجمالي الأسبوعي {{period}}: {{requests}} و{{completed}}. الأسبوع الأخير: {{latestRequests}} و{{latestCompleted}}.",
+        "month": "الإجمالي الشهري {{period}}: {{requests}} و{{completed}}. الشهر الأخير: {{latestRequests}} و{{latestCompleted}}."
+      },
+      "table": {
+        "week": "الأسبوع",
+        "month": "الشهر",
+        "requests": "الطلبات",
+        "completed": "الجلسات المكتملة"
+      }
+    },
+    "outcomes": {
+      "title": "نتائج الطلبات",
+      "unit": "الطلبات",
+      "definition": "الحالة الحالية لكل طلب أُرسل خلال الفترة.",
+      "summary": "{{total}}: {{list}}.",
+      "item": "{{label}}: {{value}}",
+      "empty": "لا توجد طلبات في هذه الفترة",
+      "table": {
+        "status": "الحالة",
+        "requests": "الطلبات",
+        "share": "النسبة"
+      }
+    },
+    "country": {
+      "title": "الجلسات والساعات حسب الدولة",
+      "unit": "الجلسات المكتملة وساعات التطوع",
+      "definition": "الدولة المسجّلة على الجلسة، وإلا فدولة المرشد. الدول الأعلى في الجلسات المكتملة؛ تبويب «الدول» يعرض كل الدول.",
+      "sessions": "الجلسات المكتملة",
+      "hours": "ساعات التطوع",
+      "empty": "لا توجد جلسات مكتملة في هذه الفترة",
+      "seeAll": "جميع الدول في جدول",
+      "summary": "{{countries}}؛ تتصدر {{top}} بـ{{sessions}} و{{hours}}.",
+      "tabTitle": "الجلسات حسب الدولة",
+      "tabDefinition": "كل دولة لها طلب أو جلسة مكتملة خلال الفترة. الساعات تحتسب المدد المسجّلة فقط.",
+      "table": {
+        "country": "الدولة",
+        "requests": "الطلبات",
+        "sessions": "الجلسات المكتملة",
+        "hours": "ساعات التطوع",
+        "mentors": "المرشدون",
+        "mentees": "المتدربون"
+      }
+    },
+    "mentors": {
+      "title": "المرشدون حسب الجلسات المكتملة",
+      "definition": "كل مرشد له طلب أو جلسة مكتملة خلال الفترة. اختر مرشدًا لعرض حجوزاته.",
+      "empty": "لا يوجد نشاط للمرشدين في هذه الفترة",
+      "noRating": "لا تقييمات بعد",
+      "table": {
+        "mentor": "المرشد",
+        "completed": "مكتملة",
+        "hours": "الساعات",
+        "rating": "متوسط التقييم",
+        "pending": "بانتظار الرد",
+        "requests": "الطلبات"
+      }
+    },
+    "bookings": {
+      "title": "الحجوزات خلال الفترة",
+      "definition": "الطلبات المرسلة أو الجلسات المكتملة خلال الفترة، الأحدث أولًا.",
+      "empty": "لا توجد حجوزات في هذه الفترة",
+      "table": {
+        "mentor": "المرشد",
+        "mentee": "المتدرب",
+        "status": "الحالة",
+        "requested": "تاريخ الطلب",
+        "scheduled": "موعد الجلسة",
+        "duration": "المدة",
+        "country": "الدولة"
+      }
+    },
+    "drill": {
+      "showing": "عرض: {{label}}",
+      "clear": "مسح"
+    },
+    "export": {
+      "rangeHelp": "اختر تاريخ بداية يسبق تاريخ النهاية أو يساويه."
+    },
+    "error": {
+      "title": "تعذّر تحميل التحليلات",
+      "body": "لم يتم جلب البيانات. تحقق من اتصالك وحاول مرة أخرى."
+    }
   }
 }
