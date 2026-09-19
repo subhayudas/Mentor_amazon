@@ -66,17 +66,6 @@ export function resolveRequestState(params: {
 }
 
 /**
- * True while a request the mentee cannot add to is live: a visible
- * pending/accepted/confirmed row, or the local memory (which only ever
- * records a request that went out and has not been answered as far as this
- * browser knows). "Send another request" is offered only when this is false.
- */
-export function hasOpenRequest(request: RequestState): boolean {
-  if (request.kind !== "sent") return false;
-  return request.status === undefined || ACTIVE_REQUEST_STATUSES.includes(request.status);
-}
-
-/**
  * Rail progress for a request state (F-09): the ONE mapping from request
  * state to the three stops of the request rail, shared by the profile rail
  * card, the mobile action bar, the booking success state, the landing hero

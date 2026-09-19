@@ -6,7 +6,6 @@ import { QueryClientProvider } from "@tanstack/react-query";
 
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/sonner";
-import { Toaster as LegacyToaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -188,7 +187,7 @@ function Router() {
   );
 }
 
-/** Everything that needs the active direction: Radix DirectionProvider, header, main, toasters. */
+/** Everything that needs the active direction: Radix DirectionProvider, header, main, toaster. */
 function Shell() {
   const { dir } = useDirection();
   return (
@@ -201,10 +200,7 @@ function Shell() {
           <Router />
         </main>
       </div>
-      {/* Two renderers: sonner for pages that import `toast` from "sonner",
-          the shadcn reducer-based one for pages using useToast() from @/hooks/use-toast. */}
       <Toaster />
-      <LegacyToaster />
     </DirectionProvider>
   );
 }
