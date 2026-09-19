@@ -1763,7 +1763,8 @@
       "notRecordedCount_two": "Not recorded — {{count}} completed sessions have no duration",
       "notRecordedCount_few": "Not recorded — {{count}} completed sessions have no duration",
       "notRecordedCount_many": "Not recorded — {{count}} completed sessions have no duration",
-      "notRecordedCount_other": "Not recorded — {{count}} completed sessions have no duration"
+      "notRecordedCount_other": "Not recorded — {{count}} completed sessions have no duration",
+      "definitionsSummary": "How these numbers are counted"
     },
     "counts": {
       "requests_zero": "{{count}} requests",
@@ -1819,7 +1820,10 @@
       "axis": {
         "count": "Count"
       },
-      "drillLabel": "Bookings in"
+      "rowDrillHint": {
+        "week": "Select a week to list its bookings.",
+        "month": "Select a month to list its bookings."
+      }
     },
     "outcomes": {
       "title": "Request outcomes",
@@ -1853,7 +1857,8 @@
         "hours": "Volunteer hours",
         "mentors": "Mentors",
         "mentees": "Mentees"
-      }
+      },
+      "barLabel": "{{sessions}} · {{hours}}"
     },
     "mentors": {
       "title": "Mentors by completed sessions",
@@ -1888,7 +1893,8 @@
       "clear": "Clear"
     },
     "export": {
-      "rangeHelp": "Choose a start date on or before the end date."
+      "rangeHelp": "Choose a start date on or before the end date.",
+      "button": "Export"
     },
     "error": {
       "title": "Unable to load analytics",

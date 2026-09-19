@@ -11,7 +11,7 @@ import { formatNumber } from "@/lib/format";
 import { formatBucketLabel, formatBucketTick, type Bucket, type Period, type SeriesPoint } from "@/lib/reporting";
 import { AXIS_TICK, AxisUnitLabel, BrandTooltip, COLUMN_RADIUS, CURSOR_FILL, GRID_STROKE, SERIES, SURFACE, ValueLabel, markOpacity } from "./ChartTheme";
 import { ChartFigure } from "./ChartFigure";
-import { SegmentLegend, type SegmentLegendItem } from "./SegmentLegend";
+import { RowDrillButton } from "./RowDrillButton";
 import { periodPhrase } from "./labels";
 
 /** A bucket selection: the stable key plus its human label for the drill heading. */
@@ -43,8 +43,10 @@ interface Datum {
  * sent and sessions completed, one unit, one axis, linear, no smoothing.
  * Navy = completed, burnt orange = requests, separated by a 2px surface
  * stroke and labelled directly when a column is at least 24px wide. The
- * SegmentLegend twin and the always-present table are the keyboard and
- * screen-reader paths; the recharts surface adds `accessibilityLayer`.
+ * always-present table is the keyboard and screen-reader path: each week (or
+ * month) with bookings is a row-header button that toggles the same drill a
+ * column click does (F-32 — the chip row that repeated the axis is gone); the
+ * recharts surface adds `accessibilityLayer`.
  */
 export function TrendChart({ series, bucket, period, drillCounts, activeKey, onSelect }: TrendChartProps) {
   const { t, i18n } = useTranslation();
@@ -82,11 +84,10 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
     latestCompleted: t("analyticsV2.counts.completed", { count: latest?.completed ?? 0 }),
   });
 
-  // Label only: a per-bucket count would match neither bar (a drill lists
-  // rows requested OR completed in the bucket), so it would not reconcile.
-  const legendItems: SegmentLegendItem[] = data
-    .filter((point) => (drillCounts.get(point.key) ?? 0) > 0)
-    .map((point) => ({ key: point.key, label: point.label }));
+  // A bucket drills only when it has rows (requested OR completed in it); the
+  // per-bucket count is not shown because it would match neither bar.
+  const drillable = (key: string) => (drillCounts.get(key) ?? 0) > 0;
+  const hasDrill = data.some((point) => drillable(point.key));
 
   const seriesNames = { requests: t("analyticsV2.trend.requests"), completed: t("analyticsV2.trend.completed") };
   const isEmpty = totals.requests === 0 && totals.completed === 0;
@@ -105,46 +106,47 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
   };
 
   const table = (
-    <table className="w-full text-body-sm">
-      <caption className="sr-only">{t("analyticsV2.chart.tableCaption")}</caption>
-      <thead>
-        <tr className="text-caption text-muted-foreground">
-          <th scope="col" className="py-1 text-start font-medium">{t(`analyticsV2.trend.table.${bucket}`)}</th>
-          <th scope="col" className="w-32 py-1 text-end font-medium">{t("analyticsV2.trend.table.requests")}</th>
-          <th scope="col" className="w-40 py-1 text-end font-medium">{t("analyticsV2.trend.table.completed")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {data.map((point) => (
-          <tr key={point.key} className="border-t border-border">
-            <th scope="row" className="py-1 text-start font-normal">{point.label}</th>
-            <td className="py-1 text-end tabular-nums">{formatNumber(point.requests, lang)}</td>
-            <td className="py-1 text-end tabular-nums">{formatNumber(point.completed, lang)}</td>
+    <>
+      <table className="w-full text-body-sm">
+        <caption className="sr-only">{t("analyticsV2.chart.tableCaption")}</caption>
+        <thead>
+          <tr className="text-caption text-muted-foreground">
+            <th scope="col" className="py-1 text-start font-medium">{t(`analyticsV2.trend.table.${bucket}`)}</th>
+            <th scope="col" className="w-24 py-1 ps-3 text-end font-medium sm:w-32">{t("analyticsV2.trend.table.requests")}</th>
+            <th scope="col" className="w-28 py-1 ps-3 text-end font-medium sm:w-40">{t("analyticsV2.trend.table.completed")}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {data.map((point) => (
+            <tr key={point.key} className="border-t border-border">
+              <th scope="row" className="py-1 text-start font-normal">
+                {drillable(point.key) ? (
+                  <RowDrillButton pressed={activeKey === point.key} onClick={() => select(activeKey === point.key ? null : point.key)} data-testid={`trend-row-${point.key}`}>
+                    {point.label}
+                  </RowDrillButton>
+                ) : (
+                  point.label
+                )}
+              </th>
+              <td className="py-1 ps-3 text-end tabular-nums">{formatNumber(point.requests, lang)}</td>
+              <td className="py-1 ps-3 text-end tabular-nums">{formatNumber(point.completed, lang)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {hasDrill && <p className="mt-2 text-caption text-muted-foreground">{t(`analyticsV2.trend.rowDrillHint.${bucket}`)}</p>}
+    </>
   );
 
   const legend = (
-    <div className="flex flex-col gap-3">
-      <ul className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground" aria-label={t("analyticsV2.chart.series")}>
-        {(["requests", "completed"] as const).map((key) => (
-          <li key={key} className="flex items-center gap-1.5">
-            <span aria-hidden="true" className="inline-block size-2.5 rounded-sm" style={{ background: SERIES[key] }} />
-            {seriesNames[key]}
-          </li>
-        ))}
-      </ul>
-      <SegmentLegend
-        items={legendItems}
-        activeKey={activeKey}
-        onSelect={select}
-        label={t("analyticsV2.trend.drillLabel")}
-        testId="legend-time-series"
-        maxButtons={8}
-      />
-    </div>
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-caption text-muted-foreground" aria-label={t("analyticsV2.chart.series")}>
+      {(["requests", "completed"] as const).map((key) => (
+        <li key={key} className="flex items-center gap-1.5">
+          <span aria-hidden="true" className="inline-block size-2.5 rounded-sm" style={{ background: SERIES[key] }} />
+          {seriesNames[key]}
+        </li>
+      ))}
+    </ul>
   );
 
   return (
@@ -160,7 +162,7 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
       {isEmpty ? (
         <EmptyState icon={BarChart3} title={t("analyticsV2.trend.empty")} titleAs="p" className="py-8" />
       ) : (
-        <ChartContainer config={{ requests: { label: seriesNames.requests }, completed: { label: seriesNames.completed } }} className="aspect-auto h-72 w-full">
+        <ChartContainer config={{ requests: { label: seriesNames.requests }, completed: { label: seriesNames.completed } }} className="aspect-auto h-48 w-full md:h-72">
           <BarChart
             data={data}
             accessibilityLayer
@@ -225,11 +227,10 @@ export function TrendChartSkeleton() {
         </div>
         <Skeleton className="h-9 w-28" />
       </div>
-      <Skeleton className="mt-4 h-72 w-full" />
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Skeleton className="h-8 w-28" />
-        <Skeleton className="h-8 w-28" />
-        <Skeleton className="h-8 w-28" />
+      <Skeleton className="mt-4 h-48 w-full md:h-72" />
+      <div className="mt-3 flex flex-wrap gap-4">
+        <Skeleton className="h-4 w-20" />
+        <Skeleton className="h-4 w-32" />
       </div>
     </div>
   );
