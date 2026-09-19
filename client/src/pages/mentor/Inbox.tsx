@@ -313,7 +313,7 @@ export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: 
 
                     <div className="md:col-start-1">
                       <p className="text-caption text-muted-foreground">{t("dashboardV2.inbox.goalLabel")}</p>
-                      <p dir="auto" className="mt-1 max-w-prose whitespace-pre-line text-body-sm text-foreground text-pretty" data-testid={`text-goal-${booking.id}`}>
+                      <p dir="auto" className="mt-1 w-fit max-w-prose whitespace-pre-line text-body-sm text-foreground text-pretty" data-testid={`text-goal-${booking.id}`}>
                         {booking.goal || t("dashboardV2.inbox.noGoal")}
                       </p>
                     </div>

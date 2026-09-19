@@ -6,7 +6,7 @@ import { CalendarPlus, Star } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
-import { formatDate, formatDateTime, formatNumber, formatRelativeDay, viewerTimeZone } from "@/lib/format";
+import { bidi, formatDate, formatDateTime, formatNumber, formatRelativeDay, tzDisplayLabel, viewerTimeZone } from "@/lib/format";
 import { credentialLine, initialsOf, localizedField } from "@/lib/localized";
 import { isConfirmedPast, isConfirmedWithoutTime, type BookingWithMentor } from "@/lib/menteeBookings";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,11 @@ export interface BookingRowProps extends BookingRowActions {
   highlighted?: boolean;
   /** Hide the goal line (Overview lists). */
   compact?: boolean;
-  /** Indent the action row to the text column on md+ so it shares the name's edge (F-35). */
+  /**
+   * Indent the action row to the text column on md+ so it shares the name's
+   * edge (F-35). On by default so every row on every dashboard list aligns
+   * the same way (N-02).
+   */
   alignActions?: boolean;
   className?: string;
 }
@@ -102,14 +106,14 @@ export function MentorAvatar({ mentor, size = "md" }: { mentor?: BookingWithMent
   );
 }
 
-/** "3 Oct 2026, 18:00 · Your time (Asia/Dubai)" or the honest fallback for a missing time. */
+/** "3 Oct 2026, 18:00 · Your time (Gulf Standard Time (GMT+4))" — the same human zone label the profile uses (F-30), never a raw IANA id. */
 export function useSessionTime() {
   const { t, i18n } = useTranslation();
   const tz = viewerTimeZone();
   return {
     tz,
     format: (iso: string | null | undefined) => (iso ? formatDateTime(iso, i18n.language, tz) : null),
-    zoneLabel: t("dashboardV2.time.yourZone", { tz }),
+    zoneLabel: t("dashboardV2.time.yourZone", { tz: bidi(tzDisplayLabel(tz, i18n.language)) }),
   };
 }
 
@@ -118,7 +122,7 @@ export function BookingRow({
   primary = false,
   highlighted = false,
   compact = false,
-  alignActions = false,
+  alignActions = true,
   className,
   onChooseTime,
   onWithdraw,

@@ -31,7 +31,7 @@ import { VerificationBadge } from "@/components/VerificationBadge";
 import { BookingNotes } from "@/components/dashboard/BookingNotes";
 import { toast } from "sonner";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
-import { bidi, formatDateTime, formatNumber, viewerTimeZone } from "@/lib/format";
+import { bidi, formatDateTime, formatNumber, tzDisplayLabel, viewerTimeZone } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
 import { isFuture } from "@/lib/menteeBookings";
 import { queryClient } from "@/lib/queryClient";
@@ -170,7 +170,7 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
                 </p>
               )}
               {booking.goal && (
-                <p dir="auto" className="mt-1 line-clamp-2 max-w-prose text-body-sm text-foreground text-pretty">
+                <p dir="auto" className="mt-1 line-clamp-2 w-fit max-w-prose text-body-sm text-foreground text-pretty">
                   {booking.goal}
                 </p>
               )}
@@ -183,7 +183,7 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
           {booking.scheduled_at ? (
             <span className="inline-flex items-center gap-1.5">
               <CalendarClock className="size-4" strokeWidth={1.75} aria-hidden="true" />
-              {formatDateTime(booking.scheduled_at, i18n.language, viewerTz)} · {t("dashboardV2.time.yourZone", { tz: viewerTz })}
+              {formatDateTime(booking.scheduled_at, i18n.language, viewerTz)} · {t("dashboardV2.time.yourZone", { tz: bidi(tzDisplayLabel(viewerTz, i18n.language)) })}
             </span>
           ) : booking.status === "accepted" ? (
             <span>{t("dashboardV2.sessions.waitingForTime")}</span>

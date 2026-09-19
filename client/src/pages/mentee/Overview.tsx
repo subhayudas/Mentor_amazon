@@ -73,7 +73,6 @@ export default function Overview({ menteeId, mentee }: { menteeId: string; mente
                         primary={index === 0}
                         highlighted={highlightedId === booking.id}
                         compact
-                        alignActions
                         className={index > 0 ? "rounded-none border-0 border-t border-border p-0 pt-4 mt-4" : "rounded-none border-0 p-0"}
                         {...actions}
                       />
