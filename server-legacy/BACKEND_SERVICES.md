@@ -1,3 +1,7 @@
+> **Legacy document — describes the Express backend in this folder, which is NOT deployed.**
+> The production app is the static SPA in `client/` plus the Vercel functions in `api/`.
+> Kept for historical reference only; paths below refer to the old layout.
+
 # Backend Services Hosting Requirements
 
 This document lists all backend services and infrastructure components that need to be hosted for the MentorConnect application.

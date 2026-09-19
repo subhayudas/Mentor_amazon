@@ -106,6 +106,7 @@ MentorConnect/
 │   │   └── hooks/         # Custom hooks
 │   └── public/            # Static assets
 ├── api/                   # Vercel serverless functions (Amazon SSO)
+├── migrations/            # DDL delta (reference; supabase_setup_v2.sql is authoritative)
 ├── shared/                # Shared types (drizzle schema)
 └── server-legacy/         # Original Express backend (not deployed)
 ```
@@ -153,11 +154,11 @@ dist
 - Create a new project
 - Note your project URL and anon key
 
-### 2. Run Database Migrations
-Use the SQL editor in Supabase dashboard to create tables (schema in `shared/schema.ts`)
+### 2. Create the tables
+Use the SQL editor in the Supabase dashboard to create the tables (the model is `shared/schema.ts`; `npm run db:push` can emit the base DDL for a fresh project).
 
 ### 3. Apply schema additions and Row Level Security
-Run `supabase_setup_v2.sql` in the SQL editor (it is idempotent and supersedes `supabase_setup.sql`)
+Run `supabase_setup_v2.sql` in the SQL editor. It is idempotent, supersedes `supabase_setup.sql`, and is the **single source of truth** for constraints, views, functions, triggers and policies. `migrations/0001_amazon_readiness.sql` mirrors only the column/table delta for reference — it is not a drizzle-kit journaled migration, and `db:push` must never be run against the Amazon project (it would not recreate the guards).
 
 ### 4. Create Storage Bucket
 - Create a bucket named `uploads`
@@ -194,3 +195,6 @@ This project is licensed under the MIT License.
 
 **Need Help?** See `supabase_setup_v2.sql` for the database setup and `TESTING.md` for the deployment smoke tests.
 
+## Assets
+
+The former `attached_assets/` folder (Replit pastes, meeting transcripts, an email-thread PDF and seed photos) was deliberately deleted rather than published under `client/public`; nothing in the app referenced it once the fake seed data went. Placeholder artwork for the UI revamp belongs in `client/public/assets/` when it is produced.

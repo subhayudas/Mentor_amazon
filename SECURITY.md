@@ -49,7 +49,15 @@ on Vercel's CDN.
   authoritative role (auth metadata is a fallback for legacy accounts). It can
   only be changed by an admin or the service role (database trigger).
 * **Mentees** self-register with email/password through Supabase Auth; a
-  mentee can never self-select another role.
+  mentee can never self-select another role, and an SSO login never promotes
+  a self-registered mentee row or binds to a previously used auth user with
+  the same email (see `api/README.md` → Account rules). **Email confirmation
+  must stay enabled** in Supabase Auth so a squatted address is never a
+  usable account.
+* Booking status transitions are role-bound in the database: only the mentor
+  accepts/rejects/completes; a mentee can cancel or, after scheduling,
+  confirm. Each side writes only its own rating; ratings on `mentors` are
+  derived and cannot be typed in.
 * Ownership everywhere is `lower(email) = lower(auth.jwt()->>'email')`;
   `localStorage` is never an identity source.
 
@@ -179,11 +187,14 @@ DELETE FROM public.users WHERE lower(email) = lower('person@example.com');
 1. No email notifications; the in-app bell is the only channel.
 2. Cal.com is an external dependency for scheduling; the app cannot see or
    cancel Cal.com bookings.
-3. Legacy mentee email path: an anonymous requester's dashboard relies on the
-   email kept in `localStorage`; without signing in they cannot read their
-   bookings (RLS), only create new requests.
-4. Mentee registration lets a signed-in user type a different email; RLS then
-   rejects the insert. The form should prefill and lock the session email.
+3. Anonymous booking requests: `get_or_create_mentee` resolves any existing
+   mentee by email, so an anonymous caller can file a request *on behalf of*
+   a registered mentee (they cannot read anything back). Bounded by the
+   per-mentee and per-mentor rate limits; requiring a session for requests
+   would close it at the cost of the anonymous flow the programme asked for.
+4. Mentee surfaces (`/mentee-dashboard`, `/my-bookings`, `/mentee-registration`)
+   now require a session and use the session email; the old typed-email
+   access is gone.
 5. No admin-note column for verification decisions (`verification_reference`
    is the mentee-supplied value).
 6. `style-src 'unsafe-inline'` in the CSP.

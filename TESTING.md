@@ -69,7 +69,7 @@ All checks use `curl -si … | grep -iE '^(HTTP|location|cache-control|set-cooki
 | d6 | Any env var unset on a preview (e.g. `AMAZON_OIDC_CLIENT_SECRET`) → `curl -si …/api/auth/login/amazon` | `500` JSON `{"error":"server_misconfigured","missing":["AMAZON_OIDC_CLIENT_SECRET"]}` — never a stack trace, never a secret. |
 | d7 | `AMAZON_OIDC_DEBUG` unset or not exactly `true` → `curl -si https://mentor-amazon.vercel.app/api/auth/debug-claims` | `404` JSON `{"error":"not_found"}`. |
 | d8 | `AMAZON_OIDC_DEBUG=true` (integ only) → complete one browser SSO round trip → `/api/auth/debug-claims` | JSON with the ID-token claims and `sub_equals_alias: true`. Turn the flag **off** afterwards and re-check d7. |
-| d9 | `curl -si https://mentor-amazon.vercel.app/api/auth/logout` | `302 → https://mentor-amazon.vercel.app/login`, `set-cookie` clearing `mc_oidc` and `mc_oidc_debug`. |
+| d9 | `curl -si -X POST https://mentor-amazon.vercel.app/api/auth/logout` | `302 → https://mentor-amazon.vercel.app/login`, `set-cookie` clearing `mc_oidc` and `mc_oidc_debug`. |
 | d10 | Browser: `/login` → "Sign in with Amazon" with an alias **not** on the allow-list | Amazon login → `/request-access?alias=<alias>` with pending badge; an `access_requests` row appears in `/admin/access`. No Supabase session is created (`/mentor-portal` still redirects to login). |
 | d11 | Admin approves that alias (role mentor) in `/admin/access` → the mentor signs in with Amazon again | `/auth/sso` spinner card (`card-sso-working`), then `/mentor-onboarding` (no profile yet) or `/mentor-portal`. The address bar never keeps `#token_hash=…` (fragment is stripped). Browser back does not re-run the exchange. |
 | d12 | Same alias signs in a third time | Straight to the portal (existing users row is reused; no duplicate users/auth rows in Supabase → Authentication → Users). |
@@ -80,14 +80,15 @@ Use a mentee (org type) and a mentor whose profile has a Cal.com link.
 
 | # | Steps | Expected |
 | --- | --- | --- |
-| e1 | Mentee: `/` → open a mentor card → "Request session" (`button-request-session`) → fill goal → submit | Toast; `/mentee-dashboard` lists the request as **pending**. Mentor: reload any page → the bell (`button-notification-bell`) shows +1 with a "new booking request" notification (the bell refreshes on reload/navigation, it does not poll). |
+| e1 | Mentee: `/` → open a mentor card → "Request session" (`button-request-session`) → fill goal → submit | Toast ("sign in with the same email to follow it"); signed in, `/mentee-dashboard` lists the request as **pending** (anonymous visitors are sent to `/login?next=…`). Mentor: reload any page → the bell (`button-notification-bell`) shows +1 with a "new booking request" notification (the bell refreshes on reload/navigation, it does not poll). |
 | e2 | Mentee (org, pending verification): dashboard header | Org name with the amber "Verification pending" badge and the "Verification in review" banner; browsing/requesting still works. |
 | e3 | Mentor: `/mentor-portal/requests` | The request row shows the mentee name, the org name and an amber "Verification pending" badge with the muted "not verified yet" note. |
 | e4 | Mentor: click **Accept** | Row highlights, turns green with an "Accepted" pill for ~2.5 s, then leaves the pending list; toast fires. |
 | e5 | Mentee: reload `/mentee-dashboard` | Green "request has been accepted" card; the booking shows **Schedule now**. Clicking it opens the Cal.com dialog (`dialog-cal-embed`) with the mentor's calendar (iframe loads from app.cal.com — CSP must allow it, see (h)). Close button works. |
 | e6 | Mentee: reload → bell | "Booking accepted" notification present; mark read → unread count drops immediately. |
 | e7 | Mentor: `/mentor-portal/sessions` → **Mark complete** on the accepted session → dialog (`dialog-complete-session`) → choose 45 min → confirm (`button-confirm-complete`) | Toast "…45 minutes"; the card moves to the Completed tab, is scrolled into view and rings for 2 s, shows "45 min". Dashboard "Volunteer hours" tile increases by 0.8. |
-| e8 | Mentee: `/mentee-dashboard/feedback` → rate the completed session (`button-submit-feedback`) | Toast; mentor (after reload) sees a "feedback received" notification; mentor's average rating on `/` updates (trigger-recomputed). |
+| e8 | Mentee: `/mentee-dashboard/bookings` → **Give feedback** on the completed session (`button-give-feedback-<id>`) → rate → submit (`button-submit-feedback`) | Dialog closes, toast, the rated card scrolls into view and rings orange for ~2 s and now shows the rating; mentor (after reload) sees a "feedback received" notification; mentor's average rating on `/` updates (trigger-recomputed). Same dialog on `/my-bookings`. |
+| e8b | Mentee: in the Cal.com dialog (e5) actually book a slot | On Cal.com's success screen the app toasts "Session confirmed" and, after closing, the booking shows as **confirmed** with the slot time (no webhook involved). If Cal.com is blocked, the mentor can still complete the *accepted* session from `/mentor-portal/sessions`. |
 | e9 | Mentor: `/mentor-portal/feedback` → leave feedback for the mentee | Toast; mentee (after reload) sees a "feedback received" notification and the mentor's feedback on their dashboard. |
 | e10 | Mentor: Decline a second request | Row turns muted red with "Declined" pill; mentee (after reload) sees **rejected** and a notification. |
 | e11 | Repeat e1 six times quickly with the same mentee email | The 6th request fails with a rate-limit error toast (DB trigger: 5 per mentee per hour). |
@@ -121,7 +122,7 @@ Toggle with the globe button (`button-language-toggle`). For each page below, in
 
 ```bash
 curl -sI https://mentor-amazon.vercel.app/ | grep -iE '^(content-security-policy|x-content-type-options|referrer-policy|permissions-policy|strict-transport-security):'
-curl -sI https://mentor-amazon.vercel.app/api/auth/logout | grep -iE '^(cache-control|content-security-policy):'
+curl -si -X POST https://mentor-amazon.vercel.app/api/auth/logout | grep -iE '^(cache-control|content-security-policy):'
 ```
 
 | # | Expected |
