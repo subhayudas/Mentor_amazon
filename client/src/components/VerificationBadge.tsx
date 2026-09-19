@@ -1,4 +1,4 @@
-import { Clock, ShieldAlert, ShieldCheck, ShieldX, type LucideIcon } from "lucide-react";
+import { Building2, ShieldAlert, ShieldCheck, ShieldX, type LucideIcon } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Badge, type BadgeTone } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -21,13 +21,16 @@ interface StatusPresentation {
   tone: BadgeTone;
 }
 
-// Warning = not yet confirmed (still allowed to use the platform), success =
-// confirmed, danger = the programme team declined the organisation. Text +
-// icon + colour, never colour alone; the explanation lives next to the badge
-// where it matters (inbox note, dashboard banner), so no hover-only tooltip.
+// Info (neutral-blue) = not yet confirmed but still allowed to use the
+// platform — deliberately NOT the warning tone + clock that the booking
+// status "Awaiting mentor" owns (F-19), so an organisation's paperwork never
+// reads as a session waiting on someone; success = confirmed, danger = the
+// programme team declined the organisation. Text + icon + colour, never
+// colour alone; the explanation lives next to the badge where it matters
+// (inbox note, dashboard banner), so no hover-only tooltip.
 const PRESENTATION: Record<VerificationStatus, StatusPresentation> = {
-  pending: { icon: Clock, labelKey: "verification.badge.pending", tone: "warning" },
-  unverified: { icon: ShieldAlert, labelKey: "verification.badge.unverified", tone: "warning" },
+  pending: { icon: Building2, labelKey: "verification.badge.pending", tone: "info" },
+  unverified: { icon: ShieldAlert, labelKey: "verification.badge.unverified", tone: "info" },
   rejected: { icon: ShieldX, labelKey: "verification.badge.rejected", tone: "danger" },
   verified: { icon: ShieldCheck, labelKey: "verification.badge.verified", tone: "success" },
 };
