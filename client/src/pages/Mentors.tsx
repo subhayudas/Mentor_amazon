@@ -214,7 +214,8 @@ export default function Mentors() {
             key={tag.value}
             selected={urlState.expertise.includes(tag.value)}
             onToggle={(on) => toggleExpertise(tag.value, on)}
-            className="shrink-0"
+            // Fixed height so the loaded row equals the skeleton row in both scripts (F-06).
+            className="h-8 shrink-0 snap-start py-0 coarse:h-10"
             data-testid={`chip-example-${i}`}
           >
             {tag.label}

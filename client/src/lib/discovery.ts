@@ -31,8 +31,12 @@ export const NEAR_HOURS = 3;
 export const SORT_THRESHOLD = 12;
 /** Expertise chips shown on a card before the "+n" overflow (P1-15). */
 export const CARD_CHIP_LIMIT = 3;
-/** Example chips under the search box (spec §5). */
-export const EXAMPLE_CHIP_LIMIT = 5;
+/**
+ * Example chips under the search box (spec §5). Four, so the row never wraps
+ * in the hero's ~640px column and the skeleton (same count) has the loaded
+ * geometry by construction (F-06); phones show the first three.
+ */
+export const EXAMPLE_CHIP_LIMIT = 4;
 /** Cards on the landing preview (spec §5.2) and on the mobile scroller (P0-7). */
 export const PREVIEW_LIMIT = 6;
 export const PREVIEW_LIMIT_MOBILE = 4;

@@ -30,7 +30,7 @@ export interface SearchIntentProps {
   /** The submit is the page's orange primary (landing hero only). */
   primaryAction?: boolean;
   size?: "md" | "lg";
-  /** Example chips rendered under the input (one row, scrollable on mobile). */
+  /** Example chips rendered under the input (one reserved row; a snap scroller below `md`). */
   chips?: React.ReactNode;
   className?: string;
   id?: string;
@@ -141,7 +141,12 @@ export const SearchIntent = React.forwardRef<HTMLInputElement, SearchIntentProps
         </div>
       </div>
       {chips && (
-        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] md:flex-wrap md:overflow-visible md:pb-0">
+        // One reserved row (F-06): `min-h-8` (40 on touch) so the skeleton and
+        // the loaded chips occupy the same height. Below `md` it is a snap
+        // scroller that bleeds into the page gutter (`-mx-4 px-4`, the mentor
+        // scroller's pattern) so an overflowing chip peeks at the viewport
+        // edge instead of clipping flush with the column (F-24).
+        <div className="-mx-4 mt-3 flex min-h-8 snap-x gap-2 overflow-x-auto px-4 pb-1 [scroll-padding-inline:1rem] [scrollbar-width:none] coarse:min-h-10 md:mx-0 md:flex-wrap md:overflow-visible md:px-0 md:pb-0">
           {chips}
         </div>
       )}
