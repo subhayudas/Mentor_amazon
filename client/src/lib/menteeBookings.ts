@@ -1,17 +1,36 @@
 /**
- * Pure grouping of a mentee's bookings for the dashboard (P1-24). The DB is
- * the source of truth for `status`; this only decides which list a row sits in:
+ * Pure grouping of a mentee's bookings for the dashboard (P1-24, F-12). The DB
+ * is the source of truth for `status`; this decides which list a row sits in
+ * by what the MENTEE can do next, not by status alone:
  * - next: the earliest confirmed session with a future `scheduled_at`
- * - needsAction: accepted requests (the mentee picks a time on the mentor's link)
- * - waiting: pending requests
+ * - needsAction: accepted requests whose mentor has a calendar link — the
+ *   mentee owes the next step (pick a time)
+ * - waiting: pending requests, and accepted requests whose mentor has no
+ *   calendar link yet (the mentee can only wait); accepted rows first
  * - upcoming: the other confirmed future sessions, soonest first, then
  *   confirmed sessions whose time Cal.com never reported ("Time not recorded")
  * - past: completed, cancelled, declined, and confirmed sessions whose time
  *   has passed without the mentor marking them complete
+ * The needsAction / waiting split is `railStatesFor` (F-09), so the request
+ * rail beside the group and the group heading never disagree.
  */
 import type { Booking, Mentor } from "@/lib/database";
+import { railStatesFor, type RailProgress } from "@/components/booking/requestState";
 
 export type BookingWithMentor = Booking & { mentor?: Mentor };
+
+/** Whether the mentor on this row has published a calendar link the mentee can use. */
+export function hasSchedulingLink(b: Booking & { mentor?: Pick<Mentor, "cal_link"> }): boolean {
+  return Boolean(b.mentor?.cal_link);
+}
+
+/** Rail progress for one of the mentee's own rows (the row IS the request state). */
+export function railProgressFor(b: Booking & { mentor?: Pick<Mentor, "cal_link"> }): RailProgress {
+  return railStatesFor(
+    { kind: "sent", email: "", sentAt: b.created_at, status: b.status, source: "row" },
+    { hasLink: hasSchedulingLink(b) },
+  );
+}
 
 export interface GroupedBookings<T extends Booking> {
   next: T | null;
@@ -35,14 +54,18 @@ const byRecentDesc = <T extends Booking>(a: T, b: T) => {
   return kb.localeCompare(ka);
 };
 
-export function groupMenteeBookings<T extends Booking>(rows: readonly T[] | undefined, now: Date = new Date()): GroupedBookings<T> {
+export function groupMenteeBookings<T extends Booking & { mentor?: Pick<Mentor, "cal_link"> }>(
+  rows: readonly T[] | undefined,
+  now: Date = new Date(),
+): GroupedBookings<T> {
   const list = rows ?? [];
   const confirmedFuture = list.filter((b) => b.status === "confirmed" && isFuture(b.scheduled_at, now)).sort(byScheduledAsc);
   const confirmedNoTime = list.filter((b) => b.status === "confirmed" && !b.scheduled_at).sort(byCreatedDesc);
   const [next = null, ...rest] = confirmedFuture;
   const upcoming = [...rest, ...confirmedNoTime];
-  const needsAction = list.filter((b) => b.status === "accepted").sort(byCreatedDesc);
-  const waiting = list.filter((b) => b.status === "pending").sort(byCreatedDesc);
+  const accepted = list.filter((b) => b.status === "accepted").sort(byCreatedDesc);
+  const needsAction = accepted.filter((b) => railProgressFor(b).canChooseTime);
+  const waiting = [...accepted.filter((b) => !railProgressFor(b).canChooseTime), ...list.filter((b) => b.status === "pending").sort(byCreatedDesc)];
   const past = list
     .filter(
       (b) =>

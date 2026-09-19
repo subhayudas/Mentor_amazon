@@ -1,18 +1,18 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
-import { CalendarClock, Star } from "lucide-react";
+import { CalendarClock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RequestRail, type RailStopState } from "@/components/RequestRail";
+import { RequestRail } from "@/components/RequestRail";
 import { StatusBadge } from "@/components/StatusBadge";
 import type { Mentee } from "@/lib/database";
-import { bidi, formatDate, formatNumber } from "@/lib/format";
+import { bidi, formatDate } from "@/lib/format";
 import { credentialLine, localizedField } from "@/lib/localized";
-import { groupMenteeBookings, isConfirmedPast, type BookingWithMentor } from "@/lib/menteeBookings";
+import { groupMenteeBookings, isConfirmedPast, railProgressFor, type BookingWithMentor } from "@/lib/menteeBookings";
 import { ROUTES } from "@/lib/routes";
-import { BookingRow, MentorAvatar, useSessionTime } from "@/pages/mentee/BookingRow";
+import { BookingRow, MentorAvatar, PastRowActions, useSessionTime } from "@/pages/mentee/BookingRow";
 import { OrganizationVerificationStatus } from "@/pages/mentee/OrganizationVerificationStatus";
 import { useBookingActions } from "@/pages/mentee/useBookingActions";
 import { BookingListSkeleton, BookingsError, NoSessionsYet, PanelSection, useMenteeBookings } from "@/pages/mentee/shared";
@@ -20,9 +20,11 @@ import { BookingListSkeleton, BookingsError, NoSessionsYet, PanelSection, useMen
 const PAST_PREVIEW = 5;
 
 /**
- * Overview (spec §8 as amended by P1-24): next session first, then what
- * needs the mentee's action (accepted → choose a time, drawn on the request
- * rail), then upcoming sessions, then a compact past table. No tiles.
+ * Overview (spec §8 as amended by P1-24, F-12): next session first, then what
+ * needs the mentee's action (accepted WITH a calendar link → choose a time,
+ * drawn on the request rail), then what they are waiting for (pending, and
+ * accepted without a link yet), then upcoming sessions, then a compact past
+ * table. No tiles.
  */
 export default function Overview({ menteeId, mentee }: { menteeId: string; mentee: Mentee }) {
   const { t, i18n } = useTranslation();
@@ -33,11 +35,12 @@ export default function Overview({ menteeId, mentee }: { menteeId: string; mente
   const groups = useMemo(() => groupMenteeBookings(bookingsQuery.data), [bookingsQuery.data]);
   const total = bookingsQuery.data?.length ?? 0;
 
-  const railStates = useMemo<[RailStopState, RailStopState, RailStopState]>(() => {
-    const withLink = groups.needsAction.find((b) => b.mentor?.cal_link);
-    return withLink ? ["done", "done", "current"] : ["done", "current", "next"];
+  // The rail draws the first actionable row; `railProgressFor` is the same
+  // mapping that put the row in this group, so rail and heading agree (F-09).
+  const railStates = useMemo(() => {
+    const first = groups.needsAction[0];
+    return first ? railProgressFor(first).states : (["done", "done", "current"] as const);
   }, [groups.needsAction]);
-
   const railName = localizedField(groups.needsAction[0]?.mentor, "name", i18n.language);
 
   return (
@@ -61,7 +64,7 @@ export default function Overview({ menteeId, mentee }: { menteeId: string; mente
           {groups.needsAction.length > 0 && (
             <PanelSection id="needs-action" title={t("dashboardV2.overview.needsAction")}>
               <div className="rounded-lg border border-border bg-card p-4 md:p-5" data-testid="card-needs-action">
-                <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_260px]">
+                <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_240px] md:gap-6">
                   <div>
                     {groups.needsAction.map((booking, index) => (
                       <BookingRow
@@ -70,12 +73,13 @@ export default function Overview({ menteeId, mentee }: { menteeId: string; mente
                         primary={index === 0}
                         highlighted={highlightedId === booking.id}
                         compact
+                        alignActions
                         className={index > 0 ? "rounded-none border-0 border-t border-border p-0 pt-4 mt-4" : "rounded-none border-0 p-0"}
                         {...actions}
                       />
                     ))}
                   </div>
-                  <div className="rounded-lg bg-muted/40 p-4 md:order-none">
+                  <div className="border-t border-border pt-4 md:border-s md:border-t-0 md:ps-6 md:pt-0">
                     <p className="mb-3 text-caption text-muted-foreground">{t("dashboardV2.rail.title")}</p>
                     <RequestRail
                       size="sm"
@@ -242,20 +246,7 @@ function PastList({
                     <StatusBadge status={b.status} />
                   </TableCell>
                   <TableCell className="text-end">
-                    {b.status === "completed" && !b.mentee_rating ? (
-                      <Button variant="outline" size="sm" onClick={() => onRate(b)} data-testid={`button-give-feedback-${b.id}`}>
-                        {t("dashboardV2.actions.rateSession")}
-                      </Button>
-                    ) : b.status === "completed" && b.mentee_rating ? (
-                      <Button variant="ghost" size="sm" onClick={() => onRate(b)} data-testid={`button-view-feedback-${b.id}`}>
-                        <Star className="fill-brand-orange text-brand-orange" aria-hidden="true" />
-                        <span dir="ltr" className="tabular-nums">{t("dashboardV2.row.rated", { value: formatNumber(b.mentee_rating, i18n.language) })}</span>
-                      </Button>
-                    ) : (
-                      <Button variant="ghost" size="sm" onClick={() => onView(b)} data-testid={`button-view-request-${b.id}`}>
-                        {t("dashboardV2.actions.viewRequest")}
-                      </Button>
-                    )}
+                    <PastRowActions booking={b} onView={onView} onRate={onRate} dense />
                   </TableCell>
                 </TableRow>
               );
@@ -284,20 +275,7 @@ function PastList({
               </p>
               {isConfirmedPast(b) && <p className="text-caption text-muted-foreground">{t("dashboardV2.row.notMarkedComplete")}</p>}
               <div className="flex flex-wrap gap-2">
-                {b.status === "completed" && !b.mentee_rating ? (
-                  <Button variant="outline" size="sm" onClick={() => onRate(b)} data-testid={`button-give-feedback-${b.id}`}>
-                    {t("dashboardV2.actions.rateSession")}
-                  </Button>
-                ) : b.status === "completed" && b.mentee_rating ? (
-                  <Button variant="outline" size="sm" onClick={() => onRate(b)} data-testid={`button-view-feedback-${b.id}`}>
-                    <Star className="fill-brand-orange text-brand-orange" aria-hidden="true" />
-                    <span dir="ltr" className="tabular-nums">{t("dashboardV2.row.rated", { value: formatNumber(b.mentee_rating, i18n.language) })}</span>
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => onView(b)} data-testid={`button-view-request-${b.id}`}>
-                    {t("dashboardV2.actions.viewRequest")}
-                  </Button>
-                )}
+                <PastRowActions booking={b} onView={onView} onRate={onRate} />
               </div>
             </li>
           );
