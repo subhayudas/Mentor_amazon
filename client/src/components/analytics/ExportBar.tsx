@@ -49,14 +49,14 @@ export function ExportBar({ onExportView, onExportRange, defaultFrom, defaultTo,
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="export-bar">
       <Button type="button" variant="outline" size="sm" onClick={onExportView} disabled={disabled} data-testid="button-export-view">
-        <Download aria-hidden="true" strokeWidth={1.5} />
+        <Download aria-hidden="true" strokeWidth={1.75} />
         {t("analytics.exportView")}
       </Button>
 
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button type="button" variant="outline" size="sm" disabled={disabled} data-testid="button-export-range">
-            <CalendarRange aria-hidden="true" strokeWidth={1.5} />
+            <CalendarRange aria-hidden="true" strokeWidth={1.75} />
             {t("analytics.exportRange")}
           </Button>
         </PopoverTrigger>
@@ -103,7 +103,7 @@ export function ExportBar({ onExportView, onExportRange, defaultFrom, defaultTo,
             aria-describedby={!rangeValid ? `${id}-help` : undefined}
             data-testid="button-export-range-confirm"
           >
-            <Download aria-hidden="true" strokeWidth={1.5} />
+            <Download aria-hidden="true" strokeWidth={1.75} />
             {t("analytics.exportRangeConfirm")}
           </Button>
         </PopoverContent>

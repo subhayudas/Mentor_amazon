@@ -86,7 +86,7 @@ export function ChartFigure({
             className="-me-2 shrink-0 text-muted-foreground"
             data-testid={testId ? `${testId}-table-toggle` : undefined}
           >
-            <Table2 aria-hidden="true" strokeWidth={1.5} />
+            <Table2 aria-hidden="true" strokeWidth={1.75} />
             {tableOpen ? t("analyticsV2.chart.hideTable") : t("analyticsV2.chart.viewTable")}
           </Button>
         )}
@@ -96,7 +96,8 @@ export function ChartFigure({
       </p>
       <div className="mt-4">{children}</div>
       {legend && <div className="mt-3">{legend}</div>}
-      {definition && <figcaption className="mt-3 text-caption text-muted-foreground text-pretty">{definition}</figcaption>}
+      {/* A <p>, not <figcaption>: figcaption must be the first or last child of the figure and the table follows it. */}
+      {definition && <p className="mt-3 text-caption text-muted-foreground text-pretty">{definition}</p>}
       <div id={tableId} className={showTable ? "mt-4 border-t border-border pt-3" : "sr-only"} data-testid={testId ? `${testId}-table` : undefined}>
         {table}
       </div>

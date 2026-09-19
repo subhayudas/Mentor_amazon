@@ -390,8 +390,6 @@ async function resolveCountryForBooking(bookingId: string): Promise<string | und
 // (spec §9 as amended by P1-26, P2-15, P2-16). Everything below is pure.
 // ---------------------------------------------------------------------------
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /**
  * When a request was made. `clicked_at` is only set by the legacy direct
  * booking path; product-created requests carry `created_at` alone.

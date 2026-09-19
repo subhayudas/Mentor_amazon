@@ -51,7 +51,7 @@ export function FiltersPopover({ value, onChange, options, activeCount }: Filter
     <Popover>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="sm" data-testid="button-filters">
-          <SlidersHorizontal aria-hidden="true" strokeWidth={1.5} />
+          <SlidersHorizontal aria-hidden="true" strokeWidth={1.75} />
           {activeCount > 0 ? t("analyticsV2.filters.buttonCount", { count: activeCount }) : t("analyticsV2.filters.button")}
         </Button>
       </PopoverTrigger>
