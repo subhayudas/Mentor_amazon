@@ -1762,7 +1762,8 @@
       "notRecordedCount_two": "غير مسجّلة — جلستان مكتملتان بلا مدة",
       "notRecordedCount_few": "غير مسجّلة — {{count}} جلسات مكتملة بلا مدة",
       "notRecordedCount_many": "غير مسجّلة — {{count}} جلسة مكتملة بلا مدة",
-      "notRecordedCount_other": "غير مسجّلة — {{count}} جلسة مكتملة بلا مدة"
+      "notRecordedCount_other": "غير مسجّلة — {{count}} جلسة مكتملة بلا مدة",
+      "definitionsSummary": "كيف تُحسب هذه الأرقام"
     },
     "counts": {
       "requests_zero": "لا طلبات",
@@ -1818,7 +1819,10 @@
       "axis": {
         "count": "العدد"
       },
-      "drillLabel": "الحجوزات في"
+      "rowDrillHint": {
+        "week": "اختر أسبوعًا لعرض حجوزاته.",
+        "month": "اختر شهرًا لعرض حجوزاته."
+      }
     },
     "outcomes": {
       "title": "نتائج الطلبات",
@@ -1852,7 +1856,8 @@
         "hours": "ساعات التطوع",
         "mentors": "المرشدون",
         "mentees": "المتدربون"
-      }
+      },
+      "barLabel": "{{sessions}} · {{hours}}"
     },
     "mentors": {
       "title": "المرشدون حسب الجلسات المكتملة",
@@ -1887,7 +1892,8 @@
       "clear": "مسح"
     },
     "export": {
-      "rangeHelp": "اختر تاريخ بداية يسبق تاريخ النهاية أو يساويه."
+      "rangeHelp": "اختر تاريخ بداية يسبق تاريخ النهاية أو يساويه.",
+      "button": "تصدير"
     },
     "error": {
       "title": "تعذّر تحميل التحليلات",

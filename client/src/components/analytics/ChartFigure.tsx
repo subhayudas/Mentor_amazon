@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Table2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 
 export interface ChartFigureProps {
@@ -25,7 +26,7 @@ export interface ChartFigureProps {
   /** Text legend / keyboard twin rendered outside the LTR chart wrapper so it follows the page direction. */
   legend?: ReactNode;
   footer?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   headingLevel?: "h2" | "h3";
   testId?: string;
   className?: string;
@@ -59,6 +60,27 @@ export function ChartFigure({
   const tableId = `${id}-table`;
   const [tableOpen, setTableOpen] = useState(false);
   const showTable = tableMode === "beneath" || tableOpen;
+  // Phones (F-11): the toggle is a named 44px icon button so it shares the
+  // title row instead of wrapping under a long title onto a row of its own.
+  const isPhone = useIsPhone();
+  const toggleLabel = tableOpen ? t("analyticsV2.chart.hideTable") : t("analyticsV2.chart.viewTable");
+  const toggle =
+    tableMode === "toggle" ? (
+      <Button
+        type="button"
+        variant="ghost"
+        size={isPhone ? "icon" : "sm"}
+        aria-expanded={tableOpen}
+        aria-controls={tableId}
+        aria-label={isPhone ? toggleLabel : undefined}
+        onClick={() => setTableOpen((open) => !open)}
+        className={cn("shrink-0 text-muted-foreground", isPhone ? "-me-2 -mt-2 size-11" : "-me-2")}
+        data-testid={testId ? `${testId}-table-toggle` : undefined}
+      >
+        <Table2 aria-hidden="true" strokeWidth={1.75} />
+        {!isPhone && toggleLabel}
+      </Button>
+    ) : null;
 
   return (
     <figure
@@ -68,33 +90,20 @@ export function ChartFigure({
       className={cn("flex flex-col rounded-lg border border-border bg-card p-4 md:p-6", className)}
       data-testid={testId}
     >
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <div className="flex items-start justify-between gap-x-3 max-md:flex-nowrap md:flex-wrap md:gap-x-4 md:gap-y-2">
         <div className="min-w-0">
           <Heading id={titleId} className="text-h3 text-foreground">
             {title}
           </Heading>
           {meta && <p className="mt-0.5 text-caption text-muted-foreground">{meta}</p>}
         </div>
-        {tableMode === "toggle" && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-expanded={tableOpen}
-            aria-controls={tableId}
-            onClick={() => setTableOpen((open) => !open)}
-            className="-me-2 shrink-0 text-muted-foreground"
-            data-testid={testId ? `${testId}-table-toggle` : undefined}
-          >
-            <Table2 aria-hidden="true" strokeWidth={1.75} />
-            {tableOpen ? t("analyticsV2.chart.hideTable") : t("analyticsV2.chart.viewTable")}
-          </Button>
-        )}
+        {toggle}
       </div>
       <p id={descId} className="sr-only">
         {summary}
       </p>
-      <div className="mt-4">{children}</div>
+      {/* A figure that is only its table on phones (F-11 by-country) passes no chart. */}
+      {children != null && children !== false && <div className="mt-4">{children}</div>}
       {legend && <div className="mt-3">{legend}</div>}
       {/* A <p>, not <figcaption>: figcaption must be the first or last child of the figure and the table follows it. */}
       {definition && <p className="mt-3 text-caption text-muted-foreground text-pretty">{definition}</p>}

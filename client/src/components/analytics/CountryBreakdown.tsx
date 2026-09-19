@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer } from "@/components/ui/chart";
 import { useDirection } from "@/hooks/useDirection";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { UNAVAILABLE, formatHours, formatNumber } from "@/lib/format";
 import { NOT_SPECIFIED, localizeCountry, type CountryBreakdownRow, type Period } from "@/lib/reporting";
 import { AXIS_TICK, BrandTooltip, CURSOR_FILL, HORIZONTAL_CHART, SERIES, SURFACE, ValueLabel, horizontalBarRadius, markOpacity } from "./ChartTheme";
 import { ChartFigure } from "./ChartFigure";
+import { RowDrillButton } from "./RowDrillButton";
 
 interface CountryBreakdownProps {
   rows: CountryBreakdownRow[];
@@ -21,7 +23,7 @@ interface CountryBreakdownProps {
   onSelect: (country: string | null) => void;
   /** Switches the page to the Countries tab (the exact-value table for every country). */
   onSeeAll: () => void;
-  /** Countries charted (by completed sessions); the Countries tab lists every row. */
+  /** Countries charted (by completed sessions); the Countries tab lists every row. Six keeps the card level with "Request outcomes" beside it (F-33). */
   chartLimit?: number;
 }
 
@@ -39,16 +41,21 @@ interface ChartDatum {
 }
 
 /**
- * Sessions and hours by country (spec §9 breakdowns): two single-axis
- * horizontal bar charts — different units never share an axis — for the
- * countries with the most completed sessions. In Arabic the value axis grows
- * toward the inline-end (`XAxis reversed`, `YAxis orientation="right"`), the
- * f8 "mirrored bars" contract (P2-17). Clicking a bar drills into its bookings.
+ * Sessions and hours by country (spec §9 breakdowns, F-33): ONE horizontal
+ * bar list — completed sessions per country, the volunteer hours as the
+ * trailing value label ("4 · 3.5 h") — for the countries with the most
+ * completed sessions, with the exact-value table behind the same "View as
+ * table" toggle the other charts use, so the card is the height of its
+ * neighbour. On phones (F-11) the bars are dropped and the table is the
+ * whole figure. In Arabic the value axis grows toward the inline-end
+ * (`XAxis reversed`, `YAxis orientation="right"`), the f8 "mirrored bars"
+ * contract (P2-17). Clicking a bar or a country name drills into its bookings.
  */
-export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeAll, chartLimit = 10 }: CountryBreakdownProps) {
+export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeAll, chartLimit = 6 }: CountryBreakdownProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { dir } = useDirection();
+  const isPhone = useIsPhone();
   const geometry = HORIZONTAL_CHART[dir];
   const displayCountry = (country: string) => (country === NOT_SPECIFIED ? t("analytics.notSpecified") : localizeCountry(country, lang));
 
@@ -69,6 +76,7 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, chartLimit, lang, t],
   );
+  const byLabel = useMemo(() => new Map(data.map((row) => [row.label, row])), [data]);
 
   const top = data[0];
   const summary = top
@@ -86,31 +94,40 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
         })
     : t("analyticsV2.country.empty");
   // Same caveat as the hours tile, summed over the charted rows: the hours
-  // bars and the table beneath are partial sums until every session has a duration.
+  // labels and the table are partial sums until every session has a duration.
   const withoutDuration = data.reduce((sum, row) => sum + row.withoutDuration, 0);
 
   const toggle = (country: string) => onSelect(activeCountry === country ? null : country);
   // 20px bars with a 6px category gap; a single-row chart is one bar tall, not a 96px box.
   const chartHeight = Math.max(40, 28 * data.length + 12);
-  const formatValue = (dataKey: "completed" | "volunteerHours", value: number, datum?: ChartDatum) =>
-    dataKey === "volunteerHours" ? (datum?.hoursUnknown ? UNAVAILABLE : formatHours(value * 60, lang)) : formatNumber(value, lang);
+  const hoursText = (datum: ChartDatum) => (datum.hoursUnknown ? UNAVAILABLE : formatHours(datum.volunteerMinutes, lang));
+  // "4 · 3.5 h" after the bar: sessions are the mark, hours ride along as text (F-33).
+  const barLabel = (datum: ChartDatum) => t("analyticsV2.country.barLabel", { sessions: formatNumber(datum.completed, lang), hours: hoursText(datum) });
+  // Room for the combined label on the value side (the shared geometry reserves 48px for a bare number).
+  const margin = { ...geometry.margin, [dir === "rtl" ? "left" : "right"]: 104 };
+  const seriesName = t("analyticsV2.country.sessions");
 
-  const renderChart = (dataKey: "completed" | "volunteerHours", color: string, name: string, testId: string) => (
-    <div data-testid={testId}>
-      <p className="mb-1 text-caption text-muted-foreground">{name}</p>
-      <ChartContainer config={{ [dataKey]: { label: name } }} className="aspect-auto w-full" style={{ height: chartHeight }}>
-        <BarChart data={data} layout="vertical" accessibilityLayer title={name} desc={summary} margin={geometry.margin} barCategoryGap={6}>
-          <XAxis type="number" hide reversed={geometry.reversed} allowDecimals={dataKey === "volunteerHours"} />
+  const chart = (
+    <div data-testid="chart-country-completed">
+      <ChartContainer config={{ completed: { label: seriesName } }} className="aspect-auto w-full" style={{ height: chartHeight }}>
+        <BarChart data={data} layout="vertical" accessibilityLayer title={seriesName} desc={summary} margin={margin} barCategoryGap={6}>
+          <XAxis type="number" hide reversed={geometry.reversed} />
           <YAxis type="category" dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} width={120} orientation={geometry.categoryAxisSide} />
           <Tooltip
             cursor={CURSOR_FILL}
             isAnimationActive={false}
-            content={<BrandTooltip dir={dir} lang={lang} valueFormatter={(value, key, datum) => formatValue(key as "completed" | "volunteerHours", value, datum as ChartDatum)} />}
+            content={
+              <BrandTooltip
+                dir={dir}
+                lang={lang}
+                valueFormatter={(value, _key, datum) => (datum ? barLabel(datum as ChartDatum) : formatNumber(value, lang))}
+              />
+            }
           />
           <Bar
-            dataKey={dataKey}
-            name={name}
-            fill={color}
+            dataKey="completed"
+            name={seriesName}
+            fill={SERIES.completed}
             stroke={SURFACE}
             strokeWidth={2}
             radius={horizontalBarRadius(dir)}
@@ -123,24 +140,18 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
               <Cell key={entry.country} fillOpacity={markOpacity(entry.country, activeCountry)} />
             ))}
             <LabelList
-              dataKey={dataKey}
-              content={(props: LabelProps) => (
-                <ValueLabel
-                  value={typeof props.value === "number" || typeof props.value === "string" ? props.value : undefined}
-                  viewBox={props.viewBox as CartesianViewBox | undefined}
-                  placement="end"
-                  minSize={8}
-                  dir={dir}
-                  format={(value) => formatValue(dataKey, value)}
-                  // An hours row nobody recorded draws no bar and "—" in its place, never "0 h".
-                  fallback={dataKey === "volunteerHours" && props.index !== undefined && data[props.index]?.hoursUnknown ? UNAVAILABLE : undefined}
-                />
-              )}
+              dataKey="label"
+              content={(props: LabelProps) => {
+                const datum = typeof props.value === "string" ? byLabel.get(props.value) : undefined;
+                return datum ? (
+                  <ValueLabel value={datum.completed} viewBox={props.viewBox as CartesianViewBox | undefined} placement="end" minSize={8} dir={dir} format={() => barLabel(datum)} />
+                ) : null;
+              }}
             />
           </Bar>
         </BarChart>
       </ChartContainer>
-      {dataKey === "volunteerHours" && withoutDuration > 0 && (
+      {withoutDuration > 0 && (
         <p className="mt-1 text-caption text-muted-foreground" data-testid="chart-country-hours-caveat">
           {t("analyticsV2.tiles.withoutDuration", { count: withoutDuration })}
         </p>
@@ -162,15 +173,10 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
         {data.map((row) => (
           <tr key={row.country} className="border-t border-border">
             <th scope="row" className="py-1 text-start font-normal">
-              {/* Keyboard twin of the bar click: the same drill, toggled from the table row. */}
-              <button
-                type="button"
-                aria-pressed={activeCountry === row.country}
-                onClick={() => toggle(row.country)}
-                className="rounded-sm text-start underline-offset-4 transition-colors duration-fast hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring aria-pressed:font-medium"
-              >
+              {/* Keyboard twin of the bar click: the same drill, toggled from the table row (F-34 geometry and focus). */}
+              <RowDrillButton pressed={activeCountry === row.country} onClick={() => toggle(row.country)}>
                 {row.label}
-              </button>
+              </RowDrillButton>
             </th>
             <td className="py-1 ps-3 text-end tabular-nums">{formatNumber(row.completed, lang)}</td>
             <td className="py-1 ps-3 text-end tabular-nums">
@@ -186,8 +192,19 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
           </tr>
         ))}
       </tbody>
+      {isPhone && withoutDuration > 0 && (
+        <tfoot>
+          <tr>
+            <td colSpan={3} className="pt-2 text-caption font-normal text-muted-foreground" data-testid="chart-country-hours-caveat">
+              {t("analyticsV2.tiles.withoutDuration", { count: withoutDuration })}
+            </td>
+          </tr>
+        </tfoot>
+      )}
     </table>
   );
+
+  const isEmpty = data.length === 0;
 
   return (
     <ChartFigure
@@ -196,24 +213,17 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
       definition={t("analyticsV2.country.definition")}
       summary={summary}
       table={table}
-      tableMode={data.length === 0 ? "hidden" : "beneath"}
+      tableMode={isEmpty ? "hidden" : isPhone ? "beneath" : "toggle"}
       footer={
         <div className="mt-2">
-          <Button type="button" variant="link" size="sm" onClick={onSeeAll}>
+          <Button type="button" variant="link" size="sm" className="min-h-6" onClick={onSeeAll}>
             {t("analyticsV2.country.seeAll")}
           </Button>
         </div>
       }
       testId="chart-country-breakdown"
     >
-      {data.length === 0 ? (
-        <EmptyState icon={Globe} title={t("analyticsV2.country.empty")} titleAs="p" className="py-8" />
-      ) : (
-        <div className="flex flex-col gap-4">
-          {renderChart("completed", SERIES.completed, t("analyticsV2.country.sessions"), "chart-country-completed")}
-          {renderChart("volunteerHours", SERIES.teal, t("analyticsV2.country.hours"), "chart-country-hours")}
-        </div>
-      )}
+      {isEmpty ? <EmptyState icon={Globe} title={t("analyticsV2.country.empty")} titleAs="p" className="py-8" /> : isPhone ? null : chart}
     </ChartFigure>
   );
 }
@@ -228,10 +238,7 @@ export function CountryBreakdownSkeleton() {
         </div>
         <Skeleton className="h-9 w-28" />
       </div>
-      <div className="mt-4 space-y-4">
-        <Skeleton className="h-28 w-full" />
-        <Skeleton className="h-28 w-full" />
-      </div>
+      <Skeleton className="mt-4 h-28 w-full" />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { AlertTriangle, CalendarDays, Globe, Inbox, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
 import { bookingService, menteeService, mentorService } from "@/lib/services";
 import { formatTime } from "@/lib/format";
@@ -98,6 +99,8 @@ export default function Analytics() {
   const { user } = useAuth();
   const scope: Scope = user?.user_type === "admin" ? "admin" : user?.user_type === "mentor" ? "mentor" : "mentee";
   const isAdmin = scope === "admin";
+  // Below `md` the page is a second composition (F-11), not the desktop one stacked.
+  const isPhone = useIsPhone();
 
   const [period, setPeriod] = useState<Period>("30");
   const [compare, setCompare] = useState(true);
@@ -382,6 +385,7 @@ export default function Analytics() {
   return (
     <Container className="pb-16">
       <PageHeader
+        className="max-md:pb-4"
         title={title}
         description={t(isAdmin ? "analyticsV2.scope.admin" : "analyticsV2.scope.own")}
         actions={
@@ -398,23 +402,42 @@ export default function Analytics() {
                 defaultFrom={isoDate(window.start)}
                 defaultTo={isoDate(new Date())}
                 disabled={isLoading}
+                compact={isPhone}
               />
             )}
           </>
         }
       >
         {!nothingYet && (
-          <div className="mt-6 flex flex-col gap-4">
-            <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
-              <PeriodControl value={period} onChange={changePeriod} />
-              <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} />
-              {isAdmin && !isError && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
-              {updatedAt > 0 && !isError && (
-                <p className="ms-auto self-center text-caption text-muted-foreground" data-testid="analytics-updated">
-                  {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
-                </p>
-              )}
-            </div>
+          <div className="mt-4 flex flex-col gap-3 md:mt-6 md:gap-4">
+            {isPhone ? (
+              <>
+                {/* Phone (F-11): period + Filters on one row, compare + freshness as one caption line beneath. */}
+                <div className="flex items-center gap-2">
+                  <PeriodControl value={period} onChange={changePeriod} compact className="min-w-0 flex-1" />
+                  {isAdmin && !isError && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} compact />}
+                </div>
+                <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+                  <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} compact />
+                  {updatedAt > 0 && !isError && (
+                    <p className="ms-auto text-caption text-muted-foreground" data-testid="analytics-updated">
+                      {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
+                    </p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+                <PeriodControl value={period} onChange={changePeriod} />
+                <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} />
+                {isAdmin && !isError && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
+                {updatedAt > 0 && !isError && (
+                  <p className="ms-auto self-center text-caption text-muted-foreground" data-testid="analytics-updated">
+                    {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
+                  </p>
+                )}
+              </div>
+            )}
             {isAdmin && (
               <ActiveFilters
                 filters={activeFilters}
@@ -466,8 +489,12 @@ export default function Analytics() {
         </div>
       ) : (
         <Tabs value={activeTab} onValueChange={handleTabChange}>
+          {/* F-10: the shared scrollable TabsList — full-width equal tabs like the dashboards on md+, a
+              full-bleed horizontal scroller (never page overflow) below it, sticky under the header on phones. */}
           <TabsList
-            className="max-md:sticky max-md:top-14 max-md:z-30 max-md:bg-background [@media(max-height:520px)]:static md:w-auto md:max-w-2xl"
+            scrollable
+            className="md:pe-0"
+            wrapperClassName="-mx-4 px-4 max-md:sticky max-md:top-14 max-md:z-30 max-md:bg-background sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [@media(max-height:520px)]:static"
             data-testid="analytics-tabs"
           >
             {visibleTabs.map((tab) => (
@@ -479,7 +506,7 @@ export default function Analytics() {
           </TabsList>
 
           {/* ---------------- Overview: summary → tiles → trend → breakdowns ---------------- */}
-          <TabsContent value="overview" className="mt-6 space-y-6">
+          <TabsContent value="overview" className="mt-4 space-y-4 md:mt-6 md:space-y-6">
             {isLoading ? (
               <div role="status" aria-busy="true" className="space-y-6">
                 <span className="sr-only">{t("analyticsV2.loading")}</span>

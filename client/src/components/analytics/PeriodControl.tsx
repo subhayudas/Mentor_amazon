@@ -6,10 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PERIODS, type Period } from "@/lib/reporting";
 import { useMinWidth } from "@/hooks/useMediaQuery";
+import { cn } from "@/lib/utils";
 
 interface PeriodControlProps {
   value: Period;
   onChange: (period: Period) => void;
+  /** Phone row (F-11): the Select shares one row with the Filters button, so its label is visually hidden (the value names itself). */
+  compact?: boolean;
+  className?: string;
 }
 
 /**
@@ -18,7 +22,7 @@ interface PeriodControlProps {
  * labelled Select below `sm`, where four Arabic labels cannot sit side by
  * side. Exactly one of the two is in the DOM at a time.
  */
-export function PeriodControl({ value, onChange }: PeriodControlProps) {
+export function PeriodControl({ value, onChange, compact = false, className }: PeriodControlProps) {
   const { t } = useTranslation();
   const id = useId();
   const wide = useMinWidth(640);
@@ -26,8 +30,8 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
 
   if (!wide) {
     return (
-      <div className="flex w-full min-w-0 flex-col gap-1">
-        <Label htmlFor={id} className="text-caption text-muted-foreground">
+      <div className={cn("flex w-full min-w-0 flex-col gap-1", className)}>
+        <Label htmlFor={id} className={cn("text-caption text-muted-foreground", compact && "sr-only")}>
           {label}
         </Label>
         <Select value={value} onValueChange={(next) => onChange(next as Period)}>
@@ -54,7 +58,7 @@ export function PeriodControl({ value, onChange }: PeriodControlProps) {
         if (next) onChange(next as Period);
       }}
       aria-label={label}
-      className="inline-flex justify-start gap-1 rounded-lg bg-muted p-1"
+      className={cn("inline-flex justify-start gap-1 rounded-lg bg-muted p-1", className)}
       data-testid="select-date-range"
     >
       {PERIODS.map((period) => (
