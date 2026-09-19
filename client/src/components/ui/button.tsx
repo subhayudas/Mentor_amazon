@@ -55,8 +55,10 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
   /**
-   * In-flight state: a spinner replaces the leading icon slot, the label stays
-   * (so the width does), the button is `disabled` and `aria-busy`.
+   * In-flight state: the label (and any leading icon) is still laid out but
+   * made invisible, and a spinner sits over it in the same grid cell, so the
+   * button keeps its exact width and nothing beside it moves (do-not-regress
+   * #16). The button is `disabled` and `aria-busy`.
    * Ignored with `asChild` (the child owns its content).
    */
   loading?: boolean
@@ -77,14 +79,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     }
     return (
       <button
-        className={cn(buttonVariants({ variant, size, className }), loading && "[&>[data-slot=label]>svg:first-child]:hidden")}
+        className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
         {...props}
       >
-        {loading && <Loader2 className="animate-spin" aria-hidden="true" />}
-        {loading ? <span data-slot="label" className="contents">{children}</span> : children}
+        {loading ? (
+          <span className="grid place-items-center [&>*]:[grid-area:1/1]">
+            <span data-slot="label" className="invisible inline-flex items-center justify-center gap-2">
+              {children}
+            </span>
+            <Loader2 className="animate-spin" aria-hidden="true" />
+          </span>
+        ) : (
+          children
+        )}
       </button>
     )
   },
