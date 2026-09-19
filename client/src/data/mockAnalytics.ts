@@ -11,7 +11,6 @@
  */
 
 import type { Booking, Mentee, Mentor } from "@/lib/database";
-import { groupByCountry, volunteerHours } from "@/lib/reporting";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const NOW = new Date();
@@ -36,24 +35,25 @@ const chance = (probability: number): boolean => random() < probability;
 const daysAgo = (days: number, hour = 9): string =>
   new Date(TODAY_START.getTime() - days * DAY_MS + hour * 60 * 60 * 1000).toISOString();
 
-const MENTOR_SEED: Array<[name: string, country: string, expertise: string, languages: string[]]> = [
-  ["Ahmed Hassan", "United Arab Emirates", "Product Management", ["English", "Arabic"]],
-  ["Layla Mahmoud", "United Arab Emirates", "Engineering Leadership", ["English", "Arabic"]],
-  ["Karim Nasser", "Egypt", "Machine Learning", ["English", "Arabic"]],
-  ["Fatima Al-Rashid", "Saudi Arabia", "Digital Marketing", ["English", "Arabic"]],
-  ["Omar Khalil", "United Kingdom", "UX Design", ["English"]],
-  ["Nour Ibrahim", "United Kingdom", "Operations Management", ["English", "Arabic"]],
-  ["Youssef Fahmy", "Egypt", "Business Analysis", ["English", "Arabic", "French"]],
-  ["Sarah Mitchell", "United Kingdom", "Cloud Computing", ["English"]],
-  ["Priya Raman", "India", "Data Science", ["English"]],
-  ["Daniel Weber", "Germany", "Supply Chain", ["English", "German"]],
-  ["Hana Saleh", "Jordan", "Product Management", ["English", "Arabic"]],
-  ["Marcus Lee", "United States", "Engineering Leadership", ["English"]],
+const MENTOR_SEED: Array<[name: string, nameAr: string, country: string, expertise: string, languages: string[]]> = [
+  ["Ahmed Hassan", "أحمد حسن", "United Arab Emirates", "Product Management", ["English", "Arabic"]],
+  ["Layla Mahmoud", "ليلى محمود", "United Arab Emirates", "Engineering Leadership", ["English", "Arabic"]],
+  ["Karim Nasser", "كريم ناصر", "Egypt", "Machine Learning", ["English", "Arabic"]],
+  ["Fatima Al-Rashid", "فاطمة الراشد", "Saudi Arabia", "Digital Marketing", ["English", "Arabic"]],
+  ["Omar Khalil", "عمر خليل", "United Kingdom", "UX Design", ["English"]],
+  ["Nour Ibrahim", "نور إبراهيم", "United Kingdom", "Operations Management", ["English", "Arabic"]],
+  ["Youssef Fahmy", "يوسف فهمي", "Egypt", "Business Analysis", ["English", "Arabic", "French"]],
+  ["Sarah Mitchell", "سارة ميتشل", "United Kingdom", "Cloud Computing", ["English"]],
+  ["Priya Raman", "بريا رامان", "India", "Data Science", ["English"]],
+  ["Daniel Weber", "دانيال فيبر", "Germany", "Supply Chain", ["English", "German"]],
+  ["Hana Saleh", "هنا صالح", "Jordan", "Product Management", ["English", "Arabic"]],
+  ["Marcus Lee", "ماركوس لي", "United States", "Engineering Leadership", ["English"]],
 ];
 
-export const MOCK_MENTORS: Mentor[] = MENTOR_SEED.map(([name, country, expertise, languages], index) => ({
+export const MOCK_MENTORS: Mentor[] = MENTOR_SEED.map(([name, nameAr, country, expertise, languages], index) => ({
   id: `demo-mentor-${index + 1}`,
   name,
+  name_ar: nameAr,
   email: `${name.toLowerCase().replace(/[^a-z]+/g, ".")}@example.com`,
   company: "Amazon",
   position: expertise,
@@ -152,81 +152,3 @@ function buildBookings(count: number): Booking[] {
 }
 
 export const MOCK_BOOKINGS: Booking[] = buildBookings(160);
-
-const mentorsById = new Map(MOCK_MENTORS.map((mentor) => [mentor.id, mentor]));
-const menteesById = new Map(MOCK_MENTEES.map((mentee) => [mentee.id, mentee]));
-const hours = volunteerHours(MOCK_BOOKINGS);
-const ratings = MOCK_BOOKINGS.filter((booking) => typeof booking.mentee_rating === "number");
-
-/**
- * Aggregates derived from the entities above. Kept for convenience and for the
- * demo-only distribution pies; everything else on the page is computed live.
- */
-export const MOCK_ANALYTICS_DATA = {
-  kpis: {
-    total_bookings: MOCK_BOOKINGS.length,
-    completed_meetings: hours.completed,
-    canceled_meetings: MOCK_BOOKINGS.filter((booking) => booking.status === "canceled").length,
-    upcoming_meetings: MOCK_BOOKINGS.filter((booking) => booking.status === "confirmed").length,
-    unique_mentees: new Set(MOCK_BOOKINGS.map((booking) => booking.mentee_id)).size,
-    unique_mentors: new Set(MOCK_BOOKINGS.map((booking) => booking.mentor_id)).size,
-    volunteer_minutes: hours.minutes,
-    volunteer_hours: hours.hours,
-    sessions_without_duration: hours.withoutDuration,
-    avg_rating: ratings.length
-      ? Math.round((ratings.reduce((sum, booking) => sum + (booking.mentee_rating ?? 0), 0) / ratings.length) * 10) / 10
-      : 0,
-    total_ratings: ratings.length,
-  },
-
-  top_mentors: MOCK_MENTORS.map((mentor) => {
-    const own = MOCK_BOOKINGS.filter((booking) => booking.mentor_id === mentor.id);
-    return {
-      mentor_id: mentor.id,
-      mentor_name: mentor.name,
-      country: mentor.country,
-      booking_count: own.length,
-      completed_count: own.filter((booking) => booking.status === "completed").length,
-      expertise: mentor.expertise[0],
-    };
-  }).sort((a, b) => b.booking_count - a.booking_count),
-
-  country_breakdown: groupByCountry(MOCK_BOOKINGS, MOCK_MENTORS),
-
-  specialization_distribution: [
-    { name: "Product & Business", value: 62 },
-    { name: "Engineering & Cloud", value: 58 },
-    { name: "Data Science & ML", value: 38 },
-    { name: "Marketing & Growth", value: 35 },
-    { name: "Other", value: 27 },
-  ],
-
-  language_distribution: [
-    { name: "English", value: 160 },
-    { name: "Arabic", value: 118 },
-    { name: "French", value: 14 },
-  ],
-
-  mentee_type_distribution: [
-    { name: "Individual", value: MOCK_MENTEES.filter((mentee) => mentee.user_type === "individual").length },
-    { name: "Organization", value: MOCK_MENTEES.filter((mentee) => mentee.user_type === "organization").length },
-  ],
-
-  recent_bookings: MOCK_BOOKINGS.slice(0, 10).map((booking) => {
-    const mentor = mentorsById.get(booking.mentor_id);
-    const mentee = menteesById.get(booking.mentee_id);
-    return {
-      id: booking.id,
-      mentor_name: mentor?.name ?? "",
-      mentee_name: mentee?.name ?? "",
-      mentee_type: mentee?.user_type ?? "individual",
-      status: booking.status,
-      booked_at: booking.clicked_at ?? booking.created_at,
-      scheduled_at: booking.scheduled_at,
-      completed_at: booking.completed_at,
-      expertise: mentor?.expertise[0] ?? "",
-      session_duration_minutes: booking.session_duration_minutes,
-      country: booking.country ?? mentor?.country ?? "",
-    };
-  }),
-};

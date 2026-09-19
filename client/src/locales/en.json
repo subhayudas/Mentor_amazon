@@ -380,71 +380,15 @@
     "emailFromSession": "Taken from your signed-in account and cannot be changed here."
   },
   "analytics": {
-    "title": "Analytics Dashboard",
-    "subtitle": "Comprehensive insights into your mentorship program's performance",
-    "demoData": "Demo Data",
-    "filters": "Filters",
-    "dateRange": "Date Range",
-    "last7Days": "Last 7 days",
-    "last30Days": "Last 30 days",
-    "last90Days": "Last 90 days",
-    "allTime": "All time",
     "mentor": "Mentor",
-    "allMentors": "All Mentors",
-    "menteeType": "Mentee Type",
-    "allTypes": "All Types",
+    "allMentors": "All mentors",
+    "menteeType": "Mentee type",
+    "allTypes": "All types",
     "language": "Language",
-    "allLanguages": "All Languages",
+    "allLanguages": "All languages",
     "expertise": "Expertise",
-    "allExpertise": "All Expertise",
-    "totalBookings": "Total Bookings",
-    "scheduled": "Scheduled",
-    "completed": "Completed",
-    "canceled": "Canceled",
-    "clicked": "Clicked",
-    "bookingsOverTime": "Bookings Over Time",
-    "statusBreakdown": "Status Breakdown",
-    "topMentorPerformance": "Top Mentor Performance",
-    "recentBookings": "Recent Bookings",
-    "noDataAvailable": "No data available",
-    "noBookingData": "No booking data available for this period",
-    "noMentorData": "No mentor performance data available",
-    "noMentorGeoData": "No mentor geographic data available",
-    "noMenteeGeoData": "No mentee geographic data available",
-    "noBookingsYet": "No bookings yet",
-    "geographicDistribution": "Geographic Distribution",
-    "mentorsByCountry": "Mentors by Country",
-    "menteesByCountry": "Mentees by Country",
-    "specializationDistribution": "Specialization Distribution",
-    "languageDistribution": "Language Distribution",
-    "menteeTypeDistribution": "Mentee Type Distribution",
-    "tableHeaders": {
-      "mentor": "Mentor",
-      "mentee": "Mentee",
-      "status": "Status",
-      "clickedAt": "Clicked at",
-      "scheduledAt": "Scheduled at",
-      "bookings": "Bookings",
-      "completed": "Completed",
-      "volunteerHours": "Volunteer hours",
-      "uniqueMentors": "Unique mentors",
-      "uniqueMentees": "Unique mentees",
-      "country": "Country",
-      "duration": "Duration",
-      "avgRating": "Avg rating"
-    },
-    "chartLabels": {
-      "totalBookings": "Total Bookings",
-      "scheduled": "Scheduled",
-      "completed": "Completed",
-      "canceled": "Canceled",
-      "clicked": "Clicked",
-      "mentors": "Mentors",
-      "mentees": "Mentees",
-      "completedSessions": "Completed sessions",
-      "volunteerHours": "Volunteer hours"
-    },
-    "demoBannerTitle": "Demo data — not program metrics",
+    "allExpertise": "All expertise",
+    "demoBannerTitle": "Demo data — not programme metrics",
     "demoBannerBody": "Fewer than {{threshold}} real bookings exist ({{count}} so far), so every number and chart on this page is illustrative sample data. Real metrics replace it automatically once bookings accumulate.",
     "tabs": {
       "overview": "Overview",
@@ -456,20 +400,10 @@
     "allCountries": "All countries",
     "notSpecified": "Not specified",
     "unknown": "Unknown",
-    "volunteerHours": "Volunteer hours",
     "hoursUnit": "h",
-    "hoursShort": "{{count}} h",
-    "minutesShort": "{{count}} min",
-    "sessionsWithoutDuration": "Sessions without a recorded duration: {{count}}",
-    "byCountry": "Sessions and hours by country",
-    "noCountryData": "No country data available",
-    "showing": "Showing",
-    "clearDrill": "Clear",
-    "drillHint": "Click a bar or segment to see its bookings.",
     "noSegmentRows": "No bookings in this segment.",
     "rowCount": "Bookings: {{count}}",
     "showingRows": "Showing {{shown}} of {{total}} bookings",
-    "selectPeriod": "Select a period",
     "selectSegment": "Select a segment",
     "allSegments": "All",
     "exportView": "Export current view (CSV)",
@@ -493,7 +427,9 @@
       "durationMinutes": "Duration (minutes)",
       "country": "Country",
       "menteeRating": "Mentee rating",
-      "mentorRating": "Mentor rating"
+      "mentorRating": "Mentor rating",
+      "statusLabel": "Status (label)",
+      "menteeTypeLabel": "Mentee type (label)"
     }
   },
   "booking": {
@@ -1603,6 +1539,241 @@
     "_owner": "D"
   },
   "analyticsV2": {
-    "_owner": "C"
+    "title": {
+      "admin": "Programme analytics",
+      "own": "Your sessions"
+    },
+    "scope": {
+      "admin": "All programme sessions",
+      "own": "Sessions you are part of"
+    },
+    "updated": "Updated {{time}}",
+    "demoBadge": "Demo data",
+    "loading": "Loading analytics",
+    "period": {
+      "30": "Last 30 days",
+      "90": "Last 90 days",
+      "365": "Last 12 months",
+      "label": "Period",
+      "all": "All time",
+      "phrase": {
+        "30": "In the last 30 days",
+        "90": "In the last 90 days",
+        "365": "In the last 12 months",
+        "all": "Over all time"
+      },
+      "previous": {
+        "30": "the previous 30 days",
+        "90": "the previous 90 days",
+        "365": "the previous 12 months"
+      }
+    },
+    "compare": {
+      "label": "Compare with the previous period",
+      "unavailable": "Not available for all time. Choose a period to compare."
+    },
+    "filters": {
+      "button": "Filters",
+      "buttonCount": "Filters ({{count}})",
+      "title": "Filter sessions",
+      "clear": "Clear filters",
+      "chip": "{{filter}}: {{value}}"
+    },
+    "summary": {
+      "admin_zero": "{{period}}, {{count}} sessions were completed{{delta}}{{hours}}{{countries}}.",
+      "admin_one": "{{period}}, {{count}} session was completed{{delta}}{{hours}}{{countries}}.",
+      "admin_two": "{{period}}, {{count}} sessions were completed{{delta}}{{hours}}{{countries}}.",
+      "admin_few": "{{period}}, {{count}} sessions were completed{{delta}}{{hours}}{{countries}}.",
+      "admin_many": "{{period}}, {{count}} sessions were completed{{delta}}{{hours}}{{countries}}.",
+      "admin_other": "{{period}}, {{count}} sessions were completed{{delta}}{{hours}}{{countries}}.",
+      "adminNone": "{{period}}, no sessions were completed{{delta}}.",
+      "own_zero": "{{period}}, you took part in {{count}} completed sessions{{delta}}{{hours}}{{countries}}.",
+      "own_one": "{{period}}, you took part in {{count}} completed session{{delta}}{{hours}}{{countries}}.",
+      "own_two": "{{period}}, you took part in {{count}} completed sessions{{delta}}{{hours}}{{countries}}.",
+      "own_few": "{{period}}, you took part in {{count}} completed sessions{{delta}}{{hours}}{{countries}}.",
+      "own_many": "{{period}}, you took part in {{count}} completed sessions{{delta}}{{hours}}{{countries}}.",
+      "own_other": "{{period}}, you took part in {{count}} completed sessions{{delta}}{{hours}}{{countries}}.",
+      "ownNone": "{{period}}, you took part in no completed sessions{{delta}}.",
+      "delta": " ({{delta}} compared with {{previous}})",
+      "deltaNoChange": " (no change compared with {{previous}})",
+      "countries_one": " across {{count}} country",
+      "countries_two": " across {{count}} countries",
+      "countries_few": " across {{count}} countries",
+      "countries_many": " across {{count}} countries",
+      "countries_other": " across {{count}} countries",
+      "hoursAdmin": " for {{hours}} of volunteer time",
+      "hoursOwn": " for {{hours}} of mentoring"
+    },
+    "tiles": {
+      "requests": {
+        "title": "Requests received",
+        "definition": "Every request sent in the period, whatever happened to it afterwards."
+      },
+      "completed": {
+        "title": "Sessions completed",
+        "definition": "Sessions a mentor marked complete in the period."
+      },
+      "hours": {
+        "title": "Volunteer hours",
+        "definition": "Recorded durations of the completed sessions, added up. Sessions without a duration are listed but not counted."
+      },
+      "answerRate": {
+        "title": "Answer rate",
+        "definition": "Requests a mentor accepted or declined, as a share of the requests received in the period."
+      },
+      "delta": "{{delta}} vs {{previous}}",
+      "deltaPercent": "{{delta}} ({{percent}}) vs {{previous}}",
+      "deltaPoints": "{{delta}} pts vs {{previous}}",
+      "noChange": "No change vs {{previous}}",
+      "noRequests": "No requests in this period",
+      "withoutDuration_zero": "No sessions without a recorded duration",
+      "withoutDuration_one": "{{count}} session without a recorded duration",
+      "withoutDuration_two": "{{count}} sessions without a recorded duration",
+      "withoutDuration_few": "{{count}} sessions without a recorded duration",
+      "withoutDuration_many": "{{count}} sessions without a recorded duration",
+      "withoutDuration_other": "{{count}} sessions without a recorded duration",
+      "notRecordedCount_zero": "Not recorded",
+      "notRecordedCount_one": "Not recorded — 1 completed session has no duration",
+      "notRecordedCount_two": "Not recorded — {{count}} completed sessions have no duration",
+      "notRecordedCount_few": "Not recorded — {{count}} completed sessions have no duration",
+      "notRecordedCount_many": "Not recorded — {{count}} completed sessions have no duration",
+      "notRecordedCount_other": "Not recorded — {{count}} completed sessions have no duration"
+    },
+    "counts": {
+      "requests_zero": "{{count}} requests",
+      "requests_one": "{{count}} request",
+      "requests_two": "{{count}} requests",
+      "requests_few": "{{count}} requests",
+      "requests_many": "{{count}} requests",
+      "requests_other": "{{count}} requests",
+      "completed_zero": "{{count}} completed sessions",
+      "completed_one": "{{count}} completed session",
+      "completed_two": "{{count}} completed sessions",
+      "completed_few": "{{count}} completed sessions",
+      "completed_many": "{{count}} completed sessions",
+      "completed_other": "{{count}} completed sessions",
+      "countries_zero": "{{count}} countries",
+      "countries_one": "{{count}} country",
+      "countries_two": "{{count}} countries",
+      "countries_few": "{{count}} countries",
+      "countries_many": "{{count}} countries",
+      "countries_other": "{{count}} countries"
+    },
+    "chart": {
+      "viewTable": "View as table",
+      "hideTable": "Hide table",
+      "tableCaption": "Values behind the chart",
+      "series": "Series",
+      "meta": "{{unit}} · {{period}}"
+    },
+    "trend": {
+      "title": "Requests and completed sessions",
+      "unit": {
+        "week": "Per week",
+        "month": "Per month"
+      },
+      "definition": {
+        "week": "Requests by the week they were sent; completed sessions by the week the mentor marked them complete.",
+        "month": "Requests by the month they were sent; completed sessions by the month the mentor marked them complete."
+      },
+      "requests": "Requests",
+      "completed": "Completed sessions",
+      "weekOf": "Week of {{date}}",
+      "empty": "No sessions in this period",
+      "summary": {
+        "week": "{{period}}, weekly totals: {{requests}} and {{completed}}. Latest week: {{latestRequests}} and {{latestCompleted}}.",
+        "month": "{{period}}, monthly totals: {{requests}} and {{completed}}. Latest month: {{latestRequests}} and {{latestCompleted}}."
+      },
+      "table": {
+        "week": "Week",
+        "month": "Month",
+        "requests": "Requests",
+        "completed": "Completed sessions"
+      },
+      "axis": {
+        "count": "Count"
+      },
+      "drillLabel": "Bookings in"
+    },
+    "outcomes": {
+      "title": "Request outcomes",
+      "unit": "Requests",
+      "definition": "Current status of every request sent in the period.",
+      "summary": "{{total}}: {{list}}.",
+      "item": "{{value}} {{label}}",
+      "empty": "No requests in this period",
+      "table": {
+        "status": "Status",
+        "requests": "Requests",
+        "share": "Share"
+      }
+    },
+    "country": {
+      "title": "Sessions and hours by country",
+      "unit": "Completed sessions and volunteer hours",
+      "definition": "The country recorded on the session, else the mentor's country. Countries with the most completed sessions; the Countries tab lists every country.",
+      "sessions": "Completed sessions",
+      "hours": "Volunteer hours",
+      "empty": "No completed sessions in this period",
+      "seeAll": "All countries in a table",
+      "summary": "{{countries}}; {{top}} leads with {{sessions}} and {{hours}}.",
+      "summaryNoHours": "{{countries}}; {{top}} leads with {{sessions}} (no recorded durations, so no hours).",
+      "tabTitle": "Sessions by country",
+      "tabDefinition": "Every country with a request or a completed session in the period. Hours count recorded durations only.",
+      "table": {
+        "country": "Country",
+        "requests": "Requests",
+        "sessions": "Completed sessions",
+        "hours": "Volunteer hours",
+        "mentors": "Mentors",
+        "mentees": "Mentees"
+      }
+    },
+    "mentors": {
+      "title": "Mentors by completed sessions",
+      "definition": "Every mentor with a request or a completed session in the period. Select a mentor to list their bookings.",
+      "empty": "No mentor activity in this period",
+      "noRating": "No ratings yet",
+      "table": {
+        "mentor": "Mentor",
+        "completed": "Completed",
+        "hours": "Hours",
+        "rating": "Avg rating",
+        "pending": "Awaiting reply",
+        "requests": "Requests"
+      }
+    },
+    "bookings": {
+      "title": "Bookings in the period",
+      "definition": "Requests sent or sessions completed in the period, newest first.",
+      "empty": "No bookings in this period",
+      "table": {
+        "mentor": "Mentor",
+        "mentee": "Mentee",
+        "status": "Status",
+        "requested": "Requested",
+        "scheduled": "Scheduled",
+        "duration": "Duration",
+        "country": "Country"
+      }
+    },
+    "drill": {
+      "showing": "Showing: {{label}}",
+      "clear": "Clear"
+    },
+    "export": {
+      "rangeHelp": "Choose a start date on or before the end date."
+    },
+    "error": {
+      "title": "Unable to load analytics",
+      "body": "The data could not be fetched. Check your connection and try again."
+    },
+    "nothingYet": {
+      "menteeTitle": "No sessions yet",
+      "menteeBody": "Once you send a request, it appears here together with everything that follows it.",
+      "mentorTitle": "No requests yet",
+      "mentorBody": "Requests mentees send you appear here, with the sessions that follow.",
+      "browse": "Browse mentors"
+    }
   }
 }

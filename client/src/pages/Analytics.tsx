@@ -1,455 +1,315 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState, useMemo, useCallback, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { isRTL } from "@/lib/i18n";
-import type { Booking, Mentor, Mentee } from "@/lib/database";
-import { bookingService, mentorService, menteeService } from "@/lib/services";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Label as ChartLabel,
-} from "recharts";
-import {
-  Calendar, CheckCircle2, Clock, BarChart3, Activity, Filter, Globe, Users, AlertTriangle,
-  LayoutDashboard, CalendarDays, Timer, TrendingUp, UserRound,
-} from "lucide-react";
-import {
-  format,
-  startOfDay,
-  startOfWeek,
-  startOfMonth,
-  subDays,
-  isAfter,
-  eachDayOfInterval,
-  eachWeekOfInterval,
-  eachMonthOfInterval,
-  endOfDay,
-  parseISO,
-} from "date-fns";
-import { MOCK_BOOKINGS, MOCK_MENTORS, MOCK_MENTEES } from "@/data/mockAnalytics";
-import { toCsv, downloadCsv, csvFilename, isoDate, type CsvValue } from "@/lib/csv";
+import { AlertTriangle, CalendarDays, Globe, Inbox, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
+
+import { useAuth } from "@/context/AuthContext";
+import type { Booking, Mentee, Mentor } from "@/lib/database";
+import { bookingService, menteeService, mentorService } from "@/lib/services";
+import { formatTime } from "@/lib/format";
+import { csvFilename, downloadCsv, isoDate, toCsv, type CsvValue } from "@/lib/csv";
+import { ROUTES } from "@/lib/routes";
 import {
   NOT_SPECIFIED,
-  localizeCountry,
   bookingCountry,
+  bucketFor,
+  bucketKey,
+  completionDate,
+  countryBreakdown,
   countryOptions,
-  groupByCountry,
+  expertiseLabels,
+  inWindow,
+  localizeCountry,
+  localizeLanguage,
+  localizedName,
+  mentorPerformance,
+  outcomeCounts,
+  periodWindow,
+  previousWindow,
+  requestedAt,
+  summarize,
+  timeSeries,
   toBookingRows,
-  volunteerHours,
-  minutesToHours,
   type BookingRow,
-  type StatusGroup,
+  type Period,
 } from "@/lib/reporting";
-import {
-  ANIMATION_MS,
-  AXIS_TICK,
-  BAR_RADIUS,
-  BAR_RADIUS_HORIZONTAL,
-  BAR_RADIUS_HORIZONTAL_RTL,
-  BRAND,
-  BrandTooltip,
-  CATEGORICAL,
-  CURSOR_FILL,
-  GRID_PROPS,
-  LEGEND_STYLE,
-  STATUS_COLORS,
-  legendText,
-  segmentFill,
-} from "@/components/analytics/ChartTheme";
-import { StatTile } from "@/components/analytics/StatTile";
-import { ExportBar } from "@/components/analytics/ExportBar";
-import { DrilldownTable } from "@/components/analytics/DrilldownTable";
-import { CountryBreakdown } from "@/components/analytics/CountryBreakdown";
-import { SegmentLegend, type SegmentLegendItem } from "@/components/analytics/SegmentLegend";
+import { MOCK_BOOKINGS, MOCK_MENTEES, MOCK_MENTORS } from "@/data/mockAnalytics";
+import { bookingStatusLabel, type BookingStatus } from "@/components/StatusBadge";
+import { Container } from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { EmptyState } from "@/components/EmptyState";
+import { ActiveFilters, type ActiveFilter } from "@/components/discovery/ActiveFilters";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookingsTable } from "@/components/analytics/BookingsTable";
+import { CompareToggle } from "@/components/analytics/CompareToggle";
+import { CountryBreakdown, CountryBreakdownSkeleton } from "@/components/analytics/CountryBreakdown";
+import { CountryTable } from "@/components/analytics/CountryTable";
+import { DrilldownTable } from "@/components/analytics/DrilldownTable";
+import { ExportBar } from "@/components/analytics/ExportBar";
+import { ALL, EMPTY_FILTERS, FiltersPopover, type AnalyticsFilters, type FilterKey, type FilterOption } from "@/components/analytics/FiltersPopover";
+import { KpiTiles, KpiTilesSkeleton } from "@/components/analytics/KpiTiles";
+import { MentorTable } from "@/components/analytics/MentorTable";
+import { OutcomesBar, OutcomesBarSkeleton } from "@/components/analytics/OutcomesBar";
+import { PeriodControl } from "@/components/analytics/PeriodControl";
+import { SummarySentence, SummarySentenceSkeleton } from "@/components/analytics/SummarySentence";
+import { TrendChart, TrendChartSkeleton, type BucketSelection } from "@/components/analytics/TrendChart";
+import type { Scope } from "@/components/analytics/labels";
 
-/**
- * When a request was made. `clicked_at` is only set by the legacy direct
- * booking path; product-created requests carry `created_at` alone, so
- * filtering on clicked_at silently dropped every real booking.
- */
-function requestedAt(booking: Pick<Booking, "clicked_at" | "created_at">): string {
-  return booking.clicked_at || booking.created_at;
-}
-
-type DateRange = "7" | "30" | "90" | "all";
-type GroupBy = "day" | "week" | "month";
 type TabKey = "overview" | "countries" | "mentors" | "bookings";
 
-/** What a chart click narrows the details table to. One drill at a time, per tab. */
-type DrillKind = "status" | "date" | "mentor" | "country" | "mentorCountry" | "menteeCountry" | "menteeType";
+/** What a chart click narrows the details table to. One drill at a time. */
+type DrillKind = "bucket" | "status" | "mentor" | "country";
 interface Drill {
   kind: DrillKind;
   value: string;
   label: string;
 }
 
-interface TimeSeriesData {
-  date: string;
-  bookings: number;
-  scheduled: number;
-  completed: number;
-  canceled: number;
-}
-
-interface StatusDatum {
-  key: StatusGroup;
-  name: string;
-  value: number;
-  color: string;
-}
-
-interface MentorPerformance {
-  id: string;
-  name: string;
-  country: string;
-  bookings: number;
-  completed: number;
-  volunteerMinutes: number;
-  ratingSum: number;
-  ratingCount: number;
-}
-
-interface CountDatum {
-  name: string;
-  /** Display form of `name` (the NOT_SPECIFIED sentinel is translated). */
-  label: string;
-  value: number;
-}
-
-/** Recharts hands click handlers the mark's datum under `payload`. */
-interface PieEntry {
-  payload?: { key: string; name: string };
-}
-
+/** Below this many real bookings an admin sees the seeded demo set, always behind the banner (TESTING g1). */
 const MOCK_DATA_THRESHOLD = 5;
 const BOOKINGS_TAB_LIMIT = 100;
+const CSV_STEM = "mentorconnect-bookings";
 
-function groupingFor(dateRange: DateRange): GroupBy {
-  if (dateRange === "90") return "week";
-  if (dateRange === "all") return "month";
-  return "day";
-}
+const FILTER_LABEL_KEY: Record<FilterKey, string> = {
+  mentor: "analytics.mentor",
+  menteeType: "analytics.menteeType",
+  language: "analytics.language",
+  expertise: "analytics.expertise",
+  country: "analytics.country",
+};
 
-function bucketKey(date: Date, groupBy: GroupBy): string {
-  if (groupBy === "day") return format(startOfDay(date), "MMM d");
-  if (groupBy === "week") return format(startOfWeek(date), "MMM d");
-  return format(startOfMonth(date), "MMM yyyy");
-}
-
-function oldestClickedAt(bookings: Booking[]): Date {
-  return bookings.reduce((oldest, booking) => {
-    const bookingDate = new Date(requestedAt(booking));
-    return bookingDate < oldest ? bookingDate : oldest;
-  }, new Date());
-}
-
-function rangeStart(dateRange: DateRange, bookings: Booking[]): Date {
-  const now = new Date();
-  switch (dateRange) {
-    case "7":
-      return subDays(now, 7);
-    case "90":
-      return subDays(now, 90);
-    case "all":
-      return startOfMonth(oldestClickedAt(bookings));
-    default:
-      return subDays(now, 30);
-  }
-}
-
-function aggregateBookingsByDate(bookings: Booking[], dateRange: DateRange): TimeSeriesData[] {
-  if (bookings.length === 0) return [];
-
-  const now = new Date();
-  const groupBy = groupingFor(dateRange);
-  const startDate = rangeStart(dateRange, bookings);
-
-  const bookingsByDate: Record<string, TimeSeriesData> = {};
-  bookings.forEach((booking) => {
-    const bookingDate = new Date(requestedAt(booking));
-    if (!(isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime())) return;
-
-    const key = bucketKey(bookingDate, groupBy);
-    if (!bookingsByDate[key]) {
-      bookingsByDate[key] = { date: key, bookings: 0, scheduled: 0, completed: 0, canceled: 0 };
-    }
-    bookingsByDate[key].bookings += 1;
-    if (booking.status === "confirmed") bookingsByDate[key].scheduled += 1;
-    if (booking.status === "completed") bookingsByDate[key].completed += 1;
-    if (booking.status === "canceled") bookingsByDate[key].canceled += 1;
-  });
-
-  let intervals: Date[];
-  if (groupBy === "day") {
-    intervals = eachDayOfInterval({ start: startDate, end: now });
-  } else if (groupBy === "week") {
-    intervals = eachWeekOfInterval({ start: startDate, end: now });
-  } else {
-    intervals = eachMonthOfInterval({ start: startDate, end: now });
-  }
-
-  return intervals.map((date) => {
-    const key = bucketKey(date, groupBy);
-    return bookingsByDate[key] ?? { date: key, bookings: 0, scheduled: 0, completed: 0, canceled: 0 };
-  });
-}
-
-function rowMatchesDrill(row: BookingRow, drill: Drill, groupBy: GroupBy): boolean {
-  switch (drill.kind) {
-    case "status":
-      return row.statusGroup === drill.value;
-    case "date":
-      return Boolean(row.clickedAt) && bucketKey(new Date(row.clickedAt!), groupBy) === drill.value;
-    case "mentor":
-      return row.mentorId === drill.value;
-    case "country":
-      return row.country === drill.value;
-    case "mentorCountry":
-      return row.mentorCountry === drill.value;
-    case "menteeCountry":
-      return row.menteeCountry === drill.value;
-    case "menteeType":
-      return row.menteeType === drill.value;
-    default:
-      return false;
-  }
-}
-
+/**
+ * `/analytics` (spec §9/§9b as amended). Question first: is the programme
+ * delivering sessions, where, and is it improving? Admins read every row
+ * ("Programme analytics"); mentors and mentees read only the rows RLS lets
+ * them see, so their page is "Your sessions" in the second person with the
+ * trend and outcomes only (P1-26). Demo data appears only after a
+ * SUCCESSFUL admin fetch below the threshold; a failed fetch is an error
+ * state with retry, never demo numbers (findings C3).
+ */
 export default function Analytics() {
   const { t, i18n } = useTranslation();
-  const rtl = isRTL();
-  const [dateRange, setDateRange] = useState<DateRange>("30");
-  const [selectedMentor, setSelectedMentor] = useState<string>("all");
-  const [selectedMenteeType, setSelectedMenteeType] = useState<string>("all");
-  const [selectedLanguage, setSelectedLanguage] = useState<string>("all");
-  const [selectedExpertise, setSelectedExpertise] = useState<string>("all");
-  const [selectedCountry, setSelectedCountry] = useState<string>("all");
+  const lang = i18n.language;
+  const { user } = useAuth();
+  const scope: Scope = user?.user_type === "admin" ? "admin" : user?.user_type === "mentor" ? "mentor" : "mentee";
+  const isAdmin = scope === "admin";
+
+  const [period, setPeriod] = useState<Period>("30");
+  const [compare, setCompare] = useState(true);
+  const [filters, setFilters] = useState<AnalyticsFilters>(EMPTY_FILTERS);
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [drill, setDrill] = useState<Drill | null>(null);
+  const drillReturnRef = useRef<HTMLElement | null>(null);
 
-  // These previously used legacy "/api/*" query keys with no queryFn, so the
-  // page never received real rows and silently rendered the mock dataset.
-  const { data: bookings, isLoading: bookingsLoading } = useQuery<Booking[]>({
-    queryKey: ["analytics", "bookings"],
-    queryFn: () => bookingService.getAll(),
-  });
+  const bookingsQuery = useQuery<Booking[]>({ queryKey: ["analytics", "bookings"], queryFn: () => bookingService.getAll() });
+  const mentorsQuery = useQuery<Mentor[]>({ queryKey: ["analytics", "mentors"], queryFn: () => mentorService.getAll() });
+  const menteesQuery = useQuery<Mentee[]>({ queryKey: ["analytics", "mentees"], queryFn: () => menteeService.getAll() });
 
-  const { data: mentors, isLoading: mentorsLoading } = useQuery<Mentor[]>({
-    queryKey: ["analytics", "mentors"],
-    queryFn: () => mentorService.getAll(),
-  });
+  const isLoading = bookingsQuery.isLoading || mentorsQuery.isLoading || menteesQuery.isLoading;
+  const isError = bookingsQuery.isError || mentorsQuery.isError || menteesQuery.isError;
+  const isFetching = bookingsQuery.isFetching || mentorsQuery.isFetching || menteesQuery.isFetching;
+  const bookings = bookingsQuery.data;
+  // Freshness = the newest of the three queries (P2-16).
+  const updatedAt = Math.max(bookingsQuery.dataUpdatedAt, mentorsQuery.dataUpdatedAt, menteesQuery.dataUpdatedAt);
 
-  const { data: mentees, isLoading: menteesLoading } = useQuery<Mentee[]>({
-    queryKey: ["analytics", "mentees"],
-    queryFn: () => menteeService.getAll(),
-  });
+  const retry = () => {
+    void bookingsQuery.refetch();
+    void mentorsQuery.refetch();
+    void menteesQuery.refetch();
+  };
 
-  const isLoading = bookingsLoading || mentorsLoading || menteesLoading;
+  // Demo mode: a successful admin fetch with too few real rows to read anything from (never on error, never for a personal view).
+  const useMockData = isAdmin && !isLoading && !isError && Array.isArray(bookings) && bookings.length < MOCK_DATA_THRESHOLD;
 
-  // Mock analytics are only ever shown behind an explicit, prominent banner.
-  // Below this threshold the charts are demo data, not programme metrics.
-  const useMockData = !isLoading && (!bookings || bookings.length < MOCK_DATA_THRESHOLD);
-
-  // One pipeline for both modes: the demo entities are typed like real rows.
   const sourceBookings = useMemo<Booking[]>(() => (useMockData ? MOCK_BOOKINGS : bookings ?? []), [useMockData, bookings]);
-  const sourceMentors = useMemo<Mentor[]>(() => (useMockData ? MOCK_MENTORS : mentors ?? []), [useMockData, mentors]);
-  const sourceMentees = useMemo<Mentee[]>(() => (useMockData ? MOCK_MENTEES : mentees ?? []), [useMockData, mentees]);
+  const sourceMentors = useMemo<Mentor[]>(() => (useMockData ? MOCK_MENTORS : mentorsQuery.data ?? []), [useMockData, mentorsQuery.data]);
+  const sourceMentees = useMemo<Mentee[]>(() => (useMockData ? MOCK_MENTEES : menteesQuery.data ?? []), [useMockData, menteesQuery.data]);
 
   const mentorsById = useMemo(() => new Map(sourceMentors.map((mentor) => [mentor.id, mentor])), [sourceMentors]);
   const menteesById = useMemo(() => new Map(sourceMentees.map((mentee) => [mentee.id, mentee])), [sourceMentees]);
 
-  const notSpecifiedLabel = t("analytics.notSpecified");
-  const language = i18n.language;
   const displayCountry = useCallback(
-    (country: string) => (country === NOT_SPECIFIED ? notSpecifiedLabel : localizeCountry(country, language)),
-    [notSpecifiedLabel, language],
+    (country: string) => (country === NOT_SPECIFIED ? t("analytics.notSpecified") : localizeCountry(country, lang)),
+    [t, lang],
   );
 
-  const filterOptions = useMemo(() => {
-    const languagesSet = new Set<string>();
-    const expertisesSet = new Set<string>();
-
+  // ---- Filters (admin): the stored English value is the key, the label follows the UI language (spec §10) ----
+  const filterOptions = useMemo<Record<FilterKey, FilterOption[]>>(() => {
+    const languages = new Set<string>();
+    const expertises = new Set<string>();
     sourceMentors.forEach((mentor) => {
-      mentor.languages_spoken?.forEach((lang) => languagesSet.add(lang));
-      mentor.expertise?.forEach((exp) => expertisesSet.add(exp));
+      mentor.languages_spoken?.forEach((value) => languages.add(value));
+      mentor.expertise?.forEach((value) => expertises.add(value));
     });
-    sourceMentees.forEach((mentee) => {
-      mentee.languages_spoken?.forEach((lang) => languagesSet.add(lang));
-    });
-
+    sourceMentees.forEach((mentee) => mentee.languages_spoken?.forEach((value) => languages.add(value)));
+    const arabicExpertise = expertiseLabels(sourceMentors);
+    const expertiseLabel = (value: string) => (lang.startsWith("ar") ? arabicExpertise.get(value) ?? value : value);
     const countries = countryOptions(sourceBookings, sourceMentors);
-    const hasUnspecified = sourceBookings.some(
-      (booking) => bookingCountry(booking, mentorsById.get(booking.mentor_id)) === NOT_SPECIFIED,
-    );
-
+    const hasUnspecified = sourceBookings.some((booking) => bookingCountry(booking, mentorsById.get(booking.mentor_id)) === NOT_SPECIFIED);
+    const byLabel = (a: FilterOption, b: FilterOption) => a.label.localeCompare(b.label, lang);
     return {
-      languages: Array.from(languagesSet).sort(),
-      expertises: Array.from(expertisesSet).sort(),
-      countries: hasUnspecified ? [...countries, NOT_SPECIFIED] : countries,
+      mentor: sourceMentors.map((mentor) => ({ value: mentor.id, label: localizedName(mentor, lang) })).sort(byLabel),
+      menteeType: [
+        { value: "individual", label: t("menteeRegistration.individual") },
+        { value: "organization", label: t("menteeRegistration.organization") },
+      ],
+      language: Array.from(languages)
+        .map((value) => ({ value, label: localizeLanguage(value, lang) }))
+        .sort(byLabel),
+      expertise: Array.from(expertises)
+        .map((value) => ({ value, label: expertiseLabel(value) }))
+        .sort(byLabel),
+      country: (hasUnspecified ? [...countries, NOT_SPECIFIED] : countries).map((value) => ({ value, label: displayCountry(value) })),
     };
-  }, [sourceBookings, sourceMentors, sourceMentees, mentorsById]);
+  }, [sourceBookings, sourceMentors, sourceMentees, mentorsById, lang, t, displayCountry]);
+
+  const activeFilters = useMemo<ActiveFilter[]>(
+    () =>
+      (Object.keys(filters) as FilterKey[])
+        .filter((key) => filters[key] !== ALL)
+        .map((key) => ({
+          key,
+          label: t("analyticsV2.filters.chip", {
+            filter: t(FILTER_LABEL_KEY[key]),
+            value: filterOptions[key].find((option) => option.value === filters[key])?.label ?? filters[key],
+          }),
+        })),
+    [filters, filterOptions, t],
+  );
 
   const filteredBookings = useMemo(() => {
-    const startDate = rangeStart(dateRange, sourceBookings);
-
+    if (!isAdmin) return sourceBookings;
     return sourceBookings.filter((booking) => {
-      const bookingDate = new Date(requestedAt(booking));
-      if (!(isAfter(bookingDate, startDate) || bookingDate.getTime() === startDate.getTime())) {
-        return false;
-      }
-
-      if (selectedMentor !== "all" && booking.mentor_id !== selectedMentor) return false;
-
+      if (filters.mentor !== ALL && booking.mentor_id !== filters.mentor) return false;
       const mentee = menteesById.get(booking.mentee_id);
-      if (selectedMenteeType !== "all" && mentee?.user_type !== selectedMenteeType) return false;
-
+      if (filters.menteeType !== ALL && mentee?.user_type !== filters.menteeType) return false;
       const mentor = mentorsById.get(booking.mentor_id);
-      if (selectedLanguage !== "all") {
-        const hasLanguage =
-          mentor?.languages_spoken?.includes(selectedLanguage) ||
-          mentee?.languages_spoken?.includes(selectedLanguage);
-        if (!hasLanguage) return false;
-      }
-
-      if (selectedExpertise !== "all" && !mentor?.expertise?.includes(selectedExpertise)) {
-        return false;
-      }
-
-      if (selectedCountry !== "all" && bookingCountry(booking, mentor) !== selectedCountry) {
-        return false;
-      }
-
+      if (filters.language !== ALL && !(mentor?.languages_spoken?.includes(filters.language) || mentee?.languages_spoken?.includes(filters.language))) return false;
+      if (filters.expertise !== ALL && !mentor?.expertise?.includes(filters.expertise)) return false;
+      if (filters.country !== ALL && bookingCountry(booking, mentor) !== filters.country) return false;
       return true;
     });
-  }, [sourceBookings, mentorsById, menteesById, selectedMentor, selectedMenteeType, selectedLanguage, selectedExpertise, selectedCountry, dateRange]);
+  }, [isAdmin, sourceBookings, filters, mentorsById, menteesById]);
 
-  const rows = useMemo(
-    () =>
-      toBookingRows(filteredBookings, sourceMentors, sourceMentees).sort(
-        (a, b) => new Date(b.clickedAt ?? 0).getTime() - new Date(a.clickedAt ?? 0).getTime(),
-      ),
-    [filteredBookings, sourceMentors, sourceMentees],
+  // ---- Period windows and cohorts ---------------------------------------
+  const window = useMemo(() => periodWindow(period, sourceBookings), [period, sourceBookings]);
+  const previous = useMemo(() => previousWindow(period, window), [period, window]);
+  const bucket = bucketFor(period);
+  const compareOn = compare && previous !== null;
+
+  const requestRows = useMemo(() => filteredBookings.filter((booking) => inWindow(requestedAt(booking), window)), [filteredBookings, window]);
+  const completedRows = useMemo(() => filteredBookings.filter((booking) => inWindow(completionDate(booking), window)), [filteredBookings, window]);
+  const prevRequestRows = useMemo(() => (previous ? filteredBookings.filter((booking) => inWindow(requestedAt(booking), previous)) : []), [filteredBookings, previous]);
+  const prevCompletedRows = useMemo(() => (previous ? filteredBookings.filter((booking) => inWindow(completionDate(booking), previous)) : []), [filteredBookings, previous]);
+
+  /** Everything the period touches: requested or completed inside it (the Bookings tab and every drill). */
+  const periodBookings = useMemo(() => {
+    const ids = new Set(requestRows.map((booking) => booking.id));
+    return [...requestRows, ...completedRows.filter((booking) => !ids.has(booking.id))];
+  }, [requestRows, completedRows]);
+
+  // One summarize() call feeds the sentence and the four tiles, so they always reconcile.
+  const current = useMemo(() => summarize(requestRows, completedRows, sourceMentors), [requestRows, completedRows, sourceMentors]);
+  const previousSummary = useMemo(
+    () => (compareOn ? summarize(prevRequestRows, prevCompletedRows, sourceMentors) : null),
+    [compareOn, prevRequestRows, prevCompletedRows, sourceMentors],
+  );
+  const series = useMemo(() => timeSeries(requestRows, completedRows, window, bucket), [requestRows, completedRows, window, bucket]);
+  const outcomes = useMemo(() => outcomeCounts(requestRows), [requestRows]);
+  const countryRows = useMemo(() => countryBreakdown(requestRows, completedRows, sourceMentors), [requestRows, completedRows, sourceMentors]);
+  const mentorRows = useMemo(() => mentorPerformance(requestRows, completedRows, sourceMentors), [requestRows, completedRows, sourceMentors]);
+
+  const rows = useMemo<BookingRow[]>(
+    () => toBookingRows(periodBookings, sourceMentors, sourceMentees).sort((a, b) => new Date(b.clickedAt ?? 0).getTime() - new Date(a.clickedAt ?? 0).getTime()),
+    [periodBookings, sourceMentors, sourceMentees],
   );
 
-  const groupBy = groupingFor(dateRange);
-  const timeSeries = useMemo(() => aggregateBookingsByDate(filteredBookings, dateRange), [filteredBookings, dateRange]);
-  const hoursSummary = useMemo(() => volunteerHours(filteredBookings), [filteredBookings]);
-  const countryRows = useMemo(() => groupByCountry(filteredBookings, sourceMentors), [filteredBookings, sourceMentors]);
+  const bucketOf = useCallback(
+    (row: BookingRow) => {
+      const requested = bucketKey(new Date(row.clickedAt ?? 0), bucket);
+      const completed = row.status === "completed" ? bucketKey(new Date(row.completedAt || row.scheduledAt || row.clickedAt || 0), bucket) : null;
+      return { requested, completed };
+    },
+    [bucket],
+  );
 
-  const statusBreakdown = useMemo<StatusDatum[]>(() => {
-    const counts: Record<StatusGroup, number> = { clicked: 0, scheduled: 0, completed: 0, canceled: 0 };
+  const drillCounts = useMemo(() => {
+    const counts = new Map<string, number>();
     rows.forEach((row) => {
-      counts[row.statusGroup] += 1;
-    });
-    return (Object.keys(counts) as StatusGroup[])
-      .map((key) => ({ key, name: t(`analytics.chartLabels.${key}`), value: counts[key], color: STATUS_COLORS[key] }))
-      .filter((item) => item.value > 0);
-  }, [rows, t]);
-
-  const menteeTypeBreakdown = useMemo<Array<{ key: string; name: string; value: number; color: string }>>(() => {
-    const counts = { individual: 0, organization: 0 };
-    rows.forEach((row) => {
-      if (row.menteeType === "individual" || row.menteeType === "organization") counts[row.menteeType] += 1;
-    });
-    return [
-      { key: "individual", name: t("menteeRegistration.individual"), value: counts.individual, color: CATEGORICAL[0] },
-      { key: "organization", name: t("menteeRegistration.organization"), value: counts.organization, color: CATEGORICAL[1] },
-    ].filter((item) => item.value > 0);
-  }, [rows, t]);
-
-  const mentorPerformance = useMemo<MentorPerformance[]>(() => {
-    const byMentor = new Map<string, MentorPerformance>();
-    rows.forEach((row) => {
-      let entry = byMentor.get(row.mentorId);
-      if (!entry) {
-        entry = {
-          id: row.mentorId,
-          name: row.mentorName || t("analytics.unknown"),
-          country: row.mentorCountry,
-          bookings: 0,
-          completed: 0,
-          volunteerMinutes: 0,
-          ratingSum: 0,
-          ratingCount: 0,
-        };
-        byMentor.set(row.mentorId, entry);
-      }
-      entry.bookings += 1;
-      if (row.status === "completed") {
-        entry.completed += 1;
-        entry.volunteerMinutes += row.durationMinutes ?? 0;
-      }
-      if (typeof row.menteeRating === "number") {
-        entry.ratingSum += row.menteeRating;
-        entry.ratingCount += 1;
-      }
-    });
-    return Array.from(byMentor.values()).sort((a, b) => b.bookings - a.bookings || b.completed - a.completed);
-  }, [rows, t]);
-
-  const topMentors = useMemo(() => mentorPerformance.slice(0, 10), [mentorPerformance]);
-
-  const geographicDistribution = useMemo(() => {
-    const countBy = (items: Array<{ country?: string }>): CountDatum[] => {
-      const counts: Record<string, number> = {};
-      items.forEach((item) => {
-        const country = item.country?.trim() || NOT_SPECIFIED;
-        counts[country] = (counts[country] || 0) + 1;
+      const { requested, completed } = bucketOf(row);
+      const keys = new Set([inWindow(row.clickedAt, window) ? requested : null, completed && inWindow(row.completedAt || row.scheduledAt || row.clickedAt, window) ? completed : null]);
+      keys.forEach((key) => {
+        if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
       });
-      return Object.entries(counts)
-        .map(([name, value]) => ({ name, label: displayCountry(name), value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 7);
-    };
-    return { mentorData: countBy(sourceMentors), menteeData: countBy(sourceMentees) };
-  }, [sourceMentors, sourceMentees, displayCountry]);
+    });
+    return counts;
+  }, [rows, bucketOf, window]);
 
-  const drillRows = useMemo(() => (drill ? rows.filter((row) => rowMatchesDrill(row, drill, groupBy)) : []), [rows, drill, groupBy]);
+  const drillRows = useMemo(() => {
+    if (!drill) return [];
+    return rows.filter((row) => {
+      switch (drill.kind) {
+        case "bucket": {
+          const { requested, completed } = bucketOf(row);
+          return (inWindow(row.clickedAt, window) && requested === drill.value) || completed === drill.value;
+        }
+        case "status":
+          return row.status === drill.value && inWindow(row.clickedAt, window);
+        case "mentor":
+          return row.mentorId === drill.value;
+        case "country":
+          return row.country === drill.value;
+        default:
+          return false;
+      }
+    });
+  }, [rows, drill, bucketOf, window]);
 
-  const toggleDrill = useCallback((next: Drill) => {
-    setDrill((current) => (current && current.kind === next.kind && current.value === next.value ? null : next));
+  // ---- Drill state: one drill at a time; focus goes to the table and comes back on Clear (D7) ----
+  const openDrill = useCallback((next: Drill | null) => {
+    if (next) drillReturnRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setDrill(next);
   }, []);
-  const clearDrill = useCallback(() => setDrill(null), []);
-  const activeDrillKey = (kind: DrillKind) => (drill?.kind === kind ? drill.value : null);
+  const clearDrill = useCallback(() => {
+    setDrill(null);
+    const target = drillReturnRef.current;
+    drillReturnRef.current = null;
+    if (target && target.isConnected) target.focus();
+  }, []);
+  const activeDrill = (kind: DrillKind) => (drill?.kind === kind ? drill.value : null);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value as TabKey);
     setDrill(null);
   };
+  const changePeriod = (next: Period) => {
+    setPeriod(next);
+    setDrill(null);
+  };
+  const changeFilters = (next: AnalyticsFilters) => {
+    setFilters(next);
+    setDrill(null);
+  };
 
-  // ---- CSV export ---------------------------------------------------------
+  const selectBucket = (selection: BucketSelection | null) => (selection ? openDrill({ kind: "bucket", value: selection.key, label: selection.label }) : clearDrill());
+  const selectStatus = (key: string | null) => (key ? openDrill({ kind: "status", value: key, label: bookingStatusLabel(key as BookingStatus, t) }) : clearDrill());
+  const selectCountry = (country: string | null) => (country ? openDrill({ kind: "country", value: country, label: displayCountry(country) }) : clearDrill());
+  const selectMentor = (mentor: { id: string; label: string } | null) => (mentor ? openDrill({ kind: "mentor", value: mentor.id, label: mentor.label }) : clearDrill());
+
+  const showMentee = scope !== "mentee";
+  const showMentor = scope !== "mentor";
+  const renderDrill = (kind: DrillKind, testId: string) =>
+    drill?.kind === kind ? (
+      // A mentor drill already names the mentor in its heading; the column would repeat it on every row.
+      <DrilldownTable segmentLabel={drill.label} rows={drillRows} onClear={clearDrill} testId={testId} showMentee={showMentee} showMentor={showMentor && kind !== "mentor"} />
+    ) : null;
+
+  // ---- CSV export (admins; the file carries mentee e-mails) -----------------
   const exportRows = useCallback(
     (rowsToExport: BookingRow[], filename: string) => {
       const headers = [
@@ -468,6 +328,8 @@ export default function Analytics() {
         t("analytics.csv.country"),
         t("analytics.csv.menteeRating"),
         t("analytics.csv.mentorRating"),
+        t("analytics.csv.statusLabel"),
+        t("analytics.csv.menteeTypeLabel"),
       ];
       const data: CsvValue[][] = rowsToExport.map((row) => [
         row.id,
@@ -485,645 +347,257 @@ export default function Analytics() {
         displayCountry(row.country),
         row.menteeRating ?? "",
         row.mentorRating ?? "",
+        bookingStatusLabel(row.status, t),
+        row.menteeType === "organization" ? t("menteeRegistration.organization") : row.menteeType === "individual" ? t("menteeRegistration.individual") : "",
       ]);
-      const csv = toCsv(headers, data, { commentLines: useMockData ? ["DEMO DATA"] : [] });
-      downloadCsv(filename, csv);
+      // The "# DEMO DATA" comment line is part of the TESTING g1 file contract, so it stays English.
+      downloadCsv(filename, toCsv(headers, data, { commentLines: useMockData ? ["DEMO DATA"] : [] }));
     },
     [t, displayCountry, useMockData],
   );
 
-  const handleExportView = () => {
-    exportRows(rows, csvFilename("mentorconnect-bookings", new Date(), undefined, useMockData));
-  };
-
+  const handleExportView = () => exportRows(rows, csvFilename(CSV_STEM, new Date(), undefined, useMockData));
   const handleExportRange = (from: string, to: string) => {
-    const start = startOfDay(parseISO(from));
-    const end = endOfDay(parseISO(to));
-    const inRange = sourceBookings.filter((booking) => {
-      const clicked = new Date(requestedAt(booking));
-      return clicked >= start && clicked <= end;
-    });
-    const rangeRows = toBookingRows(inRange, sourceMentors, sourceMentees).sort(
-      (a, b) => new Date(b.clickedAt ?? 0).getTime() - new Date(a.clickedAt ?? 0).getTime(),
-    );
-    exportRows(rangeRows, csvFilename("mentorconnect-bookings", start, end, useMockData));
+    const [fy, fm, fd] = from.split("-").map(Number);
+    const [ty, tm, td] = to.split("-").map(Number);
+    const range = { start: new Date(fy, fm - 1, fd), end: new Date(ty, tm - 1, td + 1) };
+    const inRange = sourceBookings.filter((booking) => inWindow(requestedAt(booking), range));
+    const rangeRows = toBookingRows(inRange, sourceMentors, sourceMentees).sort((a, b) => new Date(b.clickedAt ?? 0).getTime() - new Date(a.clickedAt ?? 0).getTime());
+    exportRows(rangeRows, csvFilename(CSV_STEM, range.start, new Date(ty, tm - 1, td), useMockData));
   };
 
-  const exportDefaultFrom = isoDate(rangeStart(dateRange, sourceBookings));
-  const exportDefaultTo = isoDate(new Date());
+  // ---- Render -------------------------------------------------------------
+  const title = t(isAdmin ? "analyticsV2.title.admin" : "analyticsV2.title.own");
+  // A personal view with no rows at all (any period) points forward instead of showing empty frames.
+  const nothingYet = !isAdmin && !isLoading && !isError && sourceBookings.length === 0;
 
-  // ---- Chart click handlers ----------------------------------------------
-  const handleTimeSeriesClick = (state: { activeLabel?: string }) => {
-    if (state?.activeLabel) toggleDrill({ kind: "date", value: state.activeLabel, label: state.activeLabel });
-  };
-  const handleStatusClick = (entry: PieEntry) => {
-    if (entry?.payload) toggleDrill({ kind: "status", value: entry.payload.key, label: entry.payload.name });
-  };
-  const handleMenteeTypeClick = (entry: PieEntry) => {
-    if (entry?.payload) toggleDrill({ kind: "menteeType", value: entry.payload.key, label: entry.payload.name });
-  };
-  const handleMentorClick = (entry: { payload?: MentorPerformance }) => {
-    if (entry?.payload) toggleDrill({ kind: "mentor", value: entry.payload.id, label: entry.payload.name });
-  };
-  const handleMentorCountryClick = (entry: { payload?: CountDatum }) => {
-    if (entry?.payload) toggleDrill({ kind: "mentorCountry", value: entry.payload.name, label: entry.payload.label });
-  };
-  const handleMenteeCountryClick = (entry: { payload?: CountDatum }) => {
-    if (entry?.payload) toggleDrill({ kind: "menteeCountry", value: entry.payload.name, label: entry.payload.label });
-  };
-  const handleCountrySelect = (country: string | null) => {
-    setDrill(country ? { kind: "country", value: country, label: displayCountry(country) } : null);
-  };
-
-  // Keyboard-reachable twins of the chart marks.
-  const timeSeriesLegend: SegmentLegendItem[] = timeSeries.map((point) => ({ key: point.date, label: point.date, value: point.bookings, color: BRAND.navy }));
-  const statusLegend: SegmentLegendItem[] = statusBreakdown.map((item) => ({ key: item.key, label: item.name, value: item.value, color: item.color }));
-  const menteeTypeLegend: SegmentLegendItem[] = menteeTypeBreakdown.map((item) => ({ key: item.key, label: item.name, value: item.value, color: item.color }));
-  const mentorLegend: SegmentLegendItem[] = topMentors.map((item) => ({ key: item.id, label: item.name, value: item.bookings, color: BRAND.navy }));
-  const mentorCountryLegend: SegmentLegendItem[] = geographicDistribution.mentorData.map((item) => ({ key: item.name, label: item.label, value: item.value, color: BRAND.navy }));
-  const menteeCountryLegend: SegmentLegendItem[] = geographicDistribution.menteeData.map((item) => ({ key: item.name, label: item.label, value: item.value, color: BRAND.teal }));
-
-  const selectDrill = (kind: DrillKind, items: SegmentLegendItem[]) => (key: string | null) => {
-    if (!key) {
-      setDrill(null);
-      return;
-    }
-    const item = items.find((candidate) => candidate.key === key);
-    setDrill({ kind, value: key, label: item?.label ?? key });
-  };
-
-  const totalBookings = rows.length;
-  const scheduledCount = rows.filter((row) => row.status === "confirmed").length;
-  const completedCount = hoursSummary.completed;
-
-  const renderDrill = (kind: DrillKind, testId: string) =>
-    drill?.kind === kind ? (
-      <DrilldownTable segmentLabel={drill.label} rows={drillRows} onClear={clearDrill} testId={testId} />
-    ) : null;
-
-  const sectionTitle = (Icon: typeof Activity, title: string) => (
-    <div className="flex items-center gap-2">
-      <Icon className="h-4 w-4 text-primary" aria-hidden="true" />
-      <h2 className="text-base font-semibold text-[#0F1111]">{title}</h2>
-    </div>
-  );
-
-  const chartSkeleton = (height: number) => (
-    <Card className="p-6">
-      <Skeleton style={{ height }} className="w-full" />
-    </Card>
-  );
-
-  const emptyCard = (text: string) => (
-    <Card className="p-10 text-center">
-      <p className="text-sm text-muted-foreground">{text}</p>
-    </Card>
-  );
-
-  const horizontalCountryChart = (
-    data: CountDatum[],
-    color: string,
-    name: string,
-    activeKey: string | null,
-    onClick: (entry: { payload?: CountDatum }) => void,
-    testId: string,
-  ) => (
-    <Card className="p-4 md:p-6" data-testid={testId}>
-      <div className="chart-container">
-        <ResponsiveContainer width="100%" height={Math.max(200, 36 * data.length + 40)}>
-          <BarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 4, right: 16, bottom: 4, left: 4 }}
-            barCategoryGap={6}
-          >
-            <CartesianGrid {...GRID_PROPS} vertical horizontal={false} />
-            <XAxis type="number" tick={AXIS_TICK} axisLine={false} tickLine={false} allowDecimals={false} orientation={rtl ? "top" : "bottom"} reversed={rtl} />
-            <YAxis type="category" dataKey="label" tick={AXIS_TICK} axisLine={false} tickLine={false} width={120} orientation={rtl ? "right" : "left"} />
-            <Tooltip cursor={CURSOR_FILL} content={<BrandTooltip />} />
-            <Bar
-              dataKey="value"
-              name={name}
-              fill={color}
-              radius={rtl ? BAR_RADIUS_HORIZONTAL_RTL : BAR_RADIUS_HORIZONTAL}
-              maxBarSize={22}
-              cursor="pointer"
-              animationDuration={ANIMATION_MS}
-              onClick={onClick}
-            >
-              {data.map((entry) => (
-                <Cell key={entry.name} fill={segmentFill(color, entry.name, activeKey)} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    </Card>
-  );
-
-  const donutChart = (
-    data: Array<{ key: string; name: string; value: number; color: string }>,
-    activeKey: string | null,
-    onClick: (entry: PieEntry) => void,
-    testId: string,
-    total: number,
-    legend: ReactNode,
-  ) => (
-    <Card className="p-4 md:p-6" data-testid={testId}>
-      <div className="chart-container">
-        <ResponsiveContainer width="100%" height={260}>
-          <PieChart>
-            <Pie
-              data={data}
-              dataKey="value"
-              nameKey="name"
-              cx="50%"
-              cy="50%"
-              innerRadius={62}
-              outerRadius={100}
-              paddingAngle={2}
-              stroke={BRAND.surface}
-              strokeWidth={2}
-              cursor="pointer"
-              animationDuration={ANIMATION_MS}
-              onClick={onClick}
-            >
-              {data.map((entry) => (
-                <Cell key={entry.key} fill={segmentFill(entry.color, entry.key, activeKey)} />
-              ))}
-              <ChartLabel
-                value={total.toLocaleString()}
-                position="center"
-                style={{ fill: BRAND.ink, fontSize: 24, fontWeight: 700 }}
-              />
-            </Pie>
-            <Tooltip content={<BrandTooltip />} />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="mt-3">{legend}</div>
-    </Card>
-  );
+  const tabs: Array<{ key: TabKey; icon: LucideIcon; label: string; adminOnly?: boolean }> = [
+    { key: "overview", icon: LayoutDashboard, label: t("analytics.tabs.overview") },
+    { key: "countries", icon: Globe, label: t("analytics.tabs.countries"), adminOnly: true },
+    { key: "mentors", icon: Users, label: t("analytics.tabs.mentors"), adminOnly: true },
+    { key: "bookings", icon: CalendarDays, label: t("analytics.tabs.bookings") },
+  ];
+  const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   return (
-    <div className="min-h-screen pt-24 pb-12">
-      <div className="mx-auto max-w-7xl px-4 md:px-8">
-        <header className="sticky top-20 z-10 -mx-4 border-b bg-background/95 px-4 py-3 backdrop-blur md:-mx-8 md:px-8">
-          <div className="flex flex-wrap items-center gap-3">
-            <BarChart3 className="h-5 w-5 text-primary" aria-hidden="true" />
-            <h1 className="text-xl font-bold text-[#0F1111]">{t("analytics.title")}</h1>
+    <Container className="pb-16">
+      <PageHeader
+        title={title}
+        description={t(isAdmin ? "analyticsV2.scope.admin" : "analyticsV2.scope.own")}
+        actions={
+          <>
             {useMockData && (
-              <Badge variant="outline" className="text-sm" data-testid="badge-demo-data">
-                {t("analytics.demoData")}
+              <Badge tone="warning" data-testid="badge-demo-data">
+                {t("analyticsV2.demoBadge")}
               </Badge>
             )}
-            <div className="ms-auto">
+            {isAdmin && !isError && (
               <ExportBar
                 onExportView={handleExportView}
                 onExportRange={handleExportRange}
-                defaultFrom={exportDefaultFrom}
-                defaultTo={exportDefaultTo}
+                defaultFrom={isoDate(window.start)}
+                defaultTo={isoDate(new Date())}
                 disabled={isLoading}
               />
+            )}
+          </>
+        }
+      >
+        {!nothingYet && (
+          <div className="mt-6 flex flex-col gap-4">
+            <div className="flex flex-wrap items-start gap-x-6 gap-y-3">
+              <PeriodControl value={period} onChange={changePeriod} />
+              <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} />
+              {isAdmin && !isError && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
+              {updatedAt > 0 && !isError && (
+                <p className="ms-auto self-center text-caption text-muted-foreground" data-testid="analytics-updated">
+                  {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
+                </p>
+              )}
             </div>
+            {isAdmin && (
+              <ActiveFilters
+                filters={activeFilters}
+                onRemove={(key) => changeFilters({ ...filters, [key]: ALL })}
+                onClearAll={() => changeFilters(EMPTY_FILTERS)}
+              />
+            )}
           </div>
-        </header>
+        )}
+      </PageHeader>
 
-        <div className="space-y-6 pt-6">
-          {useMockData && (
-            <Alert
-              className="border-[#FF9900] bg-[#FFF5E6] text-[#0F1111]"
-              role="status"
-              data-testid="banner-demo-data"
-            >
-              <AlertTriangle className="h-5 w-5 text-[#CC7A00]" />
-              <AlertTitle className="font-semibold">{t("analytics.demoBannerTitle")}</AlertTitle>
-              <AlertDescription>
-                {t("analytics.demoBannerBody", { count: bookings?.length ?? 0, threshold: MOCK_DATA_THRESHOLD })}
-              </AlertDescription>
-            </Alert>
+      {useMockData && (
+        <Alert variant="warning" role="status" className="mb-6" data-testid="banner-demo-data">
+          <AlertTriangle aria-hidden="true" />
+          <AlertTitle>{t("analytics.demoBannerTitle")}</AlertTitle>
+          <AlertDescription>{t("analytics.demoBannerBody", { count: bookings?.length ?? 0, threshold: MOCK_DATA_THRESHOLD })}</AlertDescription>
+        </Alert>
+      )}
+
+      {nothingYet ? (
+        <div className="rounded-lg border border-border bg-card" data-testid="analytics-nothing-yet">
+          <EmptyState
+            icon={Inbox}
+            title={t(scope === "mentor" ? "analyticsV2.nothingYet.mentorTitle" : "analyticsV2.nothingYet.menteeTitle")}
+            description={t(scope === "mentor" ? "analyticsV2.nothingYet.mentorBody" : "analyticsV2.nothingYet.menteeBody")}
+            role="status"
+            action={
+              scope === "mentee" ? (
+                <Button variant="secondary" asChild>
+                  <Link href={ROUTES.mentors}>{t("analyticsV2.nothingYet.browse")}</Link>
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
+      ) : isError && !isLoading ? (
+        <div className="rounded-lg border border-border bg-card" data-testid="analytics-error">
+          <EmptyState
+            icon={AlertTriangle}
+            title={t("analyticsV2.error.title")}
+            description={t("analyticsV2.error.body")}
+            role="status"
+            action={
+              <Button type="button" variant="secondary" onClick={retry} loading={isFetching} data-testid="button-analytics-retry">
+                {t("common.tryAgain")}
+              </Button>
+            }
+          />
+        </div>
+      ) : (
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
+          <TabsList
+            className="max-md:sticky max-md:top-14 max-md:z-30 max-md:bg-background [@media(max-height:520px)]:static md:w-auto md:max-w-2xl"
+            data-testid="analytics-tabs"
+          >
+            {visibleTabs.map((tab) => (
+              <TabsTrigger key={tab.key} value={tab.key} className="px-2 sm:px-3 [&_svg]:hidden sm:[&_svg]:block" data-testid={`tab-${tab.key}`}>
+                <tab.icon aria-hidden="true" strokeWidth={1.75} />
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          {/* ---------------- Overview: summary → tiles → trend → breakdowns ---------------- */}
+          <TabsContent value="overview" className="mt-6 space-y-6">
+            {isLoading ? (
+              <div role="status" aria-busy="true" className="space-y-6">
+                <span className="sr-only">{t("analyticsV2.loading")}</span>
+                <SummarySentenceSkeleton />
+                {isAdmin && <KpiTilesSkeleton />}
+                <TrendChartSkeleton />
+                <div className={isAdmin ? "grid grid-cols-1 items-start gap-6 lg:grid-cols-2" : ""}>
+                  <OutcomesBarSkeleton />
+                  {isAdmin && <CountryBreakdownSkeleton />}
+                </div>
+              </div>
+            ) : (
+              <>
+                <SummarySentence scope={scope} period={period} current={current} previous={previousSummary} />
+                {/* Tiles are the admin's decision numbers; a personal view keeps the sentence, the trend and the outcomes only (P1-26). */}
+                {isAdmin && <KpiTiles current={current} previous={previousSummary} period={period} />}
+                <div className="space-y-3">
+                  <TrendChart series={series} bucket={bucket} period={period} drillCounts={drillCounts} activeKey={activeDrill("bucket")} onSelect={selectBucket} />
+                  {renderDrill("bucket", "drilldown-date")}
+                </div>
+                <div className={isAdmin ? "grid grid-cols-1 items-start gap-6 lg:grid-cols-2" : ""}>
+                  <OutcomesBar counts={outcomes} period={period} activeKey={activeDrill("status")} onSelect={selectStatus} />
+                  {isAdmin && (
+                    <CountryBreakdown
+                      rows={countryRows}
+                      period={period}
+                      activeCountry={activeDrill("country")}
+                      onSelect={selectCountry}
+                      onSeeAll={() => handleTabChange("countries")}
+                    />
+                  )}
+                </div>
+                {renderDrill("status", "drilldown-status")}
+                {renderDrill("country", "drilldown-country")}
+              </>
+            )}
+          </TabsContent>
+
+          {/* ---------------- Countries (admin) ---------------- */}
+          {isAdmin && (
+            <TabsContent value="countries" className="mt-6 space-y-3">
+              {isLoading ? (
+                <TableSkeleton label={t("analyticsV2.loading")} />
+              ) : (
+                <>
+                  <CountryTable rows={countryRows} activeCountry={activeDrill("country")} onSelect={selectCountry} />
+                  {renderDrill("country", "drilldown-country")}
+                </>
+              )}
+            </TabsContent>
           )}
 
-          <Card className="p-4">
-            <div className="mb-3 flex items-center gap-2">
-              <Filter className="h-4 w-4 text-primary" aria-hidden="true" />
-              <h2 className="text-sm font-semibold">{t("analytics.filters")}</h2>
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
-              <div className="space-y-1">
-                <label htmlFor="filter-date-range" className="text-xs font-medium">{t("analytics.dateRange")}</label>
-                <Select value={dateRange} onValueChange={(value) => { setDateRange(value as DateRange); setDrill(null); }}>
-                  <SelectTrigger id="filter-date-range" data-testid="select-date-range">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7">{t("analytics.last7Days")}</SelectItem>
-                    <SelectItem value="30">{t("analytics.last30Days")}</SelectItem>
-                    <SelectItem value="90">{t("analytics.last90Days")}</SelectItem>
-                    <SelectItem value="all">{t("analytics.allTime")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="filter-mentor" className="text-xs font-medium">{t("analytics.mentor")}</label>
-                <Select value={selectedMentor} onValueChange={setSelectedMentor}>
-                  <SelectTrigger id="filter-mentor" data-testid="select-mentor">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("analytics.allMentors")}</SelectItem>
-                    {sourceMentors.map((mentor) => (
-                      <SelectItem key={mentor.id} value={mentor.id}>
-                        {mentor.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="filter-mentee-type" className="text-xs font-medium">{t("analytics.menteeType")}</label>
-                <Select value={selectedMenteeType} onValueChange={setSelectedMenteeType}>
-                  <SelectTrigger id="filter-mentee-type" data-testid="select-mentee-type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("analytics.allTypes")}</SelectItem>
-                    <SelectItem value="individual">{t("menteeRegistration.individual")}</SelectItem>
-                    <SelectItem value="organization">{t("menteeRegistration.organization")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="filter-language" className="text-xs font-medium">{t("analytics.language")}</label>
-                <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
-                  <SelectTrigger id="filter-language" data-testid="select-language">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("analytics.allLanguages")}</SelectItem>
-                    {filterOptions.languages.map((lang) => (
-                      <SelectItem key={lang} value={lang}>
-                        {lang}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="filter-expertise" className="text-xs font-medium">{t("analytics.expertise")}</label>
-                <Select value={selectedExpertise} onValueChange={setSelectedExpertise}>
-                  <SelectTrigger id="filter-expertise" data-testid="select-expertise">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("analytics.allExpertise")}</SelectItem>
-                    {filterOptions.expertises.map((exp) => (
-                      <SelectItem key={exp} value={exp}>
-                        {exp}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <label htmlFor="filter-country" className="text-xs font-medium">{t("analytics.country")}</label>
-                <Select value={selectedCountry} onValueChange={setSelectedCountry}>
-                  <SelectTrigger id="filter-country" data-testid="select-country">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">{t("analytics.allCountries")}</SelectItem>
-                    {filterOptions.countries.map((country) => (
-                      <SelectItem key={country} value={country}>
-                        {displayCountry(country)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Card>
-
-          {/* Radix defaults the root to dir="ltr" unless told otherwise, which would flip the tab bodies back to LTR in Arabic. */}
-          <Tabs value={activeTab} onValueChange={handleTabChange} dir={rtl ? "rtl" : "ltr"}>
-            <TabsList className="grid h-auto w-full max-w-2xl grid-cols-2 gap-1 p-1 sm:grid-cols-4" data-testid="analytics-tabs">
-              <TabsTrigger value="overview" className="min-w-0 gap-2 px-2 py-2 sm:px-3" data-testid="tab-overview">
-                <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
-                {t("analytics.tabs.overview")}
-              </TabsTrigger>
-              <TabsTrigger value="countries" className="min-w-0 gap-2 px-2 py-2 sm:px-3" data-testid="tab-countries">
-                <Globe className="h-4 w-4" aria-hidden="true" />
-                {t("analytics.tabs.countries")}
-              </TabsTrigger>
-              <TabsTrigger value="mentors" className="min-w-0 gap-2 px-2 py-2 sm:px-3" data-testid="tab-mentors">
-                <Users className="h-4 w-4" aria-hidden="true" />
-                {t("analytics.tabs.mentors")}
-              </TabsTrigger>
-              <TabsTrigger value="bookings" className="min-w-0 gap-2 px-2 py-2 sm:px-3" data-testid="tab-bookings">
-                <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                {t("analytics.tabs.bookings")}
-              </TabsTrigger>
-            </TabsList>
-
-            {/* ---------------- Overview ---------------- */}
-            <TabsContent value="overview" className="mt-6 space-y-6">
+          {/* ---------------- Mentors (admin): the ranked table ---------------- */}
+          {isAdmin && (
+            <TabsContent value="mentors" className="mt-6 space-y-3">
               {isLoading ? (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <Card key={i} className="p-4">
-                      <Skeleton className="h-16 w-full" />
-                    </Card>
-                  ))}
-                </div>
+                <TableSkeleton label={t("analyticsV2.loading")} />
               ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <StatTile title={t("analytics.totalBookings")} value={totalBookings} icon={Calendar} testId="metric-total-bookings" />
-                  <StatTile title={t("analytics.scheduled")} value={scheduledCount} icon={Clock} testId="metric-scheduled" />
-                  <StatTile title={t("analytics.completed")} value={completedCount} icon={CheckCircle2} testId="metric-completed" />
-                  <StatTile
-                    title={t("analytics.volunteerHours")}
-                    value={hoursSummary.hours.toFixed(1)}
-                    unit={t("analytics.hoursUnit")}
-                    icon={Timer}
-                    secondary={t("analytics.sessionsWithoutDuration", { count: hoursSummary.withoutDuration })}
-                    testId="metric-volunteer-hours"
-                  />
-                </div>
+                <>
+                  <MentorTable rows={mentorRows} activeMentor={activeDrill("mentor")} onSelect={selectMentor} />
+                  {renderDrill("mentor", "drilldown-mentor")}
+                </>
               )}
-
-              <section className="space-y-3">
-                {sectionTitle(Activity, t("analytics.bookingsOverTime"))}
-                {isLoading ? (
-                  chartSkeleton(300)
-                ) : timeSeries.length > 0 ? (
-                  <>
-                    <Card className="p-4 md:p-6" data-testid="chart-bookings-over-time">
-                      <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={300}>
-                          <LineChart data={timeSeries} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} onClick={handleTimeSeriesClick} style={{ cursor: "pointer" }}>
-                            <CartesianGrid {...GRID_PROPS} />
-                            <XAxis dataKey="date" tick={AXIS_TICK} axisLine={false} tickLine={false} minTickGap={16} />
-                            <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} allowDecimals={false} width={32} orientation={rtl ? "right" : "left"} />
-                            <Tooltip content={<BrandTooltip />} cursor={{ stroke: BRAND.border }} />
-                            <Legend iconType="circle" wrapperStyle={LEGEND_STYLE} formatter={legendText} />
-                            <Line type="linear" dataKey="bookings" stroke={BRAND.navy} strokeWidth={2} dot={false} activeDot={{ r: 6 }} animationDuration={ANIMATION_MS} name={t("analytics.chartLabels.totalBookings")} />
-                            <Line type="linear" dataKey="scheduled" stroke={BRAND.teal} strokeWidth={2} dot={false} activeDot={{ r: 5 }} animationDuration={ANIMATION_MS} name={t("analytics.chartLabels.scheduled")} />
-                            <Line type="linear" dataKey="completed" stroke={BRAND.orange} strokeWidth={2} dot={false} activeDot={{ r: 5 }} animationDuration={ANIMATION_MS} name={t("analytics.chartLabels.completed")} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="mt-3">
-                        <SegmentLegend
-                          items={timeSeriesLegend}
-                          activeKey={activeDrillKey("date")}
-                          onSelect={selectDrill("date", timeSeriesLegend)}
-                          label={t("analytics.selectPeriod")}
-                          testId="legend-time-series"
-                        />
-                      </div>
-                    </Card>
-                    {renderDrill("date", "drilldown-date")}
-                  </>
-                ) : (
-                  emptyCard(t("analytics.noBookingData"))
-                )}
-              </section>
-
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <section className="space-y-3">
-                  {sectionTitle(TrendingUp, t("analytics.statusBreakdown"))}
-                  {isLoading ? (
-                    chartSkeleton(260)
-                  ) : statusBreakdown.length > 0 ? (
-                    <>
-                      {donutChart(
-                        statusBreakdown,
-                        activeDrillKey("status"),
-                        handleStatusClick,
-                        "chart-status-breakdown",
-                        totalBookings,
-                        <SegmentLegend
-                          items={statusLegend}
-                          activeKey={activeDrillKey("status")}
-                          onSelect={selectDrill("status", statusLegend)}
-                          label={t("analytics.statusBreakdown")}
-                          testId="legend-status"
-                        />,
-                      )}
-                      {renderDrill("status", "drilldown-status")}
-                    </>
-                  ) : (
-                    emptyCard(t("analytics.noDataAvailable"))
-                  )}
-                </section>
-
-                <section className="space-y-3">
-                  {sectionTitle(UserRound, t("analytics.menteeTypeDistribution"))}
-                  {isLoading ? (
-                    chartSkeleton(260)
-                  ) : menteeTypeBreakdown.length > 0 ? (
-                    <>
-                      {donutChart(
-                        menteeTypeBreakdown,
-                        activeDrillKey("menteeType"),
-                        handleMenteeTypeClick,
-                        "chart-mentee-type-distribution",
-                        menteeTypeBreakdown.reduce((sum, item) => sum + item.value, 0),
-                        <SegmentLegend
-                          items={menteeTypeLegend}
-                          activeKey={activeDrillKey("menteeType")}
-                          onSelect={selectDrill("menteeType", menteeTypeLegend)}
-                          label={t("analytics.menteeTypeDistribution")}
-                          testId="legend-mentee-type"
-                        />,
-                      )}
-                      {renderDrill("menteeType", "drilldown-mentee-type")}
-                    </>
-                  ) : (
-                    emptyCard(t("analytics.noDataAvailable"))
-                  )}
-                </section>
-              </div>
             </TabsContent>
+          )}
 
-            {/* ---------------- Countries ---------------- */}
-            <TabsContent value="countries" className="mt-6 space-y-6">
-              <section className="space-y-3">
-                {sectionTitle(Globe, t("analytics.byCountry"))}
-                <CountryBreakdown
-                  rows={countryRows}
-                  activeCountry={activeDrillKey("country")}
-                  onSelect={handleCountrySelect}
-                  isLoading={isLoading}
-                />
-                {renderDrill("country", "drilldown-country")}
-              </section>
-
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <section className="space-y-3">
-                  {sectionTitle(Users, t("analytics.mentorsByCountry"))}
-                  {isLoading ? (
-                    chartSkeleton(240)
-                  ) : geographicDistribution.mentorData.length > 0 ? (
-                    <>
-                      {horizontalCountryChart(geographicDistribution.mentorData, BRAND.navy, t("analytics.chartLabels.mentors"), activeDrillKey("mentorCountry"), handleMentorCountryClick, "chart-mentors-by-country")}
-                      <SegmentLegend
-                        items={mentorCountryLegend}
-                        activeKey={activeDrillKey("mentorCountry")}
-                        onSelect={selectDrill("mentorCountry", mentorCountryLegend)}
-                        label={t("analytics.mentorsByCountry")}
-                        testId="legend-mentor-country"
-                      />
-                      {renderDrill("mentorCountry", "drilldown-mentor-country")}
-                    </>
-                  ) : (
-                    emptyCard(t("analytics.noMentorGeoData"))
-                  )}
-                </section>
-
-                <section className="space-y-3">
-                  {sectionTitle(UserRound, t("analytics.menteesByCountry"))}
-                  {isLoading ? (
-                    chartSkeleton(240)
-                  ) : geographicDistribution.menteeData.length > 0 ? (
-                    <>
-                      {horizontalCountryChart(geographicDistribution.menteeData, BRAND.teal, t("analytics.chartLabels.mentees"), activeDrillKey("menteeCountry"), handleMenteeCountryClick, "chart-mentees-by-country")}
-                      <SegmentLegend
-                        items={menteeCountryLegend}
-                        activeKey={activeDrillKey("menteeCountry")}
-                        onSelect={selectDrill("menteeCountry", menteeCountryLegend)}
-                        label={t("analytics.menteesByCountry")}
-                        testId="legend-mentee-country"
-                      />
-                      {renderDrill("menteeCountry", "drilldown-mentee-country")}
-                    </>
-                  ) : (
-                    emptyCard(t("analytics.noMenteeGeoData"))
-                  )}
-                </section>
-              </div>
-            </TabsContent>
-
-            {/* ---------------- Mentors ---------------- */}
-            <TabsContent value="mentors" className="mt-6 space-y-6">
-              <section className="space-y-3">
-                {sectionTitle(BarChart3, t("analytics.topMentorPerformance"))}
-                {isLoading ? (
-                  chartSkeleton(340)
-                ) : topMentors.length > 0 ? (
-                  <>
-                    <Card className="p-4 md:p-6" data-testid="chart-mentor-performance">
-                      <div className="chart-container">
-                        <ResponsiveContainer width="100%" height={340}>
-                          <BarChart data={topMentors} margin={{ top: 8, right: 16, bottom: 0, left: 0 }} barGap={2} barCategoryGap="24%">
-                            <CartesianGrid {...GRID_PROPS} />
-                            <XAxis dataKey="name" tick={AXIS_TICK} axisLine={false} tickLine={false} interval={0} angle={-30} textAnchor="end" height={80} />
-                            <YAxis tick={AXIS_TICK} axisLine={false} tickLine={false} allowDecimals={false} width={32} orientation={rtl ? "right" : "left"} />
-                            <Tooltip cursor={CURSOR_FILL} content={<BrandTooltip />} />
-                            <Legend iconType="circle" wrapperStyle={LEGEND_STYLE} formatter={legendText} />
-                            <Bar dataKey="bookings" name={t("analytics.chartLabels.totalBookings")} fill={BRAND.navy} radius={BAR_RADIUS} maxBarSize={28} cursor="pointer" animationDuration={ANIMATION_MS} onClick={handleMentorClick}>
-                              {topMentors.map((entry) => (
-                                <Cell key={entry.id} fill={segmentFill(BRAND.navy, entry.id, activeDrillKey("mentor"))} />
-                              ))}
-                            </Bar>
-                            <Bar dataKey="completed" name={t("analytics.chartLabels.completed")} fill={BRAND.orange} radius={BAR_RADIUS} maxBarSize={28} cursor="pointer" animationDuration={ANIMATION_MS} onClick={handleMentorClick}>
-                              {topMentors.map((entry) => (
-                                <Cell key={entry.id} fill={segmentFill(BRAND.orange, entry.id, activeDrillKey("mentor"))} />
-                              ))}
-                            </Bar>
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="mt-3">
-                        <SegmentLegend
-                          items={mentorLegend}
-                          activeKey={activeDrillKey("mentor")}
-                          onSelect={selectDrill("mentor", mentorLegend)}
-                          label={t("analytics.topMentorPerformance")}
-                          testId="legend-mentor"
-                        />
-                      </div>
-                    </Card>
-                    {renderDrill("mentor", "drilldown-mentor")}
-                  </>
-                ) : (
-                  emptyCard(t("analytics.noMentorData"))
-                )}
-              </section>
-
-              {!isLoading && mentorPerformance.length > 0 && (
-                <Card className="overflow-hidden" data-testid="table-mentor-performance">
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t("analytics.tableHeaders.mentor")}</TableHead>
-                          <TableHead>{t("analytics.tableHeaders.country")}</TableHead>
-                          <TableHead className="text-end">{t("analytics.tableHeaders.bookings")}</TableHead>
-                          <TableHead className="text-end">{t("analytics.tableHeaders.completed")}</TableHead>
-                          <TableHead className="text-end">{t("analytics.tableHeaders.volunteerHours")}</TableHead>
-                          <TableHead className="text-end">{t("analytics.tableHeaders.avgRating")}</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {mentorPerformance.map((mentor) => {
-                          const active = activeDrillKey("mentor") === mentor.id;
-                          return (
-                            <TableRow
-                              key={mentor.id}
-                              className={active ? "bg-[#FFF5E6] hover:bg-[#FFF5E6]" : undefined}
-                              data-state={active ? "selected" : undefined}
-                              data-testid={`row-mentor-${mentor.id}`}
-                            >
-                              <TableCell className="whitespace-nowrap font-medium">
-                                <button
-                                  type="button"
-                                  aria-pressed={active}
-                                  onClick={() => toggleDrill({ kind: "mentor", value: mentor.id, label: mentor.name })}
-                                  className="rounded-sm text-start text-[#0F1111] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                                >
-                                  {mentor.name}
-                                </button>
-                              </TableCell>
-                              <TableCell className="text-muted-foreground">{displayCountry(mentor.country)}</TableCell>
-                              <TableCell className="text-end tabular-nums">{mentor.bookings}</TableCell>
-                              <TableCell className="text-end tabular-nums">{mentor.completed}</TableCell>
-                              <TableCell className="text-end tabular-nums">{minutesToHours(mentor.volunteerMinutes).toFixed(1)}</TableCell>
-                              <TableCell className="text-end tabular-nums">
-                                {mentor.ratingCount > 0 ? (mentor.ratingSum / mentor.ratingCount).toFixed(1) : "-"}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+          {/* ---------------- Bookings ---------------- */}
+          <TabsContent value="bookings" className="mt-6">
+            {isLoading ? (
+              <TableSkeleton label={t("analyticsV2.loading")} />
+            ) : (
+              <section className="overflow-hidden rounded-lg border border-border bg-card" data-testid="table-bookings" aria-labelledby="bookings-table-title">
+                <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border px-4 py-3">
+                  <div>
+                    <h2 id="bookings-table-title" className="text-h3 text-foreground">{t("analyticsV2.bookings.title")}</h2>
+                    <p className="mt-0.5 text-caption text-muted-foreground text-pretty">{t("analyticsV2.bookings.definition")}</p>
                   </div>
-                </Card>
-              )}
-            </TabsContent>
-
-            {/* ---------------- Bookings ---------------- */}
-            <TabsContent value="bookings" className="mt-6 space-y-3">
-              {isLoading ? (
-                chartSkeleton(360)
-              ) : (
-                <Card className="overflow-hidden" data-testid="table-bookings">
-                  <div className="flex flex-wrap items-center gap-2 border-b px-4 py-2 text-xs text-muted-foreground tabular-nums">
+                  <p className="text-caption text-muted-foreground tabular-nums">
                     {rows.length > BOOKINGS_TAB_LIMIT
                       ? t("analytics.showingRows", { shown: BOOKINGS_TAB_LIMIT, total: rows.length })
                       : t("analytics.rowCount", { count: rows.length })}
-                  </div>
-                  <BookingsTable rows={rows} limit={BOOKINGS_TAB_LIMIT} emptyText={t("analytics.noBookingsYet")} testId="bookings-table" />
-                </Card>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
+                  </p>
+                </div>
+                <BookingsTable
+                  rows={rows}
+                  limit={BOOKINGS_TAB_LIMIT}
+                  emptyText={t("analyticsV2.bookings.empty")}
+                  testId="bookings-table"
+                  showMentee={showMentee}
+                  showMentor={showMentor}
+                />
+              </section>
+            )}
+          </TabsContent>
+        </Tabs>
+      )}
+    </Container>
+  );
+}
+
+/** Header row plus eight table rows — the final geometry of the dense tables. */
+function TableSkeleton({ label }: { label: string }) {
+  return (
+    <div role="status" aria-busy="true" className="overflow-hidden rounded-lg border border-border bg-card">
+      <span className="sr-only">{label}</span>
+      <div className="border-b border-border px-4 py-3">
+        <Skeleton className="h-6 w-56" />
+        <Skeleton className="mt-2 h-4 w-80 max-w-full" />
+      </div>
+      <div className="divide-y divide-border">
+        {Array.from({ length: 8 }, (_, i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="ms-auto h-4 w-12" />
+            <Skeleton className="h-4 w-12" />
+          </div>
+        ))}
       </div>
     </div>
   );
