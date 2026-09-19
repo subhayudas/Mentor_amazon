@@ -5,9 +5,9 @@ import { type Delta, type Period } from "@/lib/reporting";
 
 export type Scope = "admin" | "mentor" | "mentee";
 
-/** "the previous 30 days" for the tile deltas and the summary sentence; null for all time. */
-export function previousPhrase(period: Period, t: TFunction): string | null {
-  return period === "all" ? null : t(`analyticsV2.period.previous.${period}`);
+/** "the previous 30 days" for the tile deltas and the summary sentence (`short`: "prev. 30 days" for phone tiles); null for all time. */
+export function previousPhrase(period: Period, t: TFunction, short = false): string | null {
+  return period === "all" ? null : t(`analyticsV2.period.${short ? "previousShort" : "previous"}.${period}`);
 }
 
 /** "In the last 30 days" / "Over all time". */

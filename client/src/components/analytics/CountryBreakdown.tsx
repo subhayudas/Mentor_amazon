@@ -12,7 +12,7 @@ import { useDirection } from "@/hooks/useDirection";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { UNAVAILABLE, formatHours, formatNumber } from "@/lib/format";
 import { NOT_SPECIFIED, localizeCountry, type CountryBreakdownRow, type Period } from "@/lib/reporting";
-import { AXIS_TICK, BrandTooltip, CURSOR_FILL, HORIZONTAL_CHART, SERIES, SURFACE, ValueLabel, horizontalBarRadius, markOpacity } from "./ChartTheme";
+import { AXIS_TICK, BrandTooltip, CURSOR_FILL, HORIZONTAL_CHART, MUTED_INK, SERIES, SURFACE, ValueLabel, horizontalBarRadius, markOpacity } from "./ChartTheme";
 import { ChartFigure } from "./ChartFigure";
 import { RowDrillButton } from "./RowDrillButton";
 
@@ -38,6 +38,35 @@ interface ChartDatum {
   withoutDuration: number;
   /** Completed sessions exist but none carries a duration: hours are unknown, not zero (spec §9 real zero vs "—"). */
   hoursUnknown: boolean;
+}
+
+let measureContext: CanvasRenderingContext2D | null | undefined;
+/** Width of an axis label in the tick font (12px page font); a character estimate when canvas is unavailable. */
+function measureLabel(label: string): number {
+  if (measureContext === undefined) {
+    try {
+      measureContext = document.createElement("canvas").getContext("2d");
+      if (measureContext) measureContext.font = `${AXIS_TICK.fontSize}px ${getComputedStyle(document.body).fontFamily}`;
+    } catch {
+      measureContext = null;
+    }
+  }
+  return measureContext ? measureContext.measureText(label).width : label.length * 7;
+}
+
+/**
+ * One-line category tick: recharts' default tick wraps a label onto a second
+ * 12px line whenever its cached text measurement (taken before the web font
+ * loaded) exceeds the axis width, which is how "United Arab / Emirates" sat
+ * beside a 20px bar (N-05). The axis is sized to the longest label, so the
+ * label always fits on one line.
+ */
+function SingleLineTick({ x, y, payload, textAnchor }: { x?: number; y?: number; payload?: { value?: string }; textAnchor?: string }) {
+  return (
+    <text x={x} y={y} dy={4} textAnchor={textAnchor} fill={MUTED_INK} fontSize={AXIS_TICK.fontSize}>
+      {payload?.value}
+    </text>
+  );
 }
 
 /**
@@ -106,13 +135,16 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
   // Room for the combined label on the value side (the shared geometry reserves 48px for a bare number).
   const margin = { ...geometry.margin, [dir === "rtl" ? "left" : "right"]: 104 };
   const seriesName = t("analyticsV2.country.sessions");
+  // The category axis is sized to the longest country name so no label wraps
+  // to two 12px lines beside a 20px bar ("United Arab / Emirates", N-05).
+  const axisWidth = useMemo(() => Math.min(184, Math.max(96, Math.ceil(Math.max(0, ...data.map((row) => measureLabel(row.label)))) + 12)), [data]);
 
   const chart = (
     <div data-testid="chart-country-completed">
       <ChartContainer config={{ completed: { label: seriesName } }} className="aspect-auto w-full" style={{ height: chartHeight }}>
         <BarChart data={data} layout="vertical" accessibilityLayer title={seriesName} desc={summary} margin={margin} barCategoryGap={6}>
           <XAxis type="number" hide reversed={geometry.reversed} />
-          <YAxis type="category" dataKey="label" tick={AXIS_TICK} tickLine={false} axisLine={false} width={120} orientation={geometry.categoryAxisSide} />
+          <YAxis type="category" dataKey="label" tick={<SingleLineTick />} tickLine={false} axisLine={false} width={axisWidth} orientation={geometry.categoryAxisSide} />
           <Tooltip
             cursor={CURSOR_FILL}
             isAnimationActive={false}
@@ -211,6 +243,8 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
       title={t("analyticsV2.country.title")}
       meta={t("analyticsV2.chart.meta", { unit: t("analyticsV2.country.unit"), period: t(`analyticsV2.period.${period}`) })}
       definition={t("analyticsV2.country.definition")}
+      // Phones: the table IS the figure, so the definition is its caption underneath, not a paragraph above a one-row table (N-06).
+      definitionPlacement={isPhone && !isEmpty ? "below" : "above"}
       summary={summary}
       table={table}
       tableMode={isEmpty ? "hidden" : isPhone ? "beneath" : "toggle"}

@@ -8,6 +8,7 @@ import { bookingStatusLabel, type BookingStatus } from "@/components/StatusBadge
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartContainer } from "@/components/ui/chart";
 import { useDirection } from "@/hooks/useDirection";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { formatNumber } from "@/lib/format";
 import { OUTCOME_ORDER, formatList, type Period } from "@/lib/reporting";
 import { BrandTooltip, HORIZONTAL_CHART, OUTCOME_FILL, SURFACE, ValueLabel, markOpacity } from "./ChartTheme";
@@ -33,6 +34,9 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { dir } = useDirection();
+  // Phones (N-06): the legend is a compact two-column list and in-bar counts
+  // survive on narrower segments (a one-request segment is ~36px at 390px).
+  const isPhone = useIsPhone();
 
   const total = OUTCOME_ORDER.reduce((sum, status) => sum + counts[status], 0);
   const labels = useMemo(() => Object.fromEntries(OUTCOME_ORDER.map((status) => [status, bookingStatusLabel(status, t)])) as Record<BookingStatus, string>, [t]);
@@ -92,7 +96,7 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
       table={table}
       legend={
         total > 0 ? (
-          <SegmentLegend items={legendItems} activeKey={activeKey} onSelect={onSelect} label={t("analyticsV2.outcomes.title")} testId="legend-status" />
+          <SegmentLegend items={legendItems} activeKey={activeKey} onSelect={onSelect} label={t("analyticsV2.outcomes.title")} testId="legend-status" variant={isPhone ? "list" : "chips"} />
         ) : undefined
       }
       testId="chart-status-breakdown"
@@ -128,7 +132,7 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
                 cursor="pointer"
                 onClick={() => onSelect(activeKey === status ? null : status)}
               >
-                <LabelList dataKey={status} content={<ValueLabel placement="inside" minSize={40} format={(value) => formatNumber(value, lang)} />} />
+                <LabelList dataKey={status} content={<ValueLabel placement="inside" minSize={isPhone ? 28 : 40} format={(value) => formatNumber(value, lang)} />} />
               </Bar>
             ))}
           </BarChart>

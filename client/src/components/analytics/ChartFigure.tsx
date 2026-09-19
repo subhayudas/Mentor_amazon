@@ -12,6 +12,8 @@ export interface ChartFigureProps {
   meta?: ReactNode;
   /** One-line definition of what the marks count. */
   definition?: ReactNode;
+  /** `above` (default) sits between the chart and the table; `below` makes it the caption under an always-visible table (phones, N-06). */
+  definitionPlacement?: "above" | "below";
   /** Visually hidden one-sentence data summary computed from the same array (P0-2). */
   summary: string;
   /** The exact-value `<table>`; always in the DOM, visually toggled (P2-16). */
@@ -43,6 +45,7 @@ export function ChartFigure({
   title,
   meta,
   definition,
+  definitionPlacement = "above",
   summary,
   table,
   tableMode = "toggle",
@@ -106,10 +109,11 @@ export function ChartFigure({
       {children != null && children !== false && <div className="mt-4">{children}</div>}
       {legend && <div className="mt-3">{legend}</div>}
       {/* A <p>, not <figcaption>: figcaption must be the first or last child of the figure and the table follows it. */}
-      {definition && <p className="mt-3 text-caption text-muted-foreground text-pretty">{definition}</p>}
-      <div id={tableId} className={showTable ? "mt-4 border-t border-border pt-3" : "sr-only"} data-testid={testId ? `${testId}-table` : undefined}>
+      {definition && definitionPlacement === "above" && <p className="mt-3 text-caption text-muted-foreground text-pretty">{definition}</p>}
+      <div id={tableId} className={showTable ? cn("border-t border-border pt-3", children != null && children !== false ? "mt-4" : "mt-3") : "sr-only"} data-testid={testId ? `${testId}-table` : undefined}>
         {table}
       </div>
+      {definition && definitionPlacement === "below" && <p className="mt-2 text-caption text-muted-foreground text-pretty">{definition}</p>}
       {footer}
     </figure>
   );

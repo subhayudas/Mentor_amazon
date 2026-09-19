@@ -16,12 +16,13 @@ interface KpiTilesProps {
   period: Period;
 }
 
+/** The arrow is inline with the first word, so a wrapped delta line flows under it instead of leaving an arrow gutter (N-06). */
 function DeltaText({ diff, children }: { diff: number; children: ReactNode }) {
   const Icon = diff > 0 ? ArrowUp : diff < 0 ? ArrowDown : null;
   return (
-    <span className="inline-flex items-center gap-1">
-      {Icon && <Icon className="size-3" strokeWidth={2} aria-hidden="true" />}
-      <span>{children}</span>
+    <span className="text-pretty">
+      {Icon && <Icon className="me-1 inline-block size-3 align-[-0.125em]" strokeWidth={2} aria-hidden="true" />}
+      {children}
     </span>
   );
 }
@@ -42,7 +43,8 @@ export function KpiTiles({ current, previous, period }: KpiTilesProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const isPhone = useIsPhone();
-  const previousLabel = previousPhrase(period, t);
+  // Phones (N-06): "prev. 30 days" keeps the delta line to one or two lines in a 2-up tile.
+  const previousLabel = previousPhrase(period, t, isPhone);
   const compare = previous !== null && previousLabel !== null;
   const tileDefinition = (key: "requests" | "completed" | "hours" | "answerRate") => (isPhone ? undefined : t(`analyticsV2.tiles.${key}.definition`));
 

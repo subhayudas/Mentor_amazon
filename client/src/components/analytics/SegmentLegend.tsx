@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 
 import { FilterChip } from "@/components/discovery/FilterChip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RowDrillButton } from "./RowDrillButton";
 
 export interface SegmentLegendItem {
   key: string;
@@ -21,6 +22,12 @@ interface SegmentLegendProps {
   testId?: string;
   /** Past this many items the chips collapse into a Select (weekly buckets, long lists). */
   maxButtons?: number;
+  /**
+   * `chips` (default): one FilterChip per segment. `list`: a compact two-column
+   * list of drill toggles (swatch · label · value) for phones, where a row of
+   * bordered chips wraps to three lines (N-06). Same keys, same drill.
+   */
+  variant?: "chips" | "list";
 }
 
 /**
@@ -29,7 +36,7 @@ interface SegmentLegendProps {
  * chip applies the same drill the chart click does, so nothing on the page
  * is mouse-only or colour-only (D3).
  */
-export function SegmentLegend({ items, activeKey, onSelect, label, testId, maxButtons = 12 }: SegmentLegendProps) {
+export function SegmentLegend({ items, activeKey, onSelect, label, testId, maxButtons = 12, variant = "chips" }: SegmentLegendProps) {
   const { t } = useTranslation();
   if (items.length === 0) return null;
 
@@ -52,6 +59,30 @@ export function SegmentLegend({ items, activeKey, onSelect, label, testId, maxBu
           </SelectContent>
         </Select>
       </div>
+    );
+  }
+
+  if (variant === "list") {
+    return (
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-caption" aria-label={label} data-testid={testId}>
+        {items.map((item) => {
+          const active = item.key === activeKey;
+          return (
+            <li key={item.key} className="min-w-0">
+              <RowDrillButton
+                pressed={active}
+                onClick={() => onSelect(active ? null : item.key)}
+                className="max-w-full gap-1.5 no-underline"
+                data-testid={testId ? `${testId}-${item.key}` : undefined}
+              >
+                {item.color && <span aria-hidden="true" className="inline-block size-2.5 shrink-0 rounded-sm" style={{ background: item.color }} />}
+                <span className="truncate underline decoration-border underline-offset-4">{item.label}</span>
+                {item.value && <span className="shrink-0 tabular-nums text-muted-foreground">{item.value}</span>}
+              </RowDrillButton>
+            </li>
+          );
+        })}
+      </ul>
     );
   }
 
