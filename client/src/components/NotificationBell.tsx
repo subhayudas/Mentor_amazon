@@ -1,26 +1,37 @@
 import { Bell, Check, CheckCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { formatDistanceToNow } from "date-fns";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { notificationService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import type { Notification } from "@/lib/database";
+import { formatNumber } from "@/lib/format";
+import { formatRelativeTime } from "@/lib/localized";
+import { cn } from "@/lib/utils";
 
 interface NotificationBellProps {
   email: string;
 }
 
+const UNREAD_CAP = 99;
+
+/**
+ * Notification bell (header). The popover lists the stored server-generated
+ * rows; opening one marks it read. Times are relative ("3 hours ago") through
+ * Intl; the unread count is capped at 99+ and announced through the trigger's
+ * accessible name.
+ */
 export function NotificationBell({ email }: NotificationBellProps) {
-  const { t } = useTranslation();
-  const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
+  const { t, i18n } = useTranslation();
+  const {
+    data: notifications = [],
+    isLoading: notificationsLoading,
+    isError,
+    refetch,
+  } = useQuery<Notification[]>({
     queryKey: ["notifications", email],
     queryFn: () => notificationService.getAll(email),
     enabled: !!email,
@@ -32,39 +43,22 @@ export function NotificationBell({ email }: NotificationBellProps) {
     enabled: !!email,
   });
 
-  const markAsReadMutation = useMutation({
-    mutationFn: async (notificationId: string) => {
-      await notificationService.markAsRead(notificationId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", email] });
-      queryClient.invalidateQueries({ queryKey: ["notifications", email, "unread-count"] });
-    },
-  });
-
-  const markAllAsReadMutation = useMutation({
-    mutationFn: async () => {
-      await notificationService.markAllAsRead(email);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications", email] });
-      queryClient.invalidateQueries({ queryKey: ["notifications", email, "unread-count"] });
-    },
-  });
-
-  const handleNotificationClick = (notification: Notification) => {
-    if (!notification.is_read) {
-      markAsReadMutation.mutate(notification.id);
-    }
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["notifications", email] });
+    queryClient.invalidateQueries({ queryKey: ["notifications", email, "unread-count"] });
   };
 
-  const formatTime = (dateString: string) => {
-    try {
-      return formatDistanceToNow(new Date(dateString), { addSuffix: true });
-    } catch {
-      return dateString;
-    }
-  };
+  const markAsRead = useMutation({
+    mutationFn: (notificationId: string) => notificationService.markAsRead(notificationId),
+    onSuccess: invalidate,
+  });
+
+  const markAllAsRead = useMutation({
+    mutationFn: () => notificationService.markAllAsRead(email),
+    onSuccess: invalidate,
+  });
+
+  const unreadLabel = unreadCount > UNREAD_CAP ? t("dashboardV2.notifications.unreadCap", { count: UNREAD_CAP }) : formatNumber(unreadCount, i18n.language);
 
   return (
     <Popover>
@@ -73,103 +67,94 @@ export function NotificationBell({ email }: NotificationBellProps) {
           variant="ghost"
           size="icon"
           className="relative"
-          aria-label={
-            unreadCount > 0
-              ? t("nav.notificationsUnread", { count: unreadCount })
-              : t("nav.notifications")
-          }
+          aria-label={unreadCount > 0 ? t("nav.notificationsUnread", { count: unreadCount }) : t("nav.notifications")}
           data-testid="button-notification-bell"
         >
-          <Bell className="h-5 w-5" aria-hidden="true" />
+          <Bell className="size-5" strokeWidth={1.75} aria-hidden="true" />
           {unreadCount > 0 && (
             <Badge
-              className="absolute -top-1 -end-1 h-5 min-w-5 flex items-center justify-center p-0 text-xs"
+              tone="warning"
+              className="absolute -end-1 -top-1 h-5 min-w-5 justify-center px-1 tabular-nums"
               aria-hidden="true"
               data-testid="badge-unread-count"
             >
-              {unreadCount > 99 ? "99+" : unreadCount}
+              {unreadLabel}
             </Badge>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-80 p-0" align="end">
-        <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
-          <h4 className="font-semibold text-sm">Notifications</h4>
+        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+          <h2 className="text-body-sm font-medium text-foreground">{t("nav.notifications")}</h2>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
-              className="h-auto py-1 px-2 text-xs text-muted-foreground"
-              onClick={() => markAllAsReadMutation.mutate()}
-              disabled={markAllAsReadMutation.isPending}
+              className="h-8 px-2 text-caption text-muted-foreground"
+              onClick={() => markAllAsRead.mutate()}
+              loading={markAllAsRead.isPending}
               data-testid="button-mark-all-read"
             >
-              <CheckCheck className="h-3 w-3 me-1" aria-hidden="true" />
-              Mark all as read
+              <CheckCheck aria-hidden="true" />
+              {t("dashboardV2.notifications.markAllRead")}
             </Button>
           )}
         </div>
-        <ScrollArea className="h-[300px]">
+        <div className="max-h-[min(60vh,24rem)] overflow-y-auto overscroll-contain">
           {notificationsLoading ? (
-            <div className="flex items-center justify-center h-full p-4">
-              <span className="text-sm text-muted-foreground">Loading...</span>
+            <div className="space-y-3 p-4" role="status" aria-busy="true">
+              <span className="sr-only">{t("common.loading")}</span>
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-12 w-full" />
+            </div>
+          ) : isError ? (
+            <div className="flex flex-col items-center gap-2 p-6 text-center" role="alert">
+              <p className="text-body-sm text-muted-foreground">{t("dashboardV2.notifications.loadError")}</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                {t("common.tryAgain")}
+              </Button>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-              <Bell className="h-8 w-8 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">No notifications yet</span>
+            <div className="flex flex-col items-center gap-2 p-6 text-center">
+              <Bell className="size-6 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />
+              <p className="text-body-sm text-muted-foreground">{t("dashboardV2.notifications.empty")}</p>
             </div>
           ) : (
-            <div className="divide-y">
+            <ul className="divide-y divide-border">
               {notifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  className={`w-full text-start px-4 py-3 transition-colors hover:bg-muted ${
-                    notification.is_read ? "bg-background" : "bg-muted/50"
-                  }`}
-                  onClick={() => handleNotificationClick(notification)}
-                  data-testid={`notification-item-${notification.id}`}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className={`text-sm font-medium truncate ${
-                          notification.is_read ? "text-foreground" : "text-foreground"
-                        }`}>
-                          {notification.title}
-                        </p>
-                        {!notification.is_read && (
-                          <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                        {notification.message}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatTime(notification.created_at)}
-                      </p>
-                    </div>
-                    {!notification.is_read && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 flex-shrink-0"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          markAsReadMutation.mutate(notification.id);
-                        }}
-                        disabled={markAsReadMutation.isPending}
-                        data-testid={`button-mark-read-${notification.id}`}
-                      >
-                        <Check className="h-3 w-3" />
-                      </Button>
-                    )}
+                <li key={notification.id} className={cn("flex items-start gap-2 px-4 py-3", !notification.is_read && "bg-accent/60")} data-testid={`notification-item-${notification.id}`}>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex items-center gap-2 text-body-sm font-medium text-foreground">
+                      <span className="truncate" dir="auto">{notification.title}</span>
+                      {!notification.is_read && (
+                        <span className="size-2 shrink-0 rounded-full bg-secondary" aria-hidden="true" />
+                      )}
+                    </p>
+                    <p className="mt-0.5 line-clamp-2 text-caption text-muted-foreground" dir="auto">
+                      {notification.message}
+                    </p>
+                    <p className="mt-1 text-caption text-muted-foreground">
+                      {formatRelativeTime(notification.created_at, i18n.language)}
+                    </p>
                   </div>
-                </button>
+                  {!notification.is_read && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 shrink-0"
+                      onClick={() => markAsRead.mutate(notification.id)}
+                      disabled={markAsRead.isPending}
+                      aria-label={t("dashboardV2.notifications.markRead")}
+                      data-testid={`button-mark-read-${notification.id}`}
+                    >
+                      <Check className="size-4" aria-hidden="true" />
+                    </Button>
+                  )}
+                </li>
               ))}
-            </div>
+            </ul>
           )}
-        </ScrollArea>
+        </div>
       </PopoverContent>
     </Popover>
   );

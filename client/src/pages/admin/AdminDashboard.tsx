@@ -1,14 +1,19 @@
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { isRTL } from "@/lib/i18n";
-import { Users, Building2, CalendarCheck, KeyRound, ShieldCheck } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Building2, CalendarCheck, KeyRound, RefreshCw, TriangleAlert, Users } from "lucide-react";
+
+import { Container } from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { RouteTabs, type RouteTab } from "@/components/dashboard/RouteTabs";
+import { EmptyState } from "@/components/EmptyState";
+import { StatTile } from "@/components/StatTile";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { RequireRole } from "@/components/RouteGuard";
 import { adminQueryKeys, adminService } from "@/lib/adminService";
-import { StatTile } from "@/pages/admin/shared";
+import { formatNumber, UNAVAILABLE } from "@/lib/format";
+import { ROUTES } from "@/lib/routes";
 import MentorsTab from "@/pages/admin/MentorsTab";
 import MenteesTab from "@/pages/admin/MenteesTab";
 import BookingsTab from "@/pages/admin/BookingsTab";
@@ -23,84 +28,66 @@ function tabFromLocation(location: string): TabId {
   return candidate && TAB_IDS.includes(candidate) ? candidate : "mentors";
 }
 
+/**
+ * Admin shell (App.tsx already wraps the route in `RequireRole role="admin"`,
+ * so the guard is not repeated here): `PageHeader` + the overview strip + a
+ * URL-synced tab row (/admin, /admin/mentees, /admin/bookings, /admin/access)
+ * rendered in the single document scroll — the same shell the mentee
+ * dashboard and mentor portal use.
+ */
 export default function AdminDashboard() {
-  return (
-    <RequireRole role="admin">
-      <AdminShell />
-    </RequireRole>
-  );
-}
-
-function AdminShell() {
   const { t } = useTranslation();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
   const activeTab = tabFromLocation(location);
+  const overview = useAdminOverview();
+  const refreshing = overview.queries.some((q) => q.isFetching);
 
-  const onTabChange = useCallback(
-    (value: string) => {
-      const next = (TAB_IDS as readonly string[]).includes(value) ? value : "mentors";
-      setLocation(next === "mentors" ? "/admin" : `/admin/${next}`);
-    },
-    [setLocation],
-  );
-
-  const tabs: { id: TabId; label: string; icon: typeof Users }[] = [
-    { id: "mentors", label: t("admin.tabs.mentors"), icon: Users },
-    { id: "mentees", label: t("admin.tabs.mentees"), icon: Building2 },
-    { id: "bookings", label: t("admin.tabs.bookings"), icon: CalendarCheck },
-    { id: "access", label: t("admin.tabs.access"), icon: KeyRound },
+  const tabs: RouteTab[] = [
+    { value: "mentors", href: ROUTES.admin, label: t("admin.tabs.mentors"), icon: Users, testId: "tab-admin-mentors" },
+    { value: "mentees", href: `${ROUTES.admin}/mentees`, label: t("admin.tabs.mentees"), icon: Building2, testId: "tab-admin-mentees" },
+    { value: "bookings", href: `${ROUTES.admin}/bookings`, label: t("admin.tabs.bookings"), icon: CalendarCheck, testId: "tab-admin-bookings" },
+    { value: "access", href: `${ROUTES.admin}/access`, label: t("admin.tabs.access"), icon: KeyRound, testId: "tab-admin-access" },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-4 pb-12 space-y-6">
-        <header className="flex items-start gap-3">
-          <div className="p-2.5 rounded-lg bg-[#232F3E] shrink-0">
-            <ShieldCheck className="w-5 h-5 text-white" aria-hidden="true" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground" data-testid="text-admin-title">{t("admin.title")}</h1>
-            <p className="text-sm text-muted-foreground">{t("admin.subtitle")}</p>
-          </div>
-        </header>
-
-        <OverviewStrip />
-
-        <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-4" dir={isRTL() ? "rtl" : "ltr"}>
-          <TabsList className="grid grid-cols-4 w-full max-w-2xl h-auto" aria-label={t("admin.tabsLabel")}>
-            {tabs.map(({ id, label, icon: Icon }) => (
-              <TabsTrigger key={id} value={id} className="gap-2 py-2" data-testid={`tab-admin-${id}`}>
-                <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-                <span className="truncate">{label}</span>
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-          <TabsContent value="mentors" className="mt-0">
-            {activeTab === "mentors" && <MentorsTab />}
-          </TabsContent>
-          <TabsContent value="mentees" className="mt-0">
-            {activeTab === "mentees" && <MenteesTab />}
-          </TabsContent>
-          <TabsContent value="bookings" className="mt-0">
-            {activeTab === "bookings" && <BookingsTab />}
-          </TabsContent>
-          <TabsContent value="access" className="mt-0">
-            {activeTab === "access" && <AccessTab />}
-          </TabsContent>
-        </Tabs>
+    <Container className="pb-16">
+      <PageHeader
+        eyebrow={t("admin.eyebrow")}
+        title={<span data-testid="text-admin-title">{t("admin.title")}</span>}
+        description={t("admin.subtitle")}
+        className="pb-6 md:pb-6"
+        actions={
+          <Button variant="outline" size="sm" onClick={() => overview.queries.forEach((q) => q.refetch())} loading={refreshing} data-testid="button-refresh-admin">
+            <RefreshCw aria-hidden="true" />
+            {t("common.refresh")}
+          </Button>
+        }
+      />
+      <OverviewStrip {...overview} />
+      <div className="mt-8">
+        <RouteTabs tabs={tabs} ariaLabel={t("admin.tabsLabel")}>
+          {activeTab === "mentors" && <MentorsTab />}
+          {activeTab === "mentees" && <MenteesTab />}
+          {activeTab === "bookings" && <BookingsTab />}
+          {activeTab === "access" && <AccessTab />}
+        </RouteTabs>
       </div>
-    </div>
+    </Container>
   );
 }
 
-function OverviewStrip() {
-  const { t } = useTranslation();
-
+/** The four queue queries behind the overview strip (shared with the header's Refresh). */
+function useAdminOverview() {
   const mentors = useQuery({ queryKey: adminQueryKeys.mentors, queryFn: adminService.getMentors });
   const mentees = useQuery({ queryKey: adminQueryKeys.mentees, queryFn: adminService.getMentees });
   const bookings = useQuery({ queryKey: adminQueryKeys.bookings, queryFn: adminService.getBookings });
   const requests = useQuery({ queryKey: adminQueryKeys.accessRequests, queryFn: adminService.getAccessRequests });
+  return { mentors, mentees, bookings, requests, queries: [mentors, mentees, bookings, requests] };
+}
+
+/** Four honest counts; a failed query shows "—" (never a zero) and an error state with retry (P2-18). */
+function OverviewStrip({ mentors, mentees, bookings, requests }: ReturnType<typeof useAdminOverview>) {
+  const { t, i18n } = useTranslation();
 
   const stats = useMemo(() => {
     const m = mentors.data ?? [];
@@ -125,51 +112,72 @@ function OverviewStrip() {
   }, [mentors.data, mentees.data, bookings.data, requests.data]);
 
   const loading = mentors.isLoading || mentees.isLoading || bookings.isLoading || requests.isLoading;
+  const failed = [mentors, mentees, bookings, requests].filter((q) => q.isError);
+  const n = (value: number) => formatNumber(value, i18n.language);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" aria-busy="true">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4" role="status" aria-busy="true">
+        <span className="sr-only">{t("common.loading")}</span>
         {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 rounded-lg" />
+          <Skeleton key={i} className="h-28 rounded-lg" />
         ))}
       </div>
     );
   }
 
   return (
-    <section aria-label={t("admin.overview")} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      <StatTile
-        title={t("admin.stats.activeMentors")}
-        value={stats.mentorsActive}
-        hint={t("admin.stats.inactiveMentors", { count: stats.mentorsInactive })}
-        icon={Users}
-        testId="stat-active-mentors"
-      />
-      <StatTile
-        title={t("admin.stats.verifiedOrgs")}
-        value={stats.orgsVerified}
-        hint={t("admin.stats.orgsBreakdown", { pending: stats.orgsPending, individuals: stats.individuals })}
-        icon={Building2}
-        testId="stat-verified-orgs"
-      />
-      <StatTile
-        title={t("admin.stats.bookings")}
-        value={stats.bookingsTotal}
-        hint={t("admin.stats.bookingsBreakdown", {
-          pending: stats.bookingsPending,
-          confirmed: stats.bookingsConfirmed,
-          completed: stats.bookingsCompleted,
-        })}
-        icon={CalendarCheck}
-        testId="stat-bookings"
-      />
-      <StatTile
-        title={t("admin.stats.pendingAccess")}
-        value={stats.requestsPending}
-        hint={t("admin.stats.requestsTotal", { count: stats.requestsTotal })}
-        icon={KeyRound}
-        testId="stat-pending-access"
-      />
-    </section>
+    <div className="space-y-4">
+      <section aria-label={t("admin.overview")} className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatTile
+          title={t("admin.stats.activeMentors")}
+          value={mentors.isError ? UNAVAILABLE : n(stats.mentorsActive)}
+          caveat={mentors.isError ? t("admin.stats.unavailable") : t("admin.stats.inactiveMentors", { count: stats.mentorsInactive })}
+          icon={Users}
+          testId="stat-active-mentors"
+        />
+        <StatTile
+          title={t("admin.stats.verifiedOrgs")}
+          value={mentees.isError ? UNAVAILABLE : n(stats.orgsVerified)}
+          caveat={mentees.isError ? t("admin.stats.unavailable") : t("admin.stats.orgsBreakdown", { pending: n(stats.orgsPending), individuals: n(stats.individuals) })}
+          icon={Building2}
+          testId="stat-verified-orgs"
+        />
+        <StatTile
+          title={t("admin.stats.bookings")}
+          value={bookings.isError ? UNAVAILABLE : n(stats.bookingsTotal)}
+          caveat={
+            bookings.isError
+              ? t("admin.stats.unavailable")
+              : t("admin.stats.bookingsBreakdown", { pending: n(stats.bookingsPending), confirmed: n(stats.bookingsConfirmed), completed: n(stats.bookingsCompleted) })
+          }
+          icon={CalendarCheck}
+          testId="stat-bookings"
+        />
+        <StatTile
+          title={t("admin.stats.pendingAccess")}
+          value={requests.isError ? UNAVAILABLE : n(stats.requestsPending)}
+          caveat={requests.isError ? t("admin.stats.unavailable") : t("admin.stats.requestsTotal", { count: stats.requestsTotal })}
+          icon={KeyRound}
+          testId="stat-pending-access"
+        />
+      </section>
+      {failed.length > 0 && (
+        <EmptyState
+          role="alert"
+          icon={TriangleAlert}
+          title={t("admin.loadError", { queue: t("admin.queues.overview") })}
+          description={t("admin.loadErrorBody")}
+          className="py-6"
+          data-testid="overview-error"
+          action={
+            <Button variant="secondary" onClick={() => failed.forEach((q) => q.refetch())}>
+              <RefreshCw aria-hidden="true" />
+              {t("common.tryAgain")}
+            </Button>
+          }
+        />
+      )}
+    </div>
   );
 }

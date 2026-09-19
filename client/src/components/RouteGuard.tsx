@@ -4,9 +4,11 @@ import { useTranslation } from "react-i18next";
 import { ShieldAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { auth, type AuthUser, type UserRole } from "@/lib/auth";
+import { ROUTES } from "@/lib/routes";
+import { bidi } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { StatusCard, StatusPage } from "@/components/StatusCard";
 
 export type GuardStatus = "loading" | "anonymous" | "forbidden" | "ok";
 
@@ -77,54 +79,52 @@ export function useRequireRole(role?: UserRole, redirectTo = "/login"): { status
 export function GuardSkeleton() {
   const { t } = useTranslation();
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4" role="status" aria-live="polite">
+    <div className="container-page flex min-h-[60vh] items-center justify-center" role="status" aria-busy="true">
       <div className="w-full max-w-md space-y-3">
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-6 w-2/3" />
         <Skeleton className="h-6 w-1/2" />
-        <p className="text-xs text-muted-foreground text-center pt-2">{t("guard.checkingAccess")}</p>
+        <p className="pt-2 text-center text-caption text-muted-foreground">{t("guard.checkingAccess")}</p>
       </div>
     </div>
   );
 }
 
+/** Wrong role for this route: explains instead of redirecting; the heading takes focus on mount (D7). */
 export function AccessDeniedCard({ role, user }: { role: UserRole; user: AuthUser | null }) {
   const { t } = useTranslation();
   const roleLabel = t(`guard.role.${role}`);
   const homeFor: Record<UserRole, string> = {
-    admin: "/admin",
-    mentor: "/mentor-portal",
-    mentee: "/mentee-dashboard",
+    admin: ROUTES.admin,
+    mentor: ROUTES.mentorPortal,
+    mentee: ROUTES.menteeDashboard,
   };
-  const ownHome = user ? homeFor[user.user_type] : "/";
+  const ownHome = user ? homeFor[user.user_type] : ROUTES.home;
 
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4 pb-12">
-      <Card className="w-full max-w-lg border-[#D5D9D9]" data-testid="card-access-denied">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-lg bg-[#FDECEC]">
-              <ShieldAlert className="w-5 h-5 text-[#C40000]" aria-hidden="true" />
-            </div>
-            <CardTitle className="text-xl">{t("guard.noAccessTitle")}</CardTitle>
-          </div>
-          <CardDescription className="pt-2">
-            {t("guard.noAccessBody", { role: roleLabel, email: user?.email ?? "" })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Button asChild data-testid="button-denied-home">
-            <Link href={ownHome}>{t("guard.goToYourArea")}</Link>
-          </Button>
-          <Button asChild variant="outline" data-testid="button-denied-switch">
-            <Link href="/login">{t("guard.switchAccount")}</Link>
-          </Button>
-          <Button asChild variant="ghost" data-testid="button-denied-root">
-            <Link href="/">{t("guard.backHome")}</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <StatusPage>
+      <StatusCard
+        titleAs="h1"
+        tone="danger"
+        icon={ShieldAlert}
+        title={t("guard.noAccessTitle")}
+        description={t("guard.noAccessBody", { role: roleLabel, email: bidi(user?.email ?? "") })}
+        data-testid="card-access-denied"
+        actions={
+          <>
+            <Button asChild variant="secondary" data-testid="button-denied-home">
+              <Link href={ownHome}>{t("guard.goToYourArea")}</Link>
+            </Button>
+            <Button asChild variant="outline" data-testid="button-denied-switch">
+              <Link href={ROUTES.login}>{t("guard.switchAccount")}</Link>
+            </Button>
+            <Button asChild variant="ghost" data-testid="button-denied-root">
+              <Link href={ROUTES.home}>{t("guard.backHome")}</Link>
+            </Button>
+          </>
+        }
+      />
+    </StatusPage>
   );
 }
 
