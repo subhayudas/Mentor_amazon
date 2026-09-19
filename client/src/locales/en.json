@@ -1276,10 +1276,115 @@
     "_owner": "A"
   },
   "mentorProfile": {
-    "_owner": "B"
+    "backToMentors": "Back to mentors",
+    "eyebrow": "Amazon mentor",
+    "loading": "Loading mentor profile…",
+    "accepting": "Accepting requests",
+    "notAccepting": "Not accepting requests right now",
+    "notAcceptingShort": "Not accepting requests",
+    "notAcceptingBody": "<name>{{name}}</name> isn't taking new requests at the moment. Mentors with similar expertise may be able to help.",
+    "findSimilar": "Find similar mentors",
+    "ratings_zero": "{{count}} ratings",
+    "ratings_one": "{{count}} rating",
+    "ratings_two": "{{count}} ratings",
+    "ratings_few": "{{count}} ratings",
+    "ratings_many": "{{count}} ratings",
+    "ratings_other": "{{count}} ratings",
+    "ratingA11y_zero": "No ratings yet",
+    "ratingA11y_one": "Rated {{rating}} out of 5 from {{count}} rating",
+    "ratingA11y_two": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "ratingA11y_few": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "ratingA11y_many": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "ratingA11y_other": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "feedbackPrivate": "feedback is shared privately with the mentor",
+    "helpsWith": "What I can help with",
+    "industriesLine": "Industries: {{list}}",
+    "about": "About",
+    "aboutName": "About <name>{{name}}</name>",
+    "aboutDialogDescription": "The full profile text.",
+    "readMore": "Read more",
+    "readLess": "Show less",
+    "sessionStyle": "Session style",
+    "preference": {
+      "ongoing": "Open to ongoing mentoring",
+      "rotating": "Prefers one-off sessions",
+      "either": "Open to one-off or ongoing"
+    },
+    "requestSession": "Request a session",
+    "tzNote": "Your time zone: <viewer>{{viewer}}</viewer> · <name>{{name}}</name>'s: <mentor>{{mentor}}</mentor>",
+    "availabilityTitle": "Typical availability",
+    "availabilityCaption": "Typical availability, self-reported — the mentor's calendar link is the real schedule",
+    "availabilityZone": "Mentor's time (<tz>{{tz}}</tz>) · {{offset}}",
+    "notFound": {
+      "title": "This mentor isn't available",
+      "body": "The profile may have been removed, or the link is out of date."
+    },
+    "loadError": {
+      "title": "Unable to load this mentor",
+      "body": "Check your connection and try again."
+    }
   },
   "bookingRequest": {
-    "_owner": "B"
+    "title": "Request a session with <name>{{name}}</name>",
+    "description": "Tell <name>{{name}}</name> what you're working on. They reply in MentorConnect.",
+    "nameLabel": "Your name",
+    "namePlaceholder": "First and last name",
+    "emailLabel": "Your email",
+    "emailPlaceholder": "name@example.com",
+    "emailHelp": "Use the email you'll sign in with.",
+    "fromAccount": "From your account",
+    "goalLabel": "What do you want help with?",
+    "goalHelp": "Mention what you're stuck on, what you've tried, and what a good outcome looks like.",
+    "goalPlaceholder": "For example: I'm preparing for a product manager interview loop next month…",
+    "goalCountShort_zero": "At least 20 characters",
+    "goalCountShort_one": "At least 20 characters — {{count}} so far",
+    "goalCountShort_two": "At least 20 characters — {{count}} so far",
+    "goalCountShort_few": "At least 20 characters — {{count}} so far",
+    "goalCountShort_many": "At least 20 characters — {{count}} so far",
+    "goalCountShort_other": "At least 20 characters — {{count}} so far",
+    "goalCountLong": "{{typed}} of {{max}} characters",
+    "requiredNote": "* required",
+    "whatNext": "What happens next",
+    "cancel": "Cancel",
+    "send": "Send request",
+    "validation": {
+      "name": "Enter your name",
+      "email": "Enter an email like name@example.com",
+      "goalShort": "Tell {{name}} a little more — at least 20 characters.",
+      "goalLong": "Keep it under {{max}} characters."
+    },
+    "error": {
+      "rateLimited": "You've reached the limit of requests for now. Try again in an hour.",
+      "unavailable": "<name>{{name}}</name> stopped accepting requests just now.",
+      "invalidEmail": "Enter an email like name@example.com",
+      "generic": "Unable to send your request. Check your connection and try again.",
+      "tryAgain": "Try again",
+      "findSimilar": "Find similar mentors"
+    },
+    "discard": {
+      "title": "Discard request?",
+      "body": "Your message to <name>{{name}}</name> won't be sent.",
+      "confirm": "Discard request",
+      "cancel": "Keep editing"
+    },
+    "success": {
+      "title": "Request sent to <name>{{name}}</name>",
+      "signedIn": "You'll see <name>{{name}}</name>'s reply under Bookings.",
+      "anonymous": "Sign in with <email>{{email}}</email> to see <name>{{name}}</name>'s reply. Use exactly this email — it's how we match the request to you.",
+      "viewBookings": "View bookings",
+      "signIn": "Sign in",
+      "createAccount": "Create an account",
+      "backToMentors": "Back to mentors",
+      "close": "Close"
+    },
+    "status": {
+      "sent": "Request sent",
+      "sentFrom": "Sent {{when}} from <email>{{email}}</email>.",
+      "anonHint": "Sign in with this email to see <name>{{name}}</name>'s reply.",
+      "signIn": "Sign in",
+      "viewInBookings": "View in bookings",
+      "sendAnother": "Send another request"
+    }
   },
   "dashboardV2": {
     "_owner": "D"

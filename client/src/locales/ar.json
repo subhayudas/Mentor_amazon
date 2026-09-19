@@ -1276,10 +1276,115 @@
     "_owner": "A"
   },
   "mentorProfile": {
-    "_owner": "B"
+    "backToMentors": "العودة إلى المرشدين",
+    "eyebrow": "مرشد من أمازون",
+    "loading": "جارٍ تحميل الملف الشخصي للمرشد…",
+    "accepting": "يقبل الطلبات",
+    "notAccepting": "لا يقبل طلبات حاليًا",
+    "notAcceptingShort": "لا يقبل طلبات",
+    "notAcceptingBody": "لا يستقبل <name>{{name}}</name> طلبات جديدة في الوقت الحالي. قد يتمكن مرشدون بخبرات مشابهة من مساعدتك.",
+    "findSimilar": "ابحث عن مرشدين مشابهين",
+    "ratings_zero": "لا تقييمات",
+    "ratings_one": "تقييم واحد",
+    "ratings_two": "تقييمان",
+    "ratings_few": "{{count}} تقييمات",
+    "ratings_many": "{{count}} تقييمًا",
+    "ratings_other": "{{count}} تقييم",
+    "ratingA11y_zero": "لا تقييمات بعد",
+    "ratingA11y_one": "التقييم {{rating}} من 5 بناءً على تقييم واحد",
+    "ratingA11y_two": "التقييم {{rating}} من 5 بناءً على تقييمين",
+    "ratingA11y_few": "التقييم {{rating}} من 5 بناءً على {{count}} تقييمات",
+    "ratingA11y_many": "التقييم {{rating}} من 5 بناءً على {{count}} تقييمًا",
+    "ratingA11y_other": "التقييم {{rating}} من 5 بناءً على {{count}} تقييم",
+    "feedbackPrivate": "تُشارك الملاحظات مع المرشد بشكل خاص",
+    "helpsWith": "ما يمكنني المساعدة فيه",
+    "industriesLine": "الصناعات: {{list}}",
+    "about": "نبذة",
+    "aboutName": "نبذة عن <name>{{name}}</name>",
+    "aboutDialogDescription": "النص الكامل للملف الشخصي.",
+    "readMore": "اقرأ المزيد",
+    "readLess": "عرض أقل",
+    "sessionStyle": "أسلوب الجلسات",
+    "preference": {
+      "ongoing": "منفتح على إرشاد مستمر",
+      "rotating": "يفضّل الجلسات الفردية",
+      "either": "منفتح على جلسة واحدة أو إرشاد مستمر"
+    },
+    "requestSession": "طلب جلسة",
+    "tzNote": "منطقتك الزمنية: <viewer>{{viewer}}</viewer> · منطقة <name>{{name}}</name> الزمنية: <mentor>{{mentor}}</mentor>",
+    "availabilityTitle": "التوفر المعتاد",
+    "availabilityCaption": "توفر معتاد يحدده المرشد بنفسه — رابط تقويم المرشد هو الجدول الفعلي",
+    "availabilityZone": "بتوقيت المرشد (<tz>{{tz}}</tz>) · {{offset}}",
+    "notFound": {
+      "title": "هذا المرشد غير متاح",
+      "body": "ربما أُزيل الملف الشخصي، أو أن الرابط قديم."
+    },
+    "loadError": {
+      "title": "تعذّر تحميل بيانات المرشد",
+      "body": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
+    }
   },
   "bookingRequest": {
-    "_owner": "B"
+    "title": "طلب جلسة مع <name>{{name}}</name>",
+    "description": "أخبر <name>{{name}}</name> بما تعمل عليه. يردّ المرشد عبر MentorConnect.",
+    "nameLabel": "اسمك",
+    "namePlaceholder": "الاسم الأول واسم العائلة",
+    "emailLabel": "بريدك الإلكتروني",
+    "emailPlaceholder": "name@example.com",
+    "emailHelp": "استخدم البريد الإلكتروني الذي ستسجّل الدخول به.",
+    "fromAccount": "من حسابك",
+    "goalLabel": "ما الذي تريد المساعدة فيه؟",
+    "goalHelp": "اذكر ما تواجه صعوبة فيه، وما جرّبته، وكيف تبدو النتيجة الجيدة بالنسبة لك.",
+    "goalPlaceholder": "مثال: أستعد لمقابلات وظيفة مدير منتجات الشهر القادم…",
+    "goalCountShort_zero": "20 حرفًا على الأقل",
+    "goalCountShort_one": "20 حرفًا على الأقل — حرف واحد حتى الآن",
+    "goalCountShort_two": "20 حرفًا على الأقل — حرفان حتى الآن",
+    "goalCountShort_few": "20 حرفًا على الأقل — {{count}} أحرف حتى الآن",
+    "goalCountShort_many": "20 حرفًا على الأقل — {{count}} حرفًا حتى الآن",
+    "goalCountShort_other": "20 حرفًا على الأقل — {{count}} حرف حتى الآن",
+    "goalCountLong": "{{typed}} من {{max}} حرف",
+    "requiredNote": "* مطلوب",
+    "whatNext": "ما الذي يحدث بعد ذلك",
+    "cancel": "إلغاء",
+    "send": "إرسال الطلب",
+    "validation": {
+      "name": "أدخل اسمك",
+      "email": "أدخل بريدًا إلكترونيًا مثل name@example.com",
+      "goalShort": "أخبر {{name}} بالمزيد — 20 حرفًا على الأقل.",
+      "goalLong": "اجعل النص أقل من {{max}} حرف."
+    },
+    "error": {
+      "rateLimited": "وصلت إلى الحد الأقصى للطلبات حاليًا. حاول مرة أخرى بعد ساعة.",
+      "unavailable": "توقّف <name>{{name}}</name> عن قبول الطلبات للتو.",
+      "invalidEmail": "أدخل بريدًا إلكترونيًا مثل name@example.com",
+      "generic": "تعذّر إرسال طلبك. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+      "tryAgain": "حاول مرة أخرى",
+      "findSimilar": "ابحث عن مرشدين مشابهين"
+    },
+    "discard": {
+      "title": "هل تريد تجاهل الطلب؟",
+      "body": "لن تُرسل رسالتك إلى <name>{{name}}</name>.",
+      "confirm": "تجاهل الطلب",
+      "cancel": "متابعة التحرير"
+    },
+    "success": {
+      "title": "أُرسل الطلب إلى <name>{{name}}</name>",
+      "signedIn": "ستجد رد <name>{{name}}</name> ضمن الحجوزات.",
+      "anonymous": "سجّل الدخول بالبريد <email>{{email}}</email> لرؤية رد <name>{{name}}</name>. استخدم هذا البريد نفسه — فهو ما يربط الطلب بك.",
+      "viewBookings": "عرض الحجوزات",
+      "signIn": "تسجيل الدخول",
+      "createAccount": "إنشاء حساب",
+      "backToMentors": "العودة إلى المرشدين",
+      "close": "إغلاق"
+    },
+    "status": {
+      "sent": "تم إرسال الطلب",
+      "sentFrom": "أُرسل {{when}} من <email>{{email}}</email>.",
+      "anonHint": "سجّل الدخول بهذا البريد الإلكتروني لرؤية رد <name>{{name}}</name>.",
+      "signIn": "تسجيل الدخول",
+      "viewInBookings": "عرض في الحجوزات",
+      "sendAnother": "إرسال طلب آخر"
+    }
   },
   "dashboardV2": {
     "_owner": "D"

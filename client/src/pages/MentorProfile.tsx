@@ -1,494 +1,301 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams } from "wouter";
-import { useState } from "react";
-import { mentorService, bookingService } from "@/lib/services";
-import type { PublicMentor } from "@/lib/database";
-import { queryClient } from "@/lib/queryClient";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { ArrowLeft, Clock, Globe, Star, Calendar } from "lucide-react";
-import { Link } from "wouter";
-import { useToast } from "@/hooks/use-toast";
+import * as React from "react";
+import { Link, useParams } from "wouter";
 import { useTranslation } from "react-i18next";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { ArrowLeft, CircleAlert, UserX } from "lucide-react";
 
-const bookingRequestFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Valid email is required"),
-  goal: z.string().min(10, "Please describe your goals in at least 10 characters"),
-});
+import { EmptyState } from "@/components/EmptyState";
+import { DEFAULT_STOPS, RequestRail } from "@/components/RequestRail";
+import { Container } from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { BookingRequestDialog, type BookingPrefill } from "@/components/booking/BookingRequestDialog";
+import { RequestStatusCard } from "@/components/booking/RequestStatusCard";
+import { resolveRequestState } from "@/components/booking/requestState";
+import { AboutSection } from "@/components/profile/AboutSection";
+import { AvailabilityWindows } from "@/components/profile/AvailabilityWindows";
+import { HelpsWith } from "@/components/profile/HelpsWith";
+import { MobileActionBar } from "@/components/profile/MobileActionBar";
+import { ProfileHeader } from "@/components/profile/ProfileHeader";
+import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
+import { RequestRailCard } from "@/components/profile/RequestRailCard";
+import { SessionStyle } from "@/components/profile/SessionStyle";
+import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
+import { UnavailableBlock } from "@/components/profile/UnavailableBlock";
+import { mentorDisplay } from "@/components/profile/localized";
+import { DESKTOP_QUERY, useMediaQuery } from "@/components/profile/useMediaQuery";
+import { useAuth } from "@/context/AuthContext";
+import { usePublicAvailability, windowsForMentor } from "@/lib/availability";
+import type { Booking, Mentee, PublicMentor } from "@/lib/database";
+import { discoveryUrl } from "@/lib/routes";
+import { getSentRequest, markSent } from "@/lib/sentRequests";
+import { menteeService, mentorService } from "@/lib/services";
+import { lastDiscoveryHref } from "@/lib/urlState";
 
-type BookingRequestFormData = z.infer<typeof bookingRequestFormSchema>;
+/** localStorage mirror used by the anonymous request path (Login/registration read the same keys). */
+function readStored(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
 
+/**
+ * "Back to mentors" → the last discovery URL, never a bare /mentors (P1-12).
+ * One anchor, no nested button (the old page wrapped a Button in a Link):
+ * `link-back` names the anchor, `button-back` its label span, so both legacy
+ * test ids still resolve to the same control.
+ */
+function BackLink() {
+  const { t } = useTranslation();
+  return (
+    <Link
+      href={lastDiscoveryHref()}
+      data-testid="link-back"
+      className="mt-6 inline-flex min-h-8 items-center gap-1 rounded-sm text-body-sm text-muted-foreground transition-colors duration-fast hover:text-foreground"
+    >
+      <ArrowLeft className="size-4 rtl:-scale-x-100" strokeWidth={1.5} aria-hidden="true" />
+      <span data-testid="button-back">{t("mentorProfile.backToMentors")}</span>
+    </Link>
+  );
+}
+
+/** Not found / load error share one frame: the page title h1, then a compact EmptyState. */
+function ProfileState({
+  icon,
+  title,
+  description,
+  testId,
+  action,
+}: {
+  icon: typeof UserX;
+  title: string;
+  description: string;
+  testId: string;
+  action?: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Container className="pb-16">
+      <PageHeader title={t("nav.titles.mentor")} />
+      <EmptyState
+        icon={icon}
+        title={title}
+        description={description}
+        titleAs="h2"
+        data-testid={testId}
+        action={action}
+        secondaryAction={
+          <Button variant={action ? "outline" : "secondary"} asChild>
+            <Link href={lastDiscoveryHref()} data-testid="link-back">
+              {t("mentorProfile.backToMentors")}
+            </Link>
+          </Button>
+        }
+      />
+    </Container>
+  );
+}
+
+/**
+ * Public mentor profile `/mentor/:id` (also `/mentors/:id`) — spec §6 as
+ * amended (P1-17, P1-18, P1-19, P1-12, P1-21, P1-30) plus the booking request
+ * flow of §7. Anonymous visitors can request a session; signed-in mentees get
+ * their identity prefilled and, when a booking row is visible, the live status.
+ */
 export default function MentorProfile() {
   const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
-  // Both /mentor/:id and /mentors/:id route here; useParams reads whichever matched.
+  const lang = i18n.language;
   const params = useParams<{ id?: string }>();
-  const mentorId = params.id;
-  const { toast } = useToast();
-  const [showBookingDialog, setShowBookingDialog] = useState(false);
-  
-  const { data: mentor, isLoading } = useQuery<PublicMentor | null>({
-    queryKey: ['mentor', mentorId],
-    queryFn: () => mentorService.getById(mentorId!),
-    enabled: !!mentorId,
+  const mentorId = params.id ?? "";
+  const { user } = useAuth();
+  const signedIn = Boolean(user);
+  const isDesktop = useMediaQuery(DESKTOP_QUERY);
+
+  const mentorQuery = useQuery<PublicMentor | null>({
+    queryKey: ["mentor", mentorId],
+    queryFn: () => mentorService.getById(mentorId),
+    enabled: mentorId.length > 0,
+    staleTime: 5 * 60_000,
+  });
+  const availability = usePublicAvailability();
+  const windows = React.useMemo(() => windowsForMentor(availability.data, mentorId), [availability.data, mentorId]);
+
+  // Signed-in identity: the mentees row (name, id) via the same key and
+  // queryFn the dashboard uses, so the two never race for different shapes.
+  const email = user?.email;
+  const menteeQuery = useQuery<Mentee | null>({
+    queryKey: ["mentee", "email", email],
+    queryFn: () => menteeService.getByEmail(email!),
+    enabled: Boolean(email),
+    staleTime: 5 * 60_000,
+  });
+  const menteeId = user?.profile_id ?? menteeQuery.data?.id;
+  // The live booking row comes from the dashboard's ['mentee', id, 'bookings']
+  // cache when it exists (P1-21); this observer never fetches (`skipToken`),
+  // so the profile adds no bookings request — anonymous visitors could not
+  // read one back anyway. Cache updates still re-render the status block.
+  const bookingsQuery = useQuery<Booking[]>({
+    queryKey: ["mentee", menteeId, "bookings"],
+    queryFn: skipToken,
   });
 
-  const form = useForm<BookingRequestFormData>({
-    resolver: zodResolver(bookingRequestFormSchema),
-    defaultValues: {
-      name: localStorage.getItem("menteeName") || "",
-      email: localStorage.getItem("menteeEmail") || "",
-      goal: "",
-    },
-  });
+  const [localSent, setLocalSent] = React.useState(() => getSentRequest(mentorId));
+  React.useEffect(() => {
+    setLocalSent(getSentRequest(mentorId));
+  }, [mentorId]);
 
-  const bookingRequestMutation = useMutation({
-    mutationFn: async (data: { mentor_id: string; mentee_name: string; mentee_email: string; goal: string }) => {
-      return bookingService.createRequest(data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bookings'] });
-      queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toast({
-        title: t("booking.requestSentTitle"),
-        description: t("booking.requestSentBody"),
-      });
-      setShowBookingDialog(false);
-      form.reset({
-        name: localStorage.getItem("menteeName") || "",
-        email: localStorage.getItem("menteeEmail") || "",
-        goal: "",
-      });
-    },
-    onError: () => {
-      toast({
-        title: t("booking.requestFailedTitle"),
-        description: t("booking.requestFailedBody"),
-        variant: "destructive",
-      });
-    },
-  });
+  const [dialogOpen, setDialogOpen] = React.useState(false);
+  const returnFocusRef = React.useRef<HTMLElement | null>(null);
+  const registerReturnFocus = React.useCallback((element: HTMLElement | null) => {
+    returnFocusRef.current = element;
+  }, []);
 
-  const onSubmitBookingRequest = (data: BookingRequestFormData) => {
-    if (!mentorId) return;
-    
-    localStorage.setItem("menteeName", data.name);
-    localStorage.setItem("menteeEmail", data.email);
-    
-    bookingRequestMutation.mutate({
-      mentor_id: mentorId,
-      mentee_name: data.name,
-      mentee_email: data.email,
-      goal: data.goal,
-    });
-  };
+  const mentor = mentorQuery.data ?? null;
+  const display = React.useMemo(() => (mentor ? mentorDisplay(mentor, lang) : null), [mentor, lang]);
 
-  const handleOpenBookingDialog = () => {
-    form.reset({
-      name: localStorage.getItem("menteeName") || "",
-      email: localStorage.getItem("menteeEmail") || "",
-      goal: "",
-    });
-    setShowBookingDialog(true);
-  };
+  const openDialog = React.useCallback(() => setDialogOpen(true), []);
+  const sendAnother = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    returnFocusRef.current = event.currentTarget;
+    setDialogOpen(true);
+  }, []);
+  const handleSent = React.useCallback(
+    (sentEmail: string) => {
+      markSent(mentorId, sentEmail);
+      setLocalSent(getSentRequest(mentorId));
+    },
+    [mentorId],
+  );
 
-  if (isLoading) {
+  if (!mentorId || (mentorQuery.isSuccess && !mentor)) {
     return (
-      <div className="min-h-screen py-12">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <Skeleton className="h-10 w-32 mb-8" />
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-            <div className="lg:col-span-2">
-              <Card className="p-8">
-                <div className="space-y-6">
-                  <div className="flex flex-col items-center text-center gap-4">
-                    <Skeleton className="w-32 h-32 rounded-full" />
-                    <div className="space-y-2 w-full">
-                      <Skeleton className="h-8 w-3/4 mx-auto" />
-                      <Skeleton className="h-5 w-1/2 mx-auto" />
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <Skeleton className="h-24 w-full" />
-                    <div className="flex flex-wrap gap-2">
-                      <Skeleton className="h-6 w-20" />
-                      <Skeleton className="h-6 w-24" />
-                      <Skeleton className="h-6 w-20" />
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-            <div className="lg:col-span-3">
-              <Skeleton className="h-[400px] w-full rounded-lg" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!mentor) {
-    return (
-      <div className="min-h-screen py-12">
-        <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <Card className="p-12 text-center">
-            <p className="text-muted-foreground">{t('errors.notFound')}</p>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  const displayName = isArabic && mentor.name_ar ? mentor.name_ar : mentor.name;
-  const displayPosition = isArabic && mentor.position_ar ? mentor.position_ar : mentor.position;
-  const displayCompany = isArabic && mentor.company_ar ? mentor.company_ar : mentor.company;
-  const displayBio = isArabic && mentor.bio_ar ? mentor.bio_ar : mentor.bio;
-  const displayExpertise = isArabic && mentor.expertise_ar ? mentor.expertise_ar : mentor.expertise;
-  const displayIndustries = isArabic && mentor.industries_ar ? mentor.industries_ar : mentor.industries;
-
-  const initials = mentor.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase();
-
-  const averageRating = mentor.average_rating ? parseFloat(mentor.average_rating.toString()) : 0;
-  const totalRatings = mentor.total_ratings || 0;
-
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }).map((_, index) => (
-      <Star
-        key={index}
-        className={`w-4 h-4 ${
-          index < Math.round(rating)
-            ? "fill-primary text-primary"
-            : "fill-muted text-muted"
-        }`}
+      <ProfileState
+        icon={UserX}
+        title={t("mentorProfile.notFound.title")}
+        description={t("mentorProfile.notFound.body")}
+        testId="mentor-not-found"
       />
-    ));
-  };
+    );
+  }
+  if (mentorQuery.isError) {
+    return (
+      <ProfileState
+        icon={CircleAlert}
+        title={t("mentorProfile.loadError.title")}
+        description={t("mentorProfile.loadError.body")}
+        testId="mentor-load-error"
+        action={
+          <Button variant="secondary" onClick={() => void mentorQuery.refetch()} data-testid="button-retry-mentor">
+            {t("common.tryAgain")}
+          </Button>
+        }
+      />
+    );
+  }
+  if (!mentor || !display) {
+    return <ProfileSkeleton />;
+  }
 
-  const timezoneToUTC = (ianaTimeZone: string): string => {
-    try {
-      const date = new Date();
-      const toTimeZone = (z: string) => new Date(
-        date.toLocaleString('sv', { timeZone: z }).replace(' ', 'T')
-      );
-      
-      const offsetMinutes = (toTimeZone(ianaTimeZone).getTime() - toTimeZone('UTC').getTime()) / 60000;
-      
-      const sign = offsetMinutes >= 0 ? '+' : '-';
-      const absMinutes = Math.abs(offsetMinutes);
-      const hours = Math.floor(absMinutes / 60);
-      const minutes = absMinutes % 60;
-      
-      return minutes === 0 
-        ? `UTC${sign}${hours}`
-        : `UTC${sign}${hours}:${String(minutes).padStart(2, '0')}`;
-    } catch {
-      return ianaTimeZone.split('/').pop() || ianaTimeZone;
-    }
+  const request = resolveRequestState({
+    mentorId,
+    isAvailable: mentor.is_available,
+    bookings: signedIn ? bookingsQuery.data : undefined,
+    viewerEmail: user?.email,
+    local: localSent,
+  });
+  const similarHref = discoveryUrl({ expertise: mentor.expertise?.[0] ? [mentor.expertise[0]] : [] });
+  const prefill: BookingPrefill = signedIn
+    ? {
+        name: menteeQuery.data?.name ?? user?.name ?? "",
+        email: user?.email ?? "",
+        nameReadOnly: Boolean(menteeQuery.data?.name),
+        emailReadOnly: true,
+      }
+    : { name: readStored("menteeName"), email: readStored("menteeEmail"), nameReadOnly: false, emailReadOnly: false };
+  const invalidateKeys = signedIn && menteeId ? [["mentee", menteeId, "bookings"]] : undefined;
+
+  const slotProps = {
+    mentor,
+    mentorName: display.name,
+    request,
+    signedIn,
+    similarHref,
+    onRequest: openDialog,
+    onSendAnother: sendAnother,
+    registerReturnFocus,
   };
 
   return (
-    <div className="min-h-screen py-12">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
-        <Link href="/" data-testid="link-back">
-          <Button variant="ghost" className="mb-8" data-testid="button-back">
-            <ArrowLeft className={`w-4 h-4 ${isArabic ? 'ml-2' : 'mr-2'}`} />
-            {isArabic ? 'العودة إلى المرشدين' : 'Back to Mentors'}
-          </Button>
-        </Link>
-
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-2">
-            <Card className="p-8 sticky top-24">
-              <div className="space-y-6">
-                <div className="flex flex-col items-center text-center gap-4">
-                  <Avatar className="w-32 h-32">
-                    <AvatarImage src={mentor.photo_url || undefined} alt={displayName} />
-                    <AvatarFallback className="text-2xl font-bold bg-primary/10 text-primary">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-
-                  <div className="space-y-2 w-full">
-                    <h1 className="text-3xl font-bold" data-testid="text-mentor-name">
-                      {displayName}
-                    </h1>
-                    <p className="text-lg text-muted-foreground font-medium" data-testid="text-mentor-position">
-                      {displayPosition}{displayCompany && ` @ ${displayCompany}`}
-                    </p>
-                    
-                    <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground">
-                      {mentor.timezone && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          <span>{timezoneToUTC(mentor.timezone)}</span>
-                        </div>
-                      )}
-                      {mentor.languages_spoken && mentor.languages_spoken.length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Globe className="w-4 h-4" />
-                          <span>{mentor.languages_spoken.join(", ")}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {totalRatings > 0 && (
-                      <div className="flex items-center justify-center gap-2 pt-2">
-                        <div className="flex gap-0.5">{renderStars(averageRating)}</div>
-                        <span className="text-sm font-medium">
-                          {averageRating.toFixed(1)} ({totalRatings} {totalRatings === 1 ? "review" : "reviews"})
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                      {isArabic ? 'نبذة' : 'About'}
-                    </h3>
-                    <p className="text-muted-foreground leading-relaxed" data-testid="text-mentor-bio">
-                      {displayBio}
-                    </p>
-                  </div>
-
-                  {displayIndustries && displayIndustries.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                        {t('profile.industries')}
-                      </h3>
-                      <div className="flex flex-wrap gap-2">
-                        {displayIndustries.map((industry, index) => (
-                          <Badge key={index} variant="outline" className="bg-muted">
-                            {industry}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                      {t('profile.expertise')}
-                    </h3>
-                    {displayExpertise.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {displayExpertise.map((skill, index) => (
-                          <Badge key={index} className="bg-primary/10 text-primary border-primary/20">
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic" data-testid="text-skills-tip">
-                        {t('profile.skillsTip')}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          <div className="lg:col-span-3">
-            <Card className="p-8">
-              <h2 className="text-2xl font-bold mb-6">{t('session.bookSession')}</h2>
-              {!mentor.is_available ? (
-                <div className="p-12 text-center space-y-4" data-testid="mentor-unavailable">
-                  <Star className="w-12 h-12 mx-auto text-muted-foreground" />
-                  <p className="text-lg text-muted-foreground">
-                    {t('profile.noSlotsAvailable')}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {t('profile.starForLater')}
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center space-y-6" data-testid="booking-section">
-                  <div className="space-y-3">
-                    <Calendar className="w-16 h-16 mx-auto text-primary" />
-                    <p className="text-lg text-muted-foreground">
-                      {isArabic 
-                        ? `هل أنت مستعد للتواصل مع ${displayName}؟`
-                        : `Ready to connect with ${displayName}?`}
-                    </p>
-                    <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                      {isArabic
-                        ? "اطلب جلسة إرشاد وشارك أهدافك. سيقوم المرشد بمراجعة طلبك والرد عليه."
-                        : "Request a mentoring session and share your goals. The mentor will review your request and respond."}
-                    </p>
-                  </div>
-                  <Button 
-                    size="lg" 
-                    onClick={handleOpenBookingDialog}
-                    data-testid="button-request-session"
-                  >
-                    <Calendar className={`w-5 h-5 ${isArabic ? 'ml-2' : 'mr-2'}`} />
-                    {isArabic ? 'طلب جلسة' : 'Request a Session'}
-                  </Button>
-                  <div className="pt-4 border-t max-w-lg mx-auto">
-                    <h4 className="text-sm font-medium mb-3">{isArabic ? 'كيف يعمل النظام:' : 'How it works:'}</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                      <div className="space-y-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto font-bold">1</div>
-                        <p className="text-xs text-muted-foreground">
-                          {isArabic ? 'أرسل طلبك مع أهدافك' : 'Submit your request with your goals'}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto font-bold">2</div>
-                        <p className="text-xs text-muted-foreground">
-                          {isArabic ? 'المرشد يراجع ويقبل' : 'Mentor reviews and accepts'}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto font-bold">3</div>
-                        <p className="text-xs text-muted-foreground">
-                          {isArabic ? 'احجز موعدك عبر التقويم' : 'Book your time via calendar'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </Card>
-          </div>
-        </div>
-
-        <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
-          <DialogContent data-testid="dialog-booking-request">
-            <DialogHeader>
-              <DialogTitle>
-                {isArabic ? 'طلب جلسة إرشاد' : 'Request a Mentoring Session'}
-              </DialogTitle>
-              <DialogDescription>
-                {isArabic 
-                  ? `أرسل طلبًا إلى ${displayName} للتواصل. يرجى مشاركة أهدافك حتى يتمكنوا من الاستعداد لجلستكم.`
-                  : `Send a request to ${displayName} to connect. Please share your goals so they can prepare for your session.`}
-              </DialogDescription>
-            </DialogHeader>
-
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmitBookingRequest)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'اسمك' : 'Your Name'}</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          placeholder={isArabic ? 'أدخل اسمك الكامل' : 'Enter your full name'}
-                          data-testid="input-booking-name"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>{isArabic ? 'بريدك الإلكتروني' : 'Your Email'}</FormLabel>
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="email"
-                          placeholder={isArabic ? 'أدخل بريدك الإلكتروني' : 'Enter your email address'}
-                          data-testid="input-booking-email"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="goal"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        {isArabic 
-                          ? 'ما الذي تأمل تحقيقه من هذه الجلسة؟'
-                          : 'What are you hoping to achieve from this session?'}
-                      </FormLabel>
-                      <FormControl>
-                        <Textarea
-                          {...field}
-                          placeholder={isArabic 
-                            ? 'صف أهدافك، والتحديات التي تواجهها، أو المواضيع التي ترغب في مناقشتها...'
-                            : 'Describe your goals, challenges you\'re facing, or topics you\'d like to discuss...'}
-                          className="min-h-[120px] resize-none"
-                          data-testid="textarea-booking-goal"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <DialogFooter className="gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowBookingDialog(false)}
-                    data-testid="button-cancel-booking"
-                  >
-                    {isArabic ? 'إلغاء' : 'Cancel'}
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={bookingRequestMutation.isPending}
-                    data-testid="button-submit-booking"
-                  >
-                    {bookingRequestMutation.isPending 
-                      ? (isArabic ? 'جاري الإرسال...' : 'Sending...') 
-                      : (isArabic ? 'إرسال الطلب' : 'Submit Request')}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+    <Container className="pb-24 lg:pb-16 [@media(max-height:520px)]:pb-8">
+      <BackLink />
+      <div className="mt-8">
+        <ProfileHeader mentor={mentor} display={display} />
       </div>
-    </div>
+
+      {!isDesktop && (
+        <div className="mt-5 flex flex-col gap-4">
+          {request.kind === "unavailable" ? (
+            <UnavailableBlock
+              mentorName={display.name}
+              similarHref={similarHref}
+              testId="mentor-unavailable"
+              showBadge={false}
+            />
+          ) : (
+            <TimeZoneNote mentorName={display.name} mentorTz={mentor.timezone} />
+          )}
+          {request.kind === "sent" && (
+            <RequestStatusCard
+              request={request}
+              mentorName={display.name}
+              signedIn={signedIn}
+              canSendAnother={mentor.is_available}
+              onSendAnother={sendAnother}
+              firstLinkRef={registerReturnFocus}
+            />
+          )}
+        </div>
+      )}
+
+      <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_336px] lg:gap-12">
+        <div className="flex min-w-0 flex-col gap-10">
+          <HelpsWith expertise={display.expertise} industries={display.industries} />
+          <AboutSection name={display.name} bio={display.bio} />
+          <SessionStyle preference={mentor.mentorship_preference} />
+          {!isDesktop && (
+            <section aria-labelledby="profile-rail-title">
+              <h2 id="profile-rail-title" className="text-h2-sm text-foreground md:text-h2">
+                {t("common.rail.title")}
+              </h2>
+              <RequestRail size="sm" stops={DEFAULT_STOPS(t)} className="mt-4" />
+            </section>
+          )}
+          {!isDesktop && windows.length > 0 && (
+            <AvailabilityWindows windows={windows} mentorTz={mentor.timezone} headingLevel="h2" />
+          )}
+        </div>
+        {isDesktop && (
+          <div className="lg:sticky lg:top-20 lg:self-start">
+            <RequestRailCard {...slotProps} windows={windows} />
+          </div>
+        )}
+      </div>
+
+      {!isDesktop && <MobileActionBar {...slotProps} isAvailable={mentor.is_available} />}
+
+      <BookingRequestDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        mentor={mentor}
+        mentorName={display.name}
+        signedIn={signedIn}
+        prefill={prefill}
+        similarHref={similarHref}
+        returnFocusRef={returnFocusRef}
+        onSent={handleSent}
+        invalidateKeys={invalidateKeys}
+      />
+    </Container>
   );
 }
