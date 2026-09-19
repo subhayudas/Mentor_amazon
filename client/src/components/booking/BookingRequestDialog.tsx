@@ -384,12 +384,8 @@ export function BookingRequestDialog({
                 className="mt-2 [&>li:not(:last-child)]:pb-3"
               />
             </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-              <Button variant="link" className="max-md:min-h-11" asChild>
-                <Link href={lastDiscoveryHref()} data-testid="link-success-back">
-                  {t("bookingRequest.success.backToMentors")}
-                </Link>
-              </Button>
+            {/* Primary first in the DOM so phone Tab order matches the painted order (N-12, WCAG 2.4.3); ≥sm the row is reversed so the primary keeps the inline-end. */}
+            <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center sm:justify-start">
               {signedIn ? (
                 <Button variant="secondary" className={mobileTapClass} asChild>
                   <Link href={ROUTES.menteeBookings} data-testid="link-success-bookings">
@@ -403,6 +399,11 @@ export function BookingRequestDialog({
                   </Link>
                 </Button>
               )}
+              <Button variant="link" className="max-md:min-h-11" asChild>
+                <Link href={lastDiscoveryHref()} data-testid="link-success-back">
+                  {t("bookingRequest.success.backToMentors")}
+                </Link>
+              </Button>
             </div>
           </div>
         ) : (
