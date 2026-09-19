@@ -87,7 +87,7 @@ function ProfileState({
         data-testid={testId}
         action={action}
         secondaryAction={
-          <Button variant={action ? "outline" : "secondary"} asChild>
+          <Button variant={action ? "outline" : "secondary"} className="max-md:h-11 max-md:text-base" asChild>
             <Link href={lastDiscoveryHref()} data-testid="link-back">
               {t("mentorProfile.backToMentors")}
             </Link>
@@ -132,13 +132,16 @@ export default function MentorProfile() {
     staleTime: 5 * 60_000,
   });
   const menteeId = user?.profile_id ?? menteeQuery.data?.id;
-  // The live booking row comes from the dashboard's ['mentee', id, 'bookings']
-  // cache when it exists (P1-21); this observer never fetches (`skipToken`),
-  // so the profile adds no bookings request — anonymous visitors could not
-  // read one back anyway. Cache updates still re-render the status block.
+  // The live booking row (P1-21): signed-in viewers fetch their bookings
+  // through the same key and queryFn the dashboard uses, so a direct load of
+  // the profile shows a scheduled/pending request instead of inviting a
+  // duplicate; the two caches merge and the dashboard's polling keeps this
+  // observer fresh. Anonymous visitors never fetch (`skipToken`) — RLS would
+  // not return a row to them anyway.
   const bookingsQuery = useQuery<Booking[]>({
     queryKey: ["mentee", menteeId, "bookings"],
-    queryFn: skipToken,
+    queryFn: signedIn && menteeId ? () => menteeService.getBookings(menteeId) : skipToken,
+    staleTime: 60_000,
   });
 
   const [localSent, setLocalSent] = React.useState(() => getSentRequest(mentorId));
@@ -186,7 +189,12 @@ export default function MentorProfile() {
         description={t("mentorProfile.loadError.body")}
         testId="mentor-load-error"
         action={
-          <Button variant="secondary" onClick={() => void mentorQuery.refetch()} data-testid="button-retry-mentor">
+          <Button
+            variant="secondary"
+            className="max-md:h-11 max-md:text-base"
+            onClick={() => void mentorQuery.refetch()}
+            data-testid="button-retry-mentor"
+          >
             {t("common.tryAgain")}
           </Button>
         }
@@ -235,7 +243,8 @@ export default function MentorProfile() {
 
       {!isDesktop && (
         <div className="mt-5 flex flex-col gap-4">
-          {request.kind === "unavailable" ? (
+          {/* Not accepting keeps its block and the "Find similar mentors" escape even once a request was sent. */}
+          {!mentor.is_available ? (
             <UnavailableBlock
               mentorName={display.name}
               similarHref={similarHref}

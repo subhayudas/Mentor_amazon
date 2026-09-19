@@ -77,8 +77,11 @@ export function ProfileHeader({ mentor, display }: { mentor: PublicMentor; displ
               <p className="text-caption text-muted-foreground" data-testid="text-mentor-rating">
                 <span className="sr-only">{t("mentorProfile.ratingA11y", { rating: ratingText, count: ratingCount })}</span>
                 <span aria-hidden="true">
-                  <span dir="ltr" className="inline-flex items-center gap-1 tabular-nums text-foreground">
-                    <Star className="size-3.5 fill-brand-orange text-brand-orange" strokeWidth={1.5} />
+                  <span dir="ltr" className="tabular-nums text-foreground">
+                    <Star
+                      className="me-1 inline-block size-3.5 fill-brand-orange align-text-bottom text-brand-orange"
+                      strokeWidth={1.5}
+                    />
                     {ratingText}
                   </span>
                   {" · "}

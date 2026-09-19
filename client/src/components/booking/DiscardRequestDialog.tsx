@@ -51,9 +51,14 @@ export function DiscardRequestDialog({
         }}
       >
         <AlertDialogHeader>
-          <AlertDialogTitle>{t("bookingRequest.discard.title")}</AlertDialogTitle>
+          {/* Inner spans restate the type roles until lib/utils.ts merges them (see BookingRequestDialog). */}
+          <AlertDialogTitle>
+            <span className="text-h3">{t("bookingRequest.discard.title")}</span>
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            <Trans i18nKey="bookingRequest.discard.body" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+            <span className="text-body-sm">
+              <Trans i18nKey="bookingRequest.discard.body" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

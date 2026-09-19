@@ -28,15 +28,18 @@ import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
 import { textLinkDestructiveClass } from "@/components/profile/styles";
 import { useToast } from "@/hooks/use-toast";
 import type { PublicMentor } from "@/lib/database";
-import { formatNumber } from "@/lib/format";
+import { bidi, formatNumber } from "@/lib/format";
 import { ROUTES, loginHref } from "@/lib/routes";
 import { bookingService } from "@/lib/services";
 import { lastDiscoveryHref } from "@/lib/urlState";
+import { cn } from "@/lib/utils";
 
 export const GOAL_MIN = 20;
 export const GOAL_MAX = 1000;
 /** The counter appears only near the limits (P1-20). */
 const COUNTER_HIGH = 900;
+/** Footer and success actions are the primary mobile controls: 44px below `md` (spec §3). */
+const mobileTapClass = "max-md:h-11 max-md:text-base";
 
 export interface BookingPrefill {
   name: string;
@@ -116,6 +119,7 @@ export function BookingRequestDialog({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const formId = React.useId();
+  const alertId = React.useId();
 
   const [step, setStep] = React.useState<Step>("form");
   const [serverError, setServerError] = React.useState<BookingErrorKind | null>(null);
@@ -136,7 +140,7 @@ export function BookingRequestDialog({
         goal: z
           .string()
           .trim()
-          .min(GOAL_MIN, { message: t("bookingRequest.validation.goalShort", { name: mentorName }) })
+          .min(GOAL_MIN, { message: t("bookingRequest.validation.goalShort", { name: bidi(mentorName) }) })
           .max(GOAL_MAX, { message: t("bookingRequest.validation.goalLong", { max: maxText }) }),
       }),
     [t, mentorName, maxText],
@@ -201,6 +205,10 @@ export function BookingRequestDialog({
     },
   });
   const isPending = mutation.isPending;
+  // After the rate limit or a "stopped accepting" refusal another send cannot
+  // succeed, so the primary is aria-disabled (still focusable) and described
+  // by the alert that says why; a fresh open clears it.
+  const sendBlocked = serverError === "rateLimited" || serverError === "unavailable";
 
   React.useEffect(() => {
     if (serverError) alertRef.current?.focus();
@@ -210,7 +218,7 @@ export function BookingRequestDialog({
     if (step === "success") successRef.current?.focus();
   }, [step]);
 
-  const submit = form.handleSubmit((values) => {
+  const submitValid = form.handleSubmit((values) => {
     if (mutation.isPending) return;
     if (mentor.is_available === false) {
       setServerError("unavailable");
@@ -230,6 +238,13 @@ export function BookingRequestDialog({
       goal: values.goal,
     });
   });
+  const submit = (event?: React.BaseSyntheticEvent) => {
+    if (sendBlocked) {
+      event?.preventDefault();
+      return Promise.resolve();
+    }
+    return submitValid(event);
+  };
 
   const guardDirty = step === "form" && goalDirty;
 
@@ -267,17 +282,34 @@ export function BookingRequestDialog({
           variant="outline"
           onClick={requestClose}
           aria-disabled={isPending || undefined}
-          className={isPending ? "text-muted-foreground" : undefined}
+          className={cn(mobileTapClass, isPending && "text-muted-foreground")}
           data-testid="button-cancel-booking"
         >
           {t("bookingRequest.cancel")}
         </Button>
-        <Button type="submit" form={formId} loading={isPending} data-testid="button-submit-booking">
+        <Button
+          type="submit"
+          form={formId}
+          loading={isPending}
+          aria-disabled={sendBlocked || undefined}
+          aria-describedby={sendBlocked ? alertId : undefined}
+          className={cn(
+            mobileTapClass,
+            sendBlocked && "bg-muted text-muted-foreground hover:bg-muted active:bg-muted active:scale-100",
+          )}
+          data-testid="button-submit-booking"
+        >
           {t("bookingRequest.send")}
         </Button>
       </>
     ) : (
-      <Button type="button" variant="outline" onClick={() => onOpenChange(false)} data-testid="button-close-success">
+      <Button
+        type="button"
+        variant="outline"
+        className={mobileTapClass}
+        onClick={() => onOpenChange(false)}
+        data-testid="button-close-success"
+      >
         {t("bookingRequest.success.close")}
       </Button>
     );
@@ -287,9 +319,18 @@ export function BookingRequestDialog({
       <ResponsiveDialog
         open={open}
         onOpenChange={onOpenChange}
-        title={<Trans i18nKey="bookingRequest.title" values={{ name: mentorName }} components={{ name: <bdi /> }} />}
+        // The inner spans restate the type roles: `cn()` in the dialog primitives
+        // drops `text-h3` / `text-body-sm` next to a colour class (ticket: lib/utils.ts
+        // extendTailwindMerge); once merged these wrappers are redundant and can go.
+        title={
+          <span className="text-h3">
+            <Trans i18nKey="bookingRequest.title" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+          </span>
+        }
         description={
-          <Trans i18nKey="bookingRequest.description" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+          <span className="text-body-sm">
+            <Trans i18nKey="bookingRequest.description" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+          </span>
         }
         hideDescription={step === "success"}
         size="lg"
@@ -338,26 +379,26 @@ export function BookingRequestDialog({
             />
             <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
               {signedIn ? (
-                <Button variant="secondary" asChild>
+                <Button variant="secondary" className={mobileTapClass} asChild>
                   <Link href={ROUTES.menteeBookings} data-testid="link-success-bookings">
                     {t("bookingRequest.success.viewBookings")}
                   </Link>
                 </Button>
               ) : (
                 <>
-                  <Button variant="secondary" asChild>
+                  <Button variant="secondary" className={mobileTapClass} asChild>
                     <Link href={loginHref(ROUTES.menteeBookings)} data-testid="link-success-sign-in">
                       {t("bookingRequest.success.signIn")}
                     </Link>
                   </Button>
-                  <Button variant="outline" asChild>
+                  <Button variant="outline" className={mobileTapClass} asChild>
                     <Link href={signupHref} data-testid="link-success-signup">
                       {t("bookingRequest.success.createAccount")}
                     </Link>
                   </Button>
                 </>
               )}
-              <Button variant={signedIn ? "outline" : "link"} asChild>
+              <Button variant={signedIn ? "outline" : "link"} className={signedIn ? mobileTapClass : "max-md:min-h-11"} asChild>
                 <Link href={lastDiscoveryHref()} data-testid="link-success-back">
                   {t("bookingRequest.success.backToMentors")}
                 </Link>
@@ -372,6 +413,7 @@ export function BookingRequestDialog({
                 {serverError && (
                   <Alert
                     ref={alertRef}
+                    id={alertId}
                     tabIndex={-1}
                     variant="destructive"
                     data-testid="booking-error"
@@ -475,7 +517,7 @@ export function BookingRequestDialog({
               <FormField
                 control={form.control}
                 name="goal"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormItem>
                     <FormLabel>
                       {t("bookingRequest.goalLabel")} <RequiredMark />
@@ -504,7 +546,8 @@ export function BookingRequestDialog({
                     </FormControl>
                     <FormDescription className="text-pretty">
                       {t("bookingRequest.goalHelp")}
-                      {showCounter && (
+                      {/* The "at least 20" counter yields to the validation message saying the same thing. */}
+                      {showCounter && !(fieldState.error && goalLength < GOAL_MIN) && (
                         <span className="mt-1 block tabular-nums" data-testid="goal-counter">
                           {goalLength < GOAL_MIN
                             ? t("bookingRequest.goalCountShort", { count: goalLength })
