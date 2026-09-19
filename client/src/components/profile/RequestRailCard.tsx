@@ -1,16 +1,17 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 
-import { DEFAULT_STOPS, RequestRail } from "@/components/RequestRail";
+import { RequestRail } from "@/components/RequestRail";
 import { Button } from "@/components/ui/button";
 import { RequestStatusCard } from "@/components/booking/RequestStatusCard";
-import type { RequestState } from "@/components/booking/requestState";
+import { railStopsFor, type RequestState } from "@/components/booking/requestState";
 import { AvailabilityBadge } from "@/components/profile/AvailabilityBadge";
 import { AvailabilityWindows } from "@/components/profile/AvailabilityWindows";
-import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
 import { UnavailableBlock } from "@/components/profile/UnavailableBlock";
+import { profileCardClass } from "@/components/profile/styles";
 import type { AvailabilityRow } from "@/lib/availability";
 import type { PublicMentor } from "@/lib/database";
+import { bidi } from "@/lib/format";
 
 export interface RequestSlotProps {
   mentor: PublicMentor;
@@ -19,17 +20,20 @@ export interface RequestSlotProps {
   signedIn: boolean;
   similarHref: string;
   onRequest: () => void;
-  onSendAnother: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  /** Opens the mentor's Cal.com embed for an accepted request that carries a link. */
+  onChooseTime: () => void;
   /** Callback ref for whichever element a closing dialog should focus. */
   registerReturnFocus: (element: HTMLElement | null) => void;
 }
 
 /**
- * Desktop request card (P1-17/P1-18/P1-21): sticky `top-20`, white, radius
- * 12, p-6. Status line → request rail (three `next` stops) → time-zone note →
- * the one primary button, or the anchored status block, or (not accepting)
- * no button at all. The availability strip and windows sit last and only
- * when rows exist. The primary button is the page's single orange fill.
+ * Desktop request card (P1-17/P1-18/P1-21/F-09): sticky `top-20`, white,
+ * radius 12, p-6. Status badge (the page's only one on desktop — the header
+ * hides its copy) → the request rail drawn from `railStopsFor(request)` so
+ * it advances with the request → the one primary button, or the anchored
+ * status block, or (not accepting) no button at all. The availability strip
+ * and windows sit last and only when rows exist. The time zone lives in the
+ * header's meta line, not here (F-30).
  */
 export function RequestRailCard({
   mentor,
@@ -38,17 +42,15 @@ export function RequestRailCard({
   signedIn,
   similarHref,
   onRequest,
-  onSendAnother,
+  onChooseTime,
   registerReturnFocus,
   windows,
 }: RequestSlotProps & { windows: ReadonlyArray<AvailabilityRow> }) {
   const { t } = useTranslation();
+  const sent = request.kind === "sent";
+  const { stops } = railStopsFor(t, request, { signedIn, name: bidi(mentorName) });
   return (
-    <section
-      aria-labelledby="profile-request-card"
-      className="rounded-xl border border-border bg-card p-6"
-      data-testid="request-card"
-    >
+    <section aria-labelledby="profile-request-card" className={profileCardClass} data-testid="request-card">
       <h2 id="profile-request-card" className="sr-only">
         {t("mentorProfile.requestSession")}
       </h2>
@@ -61,15 +63,13 @@ export function RequestRailCard({
         </div>
       )}
 
-      <p className="mt-5 text-caption text-muted-foreground">{t("common.rail.title")}</p>
-      <RequestRail size="sm" stops={DEFAULT_STOPS(t, undefined, { signedIn })} className="mt-3" />
-
-      {mentor.is_available && (
-        <TimeZoneNote mentorName={mentorName} mentorTz={mentor.timezone} className="mt-5" />
-      )}
+      <p className="mt-5 text-caption text-muted-foreground">
+        {sent ? t("dashboardV2.rail.title") : t("common.rail.title")}
+      </p>
+      <RequestRail size="sm" stops={stops} className="mt-3" />
 
       {request.kind === "cta" && (
-        <div data-testid="booking-section" className="mt-4">
+        <div data-testid="booking-section" className="mt-5">
           <Button
             ref={registerReturnFocus}
             type="button"
@@ -87,10 +87,9 @@ export function RequestRailCard({
           request={request}
           mentorName={mentorName}
           signedIn={signedIn}
-          canSendAnother={mentor.is_available}
-          onSendAnother={onSendAnother}
+          onChooseTime={onChooseTime}
           firstLinkRef={registerReturnFocus}
-          className="mt-4"
+          className="mt-5 border-t border-border pt-5"
         />
       )}
 

@@ -152,6 +152,29 @@ export function tzOffsetLabel(mentorTz: string | null | undefined, viewerTz: str
 }
 
 /**
+ * A human label for an IANA zone in the active language — the localized zone
+ * name plus its current UTC offset, e.g. "Gulf Standard Time (GMT+4)" /
+ * "توقيت الخليج الرسمي (GMT+4)" — so the UI never prints "Asia/Dubai" (F-30).
+ * Unknown zones fall back to the id itself rather than inventing a label.
+ */
+export function tzDisplayLabel(timeZone: string | null | undefined, lang?: string, at: Date = new Date()): string {
+  if (!timeZone) return UNAVAILABLE;
+  const part = (options: Intl.DateTimeFormatOptions) => {
+    try {
+      return new Intl.DateTimeFormat(intlLocale(lang), { timeZone, ...options })
+        .formatToParts(at)
+        .find((p) => p.type === "timeZoneName")?.value;
+    } catch {
+      return undefined;
+    }
+  };
+  const name = part({ timeZoneName: "long" });
+  const offset = part({ timeZoneName: "shortOffset" }) ?? part({ timeZoneName: "short" });
+  if (!name) return timeZone;
+  return offset && offset !== name ? `${name} (${offset})` : name;
+}
+
+/**
  * Wrap a user-supplied or code-like value (name, email, IANA zone, alias) in
  * FIRST STRONG ISOLATE … POP DIRECTIONAL ISOLATE so it keeps its own direction
  * inside a translated sentence (P1-27). Use in aria-labels, titles, toasts and

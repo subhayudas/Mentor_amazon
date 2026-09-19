@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, CircleAlert } from "lucide-react";
 
 import { ResponsiveDialog } from "@/components/ResponsiveDialog";
-import { DEFAULT_STOPS, RequestRail } from "@/components/RequestRail";
+import { RequestRail } from "@/components/RequestRail";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,9 +24,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { classifyBookingError, type BookingErrorKind } from "@/components/booking/bookingErrors";
 import { DiscardRequestDialog } from "@/components/booking/DiscardRequestDialog";
+import { railStopsFor } from "@/components/booking/requestState";
 import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
-import { textLinkDestructiveClass } from "@/components/profile/styles";
-import { useToast } from "@/hooks/use-toast";
+import { inlineLinkClass, textLinkDestructiveClass } from "@/components/profile/styles";
 import type { PublicMentor } from "@/lib/database";
 import { bidi, formatNumber } from "@/lib/format";
 import { ROUTES, loginHref } from "@/lib/routes";
@@ -70,15 +70,6 @@ export interface BookingRequestDialogProps {
 
 type Step = "form" | "success";
 
-/** The visual required marker; the legend above the fields explains it once and `required` carries the semantics. */
-function RequiredMark() {
-  return (
-    <span aria-hidden="true" className="text-muted-foreground">
-      *
-    </span>
-  );
-}
-
 interface Values {
   name: string;
   email: string;
@@ -90,17 +81,21 @@ interface Values {
  * P1-29, P0-1, P2-12, P2-13, P2-14).
  *
  * One step, no stepper: name, email, one guided textarea, the request rail
- * as "What happens next" and the time-zone line. Radix Dialog only
- * (`ResponsiveDialog`, fullscreen below `md`, top-anchored at `md+` so a
- * growing error slot never re-centres the surface). `initialFocusRef` is the
- * goal field when name and email are prefilled, else the name field.
- * Escape, outside pointer-down, the close button and Cancel all pass through
- * the discard guard while the goal is dirty, and are ignored while the send
- * is in flight. Success renders inside the dialog (never toast-only): the
- * h3 receives focus, and on close focus returns to the anchored status block.
- * `bookingService.createRequest({ mentor_id, mentee_name, mentee_email, goal })`
- * is called exactly as before (RLS depends on it) and the legacy toast keeps
- * firing (TESTING e1).
+ * as "What happens next" and the time-zone line in a muted strip. Radix
+ * Dialog only (`ResponsiveDialog`, fullscreen below `md`; at `md+` anchored
+ * 32px from the top with the viewport's height, so the whole form fits at
+ * 1280×720 and a growing error slot never re-centres the surface — F-07).
+ * `initialFocusRef` is the goal field when name and email are prefilled,
+ * else the name field. Escape, outside pointer-down, the close button and
+ * Cancel all pass through the discard guard while the goal is dirty, and are
+ * ignored while the send is in flight. Success is the dialog itself (F-08):
+ * the DialogTitle becomes "Request sent to {name}" and receives focus, the
+ * description carries the follow-up copy, the rail shows stop 1 done, and
+ * there is one primary and one text link — no toast, no footer, no second
+ * heading. Escape and the close button then close it and focus returns to
+ * the anchored status block. `bookingService.createRequest({ mentor_id,
+ * mentee_name, mentee_email, goal })` is called exactly as before (RLS
+ * depends on it).
  */
 export function BookingRequestDialog({
   open,
@@ -116,7 +111,6 @@ export function BookingRequestDialog({
 }: BookingRequestDialogProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { toast } = useToast();
   const queryClient = useQueryClient();
   const formId = React.useId();
   const alertId = React.useId();
@@ -129,7 +123,7 @@ export function BookingRequestDialog({
   const nameRef = React.useRef<HTMLInputElement>(null);
   const goalRef = React.useRef<HTMLTextAreaElement>(null);
   const alertRef = React.useRef<HTMLDivElement>(null);
-  const successRef = React.useRef<HTMLHeadingElement>(null);
+  const successRef = React.useRef<HTMLSpanElement>(null);
 
   const maxText = formatNumber(GOAL_MAX, lang);
   const schema = React.useMemo(
@@ -177,10 +171,6 @@ export function BookingRequestDialog({
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       invalidateKeys?.forEach((key) => queryClient.invalidateQueries({ queryKey: [...key] }));
-      toast({
-        title: t("booking.requestSentTitle"),
-        description: t("booking.requestSentBody"),
-      });
       setSentEmail(variables.mentee_email);
       setServerError(null);
       setStep("success");
@@ -273,9 +263,14 @@ export function BookingRequestDialog({
   const initialFocusRef = (prefilled ? goalRef : nameRef) as React.RefObject<HTMLElement>;
 
   const signupHref = `${ROUTES.signup}?next=${encodeURIComponent(ROUTES.menteeBookings)}`;
+  const success = step === "success";
+  const successStops = railStopsFor(
+    t,
+    { kind: "sent", email: sentEmail, sentAt: "", source: "local" },
+    { signedIn, name: bidi(mentorName) },
+  ).stops;
 
-  const footer =
-    step === "form" ? (
+  const footer = success ? undefined : (
       <>
         <Button
           type="button"
@@ -302,16 +297,6 @@ export function BookingRequestDialog({
           {t("bookingRequest.send")}
         </Button>
       </>
-    ) : (
-      <Button
-        type="button"
-        variant="outline"
-        className={mobileTapClass}
-        onClick={() => onOpenChange(false)}
-        data-testid="button-close-success"
-      >
-        {t("bookingRequest.success.close")}
-      </Button>
     );
 
   return (
@@ -323,40 +308,29 @@ export function BookingRequestDialog({
         // drops `text-h3` / `text-body-sm` next to a colour class (ticket: lib/utils.ts
         // extendTailwindMerge); once merged these wrappers are redundant and can go.
         title={
-          <span className="text-h3">
-            <Trans i18nKey="bookingRequest.title" values={{ name: mentorName }} components={{ name: <bdi /> }} />
-          </span>
+          success ? (
+            // The success heading IS the dialog title (one heading, F-08); the
+            // focusable span lets it receive focus the way the old inner h3 did.
+            <span className="flex items-center gap-3 text-h3">
+              <span
+                aria-hidden="true"
+                className="grid size-10 shrink-0 place-items-center rounded-full bg-success-soft text-success"
+              >
+                <Check className="size-5" strokeWidth={2} />
+              </span>
+              <span ref={successRef} tabIndex={-1} className="min-w-0 rounded-sm" data-testid="booking-success-title">
+                <Trans i18nKey="bookingRequest.success.title" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+              </span>
+            </span>
+          ) : (
+            <span className="text-h3">
+              <Trans i18nKey="bookingRequest.title" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+            </span>
+          )
         }
         description={
-          <span className="text-body-sm">
-            <Trans i18nKey="bookingRequest.description" values={{ name: mentorName }} components={{ name: <bdi /> }} />
-          </span>
-        }
-        hideDescription={step === "success"}
-        size="lg"
-        fullscreenOnMobile
-        initialFocusRef={initialFocusRef}
-        returnFocusRef={returnFocusRef}
-        dirty={isPending || guardDirty}
-        onDiscard={askDiscard}
-        testId="dialog-booking-request"
-        className="md:bottom-auto md:top-[10vh] md:my-0 md:max-h-[80vh]"
-        bodyClassName="pb-3"
-        footer={footer}
-      >
-        {step === "success" ? (
-          // Fullscreen on mobile: centre the confirmation in the viewport, clear of the top toast.
-          <div
-            className="flex flex-col items-center gap-4 py-2 text-center max-md:min-h-full max-md:justify-center"
-            data-testid="booking-success"
-          >
-            <span className="grid size-10 place-items-center rounded-full bg-success-soft text-success">
-              <Check className="size-5" strokeWidth={2} aria-hidden="true" />
-            </span>
-            <h3 ref={successRef} tabIndex={-1} className="text-h3 text-foreground">
-              <Trans i18nKey="bookingRequest.success.title" values={{ name: mentorName }} components={{ name: <bdi /> }} />
-            </h3>
-            <p className="max-w-prose text-body-sm text-muted-foreground text-pretty">
+          success ? (
+            <span className="text-body-sm">
               {signedIn ? (
                 <Trans
                   i18nKey="bookingRequest.success.signedIn"
@@ -364,20 +338,58 @@ export function BookingRequestDialog({
                   components={{ name: <bdi /> }}
                 />
               ) : (
-                <Trans
-                  i18nKey="bookingRequest.success.anonymous"
-                  values={{ name: mentorName, email: sentEmail }}
-                  components={{ name: <bdi />, email: <bdi dir="ltr" className="font-medium text-foreground" /> }}
-                />
+                <>
+                  <Trans
+                    i18nKey="bookingRequest.success.anonymous"
+                    values={{ name: mentorName, email: sentEmail }}
+                    components={{ name: <bdi />, email: <bdi dir="ltr" className="font-medium text-foreground" /> }}
+                  />{" "}
+                  <Trans
+                    i18nKey="bookingRequest.success.createAccountInline"
+                    components={{
+                      // `<link>` is a void tag to the Trans parser, hence `<signup>`; inline (not the
+                      // 32px line-box link class) so the description keeps its line height.
+                      signup: <Link href={signupHref} className={inlineLinkClass} data-testid="link-success-signup" />,
+                    }}
+                  />
+                </>
               )}
-            </p>
-            <RequestRail
-              size="sm"
-              stops={DEFAULT_STOPS(t, ["done", "next", "next"], { signedIn })}
-              ariaLabel={t("bookingRequest.whatNext")}
-              className="w-full max-w-sm text-start"
-            />
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+            </span>
+          ) : (
+            <span className="text-body-sm">
+              <Trans i18nKey="bookingRequest.description" values={{ name: mentorName }} components={{ name: <bdi /> }} />{" "}
+              {t("bookingRequest.allRequired")}
+            </span>
+          )
+        }
+        size="lg"
+        fullscreenOnMobile
+        initialFocusRef={initialFocusRef}
+        returnFocusRef={returnFocusRef}
+        dirty={isPending || guardDirty}
+        onDiscard={askDiscard}
+        testId="dialog-booking-request"
+        className="md:bottom-auto md:top-6 md:my-0 md:max-h-[calc(100dvh-3rem)]"
+        bodyClassName="pb-5"
+        footer={footer}
+      >
+        {success ? (
+          <div className="flex flex-col gap-5 pt-1" data-testid="booking-success">
+            <div className="rounded-lg bg-muted/40 p-3">
+              <p className="text-caption text-muted-foreground">{t("bookingRequest.whatNext")}</p>
+              <RequestRail
+                size="sm"
+                stops={successStops}
+                ariaLabel={t("bookingRequest.whatNext")}
+                className="mt-2 [&>li:not(:last-child)]:pb-3"
+              />
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <Button variant="link" className="max-md:min-h-11" asChild>
+                <Link href={lastDiscoveryHref()} data-testid="link-success-back">
+                  {t("bookingRequest.success.backToMentors")}
+                </Link>
+              </Button>
               {signedIn ? (
                 <Button variant="secondary" className={mobileTapClass} asChild>
                   <Link href={ROUTES.menteeBookings} data-testid="link-success-bookings">
@@ -385,29 +397,17 @@ export function BookingRequestDialog({
                   </Link>
                 </Button>
               ) : (
-                <>
-                  <Button variant="secondary" className={mobileTapClass} asChild>
-                    <Link href={loginHref(ROUTES.menteeBookings)} data-testid="link-success-sign-in">
-                      {t("bookingRequest.success.signIn")}
-                    </Link>
-                  </Button>
-                  <Button variant="outline" className={mobileTapClass} asChild>
-                    <Link href={signupHref} data-testid="link-success-signup">
-                      {t("bookingRequest.success.createAccount")}
-                    </Link>
-                  </Button>
-                </>
+                <Button variant="secondary" className={mobileTapClass} asChild>
+                  <Link href={loginHref(ROUTES.menteeBookings)} data-testid="link-success-sign-in">
+                    {t("bookingRequest.success.signIn")}
+                  </Link>
+                </Button>
               )}
-              <Button variant={signedIn ? "outline" : "link"} className={signedIn ? mobileTapClass : "max-md:min-h-11"} asChild>
-                <Link href={lastDiscoveryHref()} data-testid="link-success-back">
-                  {t("bookingRequest.success.backToMentors")}
-                </Link>
-              </Button>
             </div>
           </div>
         ) : (
           <Form {...form}>
-            <form id={formId} noValidate onSubmit={submit} className="flex flex-col gap-4">
+            <form id={formId} noValidate onSubmit={submit} className="flex flex-col gap-3">
               {/* Reserved error slot: grows downward, never re-centres the dialog (P2-14). */}
               <div className="min-h-0 empty:hidden">
                 {serverError && (
@@ -451,17 +451,13 @@ export function BookingRequestDialog({
                 )}
               </div>
 
-              <p className="text-caption text-muted-foreground">{t("bookingRequest.requiredNote")}</p>
-
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   control={form.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        {t("bookingRequest.nameLabel")} <RequiredMark />
-                      </FormLabel>
+                      <FormLabel>{t("bookingRequest.nameLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -487,9 +483,7 @@ export function BookingRequestDialog({
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        {t("bookingRequest.emailLabel")} <RequiredMark />
-                      </FormLabel>
+                      <FormLabel>{t("bookingRequest.emailLabel")}</FormLabel>
                       <FormControl>
                         <Input
                           {...field}
@@ -519,9 +513,7 @@ export function BookingRequestDialog({
                 name="goal"
                 render={({ field, fieldState }) => (
                   <FormItem>
-                    <FormLabel>
-                      {t("bookingRequest.goalLabel")} <RequiredMark />
-                    </FormLabel>
+                    <FormLabel>{t("bookingRequest.goalLabel")}</FormLabel>
                     <FormControl>
                       <Textarea
                         {...field}
@@ -533,7 +525,7 @@ export function BookingRequestDialog({
                         required
                         minLength={GOAL_MIN}
                         rows={3}
-                        className="min-h-24 resize-y"
+                        className="min-h-20 resize-y"
                         placeholder={t("bookingRequest.goalPlaceholder")}
                         onKeyDown={(event) => {
                           if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -544,11 +536,13 @@ export function BookingRequestDialog({
                         data-testid="textarea-booking-goal"
                       />
                     </FormControl>
+                    {/* One helper line: the prompts and, near the limits, the counter (F-07). */}
                     <FormDescription className="text-pretty">
                       {t("bookingRequest.goalHelp")}
                       {/* The "at least 20" counter yields to the validation message saying the same thing. */}
                       {showCounter && !(fieldState.error && goalLength < GOAL_MIN) && (
-                        <span className="mt-1 block tabular-nums" data-testid="goal-counter">
+                        <span className="tabular-nums" data-testid="goal-counter">
+                          {" "}
                           {goalLength < GOAL_MIN
                             ? t("bookingRequest.goalCountShort", { count: goalLength })
                             : t("bookingRequest.goalCountLong", {
@@ -563,15 +557,15 @@ export function BookingRequestDialog({
                 )}
               />
 
-              <div className="border-t border-border pt-4">
+              <div className="mt-1 rounded-lg bg-muted/40 p-3">
                 <p className="text-caption text-muted-foreground">{t("bookingRequest.whatNext")}</p>
                 <RequestRail
                   size="sm"
-                  stops={DEFAULT_STOPS(t, undefined, { signedIn })}
+                  stops={railStopsFor(t, { kind: "cta" }, { signedIn, name: bidi(mentorName) }).stops}
                   ariaLabel={t("bookingRequest.whatNext")}
-                  className="mt-2"
+                  className="mt-2 [&>li:not(:last-child)]:pb-3"
                 />
-                <TimeZoneNote mentorName={mentorName} mentorTz={mentor.timezone} className="mt-3" />
+                <TimeZoneNote mentorName={mentorName} mentorTz={mentor.timezone} className="mt-2" />
               </div>
             </form>
           </Form>

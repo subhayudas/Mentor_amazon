@@ -1206,17 +1206,14 @@
     "aboutDialogDescription": "النص الكامل للملف الشخصي.",
     "readMore": "اقرأ المزيد",
     "readLess": "عرض أقل",
-    "sessionStyle": "أسلوب الجلسات",
     "preference": {
       "ongoing": "منفتح على إرشاد مستمر",
       "rotating": "يفضّل الجلسات الفردية",
       "either": "منفتح على جلسة واحدة أو إرشاد مستمر"
     },
     "requestSession": "طلب جلسة",
-    "tzNote": "منطقتك الزمنية: <viewer>{{viewer}}</viewer> · منطقة <name>{{name}}</name> الزمنية: <mentor>{{mentor}}</mentor>",
     "availabilityTitle": "التوفر المعتاد",
-    "availabilityCaption": "توفر معتاد يحدده المرشد بنفسه — رابط تقويم المرشد هو الجدول الفعلي",
-    "availabilityZone": "بتوقيت المرشد (<tz>{{tz}}</tz>) · {{offset}}",
+    "availabilityCaption": "يحدده المرشد بنفسه، بتوقيته المحلي — رابط التقويم هو الجدول الفعلي",
     "notFound": {
       "title": "هذا المرشد غير متاح",
       "body": "ربما أُزيل الملف الشخصي، أو أن الرابط قديم."
@@ -1245,7 +1242,6 @@
     "goalCountShort_many": "20 حرفًا على الأقل — {{count}} حرفًا حتى الآن",
     "goalCountShort_other": "20 حرفًا على الأقل — {{count}} حرف حتى الآن",
     "goalCountLong": "{{typed}} من {{max}} حرف",
-    "requiredNote": "* مطلوب",
     "whatNext": "ما الذي يحدث بعد ذلك",
     "cancel": "إلغاء",
     "send": "إرسال الطلب",
@@ -1275,18 +1271,18 @@
       "anonymous": "سجّل الدخول بالبريد <email>{{email}}</email> لرؤية رد <name>{{name}}</name>. استخدم هذا البريد نفسه — فهو ما يربط الطلب بك.",
       "viewBookings": "عرض الحجوزات",
       "signIn": "تسجيل الدخول",
-      "createAccount": "إنشاء حساب",
       "backToMentors": "العودة إلى المرشدين",
-      "close": "إغلاق"
+      "createAccountInline": "ليس لديك حساب بعد؟ <signup>أنشئ حسابًا</signup> بالبريد الإلكتروني نفسه."
     },
     "status": {
       "sent": "تم إرسال الطلب",
       "sentFrom": "أُرسل {{when}} من <email>{{email}}</email>.",
       "anonHint": "سجّل الدخول بهذا البريد الإلكتروني لرؤية رد <name>{{name}}</name>.",
       "signIn": "تسجيل الدخول",
-      "viewInBookings": "عرض في الحجوزات",
-      "sendAnother": "إرسال طلب آخر"
-    }
+      "viewInBookings": "عرض في الحجوزات"
+    },
+    "allRequired": "جميع الحقول مطلوبة.",
+    "tzLine": "المنطقة الزمنية لـ<name>{{name}}</name>: {{zone}} · {{relative}}"
   },
   "dashboardV2": {
     "tabs": {

@@ -1206,17 +1206,14 @@
     "aboutDialogDescription": "The full profile text.",
     "readMore": "Read more",
     "readLess": "Show less",
-    "sessionStyle": "Session style",
     "preference": {
       "ongoing": "Open to ongoing mentoring",
       "rotating": "Prefers one-off sessions",
       "either": "Open to one-off or ongoing"
     },
     "requestSession": "Request a session",
-    "tzNote": "Your time zone: <viewer>{{viewer}}</viewer> · <name>{{name}}</name>'s: <mentor>{{mentor}}</mentor>",
     "availabilityTitle": "Typical availability",
-    "availabilityCaption": "Typical availability, self-reported — the mentor's calendar link is the real schedule",
-    "availabilityZone": "Mentor's time (<tz>{{tz}}</tz>) · {{offset}}",
+    "availabilityCaption": "Self-reported, in the mentor's time zone — the calendar link is the real schedule",
     "notFound": {
       "title": "This mentor isn't available",
       "body": "The profile may have been removed, or the link is out of date."
@@ -1245,7 +1242,6 @@
     "goalCountShort_many": "At least 20 characters — {{count}} so far",
     "goalCountShort_other": "At least 20 characters — {{count}} so far",
     "goalCountLong": "{{typed}} of {{max}} characters",
-    "requiredNote": "* required",
     "whatNext": "What happens next",
     "cancel": "Cancel",
     "send": "Send request",
@@ -1275,18 +1271,18 @@
       "anonymous": "Sign in with <email>{{email}}</email> to see <name>{{name}}</name>'s reply. Use exactly this email — it's how we match the request to you.",
       "viewBookings": "View bookings",
       "signIn": "Sign in",
-      "createAccount": "Create an account",
       "backToMentors": "Back to mentors",
-      "close": "Close"
+      "createAccountInline": "No account yet? <signup>Create one</signup> with the same email."
     },
     "status": {
       "sent": "Request sent",
       "sentFrom": "Sent {{when}} from <email>{{email}}</email>.",
       "anonHint": "Sign in with this email to see <name>{{name}}</name>'s reply.",
       "signIn": "Sign in",
-      "viewInBookings": "View in bookings",
-      "sendAnother": "Send another request"
-    }
+      "viewInBookings": "View in bookings"
+    },
+    "allRequired": "All fields are required.",
+    "tzLine": "<name>{{name}}</name>'s time zone: {{zone}} · {{relative}}"
   },
   "dashboardV2": {
     "tabs": {

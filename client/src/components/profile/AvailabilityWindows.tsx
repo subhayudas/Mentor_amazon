@@ -1,17 +1,18 @@
 import * as React from "react";
-import { Trans, useTranslation } from "react-i18next";
+import { useTranslation } from "react-i18next";
 
 import { AvailabilityStrip } from "@/components/AvailabilityStrip";
 import { weekdayName, windowRange } from "@/components/profile/localized";
 import type { AvailabilityRow } from "@/lib/availability";
-import { tzOffsetLabel, viewerTimeZone } from "@/lib/format";
 import { cx } from "@/components/profile/styles";
 import { cn } from "@/lib/utils";
 
 /**
  * Typical availability (P0-4): the strip plus the mentor's windows listed in
  * the mentor's own zone — never converted, because the rows carry no zone —
- * with the honesty caption and the offset label. Renders nothing without rows.
+ * under one honesty caption that also says whose time the windows are in.
+ * The zone itself and its offset are stated once, in the header (F-30).
+ * Renders nothing without rows.
  */
 export function AvailabilityWindows({
   windows,
@@ -27,10 +28,6 @@ export function AvailabilityWindows({
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const Heading = headingLevel;
-  const offset = React.useMemo(
-    () => (mentorTz ? tzOffsetLabel(mentorTz, viewerTimeZone(), lang) : ""),
-    [mentorTz, lang],
-  );
 
   if (windows.length === 0) return null;
 
@@ -55,15 +52,6 @@ export function AvailabilityWindows({
           </li>
         ))}
       </ul>
-      {mentorTz && (
-        <p className="text-caption text-muted-foreground">
-          <Trans
-            i18nKey="mentorProfile.availabilityZone"
-            values={{ tz: mentorTz, offset }}
-            components={{ tz: <span dir="ltr" className="inline-block" /> }}
-          />
-        </p>
-      )}
     </section>
   );
 }

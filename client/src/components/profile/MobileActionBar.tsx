@@ -8,30 +8,30 @@ import type { RequestState } from "@/components/booking/requestState";
 import { textLinkClass } from "@/components/profile/styles";
 
 /**
- * Mobile bottom bar (P1-17, P1-18, P1-30): fixed to the bottom edge with
- * safe-area padding and a hairline, carrying the single 44px button — or the
- * "Not accepting requests" text + "Find similar mentors" link, or the compact
- * "Request sent" status. Under `max-height: 520px` it sits in the flow so at
- * most two sticky bars ever share a short viewport (the page adds `pb-24`).
- * Rendered only below `lg`, where the request card is not.
+ * Mobile bottom bar (P1-17, P1-18, P1-30, F-09): fixed to the bottom edge
+ * with safe-area padding and a hairline, carrying the single 44px button —
+ * or the "Not accepting requests" text + "Find similar mentors" link, or the
+ * compact request status, whose one action follows `railStatesFor`
+ * ("Choose a time" once accepted with a link). Under `max-height: 520px` it
+ * sits in the flow so at most two sticky bars ever share a short viewport
+ * (the page adds `pb-24`). Rendered only below `lg`, where the request card
+ * is not.
  */
 export function MobileActionBar({
   mentorName,
   request,
   signedIn,
   similarHref,
-  isAvailable,
   onRequest,
-  onSendAnother,
+  onChooseTime,
   registerReturnFocus,
 }: {
   mentorName: string;
   request: RequestState;
   signedIn: boolean;
   similarHref: string;
-  isAvailable: boolean;
   onRequest: () => void;
-  onSendAnother: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onChooseTime: () => void;
   registerReturnFocus: (element: HTMLElement | null) => void;
 }) {
   const { t } = useTranslation();
@@ -69,8 +69,7 @@ export function MobileActionBar({
             request={request}
             mentorName={mentorName}
             signedIn={signedIn}
-            canSendAnother={isAvailable}
-            onSendAnother={onSendAnother}
+            onChooseTime={onChooseTime}
           />
         )}
       </div>

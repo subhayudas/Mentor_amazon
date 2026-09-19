@@ -25,7 +25,9 @@ import { cn } from "@/lib/utils";
  *   close: `onDiscard` fires instead and the caller opens its AlertDialog
  *   ("Discard this request?"); the caller then calls `onOpenChange(false)`.
  * - The body region scrolls (`overflow-y-auto overscroll-contain`), never the
- *   page behind it.
+ *   page behind it. While more content sits below the fold the footer draws a
+ *   scroll-edge shadow (`data-scroll-edge`), so a line cut by the footer never
+ *   appears without a cue (F-07).
  */
 export interface ResponsiveDialogProps {
   open: boolean;
@@ -71,6 +73,23 @@ export function ResponsiveDialog({
   const askDiscard = React.useCallback(() => {
     onDiscard?.();
   }, [onDiscard]);
+
+  const bodyRef = React.useRef<HTMLDivElement>(null);
+  const [moreBelow, setMoreBelow] = React.useState(false);
+  React.useEffect(() => {
+    const el = bodyRef.current;
+    if (!open || !el) return;
+    const update = () => setMoreBelow(el.scrollHeight - el.scrollTop - el.clientHeight > 1);
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    observer?.observe(el);
+    Array.from(el.children).forEach((child) => observer?.observe(child));
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer?.disconnect();
+    };
+  }, [open, children]);
 
   const handleOpenChange = React.useCallback(
     (next: boolean) => {
@@ -123,11 +142,17 @@ export function ResponsiveDialog({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className={cn(hideDescription && "sr-only")}>{description}</DialogDescription>
         </DialogHeader>
-        <div className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-1", bodyClassName)}>
+        <div ref={bodyRef} className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-1", bodyClassName)}>
           {children}
         </div>
         {footer && (
-          <div className="shrink-0 border-t border-border px-6 pt-4 pb-6 max-md:pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+          <div
+            data-scroll-edge={moreBelow || undefined}
+            className={cn(
+              "shrink-0 border-t border-border px-6 pt-4 pb-6 transition-shadow duration-fast max-md:pb-[calc(1.5rem+env(safe-area-inset-bottom))]",
+              moreBelow && "shadow-[0_-8px_16px_-12px_rgba(15,17,17,0.18)]",
+            )}
+          >
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">{footer}</div>
           </div>
         )}
