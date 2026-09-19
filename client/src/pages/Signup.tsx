@@ -7,10 +7,10 @@ import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { AlertCircle, Lock, Mail, MailCheck, Users } from "lucide-react";
 
-import { auth } from "@/lib/auth";
+import { auth, rememberedMenteeEmail } from "@/lib/auth";
 import { authService, menteeService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, isMenteePath } from "@/lib/routes";
 import { safeNext } from "@/lib/ssoClient";
 import { toast } from "sonner";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -35,6 +35,10 @@ export default function Signup() {
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmEmailFor, setConfirmEmailFor] = useState<string | null>(null);
   const nextPath = safeNext(new URLSearchParams(searchString).get("next"), "");
+  // The booking success state's "Create one" arrives with ?next=<mentee path>
+  // and the mirrored email; the dialog insisted on "exactly this email", so it
+  // is the default here (still editable), the same as Login (N-08).
+  const [rememberedEmail] = useState(() => (nextPath !== "" && isMenteePath(nextPath) ? rememberedMenteeEmail() : ""));
 
   const signupSchema = useMemo(
     () =>
@@ -59,7 +63,7 @@ export default function Signup() {
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { email: "", password: "", confirmPassword: "" },
+    defaultValues: { email: rememberedEmail, password: "", confirmPassword: "" },
   });
 
   const password = form.watch("password");

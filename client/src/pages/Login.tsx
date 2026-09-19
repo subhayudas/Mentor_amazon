@@ -5,12 +5,12 @@ import { useMutation } from "@tanstack/react-query";
 import { useLocation, useSearch, Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { AlertCircle, ChevronDown, Lock, Mail, ShieldCheck } from "lucide-react";
+import { AlertCircle, ChevronRight, Lock, Mail, ShieldCheck } from "lucide-react";
 
 import { authService } from "@/lib/services";
-import { clearRoleStorage } from "@/lib/auth";
+import { clearRoleStorage, rememberedMenteeEmail } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
-import { ROUTES } from "@/lib/routes";
+import { ROUTES, isMenteePath } from "@/lib/routes";
 import { safeNext, ssoErrorKey, ssoLoginHref } from "@/lib/ssoClient";
 import { toast } from "sonner";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -22,21 +22,6 @@ import { AuthCard, AuthPage, IconInput, inlineLinkClass } from "@/components/aut
 import { cn } from "@/lib/utils";
 
 /** Paths only a mentee follows; landing here from one of them means the visitor is a mentee (F-01). */
-const MENTEE_PATH_PREFIXES = [ROUTES.menteeDashboard, ROUTES.myBookings, ROUTES.menteeRegistration, ROUTES.mentors, "/mentor/"] as const;
-
-function isMenteePath(path: string): boolean {
-  return MENTEE_PATH_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : `${p}/`) || path.startsWith(`${p}?`));
-}
-
-/** The email the booking dialog / registration mirrored for this visitor, if any. */
-function rememberedMenteeEmail(): string {
-  try {
-    return localStorage.getItem("menteeEmail")?.trim() ?? "";
-  } catch {
-    return "";
-  }
-}
-
 /**
  * Sign in. Two audiences share the page: Amazon employees (mentors, admins)
  * use SSO; mentees use email + password. Whichever audience the visitor is
@@ -157,19 +142,20 @@ export default function Login() {
   const passwordSection = (
     <Collapsible open={passwordOpen} onOpenChange={setPasswordOpen}>
       <CollapsibleTrigger asChild>
+        {/* A ghost disclosure with a leading chevron, not a bordered box with a trailing one — that silhouette read as a Select (N-07). */}
         <button
           type="button"
-          className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-input bg-card px-4 py-2.5 text-start transition-colors duration-fast hover:bg-muted"
+          className="-mx-2 flex min-h-11 w-[calc(100%+1rem)] items-start gap-2 rounded-lg px-2 py-2 text-start transition-colors duration-fast hover:bg-muted"
           data-testid="button-toggle-password-login"
         >
-          <span className="min-w-0">
-            <span className="block text-body-sm font-medium text-foreground">{t("auth.sso.passwordDisclosure")}</span>
-            <span className="block text-caption text-muted-foreground text-pretty">{t("auth.sso.passwordDisclosureHint")}</span>
-          </span>
-          <ChevronDown
-            className={cn("size-4 shrink-0 text-muted-foreground transition-transform duration-fast", passwordOpen && "rotate-180")}
+          <ChevronRight
+            className={cn("mt-0.5 size-4 shrink-0 text-muted-foreground transition-transform duration-fast rtl:-scale-x-100", passwordOpen && "rotate-90")}
             aria-hidden="true"
           />
+          <span className="min-w-0">
+            <span className="block text-body-sm font-medium text-secondary">{t("auth.sso.passwordDisclosure")}</span>
+            <span className="block text-caption text-muted-foreground text-pretty">{t("auth.sso.passwordDisclosureHint")}</span>
+          </span>
         </button>
       </CollapsibleTrigger>
       <CollapsibleContent className="pt-4">

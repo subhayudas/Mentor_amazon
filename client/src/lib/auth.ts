@@ -35,6 +35,19 @@ export interface SignupData {
 const MENTOR_STORAGE_KEYS = ['mentorId', 'mentorEmail', 'mentorName'] as const;
 const MENTEE_STORAGE_KEYS = ['menteeId', 'menteeEmail', 'menteeName'] as const;
 
+/**
+ * The email the booking dialog / registration mirrored for this visitor, if
+ * any — what Login and Signup prefill so an anonymous requester signs in or
+ * signs up with exactly the email the request was sent from (F-01, N-08).
+ */
+export function rememberedMenteeEmail(): string {
+  try {
+    return localStorage.getItem('menteeEmail')?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
 export function clearRoleStorage(keep?: 'mentor' | 'mentee'): void {
   if (keep !== 'mentor') MENTOR_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
   if (keep !== 'mentee') MENTEE_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));

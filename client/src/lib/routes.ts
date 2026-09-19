@@ -29,6 +29,13 @@ export const ROUTES = {
 /** Paths that render their own shell chrome (kept for consumers; the header is mounted everywhere per C12). */
 export const APP_SHELL_PREFIXES = [ROUTES.menteeDashboard, ROUTES.mentorPortal, ROUTES.admin] as const;
 
+const MENTEE_PATH_PREFIXES = [ROUTES.menteeDashboard, ROUTES.myBookings, ROUTES.menteeRegistration, ROUTES.mentors, "/mentor/"] as const;
+
+/** A `?next` target only a mentee would arrive from (dashboard, bookings, registration, discovery, a profile). */
+export function isMenteePath(path: string): boolean {
+  return MENTEE_PATH_PREFIXES.some((p) => path === p || path.startsWith(p.endsWith("/") ? p : `${p}/`) || path.startsWith(`${p}?`));
+}
+
 export function isAppShellPath(pathname: string): boolean {
   return APP_SHELL_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
