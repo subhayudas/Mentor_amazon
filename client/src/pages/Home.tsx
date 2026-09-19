@@ -35,6 +35,8 @@ import { ROUTES, discoveryUrl } from "@/lib/routes";
  * after the preview, needs as a 2 x 3 text grid.
  */
 const FAQ_KEYS = ["spam", "commitment", "matching", "cancel"] as const;
+/** The legacy directory search id lives on the hero input here and on the `/mentors` input there (one per page). */
+const SEARCH_INPUT_PROPS = { "data-testid": "input-search-mentors" } as React.InputHTMLAttributes<HTMLInputElement>;
 
 /** Reduced-motion aware, once-per-session hero fade (spec §2: one 200 ms opacity + 8px travel on first paint). */
 let heroPlayed = false;
@@ -112,6 +114,7 @@ export default function Home() {
                   placeholder={t("landing.hero.searchPlaceholder")}
                   submitLabel={isPhone ? undefined : t("landing.hero.search")}
                   primaryAction
+                  inputProps={SEARCH_INPUT_PROPS}
                   chips={
                     exampleTags.length > 0 ? (
                       <ExampleChips tags={exampleTags} label={t("landing.hero.examples")} />
