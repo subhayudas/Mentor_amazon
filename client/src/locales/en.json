@@ -493,19 +493,6 @@
       "menteeTypeLabel": "Mentee type (label)"
     }
   },
-  "booking": {
-    "bookSession": "Book a Session",
-    "selectDuration": "Select Duration",
-    "15min": "15 minutes",
-    "30min": "30 minutes",
-    "60min": "60 minutes",
-    "sessionBooked": "Session Booked",
-    "bookingConfirmed": "Your mentorship session has been confirmed.",
-    "requestSentTitle": "Request sent",
-    "requestSentBody": "The mentor has been notified. Sign in with the same email to follow the request under Bookings.",
-    "requestFailedTitle": "Request not sent",
-    "requestFailedBody": "Your request could not be sent. Please try again."
-  },
   "profile": {
     "about": "About",
     "expertise": "Expertise",

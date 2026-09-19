@@ -493,19 +493,6 @@
       "menteeTypeLabel": "نوع المتدرب (نص)"
     }
   },
-  "booking": {
-    "bookSession": "حجز جلسة",
-    "selectDuration": "اختر المدة",
-    "15min": "15 دقيقة",
-    "30min": "30 دقيقة",
-    "60min": "60 دقيقة",
-    "sessionBooked": "تم حجز الجلسة",
-    "bookingConfirmed": "تم تأكيد جلسة الإرشاد الخاصة بك.",
-    "requestSentTitle": "تم إرسال الطلب",
-    "requestSentBody": "تم إشعار المرشد. سجّل الدخول بنفس البريد الإلكتروني لمتابعة الطلب ضمن الحجوزات.",
-    "requestFailedTitle": "لم يتم إرسال الطلب",
-    "requestFailedBody": "تعذّر إرسال طلبك. يرجى المحاولة مرة أخرى."
-  },
   "profile": {
     "about": "نبذة",
     "expertise": "الخبرات",

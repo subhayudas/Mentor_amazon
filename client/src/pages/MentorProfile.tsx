@@ -256,11 +256,12 @@ export default function MentorProfile() {
             />
           )}
           {request.kind === "sent" && (
+            // The fixed MobileActionBar carries the one "Choose a time" fill on phones;
+            // the block keeps the status, links and focus target only (one orange per viewport).
             <RequestStatusCard
               request={request}
               mentorName={display.name}
               signedIn={signedIn}
-              onChooseTime={openCal}
               firstLinkRef={registerReturnFocus}
             />
           )}
