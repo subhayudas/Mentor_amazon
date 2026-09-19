@@ -1,5 +1,6 @@
 import type { Booking } from "@/lib/database";
 import type { SentRequest } from "@/lib/sentRequests";
+import type { RailStopState } from "@/components/RequestRail";
 
 /** Statuses that mean "a request to this mentor is live" (P1-21). */
 export const ACTIVE_REQUEST_STATUSES: ReadonlyArray<Booking["status"]> = ["pending", "accepted", "confirmed"];
@@ -48,4 +49,48 @@ export function resolveRequestState(params: {
     return { kind: "sent", email: local.email, sentAt: local.sentAt, source: "local" };
   }
   return isAvailable ? { kind: "cta" } : { kind: "unavailable" };
+}
+
+/**
+ * Rail progress for a request state (F-09): the ONE mapping from request
+ * state to the three stops of the request rail, shared by the profile rail
+ * card, the mobile action bar, the landing hero and the dashboard so the rail
+ * and the StatusBadge never tell two stories on one page.
+ */
+export interface RailProgress {
+  states: [RailStopState, RailStopState, RailStopState];
+  /**
+   * i18n key of the sentence to show under the rail when the mentee can only
+   * wait: the mentor accepted but has no calendar link yet. Interpolates
+   * `{ name }` (pass it through `bidi()`).
+   */
+  waitingKey?: string;
+  /** The mentee owes the next action — pick a time on the mentor's calendar link. */
+  canChooseTime: boolean;
+}
+
+export const RAIL_WAITING_FOR_LINK_KEY = "dashboardV2.rail.acceptedNoLink";
+
+/**
+ * - `cta` / `unavailable` (nothing sent) → all `next`;
+ * - sent with no visible row (localStorage memory) or `pending` → ['done', 'current', 'next'];
+ * - `accepted` without a calendar link → ['done', 'current', 'next'] + the waiting sentence;
+ * - `accepted` with a link → ['done', 'done', 'current'] and `canChooseTime`;
+ * - `confirmed` (and later) → all `done`.
+ */
+export function railStatesFor(request: RequestState, options: { hasLink?: boolean } = {}): RailProgress {
+  if (request.kind !== "sent") return { states: ["next", "next", "next"], canChooseTime: false };
+  switch (request.status) {
+    case "accepted":
+      return options.hasLink
+        ? { states: ["done", "done", "current"], canChooseTime: true }
+        : { states: ["done", "current", "next"], waitingKey: RAIL_WAITING_FOR_LINK_KEY, canChooseTime: false };
+    case "confirmed":
+    case "completed":
+      return { states: ["done", "done", "done"], canChooseTime: false };
+    case "pending":
+    case undefined:
+    default:
+      return { states: ["done", "current", "next"], canChooseTime: false };
+  }
 }
