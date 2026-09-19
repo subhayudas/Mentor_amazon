@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Mentee } from "@/lib/database";
 import { useLeaveGuard } from "@/lib/leaveGuard";
 import { queryClient } from "@/lib/queryClient";
-import { localizeCountry, REPORTING_COUNTRIES } from "@/lib/reporting";
+import { localizeCountry, REPORTING_COUNTRIES } from "@/lib/format";
 import { menteeService } from "@/lib/services";
 import { timeZoneChoices, utcOffsetLabel } from "@/lib/timezones";
 import { PanelSection } from "@/pages/mentee/shared";

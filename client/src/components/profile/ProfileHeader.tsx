@@ -8,7 +8,7 @@ import { AvailabilityBadge } from "@/components/profile/AvailabilityBadge";
 import { formatList, initials, languageName, type MentorDisplay } from "@/components/profile/localized";
 import type { PublicMentor } from "@/lib/database";
 import { formatNumber, tzOffsetLabel, viewerTimeZone } from "@/lib/format";
-import { localizeCountry } from "@/lib/reporting";
+import { localizeCountry } from "@/lib/format";
 
 /**
  * Profile header (P1-17): spans both columns. Avatar 80 with the 1px black/10

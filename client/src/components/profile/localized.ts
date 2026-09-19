@@ -1,23 +1,12 @@
 /**
  * Display helpers for the public mentor profile. Pure and locale-aware; every
- * date, time, number, list and language name goes through lib/format.ts.
+ * date, time, number, list and language name goes through lib/format.ts and
+ * the bilingual field lookups through lib/localized.ts (F-05: no local copies).
  */
 import type { PublicMentor } from "@/lib/database";
 import { MONDAY_FIRST, weekdayLabels } from "@/lib/availability";
-import { UNAVAILABLE, formatRange, intlLocale } from "@/lib/format";
-
-const isArabic = (lang: string) => lang.startsWith("ar");
-
-/** The `*_ar` value when the UI is Arabic and the value exists, else the English one. */
-export function localizedText(lang: string, en: string | null | undefined, ar?: string | null): string {
-  if (isArabic(lang) && ar && ar.trim()) return ar;
-  return en ?? "";
-}
-
-export function localizedList(lang: string, en: string[] | null | undefined, ar?: string[] | null): string[] {
-  if (isArabic(lang) && ar && ar.length > 0) return ar;
-  return en ?? [];
-}
+import { UNAVAILABLE, formatRange } from "@/lib/format";
+import { localizedField, localizedList } from "@/lib/localized";
 
 export interface MentorDisplay {
   name: string;
@@ -31,27 +20,18 @@ export interface MentorDisplay {
 /** Every localised text field of a mentor in one object. */
 export function mentorDisplay(mentor: PublicMentor, lang: string): MentorDisplay {
   return {
-    name: localizedText(lang, mentor.name, mentor.name_ar),
-    position: localizedText(lang, mentor.position, mentor.position_ar),
-    company: localizedText(lang, mentor.company, mentor.company_ar),
-    bio: localizedText(lang, mentor.bio, mentor.bio_ar),
-    expertise: localizedList(lang, mentor.expertise, mentor.expertise_ar),
-    industries: localizedList(lang, mentor.industries, mentor.industries_ar),
+    name: localizedField(mentor, "name", lang),
+    position: localizedField(mentor, "position", lang),
+    company: localizedField(mentor, "company", lang),
+    bio: localizedField(mentor, "bio", lang),
+    expertise: localizedList(mentor, "expertise", lang),
+    industries: localizedList(mentor, "industries", lang),
   };
 }
 
-/** Up to two initials from a display name (the avatar fallback). */
-export function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0] ?? "")
-    .join("")
-    .toLocaleUpperCase();
-}
-
 export { formatList, languageName } from "@/lib/format";
+/** Avatar initials from the displayed name (the shared helper under its profile-local name). */
+export { initialsOf as initials } from "@/lib/localized";
 
 /** Anchor a "HH:MM" wall-clock time on a fixed UTC day so Intl prints it unchanged. */
 function wallClock(hhmm: string): Date | null {

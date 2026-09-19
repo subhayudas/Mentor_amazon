@@ -12,7 +12,7 @@ import { FilterRail } from "@/components/discovery/FilterRail";
 import { MentorGrid } from "@/components/discovery/MentorGrid";
 import { SearchIntent } from "@/components/discovery/SearchIntent";
 import { ZeroResults } from "@/components/discovery/ZeroResults";
-import { useIsDesktop, useIsPhone } from "@/components/discovery/useMediaQuery";
+import { useIsDesktop, useIsPhone } from "@/hooks/useMediaQuery";
 import { useMentors } from "@/components/discovery/useMentors";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { BarChart3, Star } from "lucide-react";
 import { formatNumber, UNAVAILABLE } from "@/lib/format";
-import { localizeCountry } from "@/lib/reporting";
+import { localizeCountry } from "@/lib/format";
 import { FilterChip } from "@/components/discovery/FilterChip";
 import { adminQueryKeys, adminService, type AdminBooking } from "@/lib/adminService";
 import type { Booking } from "@/lib/database";

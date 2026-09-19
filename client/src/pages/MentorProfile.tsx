@@ -23,7 +23,7 @@ import { SessionStyle } from "@/components/profile/SessionStyle";
 import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
 import { UnavailableBlock } from "@/components/profile/UnavailableBlock";
 import { mentorDisplay } from "@/components/profile/localized";
-import { DESKTOP_QUERY, useMediaQuery } from "@/components/profile/useMediaQuery";
+import { DESKTOP_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useAuth } from "@/context/AuthContext";
 import { usePublicAvailability, windowsForMentor } from "@/lib/availability";
 import type { Booking, Mentee, PublicMentor } from "@/lib/database";

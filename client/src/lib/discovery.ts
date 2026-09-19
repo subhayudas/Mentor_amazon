@@ -15,6 +15,7 @@
 import type { PublicMentor } from "@/lib/database";
 import type { DiscoverySort, DiscoveryState } from "@/lib/discoveryState";
 import { languageName, tzOffsetMinutes } from "@/lib/format";
+import { isArabic, localizedField } from "@/lib/localized";
 import { matchesQuery, normalizeForSearch } from "@/lib/search";
 
 export interface DiscoveryContext {
@@ -36,18 +37,14 @@ export const EXAMPLE_CHIP_LIMIT = 5;
 export const PREVIEW_LIMIT = 6;
 export const PREVIEW_LIMIT_MOBILE = 4;
 
-export const isArabic = (lang: string): boolean => lang.startsWith("ar");
+export { isArabic };
 
 type TextField = "name" | "position" | "company" | "bio";
 type ListField = "expertise" | "industries";
 
-/** The mentor's text field in the active language, falling back to English. */
+/** The mentor's text field in the active language, falling back to English (lib/localized's lookup, typed to the card fields). */
 export function localized(mentor: PublicMentor, field: TextField, lang: string): string {
-  if (isArabic(lang)) {
-    const ar = mentor[`${field}_ar` as const];
-    if (ar && ar.trim()) return ar;
-  }
-  return mentor[field] ?? "";
+  return localizedField(mentor, field, lang);
 }
 
 export interface LocalizedTag {
@@ -289,13 +286,3 @@ export function languageLabels(mentor: PublicMentor, lang: string): string[] {
   return out;
 }
 
-/** Initials for the avatar fallback: first letters of the first two words. */
-export function initialsOf(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toLocaleUpperCase() ?? "")
-    .join("");
-}

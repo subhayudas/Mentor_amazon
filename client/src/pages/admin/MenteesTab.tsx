@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { BadgeCheck, Ban, Building2, User as UserIcon } from "lucide-react";
 import { bidi, UNAVAILABLE } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
-import { localizeCountry } from "@/lib/reporting";
+import { localizeCountry } from "@/lib/format";
 import { adminQueryKeys, adminService } from "@/lib/adminService";
 import type { Mentee, VerificationStatus } from "@/lib/database";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";

@@ -12,13 +12,12 @@ import type { PublicMentor } from "@/lib/database";
 import {
   CARD_CHIP_LIMIT,
   firstSentence,
-  initialsOf,
   languageLabels,
   localized,
   localizedTags,
 } from "@/lib/discovery";
-import { UNAVAILABLE, bidi, formatNumber, tzOffsetLabel, viewerTimeZone } from "@/lib/format";
-import { localizeCountry } from "@/lib/reporting";
+import { UNAVAILABLE, bidi, formatNumber, localizeCountry, tzOffsetLabel, viewerTimeZone } from "@/lib/format";
+import { initialsOf } from "@/lib/localized";
 import { ROUTES } from "@/lib/routes";
 import { getSentRequest } from "@/lib/sentRequests";
 import { cn } from "@/lib/utils";
@@ -61,7 +60,8 @@ function useCardFields(mentor: PublicMentor) {
       name,
       position,
       company,
-      initials: initialsOf(mentor.name),
+      // From the displayed name, so Arabic cards show Arabic initials (F-05).
+      initials: initialsOf(name),
       helpsWith: firstSentence(localized(mentor, "bio", lang)),
       tags,
       visibleTags: tags.slice(0, CARD_CHIP_LIMIT),

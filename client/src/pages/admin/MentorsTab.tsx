@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { ExternalLink, KeyRound, MoreHorizontal, Star, UserCheck, UserX, Eye } from "lucide-react";
 import { formatNumber } from "@/lib/format";
 import { initialsOf, localizedField } from "@/lib/localized";
-import { localizeCountry } from "@/lib/reporting";
+import { localizeCountry } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { adminQueryKeys, adminService, aliasFromEmail, normalizeAlias } from "@/lib/adminService";
 import type { Mentor, ApprovedUser } from "@/lib/database";

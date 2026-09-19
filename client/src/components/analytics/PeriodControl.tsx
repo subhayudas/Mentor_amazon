@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { PERIODS, type Period } from "@/lib/reporting";
-import { useMinWidth } from "./useMinWidth";
+import { useMinWidth } from "@/hooks/useMediaQuery";
 
 interface PeriodControlProps {
   value: Period;

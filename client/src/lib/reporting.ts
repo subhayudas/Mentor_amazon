@@ -8,7 +8,13 @@
 
 import { supabase } from "@/lib/supabase";
 import { intlLocale } from "@/lib/format";
+import { localizedField } from "@/lib/localized";
 import type { Booking, Mentor, Mentee } from "@/lib/database";
+
+// Display helpers shared with forms, cards and admin tables live in
+// lib/format.ts (F-04); they are re-exported here so the analytics chunk keeps
+// one import while nothing eager has to import this module.
+export { REPORTING_COUNTRIES, formatList, localizeCountry, localizeLanguage } from "@/lib/format";
 
 /**
  * Sentinel for a booking with no country on it or its mentor. Callers render it
@@ -20,87 +26,6 @@ export const NOT_SPECIFIED = "Not specified";
 export const MIN_SESSION_MINUTES = 5;
 export const MAX_SESSION_MINUTES = 600;
 export const SESSION_MINUTE_PRESETS = [15, 30, 45, 60, 90] as const;
-
-/** Same list the mentor onboarding form offers, so reporting countries stay comparable. */
-export const REPORTING_COUNTRIES: readonly string[] = [
-  "United Arab Emirates",
-  "Saudi Arabia",
-  "Egypt",
-  "Kuwait",
-  "Qatar",
-  "Bahrain",
-  "Oman",
-  "Jordan",
-  "Lebanon",
-  "Morocco",
-  "Tunisia",
-  "Algeria",
-  "Iraq",
-  "Syria",
-  "Palestine",
-  "Turkey",
-  "Pakistan",
-  "India",
-  "Bangladesh",
-  "United Kingdom",
-  "United States",
-  "Germany",
-  "France",
-  "Other",
-];
-
-/** ISO 3166-1 alpha-2 codes for the stored English country names, for localized display. */
-const COUNTRY_CODES: Record<string, string> = {
-  "United Arab Emirates": "AE",
-  "Saudi Arabia": "SA",
-  Egypt: "EG",
-  Kuwait: "KW",
-  Qatar: "QA",
-  Bahrain: "BH",
-  Oman: "OM",
-  Jordan: "JO",
-  Lebanon: "LB",
-  Morocco: "MA",
-  Tunisia: "TN",
-  Algeria: "DZ",
-  Iraq: "IQ",
-  Syria: "SY",
-  Palestine: "PS",
-  Turkey: "TR",
-  Pakistan: "PK",
-  India: "IN",
-  Bangladesh: "BD",
-  "United Kingdom": "GB",
-  "United States": "US",
-  Germany: "DE",
-  France: "FR",
-};
-
-const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
-
-/**
- * Localized name for a stored English country value (the stored value is the
- * data key; the UI shows it in the active language). Unknown values and the
- * sentinels fall back to the stored string.
- */
-export function localizeCountry(country: string, language: string): string {
-  const code = COUNTRY_CODES[country];
-  if (!code) return country;
-  let names = displayNamesCache.get(language);
-  if (names === undefined) {
-    try {
-      names = new Intl.DisplayNames([language], { type: "region" });
-    } catch {
-      names = null;
-    }
-    displayNamesCache.set(language, names);
-  }
-  try {
-    return names?.of(code) ?? country;
-  } catch {
-    return country;
-  }
-}
 
 export type StatusGroup = "clicked" | "scheduled" | "completed" | "canceled";
 
@@ -757,8 +682,8 @@ export function mentorPerformance(
 
 /** The mentor's Arabic name when the UI is Arabic and one was recorded, else the stored name. */
 export function localizedName(entity: { name: string; name_ar?: string } | { name: string; nameAr?: string }, language: string): string {
-  const arabic = "name_ar" in entity ? entity.name_ar : "nameAr" in entity ? entity.nameAr : undefined;
-  return language.startsWith("ar") && arabic ? arabic : entity.name;
+  const row = "nameAr" in entity ? { name: entity.name, name_ar: entity.nameAr } : entity;
+  return localizedField(row, "name", language) || entity.name;
 }
 
 // ---- Locale-aware labels for chart buckets (Intl is allowed here per P1-11) ----
@@ -794,75 +719,6 @@ export function formatBucketTick(start: Date, bucket: Bucket, language: string, 
 /** Full bucket name for tooltips, legends and tables: "25 Aug" (callers wrap it in "Week of …") or "August 2026". */
 export function formatBucketLabel(start: Date, bucket: Bucket, language: string): string {
   return bucketFormatter(bucket === "week" ? "week-of" : "month", language).format(start);
-}
-
-const listFormatters = new Map<string, Intl.ListFormat>();
-
-/** "a, b and c" / "a وb وc" through Intl.ListFormat (never a hand-joined ", "). */
-export function formatList(items: string[], language: string): string {
-  if (items.length === 0) return "";
-  let formatter = listFormatters.get(language);
-  if (!formatter) {
-    formatter = new Intl.ListFormat(intlLocale(language), { style: "long", type: "conjunction" });
-    listFormatters.set(language, formatter);
-  }
-  return formatter.format(items);
-}
-
-// ---- Localized labels for the dimension filters (spec §10) ----
-
-/** Stored English language names → BCP-47 codes, for `Intl.DisplayNames`. Unknown names fall back to the stored string. */
-const LANGUAGE_CODES: Record<string, string> = {
-  english: "en",
-  arabic: "ar",
-  french: "fr",
-  german: "de",
-  spanish: "es",
-  italian: "it",
-  portuguese: "pt",
-  russian: "ru",
-  turkish: "tr",
-  hindi: "hi",
-  urdu: "ur",
-  bengali: "bn",
-  tamil: "ta",
-  malayalam: "ml",
-  tagalog: "tl",
-  filipino: "fil",
-  mandarin: "zh",
-  chinese: "zh",
-  japanese: "ja",
-  korean: "ko",
-  persian: "fa",
-  farsi: "fa",
-  hebrew: "he",
-  dutch: "nl",
-  swedish: "sv",
-  polish: "pl",
-  greek: "el",
-};
-
-const languageNamesCache = new Map<string, Intl.DisplayNames | null>();
-
-/** "Arabic" → "العربية" when the UI is Arabic (via Intl.DisplayNames); the stored string when unknown. */
-export function localizeLanguage(name: string, language: string): string {
-  const code = LANGUAGE_CODES[name.trim().toLowerCase()];
-  if (!code) return name;
-  let names = languageNamesCache.get(language);
-  if (names === undefined) {
-    try {
-      names = new Intl.DisplayNames([language], { type: "language" });
-    } catch {
-      names = null;
-    }
-    languageNamesCache.set(language, names);
-  }
-  try {
-    const localized = names?.of(code);
-    return localized && localized !== code ? localized : name;
-  } catch {
-    return name;
-  }
 }
 
 /**

@@ -11,7 +11,7 @@ import { HowItHappens } from "@/components/discovery/HowItHappens";
 import { MentorPreview } from "@/components/discovery/MentorPreview";
 import { NeedsList } from "@/components/discovery/NeedsList";
 import { SearchIntent } from "@/components/discovery/SearchIntent";
-import { useIsPhone } from "@/components/discovery/useMediaQuery";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMentors } from "@/components/discovery/useMentors";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";

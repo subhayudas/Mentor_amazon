@@ -30,7 +30,7 @@ import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { bidi } from "@/lib/format";
 import { localizeLanguageName } from "@/lib/localized";
-import { localizeCountry, REPORTING_COUNTRIES } from "@/lib/reporting";
+import { localizeCountry, REPORTING_COUNTRIES } from "@/lib/format";
 import { ROUTES } from "@/lib/routes";
 import { timeZoneChoices, utcOffsetLabel } from "@/lib/timezones";
 import { BookingsError } from "@/pages/mentee/shared";

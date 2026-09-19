@@ -178,6 +178,12 @@ export function formatList(items: readonly string[], lang?: string): string {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Stored English names → localized display names (Intl.DisplayNames). One
+// code map and one cache per type; reporting.ts re-exports these for the
+// analytics chunk so the entry bundle never pulls that module (F-04).
+// ---------------------------------------------------------------------------
+
 /** English language names as the forms store them → BCP-47 codes for `Intl.DisplayNames`. */
 const LANGUAGE_CODES: Record<string, string> = {
   english: "en", arabic: "ar", french: "fr", spanish: "es", german: "de", italian: "it", portuguese: "pt",
@@ -186,28 +192,107 @@ const LANGUAGE_CODES: Record<string, string> = {
   nepali: "ne", mandarin: "zh", chinese: "zh", cantonese: "yue", japanese: "ja", korean: "ko", persian: "fa",
   farsi: "fa", kurdish: "ku", pashto: "ps", hebrew: "he", swahili: "sw", amharic: "am", somali: "so",
   tagalog: "tl", filipino: "fil", indonesian: "id", malay: "ms", thai: "th", vietnamese: "vi",
+  swedish: "sv", polish: "pl",
+};
+
+/** Same list the mentor onboarding and mentee forms offer, so reporting countries stay comparable. */
+export const REPORTING_COUNTRIES: readonly string[] = [
+  "United Arab Emirates",
+  "Saudi Arabia",
+  "Egypt",
+  "Kuwait",
+  "Qatar",
+  "Bahrain",
+  "Oman",
+  "Jordan",
+  "Lebanon",
+  "Morocco",
+  "Tunisia",
+  "Algeria",
+  "Iraq",
+  "Syria",
+  "Palestine",
+  "Turkey",
+  "Pakistan",
+  "India",
+  "Bangladesh",
+  "United Kingdom",
+  "United States",
+  "Germany",
+  "France",
+  "Other",
+];
+
+/** ISO 3166-1 alpha-2 codes for the stored English country names, for localized display. */
+const COUNTRY_CODES: Record<string, string> = {
+  "United Arab Emirates": "AE",
+  "Saudi Arabia": "SA",
+  Egypt: "EG",
+  Kuwait: "KW",
+  Qatar: "QA",
+  Bahrain: "BH",
+  Oman: "OM",
+  Jordan: "JO",
+  Lebanon: "LB",
+  Morocco: "MA",
+  Tunisia: "TN",
+  Algeria: "DZ",
+  Iraq: "IQ",
+  Syria: "SY",
+  Palestine: "PS",
+  Turkey: "TR",
+  Pakistan: "PK",
+  India: "IN",
+  Bangladesh: "BD",
+  "United Kingdom": "GB",
+  "United States": "US",
+  Germany: "DE",
+  France: "FR",
 };
 
 const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
+
+function displayNames(type: "language" | "region", lang?: string): Intl.DisplayNames | null {
+  const key = `${type}:${intlLocale(lang)}`;
+  let names = displayNamesCache.get(key);
+  if (names === undefined) {
+    try {
+      names = new Intl.DisplayNames([intlLocale(lang)], { type });
+    } catch {
+      names = null;
+    }
+    displayNamesCache.set(key, names);
+  }
+  return names;
+}
 
 /** The stored language name in the active language ("Arabic" → "العربية"); unknown values pass through. */
 export function languageName(stored: string, lang?: string): string {
   const code = LANGUAGE_CODES[stored.trim().toLowerCase()];
   if (!code) return stored;
-  const locale = intlLocale(lang);
-  let names = displayNamesCache.get(locale);
-  if (names === undefined) {
-    try {
-      names = new Intl.DisplayNames([locale], { type: "language" });
-    } catch {
-      names = null;
-    }
-    displayNamesCache.set(locale, names);
-  }
   try {
-    return names?.of(code) ?? stored;
+    const localized = displayNames("language", lang)?.of(code);
+    return localized && localized !== code ? localized : stored;
   } catch {
     return stored;
+  }
+}
+
+/** Alias of `languageName` kept for the analytics filters. */
+export const localizeLanguage = languageName;
+
+/**
+ * Localized name for a stored English country value (the stored value is the
+ * data key; the UI shows it in the active language). Unknown values and the
+ * sentinels fall back to the stored string.
+ */
+export function localizeCountry(country: string, lang?: string): string {
+  const code = COUNTRY_CODES[country];
+  if (!code) return country;
+  try {
+    return displayNames("region", lang)?.of(code) ?? country;
+  } catch {
+    return country;
   }
 }
 
