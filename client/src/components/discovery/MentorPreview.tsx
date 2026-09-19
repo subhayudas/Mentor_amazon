@@ -48,7 +48,7 @@ export function MentorPreview({ mentors, isLoading, isError, isFetching, onRetry
   let body: React.ReactNode;
   if (isLoading) {
     body = isPhone ? (
-      <div role="status" aria-busy="true" className="-mx-4 flex gap-3 overflow-x-hidden px-4">
+      <div role="status" aria-busy="true" className="-mx-4 flex gap-3 overflow-x-hidden px-4 pb-2">
         <span className="sr-only">{t("discovery.loading")}</span>
         {Array.from({ length: PREVIEW_LIMIT_MOBILE }, (_, i) => (
           <MentorCardCompactSkeleton key={i} />

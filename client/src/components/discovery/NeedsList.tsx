@@ -55,12 +55,15 @@ export function NeedsList({ mentors, isLoading, className }: NeedsListProps) {
         <ul role="status" aria-busy="true" className="mt-4 grid grid-cols-1 md:mt-6 md:grid-cols-2 md:gap-x-12">
           <li className="sr-only">{t("common.loading")}</li>
           {NEED_KEYS.map((key) => (
-            <li key={key} className="flex min-h-11 items-center gap-4 border-b border-border py-2.5 md:min-h-[5.5rem] md:py-4">
-              <div className="flex min-w-0 flex-1 flex-col gap-2">
-                <Skeleton className="h-5 w-2/3" />
-                <Skeleton className="hidden h-4 w-1/2 md:block" />
+            <li key={key} className="min-w-0 border-b border-border">
+              {/* Same box as the loaded row's link (border outside the min-h-11 box) so the page does not shift on load (N-15). */}
+              <div className="flex min-h-11 items-center gap-3 py-2.5 md:min-h-[5.5rem] md:gap-4 md:py-4">
+                <div className="flex min-w-0 flex-1 flex-col gap-2">
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="hidden h-4 w-1/2 md:block" />
+                </div>
+                <Skeleton className="h-4 w-14 md:hidden" />
               </div>
-              <Skeleton className="h-4 w-14 md:hidden" />
             </li>
           ))}
         </ul>

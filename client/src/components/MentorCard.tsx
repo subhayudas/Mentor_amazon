@@ -29,10 +29,12 @@ import { cn } from "@/lib/utils";
  *   1. min-h-14  avatar 48 · name (h3, `<bdi>`, plain text) · status Badge (text + colour; under the name below `sm`)
  *   2. h-6   credential: position · company, one line
  *   3. h-12  helps-with: first sentence of the bio, two lines, `text-pretty`
- *   4. min-h-8 (phones, single column) / ≥60px (md+, shared rows): up to 3
- *      expertise chips, or 2 + a "+n" Popover button when there are more than
- *      3 (F-25 — three chips plus "+n" orphaned the button onto a second row
- *      in 380–410px columns; the popover lists the rest, keyboard/touch, no `title`)
+ *   4. min-h-8, one row at every breakpoint: up to 3 expertise chips, or 2 +
+ *      a "+n" Popover button when there are more than 3 (F-25 — three chips
+ *      plus "+n" orphaned the button onto a second row in 380–410px columns;
+ *      the popover lists the rest, keyboard/touch, no `title`). The row never
+ *      wraps: chips shrink and truncate instead (N-01 — a reserved second row
+ *      was a permanent blank band on desktop).
  *   5. h-10  two caption lines: A languages · country; B tz offset · ★ rating (count)
  *   6. footer: ONE `outline` sm anchor "View profile" whose `after:` overlay makes
  *      the whole card one tab stop named "View profile: {name}". Nothing else on
@@ -142,9 +144,9 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
 
       <p className="line-clamp-2 h-12 text-body-sm leading-6 text-foreground text-pretty">{f.helpsWith}</p>
 
-      <div className="flex min-h-8 flex-wrap content-start gap-2 md:min-h-[3.75rem]">
+      <div className="flex min-h-8 items-start gap-2">
         {f.visibleTags.map((tag, i) => (
-          <Badge key={tag.key} tone="neutral" className="max-w-full" data-testid={`badge-expertise-${i}`}>
+          <Badge key={tag.key} tone="neutral" className="min-w-0 max-w-full shrink" data-testid={`badge-expertise-${i}`}>
             <span className="truncate">{tag.label}</span>
           </Badge>
         ))}
@@ -156,7 +158,7 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
                 aria-label={t("mentorCard.moreExpertise", { count: f.hiddenTags.length })}
                 className={cn(
                   badgeVariants({ variant: "outline" }),
-                  "relative z-[1] min-h-6 cursor-pointer text-secondary transition-colors duration-fast hover:border-secondary hover:bg-muted coarse:after:absolute coarse:after:-inset-2 coarse:after:content-['']",
+                  "relative z-[1] min-h-6 shrink-0 cursor-pointer text-secondary transition-colors duration-fast hover:border-secondary hover:bg-muted coarse:after:absolute coarse:after:-inset-2 coarse:after:content-['']",
                 )}
               >
                 <span dir="ltr">+{formatNumber(f.hiddenTags.length, lang)}</span>
@@ -299,7 +301,7 @@ export function MentorCardSkeleton({ className }: { className?: string }) {
       </div>
       <Skeleton className="h-6 w-2/3" />
       <Skeleton className="h-12 w-full" />
-      <div className="flex min-h-8 flex-wrap content-start gap-2 md:min-h-[3.75rem]">
+      <div className="flex min-h-8 items-start gap-2">
         <Skeleton className="h-5 w-24 rounded-full" />
         <Skeleton className="h-5 w-28 rounded-full" />
         <Skeleton className="h-5 w-20 rounded-full" />
@@ -329,11 +331,13 @@ export function MentorCardCompactSkeleton({ className }: { className?: string })
           <Skeleton className="h-3 w-1/2" />
         </div>
       </div>
-      <div className="flex h-14 flex-wrap content-start gap-2">
+      <div className="flex h-14 flex-wrap content-start gap-2 overflow-hidden">
         <Skeleton className="h-5 w-24 rounded-full" />
         <Skeleton className="h-5 w-20 rounded-full" />
       </div>
-      <Skeleton className="h-4 w-1/3" />
+      <div className="flex h-5 items-center">
+        <Skeleton className="h-4 w-1/3" />
+      </div>
     </div>
   );
 }
