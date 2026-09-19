@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ActiveFilters, type ActiveFilter } from "@/components/discovery/ActiveFilters";
+import { ExampleChipsSkeleton } from "@/components/discovery/ExampleChips";
 import { FilterChip } from "@/components/discovery/FilterChip";
 import { FilterDrawer } from "@/components/discovery/FilterDrawer";
 import { EMPTY_FILTERS, pickFilters, type FilterFacets, type FilterValue } from "@/components/discovery/FilterGroups";
@@ -15,6 +16,7 @@ import { useIsDesktop } from "@/components/discovery/useMediaQuery";
 import { useMentors } from "@/components/discovery/useMentors";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   EXAMPLE_CHIP_LIMIT,
   SORT_THRESHOLD,
@@ -56,6 +58,28 @@ const CLEARED_FILTERS: Partial<DiscoveryState> = { ...EMPTY_FILTERS };
 
 function labelFor(options: FacetOption[], value: string): string {
   return options.find((o) => o.value === value)?.label ?? value;
+}
+
+/** Rail geometry while the catalogue loads: two groups of option rows. Decorative; the grid announces loading. */
+function FilterRailSkeleton() {
+  return (
+    <div aria-hidden="true" className="hidden w-64 shrink-0 lg:block">
+      <Skeleton className="mb-6 h-7 w-20" />
+      {[5, 4].map((rows, g) => (
+        <div key={g} className="mb-6">
+          <Skeleton className="mb-3 h-4 w-24" />
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: rows }, (_, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                <Skeleton className="size-4 rounded-sm" />
+                <Skeleton className="h-4 flex-1" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 export default function Mentors() {
@@ -196,6 +220,8 @@ export default function Mentors() {
           </FilterChip>
         ))}
       </div>
+    ) : mentorsQuery.isLoading ? (
+      <ExampleChipsSkeleton />
     ) : undefined;
 
   return (
@@ -222,7 +248,11 @@ export default function Mentors() {
       </div>
 
       <div className="mt-8 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10">
-        {isDesktop ? (
+        {/* Filters exist only once there is a catalogue to filter: a rail skeleton while
+            loading (desktop), nothing on error (the results column carries the retry). */}
+        {!mentors ? (
+          mentorsQuery.isLoading ? <FilterRailSkeleton /> : <div className="hidden lg:block" aria-hidden="true" />
+        ) : isDesktop ? (
           <FilterRail
             facets={facets}
             value={pickFilters(urlState)}

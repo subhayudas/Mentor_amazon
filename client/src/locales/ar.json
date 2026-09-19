@@ -1483,6 +1483,7 @@
     "ratingA11y_few": "التقييم {{rating}} من 5 بناءً على {{count}} تقييمات",
     "ratingA11y_many": "التقييم {{rating}} من 5 بناءً على {{count}} تقييمًا",
     "ratingA11y_other": "التقييم {{rating}} من 5 بناءً على {{count}} تقييم",
+    "listSeparator": "، ",
     "requestSent": "تم إرسال الطلب"
   },
   "mentorProfile": {

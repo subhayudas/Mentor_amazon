@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
+import { Container } from "@/components/layout/Container";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PublicMentor } from "@/lib/database";
 import { countMatching } from "@/lib/discovery";
@@ -43,7 +44,7 @@ export function NeedsList({ mentors, isLoading, className }: NeedsListProps) {
   if (!isLoading && rows.length < 3) return null;
 
   return (
-    <section aria-labelledby={titleId} className={className}>
+    <Container as="section" aria-labelledby={titleId} className={className}>
       <h2 id={titleId} className="text-h2-sm text-foreground md:text-h2">
         {t("landing.needs.title")}
       </h2>
@@ -89,6 +90,6 @@ export function NeedsList({ mentors, isLoading, className }: NeedsListProps) {
           ))}
         </ul>
       )}
-    </section>
+    </Container>
   );
 }

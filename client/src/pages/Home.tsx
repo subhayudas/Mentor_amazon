@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { ExampleChips } from "@/components/discovery/ExampleChips";
+import { ExampleChips, ExampleChipsSkeleton } from "@/components/discovery/ExampleChips";
 import { HowItHappens } from "@/components/discovery/HowItHappens";
 import { MentorPreview } from "@/components/discovery/MentorPreview";
 import { NeedsList } from "@/components/discovery/NeedsList";
@@ -112,7 +112,13 @@ export default function Home() {
                   placeholder={t("landing.hero.searchPlaceholder")}
                   submitLabel={isPhone ? undefined : t("landing.hero.search")}
                   primaryAction
-                  chips={<ExampleChips tags={exampleTags} label={t("landing.hero.examples")} />}
+                  chips={
+                    exampleTags.length > 0 ? (
+                      <ExampleChips tags={exampleTags} label={t("landing.hero.examples")} />
+                    ) : mentorsQuery.isLoading ? (
+                      <ExampleChipsSkeleton />
+                    ) : undefined
+                  }
                 />
               </div>
               <p className="mt-3 min-h-5 text-caption text-muted-foreground tabular-nums" data-testid="text-trust-line">
@@ -161,10 +167,8 @@ export default function Home() {
         </Container>
       )}
 
-      {/* ===== What people come with ===== */}
-      <Container className="py-6 md:py-14">
-        <NeedsList mentors={mentors} isLoading={mentorsQuery.isLoading} />
-      </Container>
+      {/* ===== What people come with (renders nothing, padding included, under 3 rows) ===== */}
+      <NeedsList mentors={mentors} isLoading={mentorsQuery.isLoading} className="py-6 md:py-14" />
 
       {/* ===== FAQ ===== */}
       <section aria-labelledby={faqId}>
@@ -205,13 +209,15 @@ export default function Home() {
       {/* ===== Footer ===== */}
       <footer className="border-t border-border bg-background">
         <Container className="flex flex-col gap-3 py-6 md:flex-row md:items-center md:justify-between md:py-8">
-          <div className="flex min-w-0 items-center gap-2 text-body-sm">
-            <AmazonLogo size="sm" />
-            <span className="font-medium text-foreground">MentorConnect</span>
-            <span className="text-muted-foreground" aria-hidden="true">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-body-sm">
+            <span className="inline-flex items-center gap-2">
+              <AmazonLogo size="sm" />
+              <span className="font-medium text-foreground">MentorConnect</span>
+            </span>
+            <span className="hidden text-muted-foreground md:inline" aria-hidden="true">
               ·
             </span>
-            <span className="truncate text-muted-foreground">{t("landing.footer.programme")}</span>
+            <span className="basis-full text-muted-foreground md:basis-auto">{t("landing.footer.programme")}</span>
           </div>
           <nav aria-label={t("landing.footer.nav")}>
             <ul className="flex flex-wrap gap-x-6 gap-y-2 text-body-sm">

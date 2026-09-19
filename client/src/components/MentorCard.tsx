@@ -110,7 +110,7 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
         <h3
           id={nameId}
           data-testid={`text-mentor-name-${mentor.id}`}
-          className="line-clamp-2 min-w-0 flex-1 text-base leading-snug text-foreground [font-weight:var(--heading-weight,600)]"
+          className="line-clamp-2 min-w-0 flex-1 text-base leading-snug text-foreground [font-weight:var(--heading-weight,600)] [overflow-wrap:anywhere]"
         >
           <bdi>{f.name}</bdi>
         </h3>
@@ -161,7 +161,7 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
 
       <div className="h-10 text-caption text-muted-foreground">
         <p className="h-5 truncate leading-5">
-          {f.languages.length > 0 && <span>{f.languages.join(", ")}</span>}
+          {f.languages.length > 0 && <span>{f.languages.join(t("mentorCard.listSeparator"))}</span>}
           {f.languages.length > 0 && f.country && <span aria-hidden="true"> · </span>}
           {f.country && <span>{f.country}</span>}
         </p>

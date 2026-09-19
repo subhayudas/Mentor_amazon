@@ -1393,7 +1393,7 @@
     "resultCount_few": "{{count}} mentors",
     "resultCount_many": "{{count}} mentors",
     "resultCount_other": "{{count}} mentors",
-    "resultCountOf_zero": "No mentors match, of {{total}}",
+    "resultCountOf_zero": "No mentors match",
     "resultCountOf_one": "{{count}} of {{total}} mentors",
     "resultCountOf_two": "{{count}} of {{total}} mentors",
     "resultCountOf_few": "{{count}} of {{total}} mentors",
@@ -1483,6 +1483,7 @@
     "ratingA11y_few": "Rated {{rating}} out of 5 from {{count}} ratings",
     "ratingA11y_many": "Rated {{rating}} out of 5 from {{count}} ratings",
     "ratingA11y_other": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "listSeparator": ", ",
     "requestSent": "Request sent"
   },
   "mentorProfile": {

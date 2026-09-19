@@ -1,10 +1,12 @@
 import * as React from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
+import { dialogCloseClassName } from "@/components/ui/dialog";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerFooter,
@@ -21,7 +23,8 @@ import { FilterGroups, EMPTY_FILTERS, type FilterFacets, type FilterValue } from
  * ONE history push and closes; "Clear" empties the draft. Closing by swipe,
  * overlay or Escape discards the draft, so the URL never changes without an
  * explicit apply. The body is the only scrolling region (`data-vaul-no-drag`
- * keeps the drag gesture off the list).
+ * keeps the drag gesture off the list). A visible close button sits at the
+ * header's inline-end so dismissal never depends on the swipe gesture.
  */
 export interface FilterDrawerProps {
   facets: FilterFacets;
@@ -54,9 +57,13 @@ export function FilterDrawer({ facets, value, activeCount, countFor, onApply, cl
         </Button>
       </DrawerTrigger>
       <DrawerContent data-testid="drawer-filters">
-        <DrawerHeader className="pb-2">
+        <DrawerHeader className="relative pb-2 pe-14">
           <DrawerTitle>{t("discovery.filters.title")}</DrawerTitle>
           <DrawerDescription>{t("discovery.filters.drawerDescription")}</DrawerDescription>
+          <DrawerClose className={dialogCloseClassName} data-testid="button-close-filters">
+            <X className="size-4" aria-hidden="true" />
+            <span className="sr-only">{t("common.close")}</span>
+          </DrawerClose>
         </DrawerHeader>
         <div data-vaul-no-drag className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4">
           <FilterGroups
@@ -80,7 +87,14 @@ export function FilterDrawer({ facets, value, activeCount, countFor, onApply, cl
           >
             {t("discovery.filters.apply", { count })}
           </Button>
-          <Button type="button" variant="ghost" size="lg" className="w-full" onClick={() => setDraft(EMPTY_FILTERS)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="lg"
+            className="w-full"
+            onClick={() => setDraft(EMPTY_FILTERS)}
+            data-testid="button-clear-filters"
+          >
             {t("discovery.filters.clear")}
           </Button>
         </DrawerFooter>

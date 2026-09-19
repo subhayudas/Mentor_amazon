@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import type { FacetOption } from "@/lib/discovery";
 import { discoveryUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -36,5 +37,24 @@ export function ExampleChips({ tags, mobileCount = 3, label }: ExampleChipsProps
         </Link>
       ))}
     </nav>
+  );
+}
+
+/**
+ * Holds the chip row's height while the catalogue loads (P1-16: nothing
+ * below the search box shifts when the tags arrive). Widths approximate
+ * typical tag lengths; decorative.
+ */
+export function ExampleChipsSkeleton({ count = 5, mobileCount = 3 }: { count?: number; mobileCount?: number }) {
+  const widths = ["w-32", "w-44", "w-24", "w-16", "w-28"];
+  return (
+    <div aria-hidden="true" className="contents">
+      {Array.from({ length: count }, (_, i) => (
+        <Skeleton
+          key={i}
+          className={cn("h-8 shrink-0 rounded-md coarse:h-10", widths[i % widths.length], i >= mobileCount && "hidden md:block")}
+        />
+      ))}
+    </div>
   );
 }

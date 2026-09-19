@@ -270,9 +270,9 @@ export function countMatching(mentors: ReadonlyArray<PublicMentor>, term: string
 }
 
 /**
- * Stored language names → BCP-47 codes for `Intl.DisplayNames`. The onboarding
- * form offers six; the extra entries cover values already in the data. Unknown
- * values are displayed as stored (spec §10).
+ * Stored language names → BCP-47 codes for `Intl.DisplayNames`. Exactly the
+ * six options MentorOnboarding offers (the only known set); any other stored
+ * value is displayed as stored rather than guessed (spec §10).
  */
 const LANGUAGE_CODES: Record<string, string> = {
   english: "en",
@@ -281,48 +281,6 @@ const LANGUAGE_CODES: Record<string, string> = {
   german: "de",
   spanish: "es",
   turkish: "tr",
-  hindi: "hi",
-  urdu: "ur",
-  malayalam: "ml",
-  tamil: "ta",
-  bengali: "bn",
-  mandarin: "zh",
-  chinese: "zh",
-  portuguese: "pt",
-  italian: "it",
-  russian: "ru",
-  tagalog: "tl",
-  filipino: "fil",
-  persian: "fa",
-  farsi: "fa",
-  japanese: "ja",
-  korean: "ko",
-  dutch: "nl",
-  greek: "el",
-  hebrew: "he",
-  swahili: "sw",
-  amharic: "am",
-  somali: "so",
-  punjabi: "pa",
-  gujarati: "gu",
-  marathi: "mr",
-  telugu: "te",
-  kannada: "kn",
-  sinhala: "si",
-  nepali: "ne",
-  indonesian: "id",
-  malay: "ms",
-  thai: "th",
-  vietnamese: "vi",
-  polish: "pl",
-  ukrainian: "uk",
-  romanian: "ro",
-  czech: "cs",
-  swedish: "sv",
-  norwegian: "no",
-  danish: "da",
-  finnish: "fi",
-  hungarian: "hu",
 };
 
 const displayNamesCache = new Map<string, Intl.DisplayNames | null>();
