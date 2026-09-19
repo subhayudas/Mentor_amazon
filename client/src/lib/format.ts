@@ -159,5 +159,5 @@ export function tzOffsetLabel(mentorTz: string | null | undefined, viewerTz: str
  */
 export function bidi(value: string | number | null | undefined): string {
   if (value == null) return "";
-  return `⁨${String(value)}⁩`;
+  return `\u2068${String(value)}\u2069`;
 }

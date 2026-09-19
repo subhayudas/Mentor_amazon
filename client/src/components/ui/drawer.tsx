@@ -8,13 +8,17 @@ import { cn } from "@/lib/utils";
  * Drawer (vaul). Used only for bottom sheets such as the mobile filter drawer;
  * dialogs stay Radix (P0-3). `shouldScaleBackground` defaults to false so the
  * page behind never transforms; vaul keeps its own gesture-driven timing.
+ * `autoFocus` defaults to true so keyboard and screen-reader focus enters the
+ * drawer on open instead of staying on the page behind it.
  */
 const Drawer = ({
   shouldScaleBackground = false,
+  autoFocus = true,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
   <DrawerPrimitive.Root
     shouldScaleBackground={shouldScaleBackground}
+    autoFocus={autoFocus}
     {...props}
   />
 );

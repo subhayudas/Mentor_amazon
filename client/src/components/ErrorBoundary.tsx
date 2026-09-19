@@ -69,7 +69,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 this.headingRef = node;
               }}
               tabIndex={-1}
-              className="mt-4 text-h2-sm text-foreground focus:outline-none"
+              className="mt-4 text-h2-sm text-foreground [&:focus:not(:focus-visible)]:outline-none"
             >
               {t("common.somethingWentWrong")}
             </h1>

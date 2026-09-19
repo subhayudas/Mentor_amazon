@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
  */
 export function LanguageToggle({ className }: { className?: string }) {
   const { language, setLanguage } = useLanguage();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [loading, setLoading] = useState(false);
   const alive = useRef(true);
 
@@ -36,7 +36,7 @@ export function LanguageToggle({ className }: { className?: string }) {
 
   const toggle = () => {
     setLanguage(target);
-    if (target !== "ar") return;
+    if (target !== "ar" || i18n.hasResourceBundle("ar", "translation")) return;
     setLoading(true);
     void ensureLanguageLoaded("ar").finally(() => {
       if (alive.current) setLoading(false);

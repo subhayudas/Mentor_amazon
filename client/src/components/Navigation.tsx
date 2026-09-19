@@ -134,7 +134,7 @@ export function Navigation() {
           <span className="text-base font-semibold text-foreground">MentorConnect</span>
         </Link>
 
-        <nav aria-label={t("nav.navigation")} className="hidden lg:flex lg:flex-1 lg:items-center">
+        <nav aria-label={t("nav.primaryNav")} className="hidden lg:flex lg:flex-1 lg:items-center">
           <ul className="flex items-center">
             {desktopItems.map((item) => (
               <li key={item.href}>
@@ -248,7 +248,7 @@ export function Navigation() {
                 <SheetTitle className="text-base font-semibold">{t("nav.menu")}</SheetTitle>
                 <SheetDescription className="sr-only">{t("nav.navigation")}</SheetDescription>
               </div>
-              <nav aria-label={t("nav.navigation")} className="flex flex-col gap-1 p-3">
+              <nav aria-label={t("nav.primaryNav")} className="flex flex-col gap-1 p-3">
                 {[...primaryItems, ...roleItems].map((item) => (
                   <Link
                     key={item.href}

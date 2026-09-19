@@ -149,13 +149,15 @@ export default {
         },
         // Sheet travel is driven by --sheet-x/--sheet-y set per logical side,
         // so no physical slide-in-from-* utility is needed.
+        // Opacity rides along so a reduced-motion open (travel zeroed) is a
+        // short fade rather than a pop.
         "sheet-in": {
-          from: { transform: "translate(var(--sheet-x, 0), var(--sheet-y, 0))" },
-          to: { transform: "translate(0, 0)" },
+          from: { transform: "translate(var(--sheet-x, 0), var(--sheet-y, 0))", opacity: "0" },
+          to: { transform: "translate(0, 0)", opacity: "1" },
         },
         "sheet-out": {
-          from: { transform: "translate(0, 0)" },
-          to: { transform: "translate(var(--sheet-x, 0), var(--sheet-y, 0))" },
+          from: { transform: "translate(0, 0)", opacity: "1" },
+          to: { transform: "translate(var(--sheet-x, 0), var(--sheet-y, 0))", opacity: "0" },
         },
       },
       animation: {

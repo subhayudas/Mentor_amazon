@@ -1,4 +1,5 @@
 import { Bell, Check, CheckCheck } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ email }: NotificationBellProps) {
+  const { t } = useTranslation();
   const { data: notifications = [], isLoading: notificationsLoading } = useQuery<Notification[]>({
     queryKey: ["notifications", email],
     queryFn: () => notificationService.getAll(email),
@@ -71,12 +73,18 @@ export function NotificationBell({ email }: NotificationBellProps) {
           variant="ghost"
           size="icon"
           className="relative"
+          aria-label={
+            unreadCount > 0
+              ? t("nav.notificationsUnread", { count: unreadCount })
+              : t("nav.notifications")
+          }
           data-testid="button-notification-bell"
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-5 w-5" aria-hidden="true" />
           {unreadCount > 0 && (
             <Badge
-              className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 text-xs"
+              className="absolute -top-1 -end-1 h-5 min-w-5 flex items-center justify-center p-0 text-xs"
+              aria-hidden="true"
               data-testid="badge-unread-count"
             >
               {unreadCount > 99 ? "99+" : unreadCount}
@@ -96,7 +104,7 @@ export function NotificationBell({ email }: NotificationBellProps) {
               disabled={markAllAsReadMutation.isPending}
               data-testid="button-mark-all-read"
             >
-              <CheckCheck className="h-3 w-3 mr-1" />
+              <CheckCheck className="h-3 w-3 me-1" aria-hidden="true" />
               Mark all as read
             </Button>
           )}
@@ -116,7 +124,7 @@ export function NotificationBell({ email }: NotificationBellProps) {
               {notifications.map((notification) => (
                 <button
                   key={notification.id}
-                  className={`w-full text-left px-4 py-3 hover-elevate transition-colors ${
+                  className={`w-full text-start px-4 py-3 transition-colors hover:bg-muted ${
                     notification.is_read ? "bg-background" : "bg-muted/50"
                   }`}
                   onClick={() => handleNotificationClick(notification)}

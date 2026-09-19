@@ -63,7 +63,7 @@
 
   /* ===== Charts (P0-2: no orange series; every fill >= 3:1 on white) ===== */
   --chart-1: 213 28% 19%;               /* #232F3E completed */
-  --chart-2: 26 100% 38%;               /* #C45500 requests, 4.52:1 on white, 3.00:1 vs navy */
+  --chart-2: 26 100% 39%;               /* #C75600 requests, 4.41:1 on white, 3.08:1 vs navy (38% rounds to 2.94) */
   --chart-3: 186 76% 31%;               /* #137F8B */
   --chart-4: 212 8% 38%;                /* #5A6169 */
   --chart-5: 32 100% 35%;               /* #B15D00 */
@@ -234,11 +234,13 @@
     animation-duration: 120ms !important;
   }
 
-  .animate-sheet-in,
-  .animate-sheet-out {
-    --sheet-x: 0;
-    --sheet-y: 0;
-    animation-duration: 120ms;
+  /* Sheet (SheetContent sets data-side; the animation classes are
+     state-prefixed, so a bare .animate-sheet-in never exists): remove the
+     travel, keep the opacity keyframe, cap at 120ms. */
+  [data-side][data-state] {
+    --sheet-x: 0 !important;
+    --sheet-y: 0 !important;
+    animation-duration: 120ms !important;
   }
 
   [data-vaul-drawer],
@@ -251,8 +253,16 @@
     animation: none;
   }
 
-  .transition-transform,
-  .active\:scale-\[0\.97\] {
+  /* Stop the motion, keep the resting state: a checked Switch thumb still
+     sits at translate-x-5 and an open accordion chevron stays rotated; only
+     the transition between states is skipped. */
+  .transition-transform {
+    transition-property: none !important;
+  }
+
+  /* Button press feedback: the scale is removed only while pressed, so
+     positioning transforms on buttons (e.g. carousel arrows) survive. */
+  .active\:scale-\[0\.97\]:active {
     transform: none !important;
   }
 

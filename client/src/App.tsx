@@ -90,7 +90,7 @@ function RouteEffects() {
     const frame = window.requestAnimationFrame(() => {
       const target = document.getElementById("page-title") ?? document.getElementById("main");
       target?.focus({ preventScroll });
-      if (!preventScroll) window.scrollTo({ top: 0 });
+      if (!preventScroll) window.scrollTo({ top: 0, behavior: "instant" });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [location]);

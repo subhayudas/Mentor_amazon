@@ -91,7 +91,7 @@ export function ResponsiveDialog({
           "flex flex-col gap-0 overflow-hidden p-0",
           size === "lg" ? "max-w-2xl" : "max-w-lg",
           fullscreenOnMobile &&
-            "max-md:inset-0 max-md:top-0 max-md:h-[100dvh] max-md:max-h-none max-md:w-full max-md:max-w-none max-sm:max-w-none max-md:translate-y-0 max-md:rounded-none max-md:border-0",
+            "max-md:inset-0 max-md:h-[100dvh] max-md:max-h-none max-md:w-full max-md:max-w-none max-sm:max-w-none max-md:rounded-none max-md:border-0",
           className,
         )}
         onOpenAutoFocus={(event) => {

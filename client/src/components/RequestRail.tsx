@@ -11,8 +11,8 @@ import { cn } from "@/lib/utils";
  * (send a request → the mentor replies → pick a time on their calendar link).
  *
  * Geometry: 2px navy line, stops filled `--brand-orange` for done/current
- * with a 2px navy ring, white for next; md = 16px stops / 32px gaps,
- * sm = 12px stops / 20px gaps. No animation, no directional icons.
+ * with a 2px navy ring, white for next; 12px stops on both sizes; md = 32px
+ * gaps, sm = 20px gaps. No animation, no directional icons.
  *
  * A11y: an `<ol>` with `aria-current="step"` on the current stop, a Check
  * icon inside done stops and the state word in visually-hidden text, so the
@@ -71,7 +71,7 @@ export function RequestRail({ stops, size = "md", ariaLabel, className }: Reques
               isLast && "pb-0",
               // the rail line: from this stop down to the next one
               !isLast && "before:absolute before:top-3 before:bottom-0 before:w-0.5 before:bg-secondary",
-              !isLast && (md ? "before:start-[7px]" : "before:start-[5px]"),
+              !isLast && "before:start-[5px]",
             )}
           >
             <span
@@ -79,12 +79,12 @@ export function RequestRail({ stops, size = "md", ariaLabel, className }: Reques
               data-state={stop.state}
               className={cn(
                 "relative z-[1] grid shrink-0 place-items-center rounded-full ring-2 ring-secondary",
-                md ? "mt-1 size-4" : "mt-1.5 size-3",
+                "mt-1.5 size-3",
                 filled ? "bg-brand-orange text-secondary" : "bg-card",
               )}
             >
               {stop.state === "done" && (
-                <Check className={md ? "size-2.5" : "size-2"} strokeWidth={3.5} />
+                <Check className="size-2" strokeWidth={3.5} />
               )}
             </span>
             <div className="min-w-0">
