@@ -294,6 +294,7 @@
     "bioPlaceholder": "What you have done and what you can help with",
     "linkedinUrl": "LinkedIn URL",
     "calLink": "Cal.com link",
+    "calPlaceholder": "username/30min",
     "calHelp": "Your Cal.com booking page, e.g. username/30min. Mentees pick a time on it after you accept.",
     "calSetupLink": "Set up a Cal.com calendar",
     "expertise": "Areas of expertise",
@@ -876,6 +877,7 @@
       "assistantWithEmail": "Assistant: {{email}}"
     },
     "mentees": {
+      "viewA11y": "View details for {{name}}",
       "searchPlaceholder": "Search mentees by name, email or organization",
       "filterLabel": "Filter by verification status",
       "colName": "Mentee",
@@ -902,6 +904,7 @@
       "markedRejected": "Verification rejected for {{name}}"
     },
     "bookings": {
+      "viewA11y": "View booking details: {{mentor}} with {{mentee}}",
       "filterLabel": "Filter by status",
       "searchPlaceholder": "Search by mentor, mentee or country",
       "openAnalytics": "Open analytics",
@@ -1057,7 +1060,7 @@
       "action": "Browse mentors"
     },
     "error": {
-      "title": "Unable to load this page",
+      "title": "Unable to load this section",
       "body": "Check your connection and try again."
     },
     "overview": {
@@ -1377,6 +1380,7 @@
       "emptyOpenBody": "Add a follow-up to keep track of what you promised a mentee.",
       "newTitle": "New task",
       "newDesc": "A private reminder; mentees never see it.",
+      "titleRequired": "Enter a title for the task.",
       "titleLabel": "Title",
       "descLabel": "Details (optional)",
       "priorityLabel": "Priority",

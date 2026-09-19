@@ -714,7 +714,7 @@ export default function MentorOnboarding() {
                     <FormItem>
                       <FormLabel htmlFor="input-calcom">{t("mentorOnboarding.calLink")}</FormLabel>
                       <FormControl>
-                        <Input {...field} id="input-calcom" dir="ltr" className="text-start md:max-w-sm" autoComplete="off" spellCheck={false} placeholder="username/30min" data-testid="input-calcom" />
+                        <Input {...field} id="input-calcom" dir="ltr" className="text-start md:max-w-sm" autoComplete="off" spellCheck={false} placeholder={t("mentorOnboarding.calPlaceholder")} data-testid="input-calcom" />
                       </FormControl>
                       <FormDescription className="space-y-1">
                         <span className="block">{t("mentorOnboarding.calHelp")}</span>

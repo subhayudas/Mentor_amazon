@@ -32,12 +32,20 @@ export function StarRating({
   readonly = false,
   label,
   className,
+  id,
+  invalid,
+  describedBy,
 }: {
   rating: number;
   onRate?: (r: number) => void;
   readonly?: boolean;
   label?: string;
   className?: string;
+  /** Element id for the interactive group (so callers can move focus to it). */
+  id?: string;
+  /** Marks the group invalid and links its error message. */
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const { t, i18n } = useTranslation();
   const name = label ?? t("dashboardV2.feedback.rateLabel");
@@ -77,7 +85,15 @@ export function StarRating({
   };
 
   return (
-    <div role="radiogroup" aria-label={name} onKeyDown={onKeyDown} className={cn("flex gap-1", className)}>
+    <div
+      id={id}
+      role="radiogroup"
+      aria-label={name}
+      aria-invalid={invalid || undefined}
+      aria-describedby={describedBy}
+      onKeyDown={onKeyDown}
+      className={cn("flex gap-1", className)}
+    >
       {stars.map((star) => {
         const checked = star === rating;
         const filled = star <= rating;
@@ -154,6 +170,8 @@ export function MenteeFeedbackDialog({ booking, open, onOpenChange, invalidateKe
     if (!booking) return;
     if (rating === 0) {
       setShowRatingError(true);
+      // Announce next to the group and move focus to its Tab stop.
+      document.getElementById(`${ids}-stars`)?.querySelector<HTMLElement>('[role="radio"][tabindex="0"]')?.focus();
       return;
     }
     submit.mutate({ bookingId: booking.id, rating, feedback: text.trim() });
@@ -184,14 +202,17 @@ export function MenteeFeedbackDialog({ booking, open, onOpenChange, invalidateKe
                 <div className="space-y-2">
                   <p className="text-body-sm text-foreground" id={`${ids}-rate`}>{t("dashboardV2.feedback.rateLabel")}</p>
                   <StarRating
+                    id={`${ids}-stars`}
                     rating={rating}
+                    invalid={showRatingError}
+                    describedBy={showRatingError ? `${ids}-rating-error` : undefined}
                     onRate={(value) => {
                       setRating(value);
                       setShowRatingError(false);
                     }}
                   />
                   {showRatingError && (
-                    <p role="alert" className="text-caption text-destructive">
+                    <p id={`${ids}-rating-error`} role="alert" className="text-caption text-destructive">
                       {t("dashboardV2.feedback.ratingRequired")}
                     </p>
                   )}

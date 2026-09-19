@@ -32,7 +32,7 @@ export default function Mentors({ menteeId }: { menteeId: string }) {
 
   if (bookingsQuery.isLoading) {
     return (
-      <div role="status" aria-busy="true" className="grid gap-3 md:grid-cols-2">
+      <div role="status" aria-busy="true" className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <span className="sr-only">{t("common.loading")}</span>
         {Array.from({ length: 2 }, (_, i) => (
           <div key={i} className="flex items-center gap-4 rounded-lg border border-border bg-card p-4">
@@ -67,13 +67,13 @@ export default function Mentors({ menteeId }: { menteeId: string }) {
   return (
     <div className="space-y-4">
       <p className="text-body-sm text-muted-foreground">{t("dashboardV2.mentors.intro", { count: mentors.length })}</p>
-      <ul className="grid gap-3 md:grid-cols-2">
+      <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {mentors.map((mentor) => {
           const name = localizedField(mentor, "name", i18n.language);
           const credential = credentialLine(mentor, i18n.language);
           const rating = Number(mentor.average_rating ?? 0);
           return (
-            <li key={mentor.id} className="flex items-center gap-4 rounded-lg border border-border bg-card p-4" data-testid={`mentor-card-${mentor.id}`}>
+            <li key={mentor.id} className="flex min-w-0 items-center gap-4 rounded-lg border border-border bg-card p-4" data-testid={`mentor-card-${mentor.id}`}>
               <MentorAvatar mentor={mentor} size="lg" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-body font-medium text-foreground">

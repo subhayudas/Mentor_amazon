@@ -22,7 +22,7 @@ import {
   useFormatters,
 } from "@/pages/admin/shared";
 
-const COLS = 7;
+const COLS = 8;
 const STATUSES: Booking["status"][] = ["pending", "accepted", "confirmed", "completed", "rejected", "canceled"];
 type Filter = "all" | Booking["status"];
 
@@ -107,6 +107,9 @@ export default function BookingsTab() {
               <TableHead className="text-start">{t("admin.bookings.colScheduled")}</TableHead>
               <TableHead className="text-end">{t("admin.bookings.colDuration")}</TableHead>
               <TableHead className="text-start">{t("admin.colCountry")}</TableHead>
+              <TableHead className="text-end">
+                <span className="sr-only">{t("admin.actions")}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,6 +146,21 @@ export default function BookingsTab() {
                     <TableCell className="whitespace-nowrap text-body-sm tabular-nums">{formatDateTime(booking.scheduled_at)}</TableCell>
                     <TableCell className="text-end text-body-sm tabular-nums">{booking.session_duration_minutes != null ? formatNumber(booking.session_duration_minutes, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell className="text-body-sm">{localizeCountry(booking.country || booking.mentor?.country || "", i18n.language) || UNAVAILABLE}</TableCell>
+                    <TableCell className="text-end">
+                      {/* The real control: rows also open on click as a pointer convenience. */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDetail(booking);
+                        }}
+                        aria-label={t("admin.bookings.viewA11y", { mentor: booking.mentor?.name || UNAVAILABLE, mentee: booking.mentee?.organization_name || booking.mentee?.name || UNAVAILABLE })}
+                        data-testid={`button-view-booking-${booking.id}`}
+                      >
+                        {t("admin.viewDetails")}
+                      </Button>
+                    </TableCell>
                   </TableRow>
               ))
             )}

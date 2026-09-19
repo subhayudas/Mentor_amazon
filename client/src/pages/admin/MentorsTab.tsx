@@ -218,7 +218,7 @@ export default function MentorsTab() {
                     <TableCell className="text-body-sm text-muted-foreground">
                       <bdi dir="ltr">{mentor.email}</bdi>
                     </TableCell>
-                    <TableCell className="text-body-sm">{mentor.country ? localizeCountry(mentor.country, i18n.language) : UNAVAILABLE}</TableCell>
+                    <TableCell className="whitespace-nowrap text-body-sm">{mentor.country ? localizeCountry(mentor.country, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
                         <ActiveBadge active={mentor.is_available} activeLabel={t("admin.mentors.available")} inactiveLabel={t("admin.mentors.inactive")} />

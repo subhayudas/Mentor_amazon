@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -59,9 +59,17 @@ export default function Profile({ mentee }: { mentee: Mentee }) {
 
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: defaults });
 
+  // Hydrate from the server row, but never over unsaved edits: the 60 s
+  // mentee poll returns a new row object and resetting on each one would
+  // wipe what the mentee is typing.
+  const hydratedFor = useRef<string | null>(null);
   useEffect(() => {
-    form.reset(defaults);
-  }, [defaults, form]);
+    const rowChanged = hydratedFor.current !== mentee.id;
+    if (rowChanged || !form.formState.isDirty) {
+      form.reset(defaults);
+      hydratedFor.current = mentee.id;
+    }
+  }, [mentee.id, defaults, form]);
 
   const dirty = form.formState.isDirty;
   useLeaveGuard(dirty);

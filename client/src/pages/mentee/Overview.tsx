@@ -294,7 +294,7 @@ function PastList({
                     <span dir="ltr" className="tabular-nums">{t("dashboardV2.row.rated", { value: formatNumber(b.mentee_rating, i18n.language) })}</span>
                   </Button>
                 ) : (
-                  <Button variant="ghost" size="sm" onClick={() => onView(b)} data-testid={`button-view-request-${b.id}`}>
+                  <Button variant="outline" size="sm" onClick={() => onView(b)} data-testid={`button-view-request-${b.id}`}>
                     {t("dashboardV2.actions.viewRequest")}
                   </Button>
                 )}

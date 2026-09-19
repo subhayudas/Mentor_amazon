@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -103,8 +103,17 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
   );
 
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: defaults });
+  // Hydrate from the server row, but never over unsaved edits: the availability
+  // switch and the background refetches return a new row object, and resetting
+  // on every one of them would wipe what the mentor is typing.
+  const hydratedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (mentor) form.reset(defaults);
+    if (!mentor) return;
+    const rowChanged = hydratedFor.current !== mentor.id;
+    if (rowChanged || !form.formState.isDirty) {
+      form.reset(defaults);
+      hydratedFor.current = mentor.id;
+    }
   }, [mentor, defaults, form]);
 
   const dirty = form.formState.isDirty;

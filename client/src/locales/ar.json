@@ -294,6 +294,7 @@
     "bioPlaceholder": "ما أنجزته وما يمكنك المساعدة فيه",
     "linkedinUrl": "رابط لينكدإن",
     "calLink": "رابط Cal.com",
+    "calPlaceholder": "username/30min",
     "calHelp": "صفحة الحجز الخاصة بك على Cal.com، مثل username/30min. يختار المتدربون وقتًا من خلالها بعد قبولك.",
     "calSetupLink": "أنشئ تقويمًا على Cal.com",
     "expertise": "مجالات الخبرة",
@@ -876,6 +877,7 @@
       "assistantWithEmail": "المساعد: {{email}}"
     },
     "mentees": {
+      "viewA11y": "عرض تفاصيل {{name}}",
       "searchPlaceholder": "ابحث عن المتدربين بالاسم أو البريد الإلكتروني أو المنظمة",
       "filterLabel": "تصفية حسب حالة التوثيق",
       "colName": "المتدرب",
@@ -902,6 +904,7 @@
       "markedRejected": "تم رفض توثيق {{name}}"
     },
     "bookings": {
+      "viewA11y": "عرض تفاصيل الحجز: {{mentor}} مع {{mentee}}",
       "filterLabel": "تصفية حسب الحالة",
       "searchPlaceholder": "ابحث حسب المرشد أو المتدرب أو الدولة",
       "openAnalytics": "فتح التحليلات",
@@ -1057,7 +1060,7 @@
       "action": "تصفح المرشدين"
     },
     "error": {
-      "title": "تعذّر تحميل هذه الصفحة",
+      "title": "تعذّر تحميل هذا القسم",
       "body": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
     },
     "overview": {
@@ -1377,6 +1380,7 @@
       "emptyOpenBody": "أضف متابعة لتتذكر ما وعدت به متدربًا.",
       "newTitle": "مهمة جديدة",
       "newDesc": "تذكير خاص بك؛ لا يراه المتدربون.",
+      "titleRequired": "أدخل عنوانًا للمهمة.",
       "titleLabel": "العنوان",
       "descLabel": "التفاصيل (اختياري)",
       "priorityLabel": "الأولوية",

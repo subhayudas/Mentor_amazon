@@ -263,11 +263,23 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
         <TabsList variant="pill" className="w-full sm:w-auto">
           <TabsTrigger value="upcoming" data-testid="tab-upcoming">
             {t("dashboardV2.sessions.upcoming")}
-            {upcoming.length > 0 && <Badge tone="neutral">{formatNumber(upcoming.length, i18n.language)}</Badge>}
+            {upcoming.length > 0 && (
+              <>
+                {/* Read as "Completed (3)", not "Completed3". */}
+                <span className="sr-only"> ({formatNumber(upcoming.length, i18n.language)})</span>
+                <Badge tone="neutral" aria-hidden="true">{formatNumber(upcoming.length, i18n.language)}</Badge>
+              </>
+            )}
           </TabsTrigger>
           <TabsTrigger value="completed" data-testid="tab-completed">
             {t("dashboardV2.sessions.completed")}
-            {completed.length > 0 && <Badge tone="neutral">{formatNumber(completed.length, i18n.language)}</Badge>}
+            {completed.length > 0 && (
+              <>
+                {/* Read as "Completed (3)", not "Completed3". */}
+                <span className="sr-only"> ({formatNumber(completed.length, i18n.language)})</span>
+                <Badge tone="neutral" aria-hidden="true">{formatNumber(completed.length, i18n.language)}</Badge>
+              </>
+            )}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="upcoming">

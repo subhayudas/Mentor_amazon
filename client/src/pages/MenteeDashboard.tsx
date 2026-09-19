@@ -95,7 +95,7 @@ export default function MenteeDashboard() {
           data-testid="card-mentee-not-found"
           actions={
             <>
-              <Button asChild variant="secondary" data-testid="button-try-again">
+              <Button asChild variant="secondary" data-testid="button-complete-profile">
                 <Link href={ROUTES.menteeRegistration}>{t("dashboardV2.mentee.completeProfile")}</Link>
               </Button>
               <Button asChild variant="outline">

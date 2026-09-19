@@ -1,4 +1,4 @@
-import { useId, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { CheckCircle2, Clock, ListTodo, Plus } from "lucide-react";
@@ -35,6 +35,8 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
   const ids = useId();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ title: "", description: "", priority: "medium" as Priority, due_date: "" });
+  const [titleError, setTitleError] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
 
   const tasksQuery = useQuery<MentorTask[]>({
     queryKey: ["mentor", mentorId, "tasks"],
@@ -55,6 +57,7 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
       queryClient.invalidateQueries({ queryKey: ["mentor", mentorId, "tasks"] });
       setOpen(false);
       setDraft({ title: "", description: "", priority: "medium", due_date: "" });
+      setTitleError(false);
       toast({ title: t("dashboardV2.tasks.created") });
     },
     onError: () => toast({ title: t("common.error"), description: t("dashboardV2.tasks.createError"), variant: "destructive" }),
@@ -69,9 +72,17 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
     onError: () => toast({ title: t("common.error"), description: t("dashboardV2.tasks.updateError"), variant: "destructive" }),
   });
 
+  // The form is noValidate, so the empty-title case announces next to the
+  // field and moves focus there instead of failing silently.
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (draft.title.trim()) createTask.mutate();
+    if (!draft.title.trim()) {
+      setTitleError(true);
+      titleRef.current?.focus();
+      return;
+    }
+    setTitleError(false);
+    createTask.mutate();
   };
 
   const tasks = tasksQuery.data ?? [];
@@ -149,7 +160,13 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
         </>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setTitleError(false);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("dashboardV2.tasks.newTitle")}</DialogTitle>
@@ -159,13 +176,24 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
             <div className="space-y-2">
               <Label htmlFor={`${ids}-title`}>{t("dashboardV2.tasks.titleLabel")}</Label>
               <Input
+                ref={titleRef}
                 id={`${ids}-title`}
                 dir="auto"
                 value={draft.title}
-                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                onChange={(e) => {
+                  setDraft({ ...draft, title: e.target.value });
+                  if (titleError && e.target.value.trim()) setTitleError(false);
+                }}
                 required
+                aria-invalid={titleError || undefined}
+                aria-describedby={titleError ? `${ids}-title-error` : undefined}
                 data-testid="input-task-title"
               />
+              {titleError && (
+                <p id={`${ids}-title-error`} role="alert" className="text-caption text-destructive" data-testid="error-task-title">
+                  {t("dashboardV2.tasks.titleRequired")}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor={`${ids}-desc`}>{t("dashboardV2.tasks.descLabel")}</Label>

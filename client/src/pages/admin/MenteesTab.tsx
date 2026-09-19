@@ -28,7 +28,7 @@ import {
   useRowHighlight,
 } from "@/pages/admin/shared";
 
-const COLS = 6;
+const COLS = 7;
 const FILTERS = ["all", "pending", "verified", "rejected", "unverified"] as const;
 type Filter = (typeof FILTERS)[number];
 
@@ -124,6 +124,9 @@ export default function MenteesTab() {
               <TableHead className="text-start">{t("admin.colCountry")}</TableHead>
               <TableHead className="text-start">{t("admin.mentees.colVerification")}</TableHead>
               <TableHead className="text-start">{t("admin.mentees.colRegistered")}</TableHead>
+              <TableHead className="text-end">
+                <span className="sr-only">{t("admin.actions")}</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -169,6 +172,21 @@ export default function MenteesTab() {
                     <TableCell className="text-body-sm">{mentee.country ? localizeCountry(mentee.country, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell><VerificationBadge status={mentee.verification_status} /></TableCell>
                     <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDate(mentee.created_at)}</TableCell>
+                    <TableCell className="text-end">
+                      {/* The real control (the sheet holds verify/reject); rows also open on click. */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDetail(mentee);
+                        }}
+                        aria-label={t("admin.mentees.viewA11y", { name: mentee.organization_name || mentee.name })}
+                        data-testid={`button-view-mentee-${mentee.id}`}
+                      >
+                        {t("admin.viewDetails")}
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 );
               })
