@@ -239,7 +239,7 @@
     "flexibleScheduling": "جدولة مرنة"
   },
   "stats": {
-    "activeMentors": "المرشدون النشطون",
+    "activeMentors": "يستقبلون الطلبات",
     "sessionsBooked": "الجلسات المحجوزة",
     "countries": "الدول",
     "satisfaction": "نسبة الرضا"
@@ -737,8 +737,13 @@
     "colEmail": "البريد الإلكتروني",
     "colCountry": "الدولة",
     "stats": {
-      "activeMentors": "المرشدون النشطون",
-      "inactiveMentors": "{{count}} غير نشط",
+      "activeMentors": "يستقبلون الطلبات",
+      "inactiveMentors_zero": "الجميع يستقبل الطلبات",
+      "inactiveMentors_one": "{{count}} لا يستقبل الطلبات",
+      "inactiveMentors_two": "{{count}} لا يستقبلان الطلبات",
+      "inactiveMentors_few": "{{count}} لا يستقبلون الطلبات",
+      "inactiveMentors_many": "{{count}} لا يستقبلون الطلبات",
+      "inactiveMentors_other": "{{count}} لا يستقبلون الطلبات",
       "verifiedOrgs": "المنظمات الموثّقة",
       "orgsBreakdown": "{{pending}} قيد المراجعة · {{individuals}} أفراد",
       "bookings": "الحجوزات",
@@ -1312,7 +1317,7 @@
     "overview": {
       "nextSession": "الجلسة القادمة",
       "needsAction": "بانتظار إجراء منك",
-      "waiting": "بانتظار الرد",
+      "waiting": "بانتظار المرشد",
       "upcoming": "القادمة",
       "past": "السابقة",
       "seeAll_zero": "عرض كل الجلسات السابقة",
@@ -1370,7 +1375,7 @@
       "noGoal": "لم يُكتب هدف."
     },
     "time": {
-      "yourZone": "بتوقيتك ({{tz}})"
+      "yourZone": "بتوقيتك: {{tz}}"
     },
     "past": {
       "mentor": "المرشد",
@@ -1686,6 +1691,11 @@
         "30": "الأيام الثلاثين السابقة",
         "90": "الأيام التسعين السابقة",
         "365": "الأشهر الاثني عشر السابقة"
+      },
+      "previousShort": {
+        "30": "الـ30 يومًا السابقة",
+        "90": "الـ90 يومًا السابقة",
+        "365": "الـ12 شهرًا السابقة"
       }
     },
     "compare": {
@@ -1872,6 +1882,12 @@
       "title": "الحجوزات خلال الفترة",
       "definition": "الطلبات المرسلة أو الجلسات المكتملة خلال الفترة، الأحدث أولًا.",
       "empty": "لا توجد حجوزات في هذه الفترة",
+      "row": {
+        "requested": "طُلبت {{when}}",
+        "scheduled": "موعد الجلسة {{when}}"
+      },
+      "scrollRegion": "جدول الحجوزات (يُمرَّر أفقيًا)",
+      "scrollHint": "مرّر أفقيًا لرؤية جميع الأعمدة.",
       "table": {
         "mentor": "المرشد",
         "mentee": "المتدرب",

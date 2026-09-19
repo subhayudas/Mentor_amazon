@@ -737,8 +737,13 @@
     "colEmail": "Email",
     "colCountry": "Country",
     "stats": {
-      "activeMentors": "Active mentors",
-      "inactiveMentors": "{{count}} inactive",
+      "activeMentors": "Accepting requests",
+      "inactiveMentors_zero": "All accepting requests",
+      "inactiveMentors_one": "{{count}} not accepting",
+      "inactiveMentors_two": "{{count}} not accepting",
+      "inactiveMentors_few": "{{count}} not accepting",
+      "inactiveMentors_many": "{{count}} not accepting",
+      "inactiveMentors_other": "{{count}} not accepting",
       "verifiedOrgs": "Verified organizations",
       "orgsBreakdown": "{{pending}} pending review · {{individuals}} individuals",
       "bookings": "Bookings",
@@ -1312,7 +1317,7 @@
     "overview": {
       "nextSession": "Next session",
       "needsAction": "Needs your action",
-      "waiting": "Waiting for a reply",
+      "waiting": "Waiting on the mentor",
       "upcoming": "Upcoming",
       "past": "Past",
       "seeAll_zero": "See all past sessions",
@@ -1370,7 +1375,7 @@
       "noGoal": "No goal was written."
     },
     "time": {
-      "yourZone": "Your time ({{tz}})"
+      "yourZone": "Your time: {{tz}}"
     },
     "past": {
       "mentor": "Mentor",
@@ -1686,6 +1691,11 @@
         "30": "the previous 30 days",
         "90": "the previous 90 days",
         "365": "the previous 12 months"
+      },
+      "previousShort": {
+        "30": "prev. 30 days",
+        "90": "prev. 90 days",
+        "365": "prev. 12 months"
       }
     },
     "compare": {
@@ -1872,6 +1882,12 @@
       "title": "Bookings in the period",
       "definition": "Requests sent or sessions completed in the period, newest first.",
       "empty": "No bookings in this period",
+      "row": {
+        "requested": "Requested {{when}}",
+        "scheduled": "Scheduled {{when}}"
+      },
+      "scrollRegion": "Bookings table (scrolls sideways)",
+      "scrollHint": "Scroll sideways to see every column.",
       "table": {
         "mentor": "Mentor",
         "mentee": "Mentee",
