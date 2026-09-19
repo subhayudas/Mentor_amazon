@@ -18,7 +18,7 @@ import { CalEmbed } from "@/components/CalEmbed";
 import { MenteeFeedbackDialog } from "@/components/MenteeFeedbackDialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { BookingNotes } from "@/components/dashboard/BookingNotes";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Mentee } from "@/lib/database";
 import { bidi } from "@/lib/format";
 import { credentialLine, localizedField } from "@/lib/localized";
@@ -44,7 +44,6 @@ const HIGHLIGHT_MS = 2500;
  */
 export function useBookingActions(menteeId: string, mentee: Mentee) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
   const onCalBooked = useConfirmOnCalBooking(menteeId);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [viewing, setViewing] = useState<BookingWithMentor | null>(null);
@@ -67,16 +66,15 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
     mutationFn: (booking: BookingWithMentor) => bookingService.updateStatus(booking.id, "canceled"),
     onSuccess: (_row, booking) => {
       invalidate();
-      toast({
-        title:
-          confirm?.kind === "cancelSession" || booking.status === "confirmed"
-            ? t("dashboardV2.confirm.sessionCancelled")
-            : t("dashboardV2.confirm.requestWithdrawn"),
-      });
+      toast.success(
+        confirm?.kind === "cancelSession" || booking.status === "confirmed"
+          ? t("dashboardV2.confirm.sessionCancelled")
+          : t("dashboardV2.confirm.requestWithdrawn"),
+      );
       highlight(booking.id);
     },
     onError: () => {
-      toast({ title: t("common.error"), description: t("dashboardV2.confirm.error"), variant: "destructive" });
+      toast.error(t("dashboardV2.confirm.error"));
     },
   });
 

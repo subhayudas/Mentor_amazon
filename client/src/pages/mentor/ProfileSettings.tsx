@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Mentor } from "@/lib/database";
 import { useLeaveGuard } from "@/lib/leaveGuard";
 import { queryClient } from "@/lib/queryClient";
@@ -42,7 +42,6 @@ const splitList = (value: string) => value.split(",").map((s) => s.trim()).filte
  */
 export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettingsProps) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
 
   const mentorQuery = useQuery<Mentor | null>({
     queryKey: ["mentor", "email", mentorEmail],
@@ -156,9 +155,9 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
       queryClient.invalidateQueries({ queryKey: ["mentor", "own"] });
       queryClient.invalidateQueries({ queryKey: ["mentors"] });
       form.reset(data);
-      toast({ title: t("dashboardV2.mentorProfile.saved") });
+      toast.success(t("dashboardV2.mentorProfile.saved"));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.mentorProfile.saveError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.mentorProfile.saveError")),
   });
 
   const zones = useMemo(() => timeZoneChoices(mentor?.timezone), [mentor?.timezone]);
@@ -173,9 +172,9 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
       queryClient.invalidateQueries({ queryKey: ["mentor", "email", mentorEmail] });
       queryClient.invalidateQueries({ queryKey: ["mentor", "own"] });
       queryClient.invalidateQueries({ queryKey: ["mentors"] });
-      toast({ title: row?.is_available ? t("dashboardV2.mentorProfile.acceptingOn") : t("dashboardV2.mentorProfile.acceptingOff") });
+      toast.success(row?.is_available ? t("dashboardV2.mentorProfile.acceptingOn") : t("dashboardV2.mentorProfile.acceptingOff"));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.mentorProfile.availabilityError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.mentorProfile.availabilityError")),
   });
   const accepting = toggleAvailability.isPending && toggleAvailability.variables !== undefined ? toggleAvailability.variables : (mentor?.is_available ?? true);
 

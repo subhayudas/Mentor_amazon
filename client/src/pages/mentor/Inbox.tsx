@@ -22,7 +22,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { RequestRail } from "@/components/RequestRail";
 import { StatTile } from "@/components/StatTile";
 import { VerificationBadge } from "@/components/VerificationBadge";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Booking, Mentee, Mentor, MentorDashboardStats } from "@/lib/database";
 import { bidi, formatHours, formatNumber, formatRelativeDay, UNAVAILABLE } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
@@ -50,7 +50,6 @@ const INBOX_POLL_MS = 10_000;
  */
 export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: Mentor }) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
 
   const [inFlightId, setInFlightId] = useState<string | null>(null);
   const [decided, setDecided] = useState<Record<string, { booking: BookingWithMentee; outcome: Decision }>>({});
@@ -115,14 +114,13 @@ export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: 
     onSuccess: (_row, { id, outcome }) => {
       markDecided(id, outcome);
       invalidateAll();
-      toast({
-        title: outcome === "accepted" ? t("dashboardV2.inbox.acceptedToast") : t("dashboardV2.inbox.declinedToast"),
+      toast.success(outcome === "accepted" ? t("dashboardV2.inbox.acceptedToast") : t("dashboardV2.inbox.declinedToast"), {
         description: outcome === "accepted" ? t("dashboardV2.inbox.acceptedToastBody") : t("dashboardV2.inbox.declinedToastBody"),
       });
     },
     onError: () => {
       setInFlightId(null);
-      toast({ title: t("common.error"), description: t("dashboardV2.inbox.decisionError"), variant: "destructive" });
+      toast.error(t("dashboardV2.inbox.decisionError"));
     },
   });
 

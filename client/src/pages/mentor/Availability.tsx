@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { MONDAY_FIRST, weekdayLabels } from "@/lib/availability";
 import type { MentorAvailability as AvailabilityRow } from "@/lib/database";
 import { bidi, formatTime } from "@/lib/format";
@@ -50,7 +50,6 @@ const serialize = (slots: LocalSlot[]) =>
  */
 export default function Availability({ mentorId, mentorTimeZone }: { mentorId: string; mentorTimeZone: string }) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
   const ids = useId();
   const [slots, setSlots] = useState<LocalSlot[]>([]);
   const [baseline, setBaseline] = useState<string>("[]");
@@ -83,9 +82,9 @@ export default function Availability({ mentorId, mentorTimeZone }: { mentorId: s
       setBaseline(serialize(slots));
       queryClient.invalidateQueries({ queryKey: ["mentor", mentorId, "availability"] });
       queryClient.invalidateQueries({ queryKey: ["availability", "public"] });
-      toast({ title: t("dashboardV2.availability.saved") });
+      toast.success(t("dashboardV2.availability.saved"));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.availability.saveError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.availability.saveError")),
   });
 
   const invalidIds = useMemo(() => new Set(slots.filter((s) => s.end_time <= s.start_time).map((s) => s.id)), [slots]);

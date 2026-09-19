@@ -5,7 +5,7 @@ import { Star } from "lucide-react";
 
 import { bookingService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Booking } from "@/lib/database";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -136,7 +136,6 @@ interface MenteeFeedbackDialogProps {
  */
 export function MenteeFeedbackDialog({ booking, open, onOpenChange, invalidateKeys, onSubmitted }: MenteeFeedbackDialogProps) {
   const { t } = useTranslation();
-  const { toast } = useToast();
   const [rating, setRating] = useState(0);
   const [text, setText] = useState("");
   const [showRatingError, setShowRatingError] = useState(false);
@@ -156,11 +155,11 @@ export function MenteeFeedbackDialog({ booking, open, onOpenChange, invalidateKe
     onSuccess: (_result, variables) => {
       invalidateKeys.forEach((queryKey) => queryClient.invalidateQueries({ queryKey }));
       onOpenChange(false);
-      toast({ title: t("dashboardV2.feedback.submitted"), description: t("dashboardV2.feedback.submittedDesc") });
+      toast.success(t("dashboardV2.feedback.submitted"), { description: t("dashboardV2.feedback.submittedDesc") });
       onSubmitted?.(variables.bookingId);
     },
     onError: () => {
-      toast({ title: t("common.error"), description: t("dashboardV2.feedback.submitError"), variant: "destructive" });
+      toast.error(t("dashboardV2.feedback.submitError"));
     },
   });
 

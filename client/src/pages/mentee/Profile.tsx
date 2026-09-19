@@ -10,7 +10,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Mentee } from "@/lib/database";
 import { useLeaveGuard } from "@/lib/leaveGuard";
 import { queryClient } from "@/lib/queryClient";
@@ -28,7 +28,6 @@ import { PanelSection } from "@/pages/mentee/shared";
  */
 export default function Profile({ mentee }: { mentee: Mentee }) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
 
   const schema = useMemo(
     () =>
@@ -91,11 +90,11 @@ export default function Profile({ mentee }: { mentee: Mentee }) {
     onSuccess: (row, data) => {
       queryClient.invalidateQueries({ queryKey: ["mentee", "email"] });
       form.reset(data);
-      toast({ title: t("dashboardV2.profile.saved") });
+      toast.success(t("dashboardV2.profile.saved"));
       if (row?.name) localStorage.setItem("menteeName", row.name);
     },
     onError: () => {
-      toast({ title: t("common.error"), description: t("dashboardV2.profile.saveError"), variant: "destructive" });
+      toast.error(t("dashboardV2.profile.saveError"));
     },
   });
 

@@ -12,7 +12,7 @@ import { clearRoleStorage } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES } from "@/lib/routes";
 import { safeNext, ssoErrorKey, ssoLoginHref } from "@/lib/ssoClient";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -31,7 +31,6 @@ export default function Login() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const searchString = useSearch();
-  const { toast } = useToast();
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
@@ -88,7 +87,7 @@ export default function Login() {
 
       window.dispatchEvent(new CustomEvent("userRegistered"));
       queryClient.clear();
-      toast({ title: t("auth.loginSuccess"), description: t("auth.welcomeBack") });
+      toast.success(t("auth.loginSuccess"), { description: t("auth.welcomeBack") });
 
       if (nextPath) {
         setLocation(nextPath);

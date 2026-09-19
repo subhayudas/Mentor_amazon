@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/EmptyState";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { MentorTask } from "@/lib/database";
 import { formatDate } from "@/lib/format";
 import { queryClient } from "@/lib/queryClient";
@@ -31,7 +31,6 @@ const PRIORITY_TONE: Record<Priority, "danger" | "warning" | "neutral"> = { high
  */
 export default function TaskManager({ mentorId }: { mentorId: string }) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
   const ids = useId();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState({ title: "", description: "", priority: "medium" as Priority, due_date: "" });
@@ -58,9 +57,9 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
       setOpen(false);
       setDraft({ title: "", description: "", priority: "medium", due_date: "" });
       setTitleError(false);
-      toast({ title: t("dashboardV2.tasks.created") });
+      toast.success(t("dashboardV2.tasks.created"));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.tasks.createError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.tasks.createError")),
   });
 
   const toggleTask = useMutation({
@@ -69,7 +68,7 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
       return mentorService.updateTask(task.id, { status: next, completed_at: next === "completed" ? new Date().toISOString() : undefined });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["mentor", mentorId, "tasks"] }),
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.tasks.updateError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.tasks.updateError")),
   });
 
   // The form is noValidate, so the empty-title case announces next to the

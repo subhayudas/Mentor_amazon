@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { FilterChip } from "@/components/discovery/FilterChip";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { BookingNote } from "@/lib/database";
 import { formatDate } from "@/lib/format";
 import { queryClient } from "@/lib/queryClient";
@@ -37,7 +37,6 @@ type NoteType = "note" | "task";
 
 export function BookingNotes({ bookingId, authorType, authorEmail, extended = false }: BookingNotesProps) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
   const [content, setContent] = useState("");
   const [noteType, setNoteType] = useState<NoteType>("note");
   const [dueDate, setDueDate] = useState("");
@@ -64,21 +63,21 @@ export function BookingNotes({ bookingId, authorType, authorEmail, extended = fa
       invalidate();
       setContent("");
       setDueDate("");
-      toast({ title: t("dashboardV2.notes.added") });
+      toast.success(t("dashboardV2.notes.added"));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.notes.addError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.notes.addError")),
   });
 
   const toggleTask = useMutation({
     mutationFn: (note: BookingNote) => bookingService.updateNote(note.id, { is_completed: !note.is_completed }),
     onSuccess: () => invalidate(),
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.notes.updateError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.notes.updateError")),
   });
 
   const deleteNote = useMutation({
     mutationFn: (noteId: string) => bookingService.deleteNote(noteId),
     onSuccess: () => invalidate(),
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.notes.deleteError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.notes.deleteError")),
   });
 
   const notes = notesQuery.data ?? [];

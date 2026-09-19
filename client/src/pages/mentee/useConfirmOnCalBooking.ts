@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import type { CalBookingSuccess } from "@/components/CalEmbed";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { queryClient } from "@/lib/queryClient";
 import { bookingService } from "@/lib/services";
 
@@ -14,7 +14,6 @@ import { bookingService } from "@/lib/services";
  * Failure is reported (the row stays "Accepted" so the person can retry).
  */
 export function useConfirmOnCalBooking(menteeId: string) {
-  const { toast } = useToast();
   const { t } = useTranslation();
   const confirmMutation = useMutation({
     mutationFn: ({ bookingId, detail }: { bookingId: string; detail: CalBookingSuccess }) =>
@@ -22,10 +21,10 @@ export function useConfirmOnCalBooking(menteeId: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["mentee", menteeId, "bookings"] });
       queryClient.invalidateQueries({ queryKey: ["mentee", menteeId, "stats"] });
-      toast({ title: t("menteePortal.sessionConfirmedToast"), description: t("menteePortal.sessionScheduledDesc") });
+      toast.success(t("menteePortal.sessionConfirmedToast"), { description: t("menteePortal.sessionScheduledDesc") });
     },
     onError: () => {
-      toast({ title: t("common.error"), description: t("dashboardV2.cal.confirmError"), variant: "destructive" });
+      toast.error(t("dashboardV2.cal.confirmError"));
     },
   });
   return useCallback(

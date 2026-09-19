@@ -7,9 +7,11 @@ import { useTranslation } from "react-i18next"
 import { cn } from "@/lib/utils"
 
 /**
- * Legacy Radix toast (kept until the 17 `useToast` callers migrate to sonner).
- * Tokens only, viewport at the inline-end, 160ms fade + scale enter, and a
- * close button that is always visible (never hover-only).
+ * Legacy Radix toast (F-16: only BookingRequestDialog still calls `useToast`;
+ * new code uses sonner, which is not a DismissableLayer and so never steals
+ * Escape from an open dialog). Tokens only, viewport at the bottom inline-end
+ * on every width (never over a fullscreen dialog's header), 160ms fade +
+ * scale enter, and a close button that is always visible (never hover-only).
  */
 const ToastProvider = ToastPrimitives.Provider
 
@@ -20,7 +22,7 @@ const ToastViewport = React.forwardRef<
   <ToastPrimitives.Viewport
     ref={ref}
     className={cn(
-      "fixed top-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 sm:bottom-0 sm:end-0 sm:top-auto sm:flex-col md:max-w-[420px]",
+      "fixed bottom-0 z-[100] flex max-h-screen w-full flex-col gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:end-0 md:max-w-[420px]",
       className
     )}
     {...props}

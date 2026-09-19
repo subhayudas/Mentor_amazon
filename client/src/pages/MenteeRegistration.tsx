@@ -10,7 +10,7 @@ import { ArrowRight, Clock, ShieldCheck, Upload, Users, X } from "lucide-react";
 import { menteeService, uploadService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import type { Mentee } from "@/lib/database";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -70,7 +70,6 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export default function MenteeRegistration() {
   const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
   const { user } = useAuth();
   const ids = useId();
   // RLS only lets a signed-in user insert a mentees row whose email equals the session email,
@@ -200,11 +199,11 @@ export default function MenteeRegistration() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast({ title: t("common.error"), description: t("mentorOnboarding.invalidImageType"), variant: "destructive" });
+      toast.error(t("mentorOnboarding.invalidImageType"));
       return;
     }
     if (file.size > MAX_PHOTO_BYTES) {
-      toast({ title: t("common.error"), description: t("mentorOnboarding.imageTooLarge"), variant: "destructive" });
+      toast.error(t("mentorOnboarding.imageTooLarge"));
       return;
     }
     setIsUploading(true);
@@ -212,9 +211,9 @@ export default function MenteeRegistration() {
       const url = await uploadService.uploadFile(file, "mentees");
       form.setValue("photo_url", url, { shouldDirty: true });
       setPhotoPreview(url);
-      toast({ title: t("mentorOnboarding.photoUploaded"), description: t("mentorOnboarding.photoUploadSuccess") });
+      toast.success(t("mentorOnboarding.photoUploaded"), { description: t("mentorOnboarding.photoUploadSuccess") });
     } catch {
-      toast({ title: t("common.error"), description: t("mentorOnboarding.photoUploadFailed"), variant: "destructive" });
+      toast.error(t("mentorOnboarding.photoUploadFailed"));
     } finally {
       setIsUploading(false);
     }
@@ -256,7 +255,7 @@ export default function MenteeRegistration() {
       queryClient.invalidateQueries({ queryKey: ["mentees"] });
       queryClient.invalidateQueries({ queryKey: ["mentee", "email"] });
       if (!row?.id) {
-        toast({ title: t("common.error"), description: t("menteeRegistration.saveError"), variant: "destructive" });
+        toast.error(t("menteeRegistration.saveError"));
         return;
       }
       localStorage.setItem("menteeId", row.id);
@@ -264,8 +263,7 @@ export default function MenteeRegistration() {
       localStorage.setItem("menteeName", row.name);
       window.dispatchEvent(new Event("userRegistered"));
       const newOrgReview = row.user_type === "organization" && row.verification_status === "pending" && !(existing?.user_type === "organization");
-      toast({
-        title: completing ? t("menteeRegistration.updatedMessage") : t("menteeRegistration.successTitle"),
+      toast.success(completing ? t("menteeRegistration.updatedMessage") : t("menteeRegistration.successTitle"), {
         description: newOrgReview ? t("verification.inReviewToast") : completing ? undefined : t("menteeRegistration.successMessage"),
       });
       if (newOrgReview) {
@@ -276,7 +274,7 @@ export default function MenteeRegistration() {
       }
     },
     onError: () => {
-      toast({ title: t("common.error"), description: t("menteeRegistration.saveError"), variant: "destructive" });
+      toast.error(t("menteeRegistration.saveError"));
     },
   });
 

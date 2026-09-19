@@ -12,7 +12,7 @@ import { authService, menteeService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES } from "@/lib/routes";
 import { safeNext } from "@/lib/ssoClient";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -32,7 +32,6 @@ export default function Signup() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const searchString = useSearch();
-  const { toast } = useToast();
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmEmailFor, setConfirmEmailFor] = useState<string | null>(null);
   const nextPath = safeNext(new URLSearchParams(searchString).get("next"), "");
@@ -83,7 +82,7 @@ export default function Signup() {
         setConfirmEmailFor(user.email);
         return;
       }
-      toast({ title: t("auth.signupSuccess"), description: t("auth.accountCreated") });
+      toast.success(t("auth.signupSuccess"), { description: t("auth.accountCreated") });
       if (nextPath) {
         setLocation(nextPath);
       } else {

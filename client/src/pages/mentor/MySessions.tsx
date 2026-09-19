@@ -29,7 +29,7 @@ import { StarRating } from "@/components/MenteeFeedbackDialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { BookingNotes } from "@/components/dashboard/BookingNotes";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
 import { bidi, formatDateTime, formatNumber, viewerTimeZone } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
@@ -70,7 +70,6 @@ interface MySessionsProps {
  */
 export default function MySessions({ mentorId, mentorEmail, mentor }: MySessionsProps) {
   const { t, i18n } = useTranslation();
-  const { toast } = useToast();
   const viewerTz = viewerTimeZone();
   const [activeTab, setActiveTab] = useState<"upcoming" | "completed">("upcoming");
   const [notesFor, setNotesFor] = useState<SessionBooking | null>(null);
@@ -101,9 +100,9 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
     mutationFn: (bookingId: string) => bookingService.updateStatus(bookingId, "canceled"),
     onSuccess: () => {
       invalidate();
-      toast({ title: t("dashboardV2.sessions.cancelledToast") });
+      toast.success(t("dashboardV2.sessions.cancelledToast"));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.sessions.updateError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.sessions.updateError")),
   });
 
   const completeMutation = useMutation({
@@ -114,9 +113,9 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
       setCompleteFor(null);
       setActiveTab("completed");
       setHighlightedId(variables.bookingId);
-      toast({ title: t("common.success"), description: t("mentorPortal.sessionCompleted", { minutes: variables.minutes }) });
+      toast.success(t("mentorPortal.sessionCompleted", { minutes: variables.minutes }));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.sessions.updateError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.sessions.updateError")),
   });
 
   const { upcoming, completed } = useMemo(() => {
@@ -438,7 +437,6 @@ function MentorFeedbackDialog({
   mentorId: string;
 }) {
   const { t } = useTranslation();
-  const { toast } = useToast();
   const [rating, setRating] = useState(0);
   const [text, setText] = useState("");
   const [showRatingError, setShowRatingError] = useState(false);
@@ -459,9 +457,9 @@ function MentorFeedbackDialog({
       queryClient.invalidateQueries({ queryKey: ["mentor", mentorId, "bookings"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       onOpenChange(false);
-      toast({ title: t("dashboardV2.feedback.submitted") });
+      toast.success(t("dashboardV2.feedback.submitted"));
     },
-    onError: () => toast({ title: t("common.error"), description: t("dashboardV2.feedback.submitError"), variant: "destructive" }),
+    onError: () => toast.error(t("dashboardV2.feedback.submitError")),
   });
 
   const alreadyRated = !!booking?.mentor_rating;

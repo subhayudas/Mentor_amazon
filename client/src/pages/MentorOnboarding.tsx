@@ -12,7 +12,7 @@ import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import { useRequireRole } from "@/components/RouteGuard";
 import type { Mentor } from "@/lib/database";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -197,7 +197,6 @@ const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export default function MentorOnboarding() {
   const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
   const ids = useId();
   // Anonymous visitors are sent to /login?next=/mentor-onboarding by the guard hook.
   const { status: authStatus, user } = useRequireRole();
@@ -323,10 +322,10 @@ export default function MentorOnboarding() {
     onSuccess: (newMentor) => {
       queryClient.invalidateQueries({ queryKey: ["mentors"] });
       if (!newMentor?.id) {
-        toast({ title: t("common.error"), description: t("mentorOnboarding.saveError"), variant: "destructive" });
+        toast.error(t("mentorOnboarding.saveError"));
         return;
       }
-      toast({ title: t("mentorOnboarding.successTitle"), description: t("mentorOnboarding.successMessage") });
+      toast.success(t("mentorOnboarding.successTitle"), { description: t("mentorOnboarding.successMessage") });
       localStorage.setItem("mentorId", newMentor.id);
       localStorage.setItem("mentorEmail", newMentor.email ?? "");
       localStorage.setItem("mentorName", newMentor.name);
@@ -334,7 +333,7 @@ export default function MentorOnboarding() {
       setLocation(ROUTES.mentorPortal);
     },
     onError: () => {
-      toast({ title: t("common.error"), description: t("mentorOnboarding.saveError"), variant: "destructive" });
+      toast.error(t("mentorOnboarding.saveError"));
     },
   });
 
@@ -342,11 +341,11 @@ export default function MentorOnboarding() {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast({ title: t("common.error"), description: t("mentorOnboarding.invalidImageType"), variant: "destructive" });
+      toast.error(t("mentorOnboarding.invalidImageType"));
       return;
     }
     if (file.size > MAX_PHOTO_BYTES) {
-      toast({ title: t("common.error"), description: t("mentorOnboarding.imageTooLarge"), variant: "destructive" });
+      toast.error(t("mentorOnboarding.imageTooLarge"));
       return;
     }
     setIsUploading(true);
@@ -354,9 +353,9 @@ export default function MentorOnboarding() {
       const url = await uploadService.uploadFile(file, "mentors");
       form.setValue("photo_url", url, { shouldDirty: true });
       setPhotoPreview(url);
-      toast({ title: t("mentorOnboarding.photoUploaded"), description: t("mentorOnboarding.photoUploadSuccess") });
+      toast.success(t("mentorOnboarding.photoUploaded"), { description: t("mentorOnboarding.photoUploadSuccess") });
     } catch {
-      toast({ title: t("common.error"), description: t("mentorOnboarding.photoUploadFailed"), variant: "destructive" });
+      toast.error(t("mentorOnboarding.photoUploadFailed"));
     } finally {
       setIsUploading(false);
     }
