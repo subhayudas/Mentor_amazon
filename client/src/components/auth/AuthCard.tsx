@@ -39,6 +39,13 @@ export function AuthCard({
   );
 }
 
+/**
+ * A link inside a sentence of muted text: navy alone is 1.92:1 against the
+ * muted sentence, so the underline is persistent (WCAG 1.4.1 / F73) and only
+ * thickens on hover. Standalone links keep underline-on-hover.
+ */
+export const inlineLinkClass = "font-medium text-secondary underline decoration-1 underline-offset-4 transition-colors duration-fast hover:decoration-2";
+
 /** Input with a decorative leading icon at the inline-start (logical, so it mirrors in Arabic). */
 export const IconInput = React.forwardRef<HTMLInputElement, React.ComponentProps<typeof Input> & { icon: LucideIcon; trailing?: React.ReactNode }>(
   function IconInput({ icon: Icon, trailing, className, ...props }, ref) {

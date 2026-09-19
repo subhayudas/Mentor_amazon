@@ -17,7 +17,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AuthCard, AuthPage, IconInput, passwordStrength, STRENGTH_CLASS } from "@/components/auth/AuthCard";
+import { AuthCard, AuthPage, IconInput, passwordStrength, STRENGTH_CLASS, inlineLinkClass } from "@/components/auth/AuthCard";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { cn } from "@/lib/utils";
 
@@ -221,7 +221,7 @@ export default function Signup() {
                 <p className="font-medium text-foreground">{t("auth.amazonEmployeeTitle")}</p>
                 <p className="text-caption text-muted-foreground text-pretty">
                   {t("auth.amazonEmployeeHint")}{" "}
-                  <Link href={ROUTES.login} className="font-medium text-secondary underline-offset-4 hover:underline" data-testid="link-amazon-signin">
+                  <Link href={ROUTES.login} className={inlineLinkClass} data-testid="link-amazon-signin">
                     {t("auth.signInWithAmazon")}
                   </Link>
                 </p>
@@ -236,7 +236,7 @@ export default function Signup() {
 
         <p className="mt-6 text-center text-body-sm text-muted-foreground">
           {t("auth.haveAccount")}{" "}
-          <Link href={nextPath ? `${ROUTES.login}?next=${encodeURIComponent(nextPath)}` : ROUTES.login} className="font-medium text-secondary underline-offset-4 hover:underline" data-testid="link-login">
+          <Link href={nextPath ? `${ROUTES.login}?next=${encodeURIComponent(nextPath)}` : ROUTES.login} className={inlineLinkClass} data-testid="link-login">
             {t("auth.loginLink")}
           </Link>
         </p>
