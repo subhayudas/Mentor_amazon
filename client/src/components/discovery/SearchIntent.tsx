@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Search, X } from "lucide-react";
+import { ArrowRight, Search, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,12 @@ export interface SearchIntentProps {
   placeholder: string;
   /** Translated submit label; when omitted there is no visible submit button. */
   submitLabel?: string;
+  /**
+   * Render the submit as a 44px icon-only ghost button inset at the field's
+   * end, named by `submitLabel` (phone hero: a visible way to search that is
+   * not a second fill and does not steal the input's width).
+   */
+  iconOnlySubmit?: boolean;
   /** The submit is the page's orange primary (landing hero only). */
   primaryAction?: boolean;
   size?: "md" | "lg";
@@ -47,6 +53,7 @@ export const SearchIntent = React.forwardRef<HTMLInputElement, SearchIntentProps
     label,
     placeholder,
     submitLabel,
+    iconOnlySubmit = false,
     primaryAction = false,
     size = "md",
     chips,
@@ -68,13 +75,14 @@ export const SearchIntent = React.forwardRef<HTMLInputElement, SearchIntentProps
     else if (ref) (ref as React.MutableRefObject<HTMLInputElement | null>).current = node;
   };
   const hasSubmit = Boolean(submitLabel);
+  const iconSubmit = hasSubmit && iconOnlySubmit;
   const lg = size === "lg";
   // The input is `dir="auto"`, so its own logical paddings would follow the
   // typed text's direction, not the page's. The icon and inset controls are
   // positioned by the PAGE direction, so the two paddings are resolved here
   // from it (the one deliberate physical value in this component).
   const padStart = lg ? 48 : 44;
-  const padEnd = hasSubmit ? (value ? 152 : 112) : value ? 48 : 16;
+  const padEnd = iconSubmit ? (value ? 92 : 56) : hasSubmit ? (value ? 152 : 112) : value ? 48 : 16;
   const padding = isRTL
     ? { paddingLeft: padEnd, paddingRight: padStart }
     : { paddingLeft: padStart, paddingRight: padEnd };
@@ -122,7 +130,7 @@ export const SearchIntent = React.forwardRef<HTMLInputElement, SearchIntentProps
             lg ? "h-12 md:h-14" : "h-11",
           )}
         />
-        <div className="absolute end-2 flex items-center gap-1">
+        <div className={cn("absolute flex items-center gap-1", iconSubmit ? "end-0.5" : "end-2")}>
           {value && (
             <button
               type="button"
@@ -133,10 +141,23 @@ export const SearchIntent = React.forwardRef<HTMLInputElement, SearchIntentProps
               <X className="size-4" aria-hidden="true" />
             </button>
           )}
-          {hasSubmit && (
-            <Button type="submit" variant={primaryAction ? "primary" : "secondary"} size="md" className="rounded-sm">
-              {submitLabel}
+          {iconSubmit ? (
+            <Button
+              type="submit"
+              variant="ghost"
+              size="icon"
+              aria-label={submitLabel}
+              className="size-11 rounded-md text-secondary"
+              data-testid="button-search-submit"
+            >
+              <ArrowRight className="rtl:-scale-x-100" strokeWidth={2} aria-hidden="true" />
             </Button>
+          ) : (
+            hasSubmit && (
+              <Button type="submit" variant={primaryAction ? "primary" : "secondary"} size="md" className="rounded-sm" data-testid="button-search-submit">
+                {submitLabel}
+              </Button>
+            )
           )}
         </div>
       </div>

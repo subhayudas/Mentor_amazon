@@ -244,7 +244,8 @@ export default function Mentors() {
   return (
     <Container className="pb-16">
       <PageHeader title={t("discovery.title")} description={t("discovery.description")} className="pb-6 md:pb-8">
-        <p role="status" aria-live="polite" className="mt-3 min-h-5 text-body-sm text-muted-foreground tabular-nums" data-testid="text-result-count">
+        {/* Reserved at exactly one line of its own leading (21px EN, 24px AR) so the count arriving never moves what follows. */}
+        <p role="status" aria-live="polite" className="mt-3 min-h-[1lh] text-body-sm text-muted-foreground tabular-nums" data-testid="text-result-count">
           {countText}
         </p>
       </PageHeader>

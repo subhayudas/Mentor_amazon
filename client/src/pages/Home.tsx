@@ -121,7 +121,8 @@ export default function Home() {
                   onSubmit={(value) => navigate(discoveryUrl({ q: value }))}
                   label={t("landing.hero.searchLabel")}
                   placeholder={isPhone ? t("landing.hero.searchPlaceholderShort") : t("landing.hero.searchPlaceholder")}
-                  submitLabel={isPhone ? undefined : t("landing.hero.search")}
+                  submitLabel={t("landing.hero.search")}
+                  iconOnlySubmit={isPhone}
                   primaryAction
                   inputProps={SEARCH_INPUT_PROPS}
                   chips={
