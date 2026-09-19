@@ -47,7 +47,7 @@ export function NeedsList({ mentors, isLoading, className }: NeedsListProps) {
       <h2 id={titleId} className="text-h2-sm text-foreground md:text-h2">
         {t("landing.needs.title")}
       </h2>
-      <p className="mt-2 max-w-prose text-body text-muted-foreground text-pretty">{t("landing.needs.description")}</p>
+      <p className="mt-2 hidden max-w-prose text-body text-muted-foreground text-pretty md:block">{t("landing.needs.description")}</p>
       {isLoading ? (
         <ul role="status" aria-busy="true" className="mt-4 grid grid-cols-2 gap-x-6 md:mt-6 md:gap-x-12">
           <li className="sr-only">{t("common.loading")}</li>

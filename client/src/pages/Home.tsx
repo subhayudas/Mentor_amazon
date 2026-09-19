@@ -91,7 +91,7 @@ export default function Home() {
   return (
     <div className="flex flex-col">
       {/* ===== Hero ===== */}
-      <section aria-labelledby="page-title" className="pb-10 pt-8 md:pb-16 md:pt-14">
+      <section aria-labelledby="page-title" className="pb-6 pt-6 md:pb-12 md:pt-14">
         <Container className="lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-12">
           <div ref={heroRef} className="hero-enter">
             <PageHeader
@@ -115,10 +115,10 @@ export default function Home() {
                   chips={<ExampleChips tags={exampleTags} label={t("landing.hero.examples")} />}
                 />
               </div>
-              <p className="mt-4 min-h-5 text-caption text-muted-foreground tabular-nums" data-testid="text-trust-line">
+              <p className="mt-3 min-h-5 text-caption text-muted-foreground tabular-nums" data-testid="text-trust-line">
                 {trustLine}
               </p>
-              <p className="mt-3 flex min-h-6 flex-wrap items-center gap-x-6 gap-y-1 text-body-sm">
+              <p className="mt-3 flex min-h-6 flex-wrap items-center gap-x-5 gap-y-1 text-body-sm">
                 <Link
                   href={ROUTES.mentors}
                   className="inline-flex min-h-6 items-center gap-1 font-medium text-secondary underline-offset-4 transition-colors duration-fast hover:underline"
@@ -143,7 +143,7 @@ export default function Home() {
       </section>
 
       {/* ===== Mentors you can talk to ===== */}
-      <Container className="py-10 md:py-16">
+      <Container className="py-6 md:py-14">
         <MentorPreview
           mentors={mentors}
           isLoading={mentorsQuery.isLoading}
@@ -156,26 +156,26 @@ export default function Home() {
 
       {/* ===== Request rail (phones: after the preview, as a vertical list) ===== */}
       {isPhone && (
-        <Container className="pb-10">
-          <HowItHappens />
+        <Container className="pb-6">
+          <HowItHappens size="sm" />
         </Container>
       )}
 
       {/* ===== What people come with ===== */}
-      <Container className="py-10 md:py-16">
+      <Container className="py-6 md:py-14">
         <NeedsList mentors={mentors} isLoading={mentorsQuery.isLoading} />
       </Container>
 
       {/* ===== FAQ ===== */}
       <section aria-labelledby={faqId}>
-        <Container className="py-10 md:py-16">
+        <Container className="py-6 md:py-14">
           <h2 id={faqId} className="text-h2-sm text-foreground md:text-h2">
             {t("landing.faq.title")}
           </h2>
-          <Accordion type="single" collapsible className="mt-6 max-w-3xl rounded-lg border border-border bg-card px-4 md:px-6">
+          <Accordion type="single" collapsible className="mt-4 max-w-3xl rounded-lg border border-border bg-card px-4 md:mt-6 md:px-6">
             {FAQ_KEYS.map((key, index) => (
               <AccordionItem key={key} value={key} className={index === FAQ_KEYS.length - 1 ? "border-b-0" : undefined}>
-                <AccordionTrigger className="text-body">{t(`landing.faq.${key}Question`)}</AccordionTrigger>
+                <AccordionTrigger className="py-3 text-body md:py-4">{t(`landing.faq.${key}Question`)}</AccordionTrigger>
                 <AccordionContent className="max-w-prose text-body-sm text-muted-foreground text-pretty">
                   {t(`landing.faq.${key}Answer`)}
                 </AccordionContent>
@@ -187,7 +187,7 @@ export default function Home() {
 
       {/* ===== Final CTA band (the only surface change on the page) ===== */}
       <section aria-labelledby={ctaId} data-surface="dark" className="bg-secondary text-secondary-foreground">
-        <Container className="flex flex-col gap-6 py-12 md:flex-row md:items-center md:justify-between md:py-16">
+        <Container className="flex flex-col gap-5 py-10 md:flex-row md:items-center md:justify-between md:py-16">
           <div className="min-w-0">
             <h2 id={ctaId} className="text-h2-sm md:text-h2">
               {t("landing.cta.title")}
@@ -204,7 +204,7 @@ export default function Home() {
 
       {/* ===== Footer ===== */}
       <footer className="border-t border-border bg-background">
-        <Container className="flex flex-col gap-4 py-8 md:flex-row md:items-center md:justify-between">
+        <Container className="flex flex-col gap-3 py-6 md:flex-row md:items-center md:justify-between md:py-8">
           <div className="flex min-w-0 items-center gap-2 text-body-sm">
             <AmazonLogo size="sm" />
             <span className="font-medium text-foreground">MentorConnect</span>

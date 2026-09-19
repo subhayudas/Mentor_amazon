@@ -119,9 +119,9 @@ export function MentorPreview({ mentors, isLoading, isError, isFetching, onRetry
       <h2 id={titleId} className="text-h2-sm text-foreground md:text-h2">
         {t("landing.preview.title")}
       </h2>
-      <p className="mt-2 max-w-prose text-body text-muted-foreground text-pretty">{t("landing.preview.description")}</p>
+      <p className="mt-2 hidden max-w-prose text-body text-muted-foreground text-pretty md:block">{t("landing.preview.description")}</p>
       <div className="mt-6">{body}</div>
-      <div className={cn("mt-6 min-h-11", isPhone ? "flex" : "flex justify-start")}>
+      <div className={cn("min-h-11", isPhone ? "mt-4 flex" : "mt-6 flex justify-start")}>
         {!isLoading && !isError && total > 0 && (
           <Button asChild variant={isPhone ? "outline" : "secondary"} size="lg" className={cn(isPhone && "w-full")}>
             <Link href={ROUTES.mentors} data-testid="link-see-all-mentors">
