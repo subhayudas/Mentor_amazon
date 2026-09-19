@@ -225,13 +225,13 @@
     }
   },
   "hero": {
-    "badge": "Amazon Mentorship Program",
-    "headline": "Amazon Mentorship Program",
+    "badge": "Amazon mentorship programme",
+    "headline": "Amazon mentorship programme",
     "tagline": "Connect. Learn. Grow Together.",
     "shortNarrative": "Connect with experienced Amazon leaders for career guidance, leadership development, and industry insights.",
-    "narrative": "Our mentorship program brings together experienced Amazon leaders and aspiring professionals. Whether you're seeking career guidance, leadership development, or industry insights, our mentors are here to help you reach your full potential.",
+    "narrative": "Our mentorship programme brings together experienced Amazon leaders and aspiring professionals. Whether you're seeking career guidance, leadership development, or industry insights, our mentors are here to help you reach your full potential.",
     "impactQuote": "A single conversation with the right mentor can change the trajectory of your entire career. That's the power of mentorship.",
-    "quoteAuthor": "Amazon Mentorship Program",
+    "quoteAuthor": "Amazon mentorship programme",
     "trustedMentorship": "Trusted Mentorship",
     "expertGuidance": "Expert Guidance",
     "flexibleScheduling": "Flexible Scheduling"
@@ -271,7 +271,7 @@
     "benefit2Title": "Your calendar",
     "benefit2Desc": "Times come from your Cal.com link, never from this site",
     "benefit3Title": "Volunteer hours",
-    "benefit3Desc": "Sessions you mark complete count towards the program's hours",
+    "benefit3Desc": "Sessions you mark complete count towards the programme's hours",
     "personalInfo": "About you",
     "professionalInfo": "Your work",
     "availability": "Scheduling and preferences",
@@ -329,9 +329,9 @@
       "backHome": "Back to home",
       "requestAccess": "Request access",
       "mentorsOnlyTitle": "Mentor onboarding is for approved Amazon mentors",
-      "mentorsOnlyBody": "You are signed in as {{email}}, which is not a mentor account. Amazon employees join as mentors through Amazon sign-in after the program team approves their alias.",
+      "mentorsOnlyBody": "You are signed in as {{email}}, which is not a mentor account. Amazon employees join as mentors through Amazon sign-in after the programme team approves their alias.",
       "notApprovedTitle": "Your alias is not approved yet",
-      "notApprovedBody": "{{alias}} is not on the approved mentor list yet. Request access and the program team will review it; you can come back here once approved.",
+      "notApprovedBody": "{{alias}} is not on the approved mentor list yet. Request access and the programme team will review it; you can come back here once approved.",
       "checkFailedTitle": "We couldn't check your approval",
       "checkFailedBody": "Unable to check your approval status. Refresh the page to try again."
     },
@@ -500,7 +500,7 @@
     "sessionBooked": "Session Booked",
     "bookingConfirmed": "Your mentorship session has been confirmed.",
     "requestSentTitle": "Request sent",
-    "requestSentBody": "The mentor has been notified. Sign in with the same email to follow the request from your mentee dashboard.",
+    "requestSentBody": "The mentor has been notified. Sign in with the same email to follow the request under Bookings.",
     "requestFailedTitle": "Request not sent",
     "requestFailedBody": "Your request could not be sent. Please try again."
   },
@@ -598,9 +598,9 @@
   },
   "faq": {
     "title": "Frequently Asked Questions",
-    "subtitle": "Everything you need to know about our mentorship program",
+    "subtitle": "Everything you need to know about our mentorship programme",
     "spamQuestion": "If I participate, will I be spammed with emails?",
-    "spamAnswer": "Absolutely not. We respect your inbox and privacy. You'll only receive essential communications: session confirmations, reminders 24 hours before your meetings, and occasional program updates you can opt out of anytime. We never share your email with third parties, and you have full control over your notification preferences in your profile settings.",
+    "spamAnswer": "Absolutely not. We respect your inbox and privacy. You'll only receive essential communications: session confirmations, reminders 24 hours before your meetings, and occasional programme updates you can opt out of anytime. We never share your email with third parties, and you have full control over your notification preferences in your profile settings.",
     "commitmentQuestion": "What is the time commitment for mentors?",
     "commitmentAnswer": "You're in control of your availability. Whether you can offer one session per month or several per week, our flexible scheduling adapts to your calendar. Most mentors dedicate 1-2 hours monthly, but there's no minimum requirement. You set your own pace.",
     "matchingQuestion": "How are mentors and mentees matched?",
@@ -609,13 +609,13 @@
     "cancelAnswer": "Life happens! You can cancel or reschedule any session through your calendar link. We just ask for 24 hours notice when possible so the other party can adjust their schedule accordingly."
   },
   "legal": {
-    "disclaimer": "By participating in the Amazon Mentorship Program, you acknowledge that mentorship sessions are voluntary and for professional development purposes only. Amazon and its affiliates are not responsible for advice given during sessions. All interactions should maintain professional standards and confidentiality.",
-    "privacyNotice": "Your personal information will be used solely for program administration and matching purposes in accordance with our privacy policy.",
+    "disclaimer": "By participating in the Amazon mentorship programme, you acknowledge that mentorship sessions are voluntary and for professional development purposes only. Amazon and its affiliates are not responsible for advice given during sessions. All interactions should maintain professional standards and confidentiality.",
+    "privacyNotice": "Your personal information will be used solely for programme administration and matching purposes in accordance with our privacy policy.",
     "termsAgreement": "By registering, you agree to our Terms of Service and Privacy Policy."
   },
   "footer": {
     "poweredBy": "Powered by",
-    "amazonMentorship": "Amazon Mentorship Program",
+    "amazonMentorship": "Amazon mentorship programme",
     "allRightsReserved": "All rights reserved."
   },
   "experienceAreas": {
@@ -700,7 +700,7 @@
     "noAccessTitle": "You don't have access to this page",
     "noAccessBody": "This page is only for {{role}} accounts. You are signed in as {{email}}.",
     "role": {
-      "admin": "program admin",
+      "admin": "programme admin",
       "mentor": "mentor",
       "mentee": "mentee"
     },
@@ -711,24 +711,24 @@
   },
   "access": {
     "title": "Access not yet approved",
-    "limited": "MentorConnect access is limited to approved members of the Amazon mentoring program.",
+    "limited": "MentorConnect access is limited to approved members of the Amazon mentoring programme.",
     "aliasLabel": "Amazon alias",
     "status": {
       "pending": "Pending review",
       "approved": "Approved",
       "rejected": "Not approved"
     },
-    "recorded": "Your request has been recorded and the program team will review it. You will be able to sign in once it is approved.",
+    "recorded": "Your request has been recorded and the programme team will review it. You will be able to sign in once it is approved.",
     "approvedBody": "Your access has been approved. Sign in with Amazon again to continue.",
-    "rejectedBody": "This request was not approved. If you believe this is a mistake, contact the program team.",
-    "noAliasBody": "To request access, sign in with Amazon. Your alias is recorded automatically and the program team reviews it.",
+    "rejectedBody": "This request was not approved. If you believe this is a mistake, contact the programme team.",
+    "noAliasBody": "To request access, sign in with Amazon. Your alias is recorded automatically and the programme team reviews it.",
     "whatNext": "Approval usually happens within a few working days. There is nothing else you need to do right now.",
     "backHome": "Back to home",
     "signInAgain": "Sign in with Amazon again"
   },
   "admin": {
     "title": "Admin",
-    "subtitle": "Program administration for MentorConnect",
+    "subtitle": "Programme administration for MentorConnect",
     "overview": "Overview",
     "tabsLabel": "Admin sections",
     "tabs": {
@@ -780,8 +780,8 @@
       "colRating": "Rating",
       "colJoined": "Joined",
       "empty": "No mentors yet. Approved mentors appear here after onboarding.",
-      "available": "Available",
-      "inactive": "Inactive",
+      "available": "Accepting requests",
+      "inactive": "Not accepting requests",
       "ssoApproved": "SSO approved",
       "ssoApprovedHint": "Alias {{alias}} is on the approved list",
       "openProfile": "Open profile",
@@ -922,31 +922,31 @@
       "verified": "Verified organization"
     },
     "tooltip": {
-      "pending": "The program team is reviewing this organization's details.",
-      "unverified": "This organization has not been reviewed by the program team yet.",
-      "rejected": "The program team could not verify this organization.",
-      "verified": "The program team has confirmed this organization's details."
+      "pending": "The programme team is reviewing this organization's details.",
+      "unverified": "This organization has not been reviewed by the programme team yet.",
+      "rejected": "The programme team could not verify this organization.",
+      "verified": "The programme team has confirmed this organization's details."
     },
     "sectionTitle": "Verification",
     "referenceLabel": "Registration / licence number (optional)",
     "referencePlaceholder": "e.g. NGO licence or commercial registration number",
-    "referenceHelp": "Helps the program team confirm your organization faster.",
+    "referenceHelp": "Helps the programme team confirm your organization faster.",
     "registrationNoteTitle": "Organizations are marked \"pending review\" until confirmed",
-    "registrationNote": "We don't run automated checks yet. The MentorConnect program team reviews each organization manually before marking it verified. You can browse mentors and request sessions in the meantime.",
+    "registrationNote": "We don't run automated checks yet. The MentorConnect programme team reviews each organization manually before marking it verified. You can browse mentors and request sessions in the meantime.",
     "inReviewToast": "Your organization profile was created and is pending review.",
     "inReviewTitle": "Verification in review",
-    "inReviewDescription": "{{name}} is registered. The program team will review the details before marking the organization verified.",
-    "inReviewStep1": "The MentorConnect program team checks the details you provided.",
+    "inReviewDescription": "{{name}} is registered. The programme team will review the details before marking the organization verified.",
+    "inReviewStep1": "The MentorConnect programme team checks the details you provided.",
     "inReviewStep2": "You can browse mentors and request sessions while the review is open. Mentors will see that verification is pending.",
     "goToDashboard": "Go to dashboard",
     "redirectingShortly": "Taking you to your dashboard in a moment…",
-    "dashboardPendingBody": "The program team is reviewing your organization's details. You can keep browsing mentors and requesting sessions; mentors will see that verification is pending until it is confirmed.",
+    "dashboardPendingBody": "The programme team is reviewing your organization's details. You can keep browsing mentors and requesting sessions; mentors will see that verification is pending until it is confirmed.",
     "referenceSubmitted": "Reference submitted: {{reference}}",
     "rejectedTitle": "Verification not approved",
-    "dashboardRejectedBody": "The program team could not verify your organization with the details provided. You can still browse mentors, but mentors will see that verification was not approved.",
-    "contactLine": "Contact the MentorConnect program team to update your details or ask for another review.",
-    "mentorNoteUnverified": "This organization has not been verified by the program yet.",
-    "mentorNoteRejected": "The program team did not approve this organization's verification."
+    "dashboardRejectedBody": "The programme team could not verify your organization with the details provided. You can still browse mentors, but mentors will see that verification was not approved.",
+    "contactLine": "Contact the MentorConnect programme team to update your details or ask for another review.",
+    "mentorNoteUnverified": "This organization has not been verified by the programme yet.",
+    "mentorNoteRejected": "The programme team did not approve this organization's verification."
   },
   "landing": {
     "hero": {
@@ -1465,7 +1465,7 @@
       "country": "Country",
       "countryPlaceholder": "Choose a country",
       "accountType": "Account type",
-      "accountTypeHint": "Organizations are reviewed by the program team before they're marked verified.",
+      "accountTypeHint": "Organizations are reviewed by the programme team before they're marked verified.",
       "individual": "Individual",
       "organization": "Organization",
       "organizationName": "Organization name",
@@ -1526,7 +1526,7 @@
       "declineTitle": "Decline this request?",
       "declineBody": "{{name}} will be told you declined.",
       "declineConfirm": "Decline request",
-      "declineKeep": "Keep",
+      "declineKeep": "Keep request",
       "acceptedBadge": "Accepted",
       "declinedBadge": "Declined",
       "acceptedToast": "Request accepted",
