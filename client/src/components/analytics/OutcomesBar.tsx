@@ -10,7 +10,7 @@ import { ChartContainer } from "@/components/ui/chart";
 import { useDirection } from "@/hooks/useDirection";
 import { formatNumber } from "@/lib/format";
 import { OUTCOME_ORDER, formatList, type Period } from "@/lib/reporting";
-import { BrandTooltip, OUTCOME_FILL, SURFACE, ValueLabel, markOpacity } from "./ChartTheme";
+import { BrandTooltip, HORIZONTAL_CHART, OUTCOME_FILL, SURFACE, ValueLabel, markOpacity } from "./ChartTheme";
 import { ChartFigure } from "./ChartFigure";
 import { SegmentLegend, type SegmentLegendItem } from "./SegmentLegend";
 
@@ -32,7 +32,7 @@ interface OutcomesBarProps {
 export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBarProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { dir, isRTL } = useDirection();
+  const { dir } = useDirection();
 
   const total = OUTCOME_ORDER.reduce((sum, status) => sum + counts[status], 0);
   const labels = useMemo(() => Object.fromEntries(OUTCOME_ORDER.map((status) => [status, bookingStatusLabel(status, t)])) as Record<BookingStatus, string>, [t]);
@@ -111,7 +111,7 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
             barCategoryGap={0}
             barSize={32}
           >
-            <XAxis type="number" hide domain={[0, total]} reversed={isRTL} />
+            <XAxis type="number" hide domain={[0, total]} reversed={HORIZONTAL_CHART[dir].reversed} />
             <YAxis type="category" dataKey="name" hide />
             <Tooltip cursor={false} content={<BrandTooltip dir={dir} lang={lang} hideLabel />} />
             {OUTCOME_ORDER.map((status) => (

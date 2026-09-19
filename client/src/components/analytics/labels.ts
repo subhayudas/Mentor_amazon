@@ -1,6 +1,6 @@
 import type { TFunction } from "i18next";
 
-import { formatNumber } from "@/lib/format";
+import { bidi, formatNumber } from "@/lib/format";
 import { type Delta, type Period } from "@/lib/reporting";
 
 export type Scope = "admin" | "mentor" | "mentee";
@@ -34,13 +34,15 @@ export function deltaLine(
   unit?: "hours" | "points",
 ): string {
   if (d.diff === 0) return t("analyticsV2.tiles.noChange", { previous });
-  const delta =
+  // Signed numbers are bidi-isolated so "-11" keeps its sign in front inside Arabic text (P1-27).
+  const delta = bidi(
     unit === "hours"
       ? signedNumber(d.diff / 60, lang, { style: "unit", unit: "hour", unitDisplay: "narrow" })
-      : signedNumber(d.diff, lang);
+      : signedNumber(d.diff, lang),
+  );
   if (unit === "points") return t("analyticsV2.tiles.deltaPoints", { delta, previous });
   if (d.percent !== null && previousValue >= 10) {
-    const percent = formatNumber(d.percent, lang, { style: "percent", signDisplay: "exceptZero", maximumFractionDigits: 0 });
+    const percent = bidi(formatNumber(d.percent, lang, { style: "percent", signDisplay: "exceptZero", maximumFractionDigits: 0 }));
     return t("analyticsV2.tiles.deltaPercent", { delta, percent, previous });
   }
   return t("analyticsV2.tiles.delta", { delta, previous });

@@ -408,7 +408,6 @@
     "noSegmentRows": "لا توجد حجوزات في هذا الجزء.",
     "rowCount": "عدد الحجوزات: {{count}}",
     "showingRows": "عرض {{shown}} من أصل {{total}} حجز",
-    "selectPeriod": "اختر فترة",
     "selectSegment": "اختر جزءًا",
     "allSegments": "الكل",
     "exportView": "تصدير العرض الحالي (CSV)",
@@ -1379,7 +1378,8 @@
       },
       "axis": {
         "count": "العدد"
-      }
+      },
+      "drillLabel": "الحجوزات في"
     },
     "outcomes": {
       "title": "نتائج الطلبات",

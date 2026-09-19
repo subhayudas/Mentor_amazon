@@ -11,8 +11,8 @@ const THEMES = { light: "", dark: ".dark" } as const
 
 /**
  * Series colours read from the design tokens (P0-2): navy, burnt orange
- * (#C45500, 4.52:1 on white and 3:1 against navy), teal, slate, brown.
- * Use them as `color` in a ChartConfig; never a JS palette or #FF9900.
+ * (4.5:1 on white and 3:1 against navy), teal, slate, brown. Use them as
+ * `color` in a ChartConfig; never a JS palette, never the brand orange.
  */
 export const CHART_SERIES = {
   1: "hsl(var(--chart-1))",
@@ -196,7 +196,7 @@ const ChartTooltipContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          "grid min-w-[8rem] items-start gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs shadow-elevated",
           className
         )}
       >

@@ -783,10 +783,14 @@ function bucketFormatter(kind: "tick-week" | "tick-month" | "tick-month-year" | 
   return formatter;
 }
 
-/** Short axis tick: "25 Aug" for weeks, "Aug" for months ("Jan 2027" on a January bucket, one Intl call). */
-export function formatBucketTick(start: Date, bucket: Bucket, language: string): string {
+/**
+ * Short axis tick: "25 Aug" for weeks, "Aug" for months. A month tick carries
+ * its year on January and wherever the caller asks (`withYear`, e.g. the first
+ * bucket of a 12-month series), in one Intl call.
+ */
+export function formatBucketTick(start: Date, bucket: Bucket, language: string, withYear = false): string {
   if (bucket === "week") return bucketFormatter("tick-week", language).format(start);
-  return bucketFormatter(start.getMonth() === 0 ? "tick-month-year" : "tick-month", language).format(start);
+  return bucketFormatter(withYear || start.getMonth() === 0 ? "tick-month-year" : "tick-month", language).format(start);
 }
 
 /** Full bucket name for tooltips, legends and tables: "25 Aug" (callers wrap it in "Week of …") or "August 2026". */

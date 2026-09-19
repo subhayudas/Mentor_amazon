@@ -53,12 +53,12 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
 
   const data = useMemo<Datum[]>(
     () =>
-      series.map((point) => {
+      series.map((point, index) => {
         const dateLabel = formatBucketLabel(point.start, bucket, lang);
         return {
           key: point.key,
           label: bucket === "week" ? t("analyticsV2.trend.weekOf", { date: dateLabel }) : dateLabel,
-          tick: formatBucketTick(point.start, bucket, lang),
+          tick: formatBucketTick(point.start, bucket, lang, index === 0),
           requests: point.requests,
           completed: point.completed,
         };
@@ -86,7 +86,7 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
   // rows requested OR completed in the bucket), so it would not reconcile.
   const legendItems: SegmentLegendItem[] = data
     .filter((point) => (drillCounts.get(point.key) ?? 0) > 0)
-    .map((point) => ({ key: point.key, label: point.label, color: SERIES.completed }));
+    .map((point) => ({ key: point.key, label: point.label }));
 
   const seriesNames = { requests: t("analyticsV2.trend.requests"), completed: t("analyticsV2.trend.completed") };
   const isEmpty = totals.requests === 0 && totals.completed === 0;
@@ -140,7 +140,7 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
         items={legendItems}
         activeKey={activeKey}
         onSelect={select}
-        label={t("analytics.selectPeriod")}
+        label={t("analyticsV2.trend.drillLabel")}
         testId="legend-time-series"
         maxButtons={8}
       />

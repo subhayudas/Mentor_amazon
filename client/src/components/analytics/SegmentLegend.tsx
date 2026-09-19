@@ -8,8 +8,8 @@ export interface SegmentLegendItem {
   label: string;
   /** Already formatted for display; omit when the chip should carry the label only. */
   value?: string;
-  /** CSS colour of the mark this item stands for (a token string such as `hsl(var(--chart-1))`). */
-  color: string;
+  /** CSS colour of the mark this item stands for (a token string such as `hsl(var(--chart-1))`); omitted when every item shares one colour. */
+  color?: string;
 }
 
 interface SegmentLegendProps {
@@ -39,7 +39,7 @@ export function SegmentLegend({ items, activeKey, onSelect, label, testId, maxBu
       <div className="flex flex-wrap items-center gap-2" data-testid={testId}>
         <span className="text-caption text-muted-foreground">{label}</span>
         <Select value={activeKey ?? "__none"} onValueChange={(value) => onSelect(value === "__none" ? null : value)}>
-          <SelectTrigger className="h-9 w-64 text-sm" aria-label={label} data-testid={selectId}>
+          <SelectTrigger className="h-9 w-64 max-w-full text-sm" aria-label={label} data-testid={selectId}>
             <SelectValue placeholder={t("analytics.selectSegment")} />
           </SelectTrigger>
           <SelectContent>
@@ -67,7 +67,7 @@ export function SegmentLegend({ items, activeKey, onSelect, label, testId, maxBu
               count={item.value}
               data-testid={testId ? `${testId}-${item.key}` : undefined}
             >
-              <span aria-hidden="true" className="me-1.5 inline-block size-2.5 rounded-sm align-middle" style={{ background: item.color }} />
+              {item.color && <span aria-hidden="true" className="me-1.5 inline-block size-2.5 rounded-sm align-middle" style={{ background: item.color }} />}
               {item.label}
             </FilterChip>
           </li>

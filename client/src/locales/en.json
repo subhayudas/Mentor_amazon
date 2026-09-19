@@ -408,7 +408,6 @@
     "noSegmentRows": "No bookings in this segment.",
     "rowCount": "Bookings: {{count}}",
     "showingRows": "Showing {{shown}} of {{total}} bookings",
-    "selectPeriod": "Select a period",
     "selectSegment": "Select a segment",
     "allSegments": "All",
     "exportView": "Export current view (CSV)",
@@ -1379,7 +1378,8 @@
       },
       "axis": {
         "count": "Count"
-      }
+      },
+      "drillLabel": "Bookings in"
     },
     "outcomes": {
       "title": "Request outcomes",

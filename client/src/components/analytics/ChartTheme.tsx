@@ -8,7 +8,7 @@ import { formatNumber } from "@/lib/format";
 
 /**
  * Chart theme (P0-2, dataviz): every colour is a CSS token read through
- * `hsl(var(--chart-n))`, never a JS palette, never #FF9900. Completed sessions
+ * `hsl(var(--chart-n))`, never a JS palette, never the brand orange. Completed sessions
  * are navy, requests burnt orange (4.4:1 on white, 3:1 against navy); the
  * six outcome segments reuse the series tokens plus the destructive token and
  * rely on the 2px surface stroke, direct labels and the text legend rather
@@ -42,11 +42,26 @@ export const OUTCOME_FILL: Record<BookingStatus, string> = {
 export const AXIS_TICK = { fontSize: 12 } as const;
 const TABULAR = { fontVariantNumeric: "tabular-nums" } as const;
 
-/** Rounded data-end, square baseline (dataviz mark spec) — one place for the RTL pair. */
-export const COLUMN_RADIUS: [number, number, number, number] = [4, 4, 0, 0];
-export function horizontalBarRadius(isRTL: boolean): [number, number, number, number] {
-  return isRTL ? [4, 0, 0, 4] : [0, 4, 4, 0];
+type Corners = [number, number, number, number];
+
+/** Rounded data-end, square baseline (dataviz mark spec) — one place for the direction pair. */
+export const COLUMN_RADIUS: Corners = [4, 4, 0, 0];
+const HORIZONTAL_BAR_RADIUS: Record<Direction, Corners> = { ltr: [0, 4, 4, 0], rtl: [4, 0, 0, 4] };
+export function horizontalBarRadius(dir: Direction): Corners {
+  return HORIZONTAL_BAR_RADIUS[dir];
 }
+
+/**
+ * Geometry for a horizontal (`layout="vertical"`) bar chart per direction
+ * (P2-17): in Arabic the category axis sits at the inline-start (right) and
+ * the value axis grows toward the inline-end (left), so the label margin and
+ * the axis side swap. Physical values are fine here — they live inside the
+ * `dir="ltr"` chart wrapper.
+ */
+export const HORIZONTAL_CHART: Record<Direction, { margin: { top: number; right: number; bottom: number; left: number }; categoryAxisSide: "left" | "right"; reversed: boolean }> = {
+  ltr: { margin: { top: 0, right: 48, bottom: 0, left: 4 }, categoryAxisSide: "left", reversed: false },
+  rtl: { margin: { top: 0, right: 4, bottom: 0, left: 48 }, categoryAxisSide: "right", reversed: true },
+};
 
 /** Marks outside an active drill fade to ~35% so the selection reads on the chart itself. */
 export function markOpacity(key: string, activeKey: string | null): number {
@@ -67,9 +82,15 @@ interface ValueLabelProps {
   placement: "top" | "end" | "inside";
   /** Minimum mark size (px) before a label is drawn; smaller marks stay unlabelled (the table carries the value). */
   minSize: number;
-  isRTL?: boolean;
+  /** Page direction; a horizontal bar's data end is the left edge in `rtl`. */
+  dir?: Direction;
   format: (value: number) => string;
 }
+
+const END_LABEL: Record<Direction, { offset: number; anchor: "start" | "end" }> = {
+  ltr: { offset: 6, anchor: "start" },
+  rtl: { offset: -6, anchor: "end" },
+};
 
 /**
  * Selective direct labels for recharts `LabelList content`: nothing for zero
@@ -77,7 +98,7 @@ interface ValueLabelProps {
  * mark. Inside a coloured segment the label sits on a surface chip so it stays
  * ink-on-white whatever the segment colour.
  */
-export function ValueLabel({ value, viewBox, placement, minSize, isRTL = false, format }: ValueLabelProps) {
+export function ValueLabel({ value, viewBox, placement, minSize, dir = "ltr", format }: ValueLabelProps) {
   const numeric = typeof value === "number" ? value : Number(value ?? 0);
   if (!viewBox || !Number.isFinite(numeric) || numeric <= 0) return null;
   // A reversed axis (Arabic horizontal bars) hands recharts a negative width:
@@ -102,10 +123,10 @@ export function ValueLabel({ value, viewBox, placement, minSize, isRTL = false, 
     );
   }
   if (placement === "end") {
-    // The data end is the left edge when the bar grows toward the inline-start (RTL).
-    const anchorX = isRTL ? x - 6 : x + width + 6;
+    const end = END_LABEL[dir];
+    const dataEnd = dir === "rtl" ? x : x + width;
     return (
-      <text x={anchorX} y={y + height / 2} dy={4} textAnchor={isRTL ? "end" : "start"} fill={MUTED_INK} fontSize={12} style={TABULAR}>
+      <text x={dataEnd + end.offset} y={y + height / 2} dy={4} textAnchor={end.anchor} fill={MUTED_INK} fontSize={12} style={TABULAR}>
         {text}
       </text>
     );
