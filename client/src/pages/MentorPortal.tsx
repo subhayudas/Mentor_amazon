@@ -122,13 +122,14 @@ export default function MentorPortal() {
         eyebrow={t("dashboardV2.mentor.eyebrow")}
         title={<bdi>{name}</bdi>}
         description={
-          <>
+          // Credential and status are siblings that wrap as units (F-43): no
+          // text-node separator to orphan on a new line or be read aloud.
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             {credential && <span>{credential}</span>}
-            {credential && " · "}
-            <Badge tone={mentor.is_available ? "success" : "neutral"} className="align-middle" data-testid="badge-mentor-availability">
+            <Badge tone={mentor.is_available ? "success" : "neutral"} data-testid="badge-mentor-availability">
               {mentor.is_available ? t("dashboardV2.mentor.accepting") : t("dashboardV2.mentor.notAccepting")}
             </Badge>
-          </>
+          </span>
         }
         className="pb-6 md:pb-6"
         actions={

@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Building2, Clock, ShieldX } from "lucide-react";
+import { Building2, ShieldAlert, ShieldX } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { VerificationBadge } from "@/components/VerificationBadge";
@@ -32,9 +32,10 @@ export function OrganizationVerificationStatus({ mentee }: { mentee: Mentee }) {
         <VerificationBadge status={status} type="organization" size="sm" />
       </div>
 
+      {/* Info, not warning (F-19): the warning tint + clock belong to a booking awaiting the mentor. */}
       {status === "pending" && (
-        <Alert variant="warning" role="status" data-testid="banner-verification-pending">
-          <Clock aria-hidden="true" />
+        <Alert variant="info" role="status" data-testid="banner-verification-pending">
+          <ShieldAlert aria-hidden="true" />
           <AlertTitle className="leading-snug">{t("verification.inReviewTitle")}</AlertTitle>
           <AlertDescription>
             <p>{t("verification.dashboardPendingBody")}</p>

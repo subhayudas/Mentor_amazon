@@ -25,8 +25,8 @@ export interface BookingRowActions {
   onCancelSession: (booking: BookingWithMentor) => void;
   onView: (booking: BookingWithMentor) => void;
   onRate: (booking: BookingWithMentor) => void;
-  /** Row id currently mid-mutation (buttons show a spinner). */
-  busyId?: string | null;
+  /** Rows with a mutation in flight (their buttons show a spinner) — one per row, not only the latest (F-37). */
+  pendingIds?: ReadonlySet<string>;
 }
 
 export interface BookingRowProps extends BookingRowActions {
@@ -36,7 +36,57 @@ export interface BookingRowProps extends BookingRowActions {
   highlighted?: boolean;
   /** Hide the goal line (Overview lists). */
   compact?: boolean;
+  /** Indent the action row to the text column on md+ so it shares the name's edge (F-35). */
+  alignActions?: boolean;
   className?: string;
+}
+
+/**
+ * The actions of a finished row (completed / cancelled / declined / a
+ * confirmed session whose time has passed). One helper feeds `BookingRow`
+ * and the Overview's past table so the two never offer different recoveries
+ * (F-36): declined and cancelled always get "Request again".
+ */
+export function PastRowActions({
+  booking,
+  onView,
+  onRate,
+  dense = false,
+}: {
+  booking: BookingWithMentor;
+  onView: (b: BookingWithMentor) => void;
+  onRate: (b: BookingWithMentor) => void;
+  /** Table cell: ghost for the low-emphasis action. */
+  dense?: boolean;
+}) {
+  const { t, i18n } = useTranslation();
+  const quiet = dense ? "ghost" : "outline";
+  if (booking.status === "completed") {
+    return booking.mentee_rating ? (
+      <Button variant={quiet} size="sm" onClick={() => onRate(booking)} data-testid={`button-view-feedback-${booking.id}`}>
+        <Star className="fill-brand-orange text-brand-orange" aria-hidden="true" />
+        <span dir="ltr" className="tabular-nums">
+          {t("dashboardV2.row.rated", { value: formatNumber(booking.mentee_rating, i18n.language) })}
+        </span>
+      </Button>
+    ) : (
+      <Button variant={dense ? "outline" : "secondary"} size="sm" onClick={() => onRate(booking)} data-testid={`button-give-feedback-${booking.id}`}>
+        {t("dashboardV2.actions.rateSession")}
+      </Button>
+    );
+  }
+  if ((booking.status === "canceled" || booking.status === "rejected") && booking.mentor) {
+    return (
+      <Button asChild variant="outline" size="sm" data-testid={`button-request-again-${booking.id}`}>
+        <Link href={`/mentor/${encodeURIComponent(booking.mentor.id)}`}>{t("dashboardV2.actions.requestAgain")}</Link>
+      </Button>
+    );
+  }
+  return (
+    <Button variant={quiet} size="sm" onClick={() => onView(booking)} data-testid={`button-view-request-${booking.id}`}>
+      {t("dashboardV2.actions.viewRequest")}
+    </Button>
+  );
 }
 
 export function MentorAvatar({ mentor, size = "md" }: { mentor?: BookingWithMentor["mentor"]; size?: "sm" | "md" | "lg" }) {
@@ -68,6 +118,7 @@ export function BookingRow({
   primary = false,
   highlighted = false,
   compact = false,
+  alignActions = false,
   className,
   onChooseTime,
   onWithdraw,
@@ -75,14 +126,14 @@ export function BookingRow({
   onCancelSession,
   onView,
   onRate,
-  busyId,
+  pendingIds,
 }: BookingRowProps) {
   const { t, i18n } = useTranslation();
   const { format, zoneLabel } = useSessionTime();
   const mentor = booking.mentor;
   const name = localizedField(mentor, "name", i18n.language) || t("dashboardV2.row.unknownMentor");
   const credential = credentialLine(mentor, i18n.language);
-  const busy = busyId === booking.id;
+  const busy = pendingIds?.has(booking.id) ?? false;
   const hasLink = !!mentor?.cal_link;
   const scheduled = format(booking.scheduled_at);
   const completed = format(booking.completed_at);
@@ -155,7 +206,7 @@ export function BookingRow({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className={cn("flex flex-wrap items-center gap-2", alignActions && "md:ms-[3.25rem]")}>
         {booking.status === "pending" && (
           <>
             <Button variant="outline" size="sm" onClick={() => onView(booking)} data-testid={`button-view-request-${booking.id}`}>
@@ -220,28 +271,13 @@ export function BookingRow({
         )}
         {booking.status === "completed" && (
           <>
-            {booking.mentee_rating ? (
-              <Button variant="outline" size="sm" onClick={() => onRate(booking)} data-testid={`button-view-feedback-${booking.id}`}>
-                <Star className="fill-brand-orange text-brand-orange" aria-hidden="true" />
-                <span dir="ltr" className="tabular-nums">
-                  {t("dashboardV2.row.rated", { value: formatNumber(booking.mentee_rating, i18n.language) })}
-                </span>
-              </Button>
-            ) : (
-              <Button variant="secondary" size="sm" onClick={() => onRate(booking)} data-testid={`button-give-feedback-${booking.id}`}>
-                {t("dashboardV2.actions.rateSession")}
-              </Button>
-            )}
+            <PastRowActions booking={booking} onView={onView} onRate={onRate} />
             <Button variant="ghost" size="sm" onClick={() => onView(booking)} data-testid={`button-view-request-${booking.id}`}>
               {t("dashboardV2.actions.viewRequest")}
             </Button>
           </>
         )}
-        {(booking.status === "canceled" || booking.status === "rejected") && mentor && (
-          <Button asChild variant="outline" size="sm" data-testid={`button-request-again-${booking.id}`}>
-            <Link href={`/mentor/${encodeURIComponent(mentor.id)}`}>{t("dashboardV2.actions.requestAgain")}</Link>
-          </Button>
-        )}
+        {(booking.status === "canceled" || booking.status === "rejected") && <PastRowActions booking={booking} onView={onView} onRate={onRate} />}
       </div>
     </article>
   );

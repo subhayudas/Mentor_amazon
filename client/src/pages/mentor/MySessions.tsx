@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { CalendarClock, CheckCircle2, FileText, MessageSquare, Timer, XCircle } from "lucide-react";
@@ -50,6 +50,8 @@ import { ARIA_DISABLED_CLASS, BookingsError } from "@/pages/mentee/shared";
 
 /** Radix Select cannot hold an empty-string value, so "no country" is this sentinel. */
 const NO_COUNTRY = "__none";
+/** The "Other…" duration chip; it reveals the free number field. */
+const OTHER_DURATION = "__other";
 const HIGHLIGHT_MS = 2000;
 
 type SessionBooking = Booking & { mentee?: Mentee };
@@ -66,7 +68,9 @@ interface MySessionsProps {
  * Completed (completed, plus confirmed sessions whose time passed and still
  * need a duration). Every row shows the mentee (embedded, never a UUID) and
  * a StatusBadge; completing records the real duration for volunteer hours;
- * cancelling confirms first.
+ * cancelling confirms first. An accepted request has no time yet, so its
+ * primary action is to wait: "Mark complete" is only a quiet link for a
+ * session that happened off the calendar link (F-39).
  */
 export default function MySessions({ mentorId, mentorEmail, mentor }: MySessionsProps) {
   const { t, i18n } = useTranslation();
@@ -136,6 +140,7 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
     const name = mentee?.name || t("dashboardV2.inbox.unknownMentee");
     const busy = cancelMutation.isPending && cancelMutation.variables === booking.id;
     const canAct = booking.status === "confirmed" || booking.status === "accepted";
+    const awaitingTime = booking.status === "accepted";
     const sessionOver = booking.status === "completed" || (!!booking.scheduled_at && !isFuture(booking.scheduled_at));
     return (
       <li
@@ -147,12 +152,12 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
         data-testid={`session-card-${booking.id}`}
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-3">
             <Avatar className="size-10">
               {mentee?.photo_url ? <AvatarImage src={mentee.photo_url} alt="" /> : null}
               <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(name)}</AvatarFallback>
             </Avatar>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <h3 className="text-body font-medium text-foreground" data-testid={`text-session-mentee-${booking.id}`}>
                   <bdi>{name}</bdi>
@@ -165,7 +170,7 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
                 </p>
               )}
               {booking.goal && (
-                <p dir="auto" className="mt-1 line-clamp-2 text-body-sm text-foreground text-pretty">
+                <p dir="auto" className="mt-1 line-clamp-2 max-w-prose text-body-sm text-foreground text-pretty">
                   {booking.goal}
                 </p>
               )}
@@ -195,7 +200,7 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          {canAct && (
+          {canAct && !awaitingTime && (
             <Button variant="secondary" size="sm" onClick={() => openComplete(booking)} data-testid={`button-complete-${booking.id}`}>
               <CheckCircle2 aria-hidden="true" />
               {t("dashboardV2.sessions.markComplete")}
@@ -214,23 +219,48 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
           {canAct && (
             <Button variant="ghost" size="sm" loading={busy} onClick={() => setCancelFor(booking)} data-testid={`button-cancel-${booking.id}`}>
               <XCircle aria-hidden="true" />
-              {t("dashboardV2.sessions.cancel")}
+              {awaitingTime ? t("dashboardV2.sessions.cancelRequest") : t("dashboardV2.sessions.cancel")}
             </Button>
           )}
         </div>
+        {awaitingTime && (
+          <p className="mt-3 text-caption text-muted-foreground">
+            {t("dashboardV2.sessions.metOffPlatform")}{" "}
+            <button
+              type="button"
+              className="inline-flex min-h-6 items-center rounded-sm font-medium text-secondary underline decoration-1 underline-offset-4 transition-colors duration-fast hover:decoration-2"
+              onClick={() => openComplete(booking)}
+              data-testid={`button-complete-${booking.id}`}
+            >
+              {t("dashboardV2.sessions.markCompleteAnyway")}
+            </button>
+          </p>
+        )}
       </li>
     );
   };
 
   // ----- complete dialog state -----
+  // One control for the duration (F-42): preset chips, plus an "Other" chip
+  // that reveals the free number field instead of showing both at once.
   const [minutesInput, setMinutesInput] = useState("30");
+  const [otherDuration, setOtherDuration] = useState(false);
   const [sessionCountry, setSessionCountry] = useState("");
+  const minutesRef = useRef<HTMLInputElement | null>(null);
   const parsedMinutes = Number.parseInt(minutesInput, 10);
   const minutesValid = Number.isInteger(parsedMinutes) && parsedMinutes >= MIN_SESSION_MINUTES && parsedMinutes <= MAX_SESSION_MINUTES;
   const ids = useId();
+  const durationChoice = !otherDuration && SESSION_MINUTE_PRESETS.some((preset) => preset === parsedMinutes) ? String(parsedMinutes) : OTHER_DURATION;
+
+  useEffect(() => {
+    if (!otherDuration) return;
+    const frame = window.requestAnimationFrame(() => minutesRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [otherDuration]);
 
   const openComplete = (booking: SessionBooking) => {
     setMinutesInput("30");
+    setOtherDuration(false);
     setSessionCountry(booking.country || getMentorCountry(mentor) || "");
     setCompleteFor(booking);
   };
@@ -298,42 +328,60 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
           </DialogHeader>
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="input-session-minutes">{t("mentorPortal.sessionDuration")}</Label>
+              <Label id={`${ids}-duration-label`}>{t("mentorPortal.sessionDuration")}</Label>
               <ChipRadioGroup
-                aria-label={t("mentorPortal.sessionDuration")}
-                value={SESSION_MINUTE_PRESETS.some((preset) => preset === parsedMinutes) ? String(parsedMinutes) : ""}
-                onValueChange={(value) => setMinutesInput(value)}
+                aria-labelledby={`${ids}-duration-label`}
+                value={durationChoice}
+                onValueChange={(value) => {
+                  if (value === OTHER_DURATION) {
+                    setOtherDuration(true);
+                    return;
+                  }
+                  setOtherDuration(false);
+                  setMinutesInput(value);
+                }}
               >
                 {SESSION_MINUTE_PRESETS.map((preset) => (
                   <ChipRadio key={preset} value={String(preset)} data-testid={`button-minutes-${preset}`}>
                     {t("mentorPortal.durationMinutes", { count: preset })}
                   </ChipRadio>
                 ))}
+                <ChipRadio value={OTHER_DURATION} data-testid="button-minutes-other">
+                  {t("mentorPortal.otherDuration")}
+                </ChipRadio>
               </ChipRadioGroup>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="input-session-minutes"
-                  type="number"
-                  inputMode="numeric"
-                  min={MIN_SESSION_MINUTES}
-                  max={MAX_SESSION_MINUTES}
-                  value={minutesInput}
-                  onChange={(event) => setMinutesInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") confirmComplete();
-                  }}
-                  aria-invalid={!minutesValid}
-                  aria-describedby={`${ids}-minutes-hint`}
-                  className="w-28"
-                  data-testid="input-session-minutes"
-                />
-                <span className="text-body-sm text-muted-foreground">{t("mentorPortal.minutesLabel")}</span>
-              </div>
-              <p id={`${ids}-minutes-hint`} className={cn("text-caption", minutesValid ? "text-muted-foreground" : "text-destructive")}>
-                {minutesValid
-                  ? t("mentorPortal.minutesHint", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })
-                  : t("mentorPortal.invalidDuration", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })}
-              </p>
+              {otherDuration && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="input-session-minutes" className="sr-only">
+                      {t("mentorPortal.sessionDuration")}
+                    </Label>
+                    <Input
+                      ref={minutesRef}
+                      id="input-session-minutes"
+                      type="number"
+                      inputMode="numeric"
+                      min={MIN_SESSION_MINUTES}
+                      max={MAX_SESSION_MINUTES}
+                      value={minutesInput}
+                      onChange={(event) => setMinutesInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") confirmComplete();
+                      }}
+                      aria-invalid={!minutesValid}
+                      aria-describedby={`${ids}-minutes-hint`}
+                      className="w-28"
+                      data-testid="input-session-minutes"
+                    />
+                    <span className="text-body-sm text-muted-foreground">{t("mentorPortal.minutesLabel")}</span>
+                  </div>
+                  <p id={`${ids}-minutes-hint`} className={cn("text-caption", minutesValid ? "text-muted-foreground" : "text-destructive")}>
+                    {minutesValid
+                      ? t("mentorPortal.minutesHint", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })
+                      : t("mentorPortal.invalidDuration", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })}
+                  </p>
+                </>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="select-session-country">{t("mentorPortal.sessionCountry")}</Label>
@@ -391,13 +439,15 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
       <AlertDialog open={!!cancelFor} onOpenChange={(open) => !open && setCancelFor(null)}>
         <AlertDialogContent data-testid="dialog-cancel-session">
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("dashboardV2.sessions.cancelTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{cancelFor?.status === "accepted" ? t("dashboardV2.sessions.cancelRequestTitle") : t("dashboardV2.sessions.cancelTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("dashboardV2.sessions.cancelBody", { name: bidi(cancelFor?.mentee?.name || t("dashboardV2.inbox.unknownMentee")) })}
+              {t(cancelFor?.status === "accepted" ? "dashboardV2.sessions.cancelRequestBody" : "dashboardV2.sessions.cancelBody", {
+                name: bidi(cancelFor?.mentee?.name || t("dashboardV2.inbox.unknownMentee")),
+              })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("dashboardV2.sessions.cancelKeep")}</AlertDialogCancel>
+            <AlertDialogCancel>{cancelFor?.status === "accepted" ? t("dashboardV2.sessions.cancelRequestKeep") : t("dashboardV2.sessions.cancelKeep")}</AlertDialogCancel>
             <AlertDialogAction
               className={buttonVariants({ variant: "destructive" })}
               onClick={() => {
@@ -406,7 +456,7 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
               }}
               data-testid="button-cancel-session-confirm"
             >
-              {t("dashboardV2.sessions.cancelConfirm")}
+              {cancelFor?.status === "accepted" ? t("dashboardV2.sessions.cancelRequest") : t("dashboardV2.sessions.cancelConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

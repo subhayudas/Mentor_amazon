@@ -88,6 +88,11 @@ export function RoleBadge({ role }: { role: "mentor" | "admin" }) {
 
 // ==================== LAYOUT PIECES ====================
 
+/**
+ * Search input. `dir="auto"` only once there is a value (as SearchIntent
+ * does, F-46): Chromium resolves an EMPTY dir=auto input as LTR, which clips
+ * the start of an Arabic placeholder; empty, it inherits the page direction.
+ */
 export function SearchBox({ value, onChange, placeholder, testId }: { value: string; onChange: (v: string) => void; placeholder: string; testId?: string }) {
   return (
     <div className="relative w-full sm:max-w-xs">
@@ -98,7 +103,7 @@ export function SearchBox({ value, onChange, placeholder, testId }: { value: str
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        dir="auto"
+        dir={value ? "auto" : undefined}
         className="ps-9"
         data-testid={testId}
       />

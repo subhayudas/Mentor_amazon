@@ -20,7 +20,6 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/EmptyState";
 import { RequestRail } from "@/components/RequestRail";
-import { StatTile } from "@/components/StatTile";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { toast } from "sonner";
 import type { Booking, Mentee, Mentor, MentorDashboardStats } from "@/lib/database";
@@ -41,12 +40,14 @@ const DECISION_LINGER_MS = 2500;
 const INBOX_POLL_MS = 10_000;
 
 /**
- * Mentor inbox (P1-25 + P1-23 tiles): two honest tiles, then every pending
- * request with the full goal text, the mentee's identity and verification,
- * and Accept / Decline per row (Decline confirms; Accept is replaced by a
- * link to add a Cal.com link when the mentor has none, because accepting
- * without one strands the mentee). Decisions stay anchored to the row for
- * 2.5 s before it leaves the list.
+ * Mentor inbox (P1-25, F-40): the two honest numbers (requests waiting,
+ * sessions this month with volunteer hours) as a compact stat row inside the
+ * section header — not a wall of tiles above the one thing that matters —
+ * then every pending request with the full goal text at a readable measure
+ * (F-13), the mentee's identity and verification, and Accept / Decline per
+ * row (Decline confirms; Accept is replaced by a link to add a Cal.com link
+ * when the mentor has none, because accepting without one strands the
+ * mentee). Decisions stay anchored to the row for 2.5 s before it leaves.
  */
 export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: Mentor }) {
   const { t, i18n } = useTranslation();
@@ -147,44 +148,6 @@ export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: 
 
   return (
     <div className="space-y-8">
-      {pendingQuery.isLoading || bookingsQuery.isLoading || statsQuery.isLoading ? (
-        <div className="grid gap-4 sm:grid-cols-2" role="status" aria-busy="true">
-          <span className="sr-only">{t("common.loading")}</span>
-          <Skeleton className="h-36 rounded-lg" />
-          <Skeleton className="h-36 rounded-lg" />
-        </div>
-      ) : (
-      <section aria-label={t("dashboardV2.inbox.tilesLabel")} className="grid gap-4 sm:grid-cols-2">
-        <StatTile
-          title={t("dashboardV2.inbox.tileWaiting")}
-          value={waiting}
-          definition={t("dashboardV2.inbox.tileWaitingDef")}
-          testId="stat-requests-waiting"
-        />
-        <StatTile
-          title={t("dashboardV2.inbox.tileSessionsMonth")}
-          value={bookingsQuery.isError ? UNAVAILABLE : formatNumber(sessionsThisMonth, i18n.language)}
-          delta={
-            statsQuery.isError ? (
-              t("dashboardV2.inbox.tileHoursUnavailable")
-            ) : (
-              <>
-                <span data-testid="stat-volunteer-hours-month">
-                  {t("dashboardV2.inbox.tileHoursMonth", { hours: formatHours(stats?.monthlyVolunteerMinutes, i18n.language) })}
-                </span>
-                <span aria-hidden="true"> · </span>
-                <span data-testid="stat-volunteer-hours">
-                  {t("dashboardV2.inbox.tileHoursTotal", { hours: formatHours(stats?.volunteerMinutes, i18n.language) })}
-                </span>
-              </>
-            )
-          }
-          definition={t("dashboardV2.inbox.tileSessionsMonthDef")}
-          testId="stat-sessions-month"
-        />
-      </section>
-      )}
-
       <section aria-labelledby="inbox-heading" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="inbox-heading" className="text-h2-sm text-foreground">
@@ -195,6 +158,53 @@ export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: 
             {t("common.refresh")}
           </Button>
         </div>
+
+        {pendingQuery.isLoading || bookingsQuery.isLoading || statsQuery.isLoading ? (
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 border-b border-border pb-4 sm:flex sm:flex-wrap sm:gap-x-10" role="status" aria-busy="true">
+            <span className="sr-only">{t("common.loading")}</span>
+            <div className="space-y-1.5" aria-hidden="true">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-7 w-10" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="space-y-1.5" aria-hidden="true">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-7 w-10" />
+              <Skeleton className="h-4 w-56" />
+            </div>
+          </div>
+        ) : (
+          <dl aria-label={t("dashboardV2.inbox.tilesLabel")} className="grid grid-cols-2 gap-x-6 gap-y-3 border-b border-border pb-4 sm:flex sm:flex-wrap sm:gap-x-10">
+            <div className="min-w-0">
+              <dt className="text-caption text-muted-foreground">{t("dashboardV2.inbox.tileWaiting")}</dt>
+              <dd className="mt-0.5 text-2xl font-semibold leading-tight tabular-nums text-foreground" data-testid="stat-requests-waiting">
+                {waiting}
+              </dd>
+              <dd className="text-caption text-muted-foreground text-pretty">{t("dashboardV2.inbox.tileWaitingDef")}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-caption text-muted-foreground">{t("dashboardV2.inbox.tileSessionsMonth")}</dt>
+              <dd className="mt-0.5 text-2xl font-semibold leading-tight tabular-nums text-foreground" data-testid="stat-sessions-month">
+                {bookingsQuery.isError ? UNAVAILABLE : formatNumber(sessionsThisMonth, i18n.language)}
+              </dd>
+              <dd className="text-caption text-muted-foreground tabular-nums text-pretty">
+                {statsQuery.isError ? (
+                  t("dashboardV2.inbox.tileHoursUnavailable")
+                ) : (
+                  <>
+                    <span data-testid="stat-volunteer-hours-month">
+                      {t("dashboardV2.inbox.tileHoursMonth", { hours: formatHours(stats?.monthlyVolunteerMinutes, i18n.language) })}
+                    </span>
+                    <span aria-hidden="true"> · </span>
+                    <span data-testid="stat-volunteer-hours">
+                      {t("dashboardV2.inbox.tileHoursTotal", { hours: formatHours(stats?.volunteerMinutes, i18n.language) })}
+                    </span>
+                  </>
+                )}
+              </dd>
+            </div>
+          </dl>
+        )}
 
         {!hasCalLink && !pendingQuery.isLoading && visible.length > 0 && (
           <p className="rounded-lg border border-warning-border bg-warning p-3 text-body-sm text-warning-foreground" role="status" data-testid="note-no-cal-link">
@@ -269,9 +279,9 @@ export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: 
                   data-testid={`booking-row-${booking.id}`}
                   data-decision={outcome}
                 >
-                  <article aria-labelledby={`request-${booking.id}`} className="space-y-4">
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
+                  <article aria-labelledby={`request-${booking.id}`} className="grid gap-4 md:grid-cols-[minmax(0,1fr)_max-content] md:gap-x-8">
+                    <div className="flex flex-wrap items-start justify-between gap-3 md:contents">
+                      <div className="flex min-w-0 items-start gap-3 md:col-start-1">
                         <Avatar className="size-10">
                           {mentee?.photo_url ? <AvatarImage src={mentee.photo_url} alt="" /> : null}
                           <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(name)}</AvatarFallback>
@@ -296,19 +306,19 @@ export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: 
                           {verificationNote(mentee)}
                         </div>
                       </div>
-                      <p className="text-caption text-muted-foreground tabular-nums">
+                      <p className="text-caption text-muted-foreground tabular-nums md:col-start-2 md:row-start-1 md:text-end">
                         {t("dashboardV2.inbox.requestedAt", { when: formatRelativeDay(booking.created_at, i18n.language) })}
                       </p>
                     </div>
 
-                    <div>
+                    <div className="md:col-start-1">
                       <p className="text-caption text-muted-foreground">{t("dashboardV2.inbox.goalLabel")}</p>
-                      <p dir="auto" className="mt-1 whitespace-pre-line text-body-sm text-foreground text-pretty" data-testid={`text-goal-${booking.id}`}>
+                      <p dir="auto" className="mt-1 max-w-prose whitespace-pre-line text-body-sm text-foreground text-pretty" data-testid={`text-goal-${booking.id}`}>
                         {booking.goal || t("dashboardV2.inbox.noGoal")}
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 md:col-start-1">
                       {outcome ? (
                         <Badge tone={outcome === "accepted" ? "success" : "danger"} role="status" data-testid={`badge-decision-${booking.id}`}>
                           {outcome === "accepted" ? <Check aria-hidden="true" /> : <Ban aria-hidden="true" />}

@@ -29,7 +29,8 @@ import { useConfirmOnCalBooking } from "@/pages/mentee/useConfirmOnCalBooking";
 import { MentorAvatar, useSessionTime } from "@/pages/mentee/BookingRow";
 import type { BookingRowActions } from "@/pages/mentee/BookingRow";
 
-type Confirm = { kind: "withdraw" | "cancelRequest" | "cancelSession"; booking: BookingWithMentor };
+type ConfirmKind = "withdraw" | "cancelRequest" | "cancelSession";
+type Confirm = { kind: ConfirmKind; booking: BookingWithMentor };
 
 const HIGHLIGHT_MS = 2500;
 
@@ -52,6 +53,9 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
   const [rating, setRating] = useState<BookingWithMentor | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  // Every row with a PATCH in flight, not just the latest one (F-37): a second
+  // withdraw while the first is pending must not drop the first row's spinner.
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(() => new Set());
   const highlightTimer = useRef<number | undefined>(undefined);
 
   useEffect(() => () => window.clearTimeout(highlightTimer.current), []);
@@ -63,18 +67,25 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
   };
 
   const cancelMutation = useMutation({
-    mutationFn: (booking: BookingWithMentor) => bookingService.updateStatus(booking.id, "canceled"),
-    onSuccess: (_row, booking) => {
+    mutationFn: ({ booking }: Confirm) => bookingService.updateStatus(booking.id, "canceled"),
+    onMutate: ({ booking }) => {
+      setPendingIds((ids) => new Set(ids).add(booking.id));
+    },
+    onSuccess: (_row, { kind, booking }) => {
       invalidate();
-      toast.success(
-        confirm?.kind === "cancelSession" || booking.status === "confirmed"
-          ? t("dashboardV2.confirm.sessionCancelled")
-          : t("dashboardV2.confirm.requestWithdrawn"),
-      );
+      // The kind travels with the mutation: `confirm` is already cleared by now.
+      toast.success(kind === "cancelSession" ? t("dashboardV2.confirm.sessionCancelled") : t("dashboardV2.confirm.requestWithdrawn"));
       highlight(booking.id);
     },
     onError: () => {
       toast.error(t("dashboardV2.confirm.error"));
+    },
+    onSettled: (_row, _error, { booking }) => {
+      setPendingIds((ids) => {
+        const next = new Set(ids);
+        next.delete(booking.id);
+        return next;
+      });
     },
   });
 
@@ -102,7 +113,7 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
       setRating(booking);
       setFeedbackOpen(true);
     },
-    busyId: cancelMutation.isPending ? cancelMutation.variables?.id ?? null : null,
+    pendingIds,
   };
 
   const mentorName = (booking: BookingWithMentor | null) =>
@@ -146,7 +157,7 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
             <AlertDialogAction
               className={buttonVariants({ variant: "destructive" })}
               onClick={() => {
-                if (confirm) cancelMutation.mutate(confirm.booking);
+                if (confirm) cancelMutation.mutate(confirm);
                 setConfirm(null);
               }}
               data-testid="button-confirm-cancel"
