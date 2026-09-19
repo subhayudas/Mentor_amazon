@@ -1,543 +1,242 @@
-import { useState, useCallback } from "react";
-import { useQuery } from "@tanstack/react-query";
+import * as React from "react";
+import { Link, useLocation } from "wouter";
+import { ArrowRight } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { motion } from "framer-motion";
-import { mentorService } from "@/lib/services";
-import type { Mentor } from "@/lib/database";
-import { MentorCard } from "@/components/MentorCard";
-import { SearchAndFilter } from "@/components/SearchAndFilter";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { NumberTicker, ScrambleHover } from "@/components/fancy/FancyComponents";
-import { ArrowRight, Sparkles, MessageCircle, Target, Zap, Globe, ChevronRight } from "lucide-react";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Link } from "wouter";
+
+import { AmazonLogo } from "@/components/AmazonSmile";
+import { Container } from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { ExampleChips } from "@/components/discovery/ExampleChips";
+import { HowItHappens } from "@/components/discovery/HowItHappens";
+import { MentorPreview } from "@/components/discovery/MentorPreview";
+import { NeedsList } from "@/components/discovery/NeedsList";
+import { SearchIntent } from "@/components/discovery/SearchIntent";
+import { useIsPhone } from "@/components/discovery/useMediaQuery";
+import { useMentors } from "@/components/discovery/useMentors";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import { EXAMPLE_CHIP_LIMIT, topTags, trustStats } from "@/lib/discovery";
+import { ROUTES, discoveryUrl } from "@/lib/routes";
+
+/**
+ * Landing `/` (spec §5 as amended by P0-6/C1/C2, P0-7, P1-13, P1-14, P1-16,
+ * P2-8, C19). Sections, in order: hero (search is the primary action; the
+ * request-rail card is the product artifact) → "Mentors you can talk to" →
+ * "What people come with" → FAQ → final CTA band → compact footer.
+ *
+ * The page sits on `--background`; only the CTA band changes surface. The
+ * hero search submit is the ONE orange fill above the fold, the CTA band
+ * button the one below it. Every number on the page is computed from the
+ * `mentors_public` list; nothing is invented, nothing renders as `0` before
+ * data arrives.
+ *
+ * Phones get a separate composition (P0-7): three example chips on one line,
+ * no visible submit, a snap scroller of four compact cards, the rail card
+ * after the preview, needs as a 2 x 3 text grid.
+ */
+const FAQ_KEYS = ["spam", "commitment", "matching", "cancel"] as const;
+
+/** Reduced-motion aware, once-per-session hero fade (spec §2: one 200 ms opacity + 8px travel on first paint). */
+let heroPlayed = false;
+function useHeroEnter(ref: React.RefObject<HTMLElement>) {
+  // Layout effect: the first keyframe applies before the first paint, so the
+  // hero never flashes at full opacity before fading in.
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || heroPlayed || typeof el.animate !== "function") return;
+    heroPlayed = true;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    el.animate(
+      [
+        { opacity: 0, transform: "translateY(8px)" },
+        { opacity: 1, transform: "translateY(0)" },
+      ],
+      { duration: 200, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "none" },
+    );
+  }, [ref]);
+}
 
 export default function Home() {
   const { t, i18n } = useTranslation();
-  const isArabic = i18n.language === 'ar';
-  const [filters, setFilters] = useState({ search: "", expertise: "", industry: "", language: "" });
+  const lang = i18n.language;
+  const [, navigate] = useLocation();
+  const isPhone = useIsPhone();
+  const heroRef = React.useRef<HTMLDivElement>(null);
+  useHeroEnter(heroRef);
 
-  const { data: mentors, isLoading } = useQuery<Mentor[]>({
-    queryKey: ['mentors', filters],
-    queryFn: () => mentorService.getAll({
-      search: filters.search || undefined,
-      expertise: filters.expertise && filters.expertise !== 'all' ? filters.expertise : undefined,
-      industry: filters.industry && filters.industry !== 'all' ? filters.industry : undefined,
-      language: filters.language && filters.language !== 'all' ? filters.language : undefined,
-    }),
-  });
-  
-  const allMentors = mentors;
+  const mentorsQuery = useMentors();
+  const mentors = mentorsQuery.data;
+  const [query, setQuery] = React.useState("");
 
-  const handleFilterChange = useCallback((newFilters: { search: string; expertise: string; industry: string; language: string }) => {
-    setFilters(newFilters);
-  }, []);
+  const stats = React.useMemo(() => (mentors ? trustStats(mentors) : null), [mentors]);
+  const exampleTags = React.useMemo(
+    () => (mentors ? topTags(mentors, "expertise", EXAMPLE_CHIP_LIMIT, lang) : []),
+    [mentors, lang],
+  );
 
-  const activeFilterCount = [
-    filters.search,
-    filters.expertise && filters.expertise !== "all",
-    filters.industry && filters.industry !== "all",
-    filters.language && filters.language !== "all"
-  ].filter(Boolean).length;
+  const trustLine = stats
+    ? [
+        t("landing.trust.mentors", { count: stats.mentors }),
+        stats.languages > 0 ? t("landing.trust.languages", { count: stats.languages }) : "",
+        stats.countries > 0 ? t("landing.trust.countries", { count: stats.countries }) : "",
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
 
-  const pastelColors: Array<'pink' | 'mint' | 'purple' | 'coral' | 'blue'> = ['pink', 'mint', 'purple', 'coral', 'blue'];
-  const getCardColor = (index: number): 'pink' | 'mint' | 'purple' | 'coral' | 'blue' => pastelColors[index % pastelColors.length];
+  const year = new Date().getFullYear();
+  const faqId = React.useId();
+  const ctaId = React.useId();
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--cream)' }}>
-
-      {/* ========== HERO SECTION ========== */}
-      <section className="hero-mesh relative py-20 md:py-32 overflow-hidden">
-        {/* Floating decorative elements */}
-        <motion.div
-          className="absolute top-20 right-[15%] w-20 h-20 rounded-3xl float-slow"
-          style={{ background: 'var(--pastel-peach)', opacity: 0.6 }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 0.6, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.8 }}
-        />
-        <motion.div
-          className="absolute bottom-32 left-[10%] w-16 h-16 rounded-2xl float-slow"
-          style={{ background: 'var(--pastel-lavender)', opacity: 0.5, animationDelay: '2s' }}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 0.5, y: 0 }}
-          transition={{ delay: 0.7, duration: 0.8 }}
-        />
-        <motion.div
-          className="absolute top-40 left-[20%] w-12 h-12 rounded-full float-slow"
-          style={{ background: 'var(--pastel-sage)', opacity: 0.4, animationDelay: '4s' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.4 }}
-          transition={{ delay: 0.9, duration: 0.8 }}
-        />
-
-        <div className="relative z-10 max-w-5xl mx-auto px-6 md:px-8 text-center">
-          {/* Badge */}
-          <motion.div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
-            style={{ background: 'var(--pastel-butter)', border: '1px solid rgba(255, 153, 0, 0.15)' }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-          >
-            <Sparkles className="w-4 h-4" style={{ color: 'var(--amazon-orange)' }} />
-            <span className="text-sm font-medium" style={{ color: 'var(--ink)' }}>
-              {t('hero.badge')}
-            </span>
-          </motion.div>
-
-          {/* Main Headline */}
-          <motion.h1
-            className="mb-6"
-            style={{ fontFamily: 'var(--font-display)' }}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.1 }}
-          >
-            {isArabic ? (
-              <>
-                اعثر على <span className="italic">مرشدك</span>
-                <br />
-                <span className="relative inline-block">
-                  المثالي
-                  <svg
-                    className="absolute -bottom-2 left-0 w-full"
-                    viewBox="0 0 200 12"
-                    fill="none"
-                    style={{ height: '0.15em' }}
-                  >
-                    <path
-                      d="M2 8 Q100 2 198 8"
-                      stroke="var(--amazon-orange)"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  </svg>
-                </span>
-              </>
-            ) : (
-              <>
-                Find your <span className="italic">perfect</span>
-                <br />
-                <span className="relative inline-block">
-                  mentor
-                  <svg
-                    className="absolute -bottom-2 left-0 w-full"
-                    viewBox="0 0 200 12"
-                    fill="none"
-                    style={{ height: '0.15em' }}
-                  >
-                    <path
-                      d="M2 8 Q100 2 198 8"
-                      stroke="var(--amazon-orange)"
-                      strokeWidth="4"
-                      strokeLinecap="round"
-                      fill="none"
-                    />
-                  </svg>
-                </span>
-              </>
-            )}
-          </motion.h1>
-
-          {/* Subheadline */}
-          <motion.p
-            className="text-xl md:text-2xl mb-6"
-            style={{ fontFamily: 'var(--font-display)', fontStyle: 'italic', color: 'var(--amazon-orange)' }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            {t('hero.tagline')}
-          </motion.p>
-
-          {/* Description */}
-          <motion.p
-            className="text-lg max-w-2xl mx-auto mb-10"
-            style={{ color: 'var(--ink-light)', lineHeight: 1.7 }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-          >
-            {t('hero.shortNarrative')}
-          </motion.p>
-
-          {/* CTA Buttons */}
-          <motion.div
-            className="flex flex-wrap gap-4 justify-center"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-          >
-            <a href="#mentors">
-              <button className="btn-primary text-lg group">
-                {t('nav.browseMentors')}
-                <ArrowRight className={`w-5 h-5 transition-transform group-hover:translate-x-1 ${isArabic ? 'rotate-180' : ''}`} />
-              </button>
-            </a>
-            <Link href="/mentee-registration">
-              <button className="btn-outline text-lg">
-                {t('nav.joinMentee')}
-              </button>
-            </Link>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ========== FEATURE CARDS - ASYMMETRIC BENTO ========== */}
-      <section className="py-20 md:py-28">
-        <div className="max-w-6xl mx-auto px-6 md:px-8">
-
-          {/* Asymmetric Grid */}
-          <div className="grid grid-cols-12 gap-4 md:gap-6">
-
-            {/* Large Card - Personal Mentorship */}
-            <motion.div
-              className="feature-card card-blush col-span-12 md:col-span-7 min-h-[320px] flex flex-col justify-between"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.6 }}
+    <div className="flex flex-col">
+      {/* ===== Hero ===== */}
+      <section aria-labelledby="page-title" className="pb-10 pt-8 md:pb-16 md:pt-14">
+        <Container className="lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-12">
+          <div ref={heroRef} className="hero-enter">
+            <PageHeader
+              size="display"
+              className="py-0 md:py-0"
+              eyebrow={t("landing.hero.eyebrow")}
+              title={t("landing.hero.title")}
+              description={t("landing.hero.lede")}
             >
-              <div>
-                <div className="inline-flex p-3 rounded-2xl mb-6" style={{ background: 'rgba(255, 182, 193, 0.5)' }}>
-                  <MessageCircle className="w-6 h-6" style={{ color: '#E75480' }} />
-                </div>
-                <h3 className="mb-4" style={{ fontFamily: 'var(--font-display)' }}>
-                  {isArabic ? 'إرشاد فردي' : '1:1 Mentorship'}
-                </h3>
-                <p style={{ color: 'var(--ink-light)', fontSize: '1.1rem', lineHeight: 1.7 }}>
-                  {isArabic
-                    ? 'احجز جلسات مخصصة مع قادة أمازون. احصل على ملاحظات مباشرة حول مشاريعك وقراراتك المهنية ومسار نموك.'
-                    : 'Book personalized sessions with Amazon leaders. Get direct feedback on your projects, career decisions, and growth trajectory.'
-                  }
-                </p>
+              <div className="mt-6 max-w-2xl">
+                <SearchIntent
+                  id="hero-search"
+                  size="lg"
+                  value={query}
+                  onChange={setQuery}
+                  onSubmit={(value) => navigate(discoveryUrl({ q: value }))}
+                  label={t("landing.hero.searchLabel")}
+                  placeholder={t("landing.hero.searchPlaceholder")}
+                  submitLabel={isPhone ? undefined : t("landing.hero.search")}
+                  primaryAction
+                  chips={<ExampleChips tags={exampleTags} label={t("landing.hero.examples")} />}
+                />
               </div>
-              <div className="mt-8">
-                <Link href="/mentee-registration" className="group inline-flex items-center gap-2 font-semibold" style={{ color: 'var(--ink)' }}>
-                  <ScrambleHover>{isArabic ? 'ابدأ الآن' : 'Get Started'}</ScrambleHover>
-                  <ChevronRight className={`w-4 h-4 transition-transform group-hover:translate-x-1 ${isArabic ? 'rotate-180' : ''}`} />
-                </Link>
-              </div>
-              <div className="card-deco" />
-            </motion.div>
-
-            {/* Stats Card */}
-            <motion.div
-              className="feature-card card-sage col-span-12 md:col-span-5 flex flex-col justify-center"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-            >
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <div className="stat-value">
-                    <NumberTicker target={mentors?.length || 50} suffix="+" />
-                  </div>
-                  <div className="stat-label mt-1">{t('stats.activeMentors')}</div>
-                </div>
-                <div>
-                  <div className="stat-value">
-                    <NumberTicker target={500} duration={2.5} suffix="+" />
-                  </div>
-                  <div className="stat-label mt-1">{t('stats.sessionsBooked')}</div>
-                </div>
-                <div>
-                  <div className="stat-value">
-                    <NumberTicker target={12} suffix="+" />
-                  </div>
-                  <div className="stat-label mt-1">{t('stats.countries')}</div>
-                </div>
-                <div>
-                  <div className="stat-value">
-                    <NumberTicker target={98} suffix="%" />
-                  </div>
-                  <div className="stat-label mt-1">{t('stats.satisfaction')}</div>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Career Goals */}
-            <motion.div
-              className="feature-card card-lavender col-span-12 md:col-span-4"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              <div className="inline-flex p-3 rounded-2xl mb-4" style={{ background: 'rgba(201, 182, 228, 0.5)' }}>
-                <Target className="w-6 h-6" style={{ color: '#7C3AED' }} />
-              </div>
-              <h3 className="text-2xl mb-3" style={{ fontFamily: 'var(--font-display)' }}>
-                {isArabic ? 'حدد أهدافك' : 'Set Goals'}
-              </h3>
-              <p style={{ color: 'var(--ink-light)' }}>
-                {isArabic
-                  ? 'أهداف واضحة مع توجيه من الذين سبقوك في المسار.'
-                  : "Clear objectives with guidance from those who've walked the path."
-                }
+              <p className="mt-4 min-h-5 text-caption text-muted-foreground tabular-nums" data-testid="text-trust-line">
+                {trustLine}
               </p>
-            </motion.div>
-
-            {/* Fast Growth */}
-            <motion.div
-              className="feature-card card-peach col-span-12 md:col-span-4"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-            >
-              <div className="inline-flex p-3 rounded-2xl mb-4" style={{ background: 'rgba(255, 179, 153, 0.5)' }}>
-                <Zap className="w-6 h-6" style={{ color: '#EA580C' }} />
-              </div>
-              <h3 className="text-2xl mb-3" style={{ fontFamily: 'var(--font-display)' }}>
-                {isArabic ? 'نمو سريع' : 'Fast Growth'}
-              </h3>
-              <p style={{ color: 'var(--ink-light)' }}>
-                {isArabic
-                  ? 'تخطى سنوات من التجربة والخطأ برؤى من كبار الأمازونيين.'
-                  : 'Skip years of trial and error with insights from senior Amazonians.'
-                }
-              </p>
-            </motion.div>
-
-            {/* Global Network */}
-            <motion.div
-              className="feature-card card-sky col-span-12 md:col-span-4"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
-              <div className="inline-flex p-3 rounded-2xl mb-4" style={{ background: 'rgba(135, 206, 235, 0.5)' }}>
-                <Globe className="w-6 h-6" style={{ color: '#0284C7' }} />
-              </div>
-              <h3 className="text-2xl mb-3" style={{ fontFamily: 'var(--font-display)' }}>
-                {isArabic ? 'شبكة عالمية' : 'Global Network'}
-              </h3>
-              <p style={{ color: 'var(--ink-light)' }}>
-                {isArabic
-                  ? 'تواصل مع مرشدين من أكثر من 12 دولة وخلفيات متنوعة.'
-                  : 'Connect with mentors across 12+ countries and diverse backgrounds.'
-                }
-              </p>
-            </motion.div>
-          </div>
-        </div>
-      </section>
-
-      {/* ========== MENTORS SECTION ========== */}
-      <section id="mentors" className="py-20 md:py-28" style={{ background: 'white' }}>
-        <div className="max-w-7xl mx-auto px-6 md:px-8">
-          {/* Section Header */}
-          <div className="text-center max-w-2xl mx-auto mb-12">
-            <motion.h2
-              className="mb-4"
-              style={{ fontFamily: 'var(--font-display)' }}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-            >
-              {t('mentors.featured')}
-            </motion.h2>
-            <p style={{ color: 'var(--ink-light)', fontSize: '1.125rem' }}>
-              {t('mentors.browseDescription')}
-            </p>
-            {activeFilterCount > 0 && (
-              <Badge className="mt-4 rounded-full px-4 py-1" style={{ background: 'var(--pastel-butter)', color: 'var(--ink)' }}>
-                {activeFilterCount} {isArabic ? 'فلتر نشط' : (activeFilterCount > 1 ? 'filters' : 'filter')} {isArabic ? '' : 'active'}
-              </Badge>
-            )}
-          </div>
-
-          {/* Search and Filter */}
-          {allMentors && (
-            <SearchAndFilter mentors={allMentors as any} onFilterChange={handleFilterChange} />
-          )}
-
-          {/* Mentor Grid */}
-          {isLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Card key={i} className="p-6 rounded-3xl bg-white">
-                  <Skeleton className="w-20 h-20 rounded-2xl mb-4" />
-                  <Skeleton className="h-6 w-3/4 mb-2" />
-                  <Skeleton className="h-4 w-1/2 mb-4" />
-                  <div className="flex gap-2 mb-4">
-                    <Skeleton className="h-6 w-16 rounded-full" />
-                    <Skeleton className="h-6 w-20 rounded-full" />
-                  </div>
-                  <Skeleton className="h-12 w-full rounded-xl" />
-                </Card>
-              ))}
-            </div>
-          ) : mentors && mentors.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-              {mentors.map((mentor, index) => (
-                <motion.div
-                  key={mentor.id}
-                  initial={{ opacity: 0, y: 30 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-50px" }}
-                  transition={{ duration: 0.5, delay: index * 0.05 }}
+              <p className="mt-3 flex min-h-6 flex-wrap items-center gap-x-6 gap-y-1 text-body-sm">
+                <Link
+                  href={ROUTES.mentors}
+                  className="inline-flex min-h-6 items-center gap-1 font-medium text-secondary underline-offset-4 transition-colors duration-fast hover:underline"
+                  data-testid="link-browse-all"
                 >
-                  <MentorCard mentor={mentor as any} accentColor={getCardColor(index)} />
-                </motion.div>
-              ))}
-            </div>
-          ) : (
-            <Card className="p-12 text-center rounded-3xl mt-10">
-              <p style={{ color: 'var(--ink-muted)' }}>
-                {activeFilterCount > 0 ? t('mentors.noResultsFilter') : t('mentors.noResults')}
+                  {stats ? t("landing.hero.browseAll", { count: stats.mentors }) : t("landing.hero.browseAllNoCount")}
+                  <ArrowRight className="size-4 rtl:-scale-x-100" strokeWidth={2} aria-hidden="true" />
+                </Link>
+                {isPhone && (
+                  <a
+                    href="#how-it-works"
+                    className="inline-flex min-h-6 items-center text-muted-foreground underline-offset-4 transition-colors duration-fast hover:text-foreground hover:underline"
+                  >
+                    {t("landing.hero.howItWorks")}
+                  </a>
+                )}
               </p>
-            </Card>
-          )}
-        </div>
+            </PageHeader>
+          </div>
+          {!isPhone && <HowItHappens className="mt-10 lg:mt-0" />}
+        </Container>
       </section>
 
-      {/* ========== FAQ SECTION ========== */}
-      <section className="py-20 md:py-28" style={{ background: 'var(--cream)' }}>
-        <div className="max-w-3xl mx-auto px-6 md:px-8">
-          <motion.div
-            className="text-center mb-12"
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6 }}
-          >
-            <h2 className="mb-4" style={{ fontFamily: 'var(--font-display)' }}>
-              {t('faq.title')}
-            </h2>
-            <p style={{ color: 'var(--ink-muted)' }}>{t('faq.subtitle')}</p>
-          </motion.div>
+      {/* ===== Mentors you can talk to ===== */}
+      <Container className="py-10 md:py-16">
+        <MentorPreview
+          mentors={mentors}
+          isLoading={mentorsQuery.isLoading}
+          isError={mentorsQuery.isError && !mentors}
+          isFetching={mentorsQuery.isFetching}
+          onRetry={() => void mentorsQuery.refetch()}
+          isPhone={isPhone}
+        />
+      </Container>
 
-          <Accordion type="single" collapsible className="w-full space-y-3">
-            {[
-              { value: "spam", question: t('faq.spamQuestion'), answer: t('faq.spamAnswer') },
-              { value: "commitment", question: t('faq.commitmentQuestion'), answer: t('faq.commitmentAnswer') },
-              { value: "matching", question: t('faq.matchingQuestion'), answer: t('faq.matchingAnswer') },
-              { value: "cancel", question: t('faq.cancelQuestion'), answer: t('faq.cancelAnswer') },
-            ].map((faq) => (
-              <AccordionItem
-                key={faq.value}
-                value={faq.value}
-                className="bg-white rounded-2xl px-6 border-none data-[state=open]:shadow-sm"
-              >
-                <AccordionTrigger className="text-left hover:no-underline py-5 font-medium text-[var(--ink)]">
-                  {faq.question}
-                </AccordionTrigger>
-                <AccordionContent className="pb-5 text-[var(--ink-light)]">
-                  {faq.answer}
+      {/* ===== Request rail (phones: after the preview, as a vertical list) ===== */}
+      {isPhone && (
+        <Container className="pb-10">
+          <HowItHappens />
+        </Container>
+      )}
+
+      {/* ===== What people come with ===== */}
+      <Container className="py-10 md:py-16">
+        <NeedsList mentors={mentors} isLoading={mentorsQuery.isLoading} />
+      </Container>
+
+      {/* ===== FAQ ===== */}
+      <section aria-labelledby={faqId}>
+        <Container className="py-10 md:py-16">
+          <h2 id={faqId} className="text-h2-sm text-foreground md:text-h2">
+            {t("landing.faq.title")}
+          </h2>
+          <Accordion type="single" collapsible className="mt-6 max-w-3xl rounded-lg border border-border bg-card px-4 md:px-6">
+            {FAQ_KEYS.map((key, index) => (
+              <AccordionItem key={key} value={key} className={index === FAQ_KEYS.length - 1 ? "border-b-0" : undefined}>
+                <AccordionTrigger className="text-body">{t(`landing.faq.${key}Question`)}</AccordionTrigger>
+                <AccordionContent className="max-w-prose text-body-sm text-muted-foreground text-pretty">
+                  {t(`landing.faq.${key}Answer`)}
                 </AccordionContent>
               </AccordionItem>
             ))}
           </Accordion>
-        </div>
+        </Container>
       </section>
 
-      {/* ========== VEROSEK-STYLE FOOTER ========== */}
-      <footer className="relative py-20 md:py-28 overflow-hidden" style={{ background: 'var(--cream)' }}>
-        {/* Background shader gradient - warm orange tones */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `
-              radial-gradient(ellipse 80% 50% at 30% 70%, rgba(255, 153, 0, 0.08) 0%, transparent 50%),
-              radial-gradient(ellipse 60% 40% at 70% 50%, rgba(255, 173, 51, 0.06) 0%, transparent 50%)
-            `,
-          }}
-        />
+      {/* ===== Final CTA band (the only surface change on the page) ===== */}
+      <section aria-labelledby={ctaId} data-surface="dark" className="bg-secondary text-secondary-foreground">
+        <Container className="flex flex-col gap-6 py-12 md:flex-row md:items-center md:justify-between md:py-16">
+          <div className="min-w-0">
+            <h2 id={ctaId} className="text-h2-sm md:text-h2">
+              {t("landing.cta.title")}
+            </h2>
+            <p className="mt-2 max-w-prose text-body text-secondary-foreground/80 text-pretty">{t("landing.cta.body")}</p>
+          </div>
+          <Button asChild variant="primary" size="lg" className="shrink-0 md:self-center">
+            <Link href={ROUTES.mentors} data-testid="link-cta-browse">
+              {t("landing.cta.button")}
+            </Link>
+          </Button>
+        </Container>
+      </section>
 
-        <div className="relative z-10 max-w-6xl mx-auto px-6 md:px-8">
-          {/* Top section - Newsletter + Navigation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-16">
-            {/* Newsletter */}
-            <div>
-              <h4 className="text-lg font-semibold mb-4" style={{ color: 'var(--ink)' }}>
-                {isArabic ? 'انضم إلينا' : 'Join Waitlist'}
-              </h4>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  placeholder={isArabic ? 'بريدك الإلكتروني' : 'Your email'}
-                  className="flex-1 px-4 py-3 rounded-xl border border-[var(--border)] bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[var(--amazon-orange)] focus:border-transparent"
-                />
-                <button
-                  className="px-5 py-3 rounded-xl text-sm font-semibold transition-all duration-200 hover:brightness-110"
-                  style={{
-                    background: 'var(--amazon-orange)',
-                    color: 'white',
-                  }}
+      {/* ===== Footer ===== */}
+      <footer className="border-t border-border bg-background">
+        <Container className="flex flex-col gap-4 py-8 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-center gap-2 text-body-sm">
+            <AmazonLogo size="sm" />
+            <span className="font-medium text-foreground">MentorConnect</span>
+            <span className="text-muted-foreground" aria-hidden="true">
+              ·
+            </span>
+            <span className="truncate text-muted-foreground">{t("landing.footer.programme")}</span>
+          </div>
+          <nav aria-label={t("landing.footer.nav")}>
+            <ul className="flex flex-wrap gap-x-6 gap-y-2 text-body-sm">
+              <li>
+                <Link href={ROUTES.mentors} className="inline-flex min-h-6 items-center text-foreground underline-offset-4 hover:underline">
+                  {t("nav.mentors")}
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={ROUTES.mentorOnboarding}
+                  className="inline-flex min-h-6 items-center text-foreground underline-offset-4 hover:underline"
                 >
-                  {isArabic ? 'إرسال' : 'Submit'}
-                </button>
-              </div>
-            </div>
-
-            {/* Navigation Links */}
-            <div>
-              <h4 className="text-lg font-semibold mb-4" style={{ color: 'var(--ink)' }}>
-                {isArabic ? 'التنقل' : 'Navigation'}
-              </h4>
-              <ul className="space-y-3">
-                <li>
-                  <Link href="/" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
-                    {t('nav.home')}
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/mentee-registration" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
-                    {t('nav.joinMentee')}
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/mentor-onboarding" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
-                    {t('nav.becomeMentor')}
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/analytics" className="text-[var(--ink-light)] hover:text-[var(--amazon-orange)] transition-colors">
-                    {t('nav.analytics')}
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-[var(--border)] mb-8" />
-
-          {/* Copyright */}
-          <div className="text-center text-sm" style={{ color: 'var(--ink-muted)' }}>
-            © 2025 amazon. {t('footer.allRightsReserved')}
-          </div>
-        </div>
-
-        {/* Large "amazon" text - Verosek style with orange */}
-        <div
-          className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full text-center pointer-events-none select-none overflow-hidden"
-          style={{
-            fontSize: 'clamp(8rem, 25vw, 20rem)',
-            fontFamily: 'var(--font-display)',
-            fontWeight: 500,
-            color: 'var(--amazon-orange)',
-            opacity: 0.25,
-            lineHeight: 0.8,
-            letterSpacing: '-0.05em',
-          }}
-        >
-          amazon
-        </div>
+                  {t("nav.becomeMentor")}
+                </Link>
+              </li>
+              <li>
+                <Link href={ROUTES.login} className="inline-flex min-h-6 items-center text-foreground underline-offset-4 hover:underline">
+                  {t("nav.signIn")}
+                </Link>
+              </li>
+            </ul>
+          </nav>
+          <p className="text-caption text-muted-foreground">{t("landing.footer.copyright", { year })}</p>
+        </Container>
       </footer>
     </div>
   );

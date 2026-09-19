@@ -1267,13 +1267,223 @@
     "mentorNoteRejected": "لم يوافق فريق البرنامج على التحقق من هذه المنظمة."
   },
   "landing": {
-    "_owner": "A"
+    "hero": {
+      "eyebrow": "برنامج الإرشاد من أمازون في الإمارات",
+      "title": "تجاوز ما يعيقك بمساعدة مرشد من أمازون.",
+      "lede": "أخبرنا بما تعمل عليه، وقارن بين مرشدين تناسب خبرتهم حاجتك، ثم أرسل طلبًا — يقبله المرشد وتختاران الوقت معًا.",
+      "searchLabel": "ما الذي تعمل عليه؟",
+      "searchPlaceholder": "ابحث حسب المهارة أو الدور أو الفريق أو ما تعمل عليه",
+      "search": "بحث",
+      "examples": "مجالات شائعة",
+      "browseAll_zero": "تصفح جميع المرشدين",
+      "browseAll_one": "تصفح المرشد الوحيد",
+      "browseAll_two": "تصفح المرشدَين",
+      "browseAll_few": "تصفح المرشدين الـ{{count}} جميعًا",
+      "browseAll_many": "تصفح المرشدين الـ{{count}} جميعًا",
+      "browseAll_other": "تصفح المرشدين الـ{{count}} جميعًا",
+      "browseAllNoCount": "تصفح جميع المرشدين",
+      "howItWorks": "اطّلع على كيفية إتمام الجلسة"
+    },
+    "trust": {
+      "mentors_zero": "لا مرشدين بعد",
+      "mentors_one": "مرشد واحد",
+      "mentors_two": "مرشدان",
+      "mentors_few": "{{count}} مرشدين",
+      "mentors_many": "{{count}} مرشدًا",
+      "mentors_other": "{{count}} مرشد",
+      "languages_zero": "لا لغات مدرجة",
+      "languages_one": "لغة واحدة",
+      "languages_two": "لغتان",
+      "languages_few": "{{count}} لغات",
+      "languages_many": "{{count}} لغة",
+      "languages_other": "{{count}} لغة",
+      "countries_zero": "لا دول مدرجة",
+      "countries_one": "دولة واحدة",
+      "countries_two": "دولتان",
+      "countries_few": "{{count}} دول",
+      "countries_many": "{{count}} دولة",
+      "countries_other": "{{count}} دولة"
+    },
+    "rail": {
+      "lede": "الطلب أولًا — ويأتي التقويم بعد موافقة المرشد."
+    },
+    "preview": {
+      "title": "مرشدون يمكنك التحدث إليهم",
+      "description": "موظفون في أمازون يتطوعون بوقتهم. من يقبلون الطلبات يظهرون أولًا.",
+      "seeAll_zero": "عرض جميع المرشدين",
+      "seeAll_one": "عرض المرشد الوحيد",
+      "seeAll_two": "عرض المرشدَين",
+      "seeAll_few": "عرض المرشدين الـ{{count}} جميعًا",
+      "seeAll_many": "عرض المرشدين الـ{{count}} جميعًا",
+      "seeAll_other": "عرض المرشدين الـ{{count}} جميعًا",
+      "errorTitle": "تعذّر تحميل المرشدين",
+      "errorBody": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+      "emptyTitle": "لا مرشدين بعد",
+      "emptyBody": "يظهر المرشدون هنا بعد أن يعتمدهم فريق البرنامج."
+    },
+    "needs": {
+      "title": "ما الذي يأتي به الناس",
+      "description": "ستة أمور يسأل عنها المتدربون أكثر من غيرها. اختر أحدها لترى من يمكنه المساعدة.",
+      "term": "يبحث عن «{{term}}»",
+      "count_zero": "لا مرشدين",
+      "count_one": "مرشد واحد",
+      "count_two": "مرشدان",
+      "count_few": "{{count}} مرشدين",
+      "count_many": "{{count}} مرشدًا",
+      "count_other": "{{count}} مرشد",
+      "items": {
+        "careers": {
+          "label": "التنقلات المهنية",
+          "term": "المهني"
+        },
+        "interviews": {
+          "label": "المقابلات",
+          "term": "المقابلات"
+        },
+        "leadership": {
+          "label": "القيادة",
+          "term": "القيادة"
+        },
+        "product": {
+          "label": "المنتجات والتصميم",
+          "term": "المنتجات"
+        },
+        "cloud": {
+          "label": "السحابة والبيانات",
+          "term": "السحابة"
+        },
+        "founders": {
+          "label": "المؤسسون والمنظمات غير الربحية",
+          "term": "الشركات الناشئة"
+        }
+      }
+    },
+    "faq": {
+      "title": "أسئلة يطرحها الناس",
+      "spamQuestion": "هل سأتلقى كثيرًا من رسائل البريد الإلكتروني؟",
+      "spamAnswer": "لا. لا يرسل MentorConnect أي رسائل تسويقية. يظهر رد المرشد ضمن حجوزاتك عند تسجيل الدخول بالبريد الإلكتروني الذي استخدمته، والرسائل الوحيدة الأخرى تأتي من أداة التقويم التي تحجز الوقت عبرها.",
+      "commitmentQuestion": "كم من الوقت يخصص المرشدون؟",
+      "commitmentAnswer": "يحدد المرشدون وتيرتهم بأنفسهم. يقدم معظمهم ساعة أو ساعتين شهريًا، ويمكنهم إيقاف استقبال الطلبات الجديدة في أي وقت — وعندها تظهر عبارة «لا يقبل الطلبات» على بطاقة المرشد.",
+      "matchingQuestion": "كيف تتم المطابقة بين المرشدين والمتدربين؟",
+      "matchingAnswer": "أنت من يختار. تصفح الدليل أو ابحث فيه، واقرأ ما يساعد فيه كل مرشد، ثم أرسل طلبًا إلى من تناسب خبرته حاجتك. لا توجد مطابقة تلقائية.",
+      "cancelQuestion": "ماذا لو احتجت إلى الإلغاء أو إعادة الجدولة؟",
+      "cancelAnswer": "استخدم رابط التقويم الذي شاركه المرشد لتغيير موعد الجلسة المجدولة أو إلغائها، وأخطره قبل أطول مدة ممكنة ليتمكن من منح الموعد لشخص آخر."
+    },
+    "cta": {
+      "title": "هل أنت مستعد لإرسال طلبك الأول؟",
+      "body": "لا يلزم إنشاء حساب. أخبر المرشد بما تعمل عليه؛ يردّ عليك، ثم تختاران الوقت معًا.",
+      "button": "تصفح المرشدين"
+    },
+    "footer": {
+      "programme": "برنامج الإرشاد من أمازون",
+      "nav": "تذييل الصفحة",
+      "copyright": "© {{year}} أمازون"
+    }
   },
   "discovery": {
-    "_owner": "A"
+    "title": "ابحث عن مرشد",
+    "description": "ابحث حسب ما تعمل عليه، ثم ضيّق النتائج حسب الخبرة أو اللغة أو التوفر.",
+    "searchLabel": "البحث عن مرشدين",
+    "searchPlaceholder": "ابحث حسب المهارة أو الدور أو الفريق أو ما تعمل عليه",
+    "examples": "مجالات شائعة",
+    "resultsHeading": "النتائج",
+    "resultCount_zero": "لا يوجد مرشدون مطابقون",
+    "resultCount_one": "مرشد واحد",
+    "resultCount_two": "مرشدان",
+    "resultCount_few": "{{count}} مرشدين",
+    "resultCount_many": "{{count}} مرشدًا",
+    "resultCount_other": "{{count}} مرشد",
+    "resultCountOf_zero": "لا يوجد مرشدون مطابقون من أصل {{total}}",
+    "resultCountOf_one": "مرشد واحد من أصل {{total}}",
+    "resultCountOf_two": "مرشدان من أصل {{total}}",
+    "resultCountOf_few": "{{count}} مرشدين من أصل {{total}}",
+    "resultCountOf_many": "{{count}} مرشدًا من أصل {{total}}",
+    "resultCountOf_other": "{{count}} مرشد من أصل {{total}}",
+    "loading": "جارٍ تحميل المرشدين",
+    "filters": {
+      "title": "الفلاتر",
+      "open": "الفلاتر",
+      "openCount_zero": "الفلاتر",
+      "openCount_one": "الفلاتر ({{count}})",
+      "openCount_two": "الفلاتر ({{count}})",
+      "openCount_few": "الفلاتر ({{count}})",
+      "openCount_many": "الفلاتر ({{count}})",
+      "openCount_other": "الفلاتر ({{count}})",
+      "drawerDescription": "ضيّق القائمة. لا يتغير شيء حتى تختار «عرض».",
+      "expertise": "الخبرة",
+      "language": "اللغة",
+      "industry": "القطاع",
+      "availability": "التوفر",
+      "accepting": "يقبل الطلبات",
+      "timezone": "المنطقة الزمنية",
+      "near": "ضمن 3 ساعات من منطقتي الزمنية",
+      "yourTimeZone": "منطقتك الزمنية: {{tz}}",
+      "more": "مزيد من الفلاتر",
+      "less": "فلاتر أقل",
+      "showMore_zero": "عرض المزيد",
+      "showMore_one": "عرض خيار إضافي واحد",
+      "showMore_two": "عرض خيارين إضافيين",
+      "showMore_few": "عرض {{count}} خيارات إضافية",
+      "showMore_many": "عرض {{count}} خيارًا إضافيًا",
+      "showMore_other": "عرض {{count}} خيار إضافي",
+      "showLess": "عرض خيارات أقل",
+      "apply_zero": "لا مرشدين للعرض",
+      "apply_one": "عرض مرشد واحد",
+      "apply_two": "عرض مرشدَين",
+      "apply_few": "عرض {{count}} مرشدين",
+      "apply_many": "عرض {{count}} مرشدًا",
+      "apply_other": "عرض {{count}} مرشد",
+      "clear": "مسح",
+      "clearAll": "مسح الكل",
+      "optionCount_zero": "لا مرشدين",
+      "optionCount_one": "مرشد واحد",
+      "optionCount_two": "مرشدان",
+      "optionCount_few": "{{count}} مرشدين",
+      "optionCount_many": "{{count}} مرشدًا",
+      "optionCount_other": "{{count}} مرشد"
+    },
+    "sort": {
+      "label": "الترتيب حسب",
+      "relevance": "الأكثر صلة",
+      "reviewed": "الأكثر تقييمًا",
+      "newest": "الأحدث"
+    },
+    "zero": {
+      "titleQuery": "لا يوجد مرشدون مطابقون لـ«{{q}}»",
+      "titleFilters": "لا يوجد مرشدون مطابقون لكل هذه الفلاتر",
+      "titleBoth": "لا يوجد مرشدون مطابقون لـ«{{q}}» وهذه الفلاتر",
+      "body": "جرّب فلاتر أقل أو كلمة بحث أوسع.",
+      "clearFilters": "مسح الفلاتر",
+      "searchAll": "البحث في كل شيء بدلًا من ذلك"
+    },
+    "error": {
+      "title": "تعذّر تحميل المرشدين",
+      "body": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
+    },
+    "empty": {
+      "title": "لا مرشدين بعد",
+      "body": "يظهر المرشدون هنا بعد أن يعتمدهم فريق البرنامج."
+    }
   },
   "mentorCard": {
-    "_owner": "A"
+    "accepting": "يقبل الطلبات",
+    "notAccepting": "لا يقبل الطلبات",
+    "viewProfile": "عرض الملف الشخصي",
+    "viewProfileOf": "عرض الملف الشخصي: {{name}}",
+    "moreExpertise_zero": "لا مجالات خبرة إضافية",
+    "moreExpertise_one": "مجال خبرة إضافي واحد",
+    "moreExpertise_two": "مجالا خبرة إضافيان",
+    "moreExpertise_few": "{{count}} مجالات خبرة إضافية",
+    "moreExpertise_many": "{{count}} مجال خبرة إضافيًا",
+    "moreExpertise_other": "{{count}} مجال خبرة إضافي",
+    "moreExpertiseTitle": "يساعد أيضًا في",
+    "ratingA11y_zero": "لم يُقيَّم بعد",
+    "ratingA11y_one": "التقييم {{rating}} من 5 بناءً على تقييم واحد",
+    "ratingA11y_two": "التقييم {{rating}} من 5 بناءً على تقييمين",
+    "ratingA11y_few": "التقييم {{rating}} من 5 بناءً على {{count}} تقييمات",
+    "ratingA11y_many": "التقييم {{rating}} من 5 بناءً على {{count}} تقييمًا",
+    "ratingA11y_other": "التقييم {{rating}} من 5 بناءً على {{count}} تقييم",
+    "requestSent": "تم إرسال الطلب"
   },
   "mentorProfile": {
     "_owner": "B"
