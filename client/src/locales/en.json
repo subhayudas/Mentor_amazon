@@ -1141,7 +1141,10 @@
       "titleFilters": "No mentors match all of these filters",
       "titleBoth": "No mentors match “{{q}}” and these filters",
       "body": "Try fewer filters or a broader search term.",
+      "bodyQuery": "Try a broader term, or search by skill (e.g. Analytics).",
+      "bodyFilters": "Try fewer filters.",
       "clearFilters": "Clear filters",
+      "clearSearch": "Clear search",
       "searchAll": "Search everything instead"
     },
     "error": {

@@ -353,7 +353,7 @@ export default function Mentors() {
                 query={query}
                 hasFilters={filterCount > 0}
                 onClearFilters={clearFilters}
-                onSearchAll={searchAll}
+                onClearQuery={searchAll}
               />
             }
           />
