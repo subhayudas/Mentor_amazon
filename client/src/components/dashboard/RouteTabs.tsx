@@ -18,10 +18,12 @@ import { confirmNavigation } from "@/lib/leaveGuard";
  * - Below `md` (F-03) the row never scrolls and never clips: the tabs that fit
  *   share the row and the rest sit behind a "More" menu with the same icons
  *   and labels. The active tab is always in the row (it swaps in for the last
- *   fitted one when it would otherwise be in the menu), so a mentor's Profile
- *   tab is one tap away and its existence is visible. Widths are measured
- *   from a hidden copy of the labels, so the cut does not depend on label
- *   length in either language. The list is full-bleed and `sticky top-14
+ *   fitted one when it would otherwise be in the menu, shedding neighbours
+ *   if it is wider), so a mentor's Profile tab is one tap away and its
+ *   existence is visible. Widths are measured from a hidden copy of the
+ *   labels, so the cut does not depend on label length in either language,
+ *   and triggers keep their natural width in the row (no equal split that
+ *   would clip the longest label). The list is full-bleed and `sticky top-14
  *   z-30` under the global header (static below 520px tall, P1-30).
  *   Desktop: static, equal width, every tab in the row.
  * - Exactly one panel is rendered (`TabsContent` for the active value) in the
@@ -61,8 +63,11 @@ export function activeTabFor(tabs: RouteTab[], pathname: string): RouteTab {
 /**
  * Splits the tabs into the ones that fit the row and the ones that go behind
  * "More": the first `n` whose natural widths fit next to the More button, with
- * the active tab always in the row. Pure, so it is testable and re-runs on
- * every resize without touching the DOM.
+ * the active tab always in the row. When the active tab swaps in for the last
+ * fitted one and is wider than it, earlier tabs are dropped into the menu
+ * until the row fits again, so the active label is never the one that clips
+ * (F-03 at 320px). Pure, so it is testable and re-runs on every resize
+ * without touching the DOM.
  */
 export function splitTabsForRow<T>(
   items: T[],
@@ -73,12 +78,19 @@ export function splitTabsForRow<T>(
 ): { row: T[]; overflow: T[] } {
   const total = widths.reduce((sum, w) => sum + w, 0);
   if (total <= available + 0.5) return { row: items, overflow: [] };
+  const budget = available - moreWidth + 0.5;
   let fitted = 0;
   let used = 0;
-  while (fitted < items.length && used + widths[fitted] <= available - moreWidth) used += widths[fitted++];
+  while (fitted < items.length && used + widths[fitted] <= budget) used += widths[fitted++];
   fitted = Math.max(1, fitted);
   const rowIndexes = Array.from({ length: fitted }, (_, i) => i);
-  if (activeIndex >= fitted) rowIndexes[fitted - 1] = activeIndex;
+  if (activeIndex >= fitted) {
+    rowIndexes[fitted - 1] = activeIndex;
+    const rowWidth = () => rowIndexes.reduce((sum, i) => sum + widths[i], 0);
+    // The active tab may be wider than the one it replaced: shed the tab
+    // before it (never the active one) until the row fits the budget.
+    while (rowIndexes.length > 1 && rowWidth() > budget) rowIndexes.splice(rowIndexes.length - 2, 1);
+  }
   const inRow = new Set(rowIndexes);
   return {
     row: rowIndexes.map((i) => items[i]),
@@ -144,7 +156,11 @@ export function RouteTabs({ tabs, ariaLabel, children, className }: RouteTabsPro
     });
   };
 
-  const triggerClass = "min-w-0 flex-1 px-2 md:px-3";
+  // Phone: triggers grow from their NATURAL width (`flex-auto`), so a long
+  // label next to a short one keeps its text while the spare space is
+  // shared; the split above guarantees the natural widths fit. Desktop keeps
+  // the spec's equal-width row (`flex-1`).
+  const triggerClass = "min-w-0 flex-auto px-2 md:flex-1 md:px-3";
 
   return (
     <Tabs value={active.value} onValueChange={onValueChange} activationMode="manual" className={className}>
