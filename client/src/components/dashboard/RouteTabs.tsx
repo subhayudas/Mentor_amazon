@@ -1,10 +1,13 @@
 import * as React from "react";
 import type { LucideIcon } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { useLocation } from "wouter";
+import { useTranslation } from "react-i18next";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useIsPhone } from "@/hooks/useMediaQuery";
 import { confirmNavigation } from "@/lib/leaveGuard";
-import { cn } from "@/lib/utils";
 
 /**
  * URL-synced tab row for the app shells (P1-23/C11/C12): the mentee dashboard
@@ -12,12 +15,15 @@ import { cn } from "@/lib/utils";
  * - Each tab is a sub-route; the active tab is derived from the location and
  *   selecting a tab navigates (manual activation, so arrow keys only move
  *   focus and Enter/Space commit — panels are lazy data views).
- * - Mobile: the list is full-bleed and `sticky top-14 z-30` under the global
- *   header (static below 520px tall, P1-30); it scrolls horizontally when the
- *   labels do not fit. When it does, the triggers are given one uniform width
- *   so that exactly n whole tabs plus a 24px peek of the next fit the scroller
- *   (measured, so the cue does not depend on label length in either
- *   language — the scrollbar is hidden). Desktop: static, equal width.
+ * - Below `md` (F-03) the row never scrolls and never clips: the tabs that fit
+ *   share the row and the rest sit behind a "More" menu with the same icons
+ *   and labels. The active tab is always in the row (it swaps in for the last
+ *   fitted one when it would otherwise be in the menu), so a mentor's Profile
+ *   tab is one tap away and its existence is visible. Widths are measured
+ *   from a hidden copy of the labels, so the cut does not depend on label
+ *   length in either language. The list is full-bleed and `sticky top-14
+ *   z-30` under the global header (static below 520px tall, P1-30).
+ *   Desktop: static, equal width, every tab in the row.
  * - Exactly one panel is rendered (`TabsContent` for the active value) in the
  *   single document scroll; no nested scroll containers.
  * - A dirty form (lib/leaveGuard) is asked before the tab changes.
@@ -52,54 +58,83 @@ export function activeTabFor(tabs: RouteTab[], pathname: string): RouteTab {
   return byPrefix ?? tabs[0];
 }
 
+/**
+ * Splits the tabs into the ones that fit the row and the ones that go behind
+ * "More": the first `n` whose natural widths fit next to the More button, with
+ * the active tab always in the row. Pure, so it is testable and re-runs on
+ * every resize without touching the DOM.
+ */
+export function splitTabsForRow<T>(
+  items: T[],
+  widths: number[],
+  available: number,
+  moreWidth: number,
+  activeIndex: number,
+): { row: T[]; overflow: T[] } {
+  const total = widths.reduce((sum, w) => sum + w, 0);
+  if (total <= available + 0.5) return { row: items, overflow: [] };
+  let fitted = 0;
+  let used = 0;
+  while (fitted < items.length && used + widths[fitted] <= available - moreWidth) used += widths[fitted++];
+  fitted = Math.max(1, fitted);
+  const rowIndexes = Array.from({ length: fitted }, (_, i) => i);
+  if (activeIndex >= fitted) rowIndexes[fitted - 1] = activeIndex;
+  const inRow = new Set(rowIndexes);
+  return {
+    row: rowIndexes.map((i) => items[i]),
+    overflow: items.filter((_, i) => !inRow.has(i)),
+  };
+}
+
 export function RouteTabs({ tabs, ariaLabel, children, className }: RouteTabsProps) {
+  const { t } = useTranslation();
   const [location, setLocation] = useLocation();
   const active = activeTabFor(tabs, location);
-  const listRef = React.useRef<HTMLDivElement>(null);
+  const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.value === active.value));
+  const isPhone = useIsPhone();
 
-  // Mobile peek (P1-30 / brief): when the row scrolls, stretch the tabs that
-  // fit so the next one starts exactly 24px before the edge — with `px-2`
-  // that is its whole icon, cut at the label. Measured from the natural
-  // widths, so a long Arabic label or a short English one cannot land a tab
-  // edge on the gutter with nothing to signal that the row scrolls.
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  const measureRef = React.useRef<HTMLDivElement>(null);
+  const [fit, setFit] = React.useState<{ widths: number[]; more: number; available: number } | null>(null);
+
+  // Natural widths come from a hidden copy of the labels (so tabs behind
+  // "More" can be measured too); re-measured on resize, font load and when
+  // the labels change (language switch).
+  const labelsKey = tabs.map((tab) => tab.label).join("|");
   React.useLayoutEffect(() => {
-    const scroller = listRef.current;
-    if (!scroller) return;
-    const PEEK = 24;
+    if (!isPhone) {
+      setFit(null);
+      return;
+    }
+    const row = rowRef.current;
+    const probe = measureRef.current;
+    if (!row || !probe) return;
     const measure = () => {
-      const triggers = Array.from(scroller.querySelectorAll<HTMLElement>('[role="tab"]'));
-      triggers.forEach((el) => el.style.removeProperty("width"));
-      if (getComputedStyle(scroller).overflowX !== "auto") return; // desktop: equal-width flex
-      const widths = triggers.map((el) => el.getBoundingClientRect().width);
-      const available = scroller.clientWidth;
-      const total = widths.reduce((sum, w) => sum + w, 0);
-      if (total <= available + 0.5) return; // everything fits: flex shares the row
-      let fitted = 0;
-      let used = 0;
-      while (fitted < widths.length && used + widths[fitted] <= available - PEEK) used += widths[fitted++];
-      if (fitted === 0) return; // one tab is wider than the row: nothing sensible to do
-      const extra = (available - PEEK - used) / fitted;
-      triggers.slice(0, fitted).forEach((el, i) => el.style.setProperty("width", `${widths[i] + extra}px`));
+      const spans = Array.from(probe.querySelectorAll<HTMLElement>("[data-measure]"));
+      const widths = spans.filter((el) => el.dataset.measure === "tab").map((el) => el.getBoundingClientRect().width);
+      const more = spans.find((el) => el.dataset.measure === "more")?.getBoundingClientRect().width ?? 0;
+      const available = row.clientWidth;
+      setFit((prev) =>
+        prev && prev.available === available && prev.more === more && prev.widths.length === widths.length && prev.widths.every((w, i) => w === widths[i])
+          ? prev
+          : { widths, more, available },
+      );
     };
     measure();
     let cancelled = false;
-    // Web fonts can land after the first paint and change the natural widths.
-    document.fonts?.ready.then(() => { if (!cancelled) measure(); });
+    document.fonts?.ready.then(() => {
+      if (!cancelled) measure();
+    });
     const observer = new ResizeObserver(measure);
-    observer.observe(scroller);
+    observer.observe(row);
     return () => {
       cancelled = true;
       observer.disconnect();
     };
-    // Re-measure when the labels change (language switch), not on every render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabs.map((tab) => tab.label).join("\u0000")]);
+  }, [isPhone, labelsKey]);
 
-  // Keep the active tab visible when the list scrolls horizontally (mobile).
-  React.useEffect(() => {
-    const trigger = listRef.current?.querySelector<HTMLElement>('[role="tab"][data-state="active"]');
-    trigger?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [active.value]);
+  const { row, overflow } =
+    isPhone && fit ? splitTabsForRow(tabs, fit.widths, fit.available, fit.more, activeIndex) : { row: tabs, overflow: [] as RouteTab[] };
 
   const onValueChange = (value: string) => {
     const next = tabs.find((tab) => tab.value === value);
@@ -109,29 +144,54 @@ export function RouteTabs({ tabs, ariaLabel, children, className }: RouteTabsPro
     });
   };
 
+  const triggerClass = "min-w-0 flex-1 px-2 md:px-3";
+
   return (
     <Tabs value={active.value} onValueChange={onValueChange} activationMode="manual" className={className}>
       <div className="sticky top-14 z-30 -mx-4 bg-background px-4 sm:-mx-6 sm:px-6 md:static md:mx-0 md:px-0 [@media(max-height:520px)]:static">
-        <div
-          ref={listRef}
-          className="overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:overflow-visible"
-        >
-          <TabsList aria-label={ariaLabel} className="w-max min-w-full md:w-full">
-            {tabs.map(({ value, label, icon: Icon, testId }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                // Mobile: natural width (the effect above stretches the tabs
-                // that fit so the next one peeks 24px); desktop: equal width.
-                // Inset focus ring so the scroller never clips it on mobile.
-                className="flex-auto shrink-0 px-2 focus-visible:-outline-offset-2 md:flex-1 md:shrink md:!w-auto md:px-3"
-                data-testid={testId}
-              >
+        <div ref={rowRef} className="relative flex items-stretch">
+          <TabsList aria-label={ariaLabel} className="min-w-0 flex-1">
+            {row.map(({ value, label, icon: Icon, testId }) => (
+              <TabsTrigger key={value} value={value} className={triggerClass} data-testid={testId}>
                 <Icon aria-hidden="true" strokeWidth={1.75} />
-                <span>{label}</span>
+                <span className="truncate">{label}</span>
               </TabsTrigger>
             ))}
           </TabsList>
+          {overflow.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap border-b border-border px-2 text-sm font-medium text-muted-foreground transition-colors duration-fast hover:text-foreground data-[state=open]:text-foreground [&_svg]:size-4 [&_svg]:shrink-0"
+                data-testid="tabs-more"
+              >
+                <MoreHorizontal aria-hidden="true" strokeWidth={1.75} />
+                <span>{t("common.moreTabs")}</span>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" aria-label={ariaLabel}>
+                {overflow.map(({ value, label, icon: Icon, testId }) => (
+                  <DropdownMenuItem key={value} onSelect={() => onValueChange(value)} data-testid={testId ? `${testId}-menu` : undefined}>
+                    <Icon aria-hidden="true" strokeWidth={1.75} />
+                    {label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {/* Measurement copy of every label at its natural width (never shown, never read). */}
+          {isPhone && (
+            <div ref={measureRef} aria-hidden="true" className="pointer-events-none invisible absolute inset-x-0 top-0 flex h-0 overflow-hidden">
+              {tabs.map(({ value, label, icon: Icon }) => (
+                <span key={value} data-measure="tab" className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-2 text-sm font-medium [&_svg]:size-4">
+                  <Icon aria-hidden="true" />
+                  {label}
+                </span>
+              ))}
+              <span data-measure="more" className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-2 text-sm font-medium [&_svg]:size-4">
+                <MoreHorizontal aria-hidden="true" />
+                {t("common.moreTabs")}
+              </span>
+            </div>
+          )}
         </div>
       </div>
       {/* Panels always start with focusable content, so the panel itself is not a Tab stop. */}
