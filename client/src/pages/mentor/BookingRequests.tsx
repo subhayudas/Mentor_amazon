@@ -244,7 +244,7 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
                     <TableHead>{t('mentorPortal.mentee')}</TableHead>
                     <TableHead>{t('mentorPortal.goal') || 'Goal'}</TableHead>
                     <TableHead>{t('mentorPortal.requestedAt')}</TableHead>
-                    <TableHead className="text-right">{t('mentorPortal.actions')}</TableHead>
+                    <TableHead className="text-end">{t('mentorPortal.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -305,7 +305,7 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
                             {booking.created_at ? format(parseISO(booking.created_at), 'MMM d, yyyy h:mm a') : 'N/A'}
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <div className="flex items-center justify-end gap-2">
                             {outcome ? (
                               <Badge
@@ -334,7 +334,7 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
                                   disabled={isMutating}
                                   data-testid={`button-accept-${booking.id}`}
                                 >
-                                  <Check className="w-4 h-4 mr-1" />
+                                  <Check className="w-4 h-4 me-1" />
                                   {t('mentorPortal.accept')}
                                 </Button>
                                 <Button
@@ -344,7 +344,7 @@ export default function BookingRequests({ mentorId }: BookingRequestsProps) {
                                   disabled={isMutating}
                                   data-testid={`button-decline-${booking.id}`}
                                 >
-                                  <X className="w-4 h-4 mr-1" />
+                                  <X className="w-4 h-4 me-1" />
                                   {t('mentorPortal.decline')}
                                 </Button>
                               </>

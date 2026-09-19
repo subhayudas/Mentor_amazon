@@ -37,7 +37,6 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { VerificationBadge } from "@/components/VerificationBadge";
 
 // How long the anchored "verification in review" card stays before we move on to the dashboard.
-const ORG_SUCCESS_REDIRECT_MS = 2500;
 
 const TIMEZONES = [
   "Africa/Cairo",
@@ -181,11 +180,11 @@ export default function MenteeRegistration() {
 
   useEffect(() => {
     if (!registeredOrg) return;
+    // Anchored confirmation stays until the person chooses to continue — an
+    // auto-redirect would tear the card away before it can be read.
     successCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     successCardRef.current?.focus({ preventScroll: true });
-    const timer = window.setTimeout(() => setLocation("/mentee-dashboard"), ORG_SUCCESS_REDIRECT_MS);
-    return () => window.clearTimeout(timer);
-  }, [registeredOrg, setLocation]);
+  }, [registeredOrg]);
 
   const form = useForm<MenteeFormData>({
     resolver: zodResolver(menteeSchema.refine(

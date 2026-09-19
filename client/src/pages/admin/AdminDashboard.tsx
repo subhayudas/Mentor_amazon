@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { isRTL } from "@/lib/i18n";
 import { Users, Building2, CalendarCheck, KeyRound, ShieldCheck } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,7 +66,7 @@ function AdminShell() {
 
         <OverviewStrip />
 
-        <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={onTabChange} className="space-y-4" dir={isRTL() ? "rtl" : "ltr"}>
           <TabsList className="grid grid-cols-4 w-full max-w-2xl h-auto" aria-label={t("admin.tabsLabel")}>
             {tabs.map(({ id, label, icon: Icon }) => (
               <TabsTrigger key={id} value={id} className="gap-2 py-2" data-testid={`tab-admin-${id}`}>

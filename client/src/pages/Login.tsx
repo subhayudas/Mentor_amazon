@@ -161,7 +161,7 @@ export default function Login() {
 
             <div className="flex items-center gap-3" aria-hidden="true">
               <span className="h-px flex-1 bg-[#D5D9D9]" />
-              <span className="text-xs uppercase tracking-wide text-[#565959]">{t("auth.sso.or")}</span>
+              <span className="text-xs text-[#565959]">{t("auth.sso.or")}</span>
               <span className="h-px flex-1 bg-[#D5D9D9]" />
             </div>
 

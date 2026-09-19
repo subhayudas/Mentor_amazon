@@ -90,7 +90,7 @@ const TONE: Record<"success" | "warning" | "danger" | "neutral" | "info", string
   warning: "border-transparent bg-amber-100 text-amber-800",
   danger: "border-transparent bg-[#FDECEC] text-[#C40000]",
   neutral: "border-transparent bg-muted text-muted-foreground",
-  info: "border-transparent bg-sky-100 text-sky-800",
+  info: "border-transparent bg-[#232F3E]/10 text-[#232F3E]",
 };
 
 const BOOKING_TONE: Record<Booking["status"], keyof typeof TONE> = {
@@ -161,7 +161,7 @@ export function StatTile({ title, value, hint, icon: Icon, testId }: StatTilePro
     <Card className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">{title}</p>
+          <p className="text-xs font-medium text-muted-foreground truncate">{title}</p>
           <p className="text-3xl font-bold leading-none text-foreground" data-testid={testId}>{value}</p>
           {hint && <p className="text-xs text-muted-foreground pt-1 truncate">{hint}</p>}
         </div>
@@ -218,7 +218,7 @@ export function LoadingRows({ colSpan, rows = 4 }: { colSpan: number; rows?: num
 export function DetailField({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <div className="text-sm text-foreground break-words">{children || "—"}</div>
     </div>
   );

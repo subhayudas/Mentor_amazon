@@ -47,7 +47,7 @@ export default function RequestAccess() {
         <CardContent className="space-y-5">
           {alias && (
             <div className="rounded-lg border border-[#D5D9D9] bg-muted/40 p-4 space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t("access.aliasLabel")}</p>
+              <p className="text-xs font-medium text-muted-foreground">{t("access.aliasLabel")}</p>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-mono font-semibold text-foreground" data-testid="text-request-alias">{alias}</p>
                 <Badge variant="outline" className={statusTone[status]} data-testid="badge-request-status">

@@ -233,9 +233,9 @@
       "backHome": "Back to home",
       "requestAccess": "Request access",
       "mentorsOnlyTitle": "Mentor onboarding is for approved Amazon mentors",
-      "mentorsOnlyBody": "You are signed in as {{email}}, which is not a mentor account. Amazon employees join as mentors through Amazon sign-in after the programme team approves their alias.",
+      "mentorsOnlyBody": "You are signed in as {{email}}, which is not a mentor account. Amazon employees join as mentors through Amazon sign-in after the program team approves their alias.",
       "notApprovedTitle": "Your alias is not approved yet",
-      "notApprovedBody": "{{alias}} is not on the approved mentor list yet. Request access and the programme team will review it; you can come back here once approved.",
+      "notApprovedBody": "{{alias}} is not on the approved mentor list yet. Request access and the program team will review it; you can come back here once approved.",
       "checkFailedTitle": "We couldn't check your approval",
       "checkFailedBody": "Something went wrong while checking your approval status. Refresh the page to try again."
     }
@@ -335,8 +335,8 @@
       "mentor": "Mentor",
       "mentee": "Mentee",
       "status": "Status",
-      "clickedAt": "Clicked At",
-      "scheduledAt": "Scheduled At",
+      "clickedAt": "Clicked at",
+      "scheduledAt": "Scheduled at",
       "bookings": "Bookings",
       "completed": "Completed",
       "volunteerHours": "Volunteer hours",
@@ -357,7 +357,7 @@
       "completedSessions": "Completed sessions",
       "volunteerHours": "Volunteer hours"
     },
-    "demoBannerTitle": "Demo data — not programme metrics",
+    "demoBannerTitle": "Demo data — not program metrics",
     "demoBannerBody": "Fewer than {{threshold}} real bookings exist ({{count}} so far), so every number and chart on this page is illustrative sample data. Real metrics replace it automatically once bookings accumulate.",
     "tabs": {
       "overview": "Overview",
@@ -380,7 +380,7 @@
     "clearDrill": "Clear",
     "drillHint": "Click a bar or segment to see its bookings.",
     "noSegmentRows": "No bookings in this segment.",
-    "rowCount": "{{count}} bookings",
+    "rowCount": "Bookings: {{count}}",
     "showingRows": "Showing {{shown}} of {{total}} bookings",
     "selectPeriod": "Select a period",
     "selectSegment": "Select a segment",
@@ -416,7 +416,11 @@
     "30min": "30 minutes",
     "60min": "60 minutes",
     "sessionBooked": "Session Booked",
-    "bookingConfirmed": "Your mentorship session has been confirmed."
+    "bookingConfirmed": "Your mentorship session has been confirmed.",
+    "requestSentTitle": "Request sent",
+    "requestSentBody": "The mentor has been notified. Sign in with the same email to follow the request from your mentee dashboard.",
+    "requestFailedTitle": "Request not sent",
+    "requestFailedBody": "Your request could not be sent. Please try again."
   },
   "profile": {
     "about": "About",
@@ -921,7 +925,11 @@
     "calendarNotAvailable": "Calendar not configured – contact your mentor",
     "oneRequestAccepted": "One request has been accepted!",
     "requestsAccepted": "Several requests have been accepted!",
-    "clickScheduleNow": "Click \"Schedule now\" below to book your session time."
+    "clickScheduleNow": "Click \"Schedule now\" below to book your session time.",
+    "sessionScheduledDesc": "Your booking is confirmed. The slot now appears under upcoming sessions.",
+    "noProfileDesc": "You are signed in, but no mentee profile exists for this email yet.",
+    "completeRegistration": "Complete registration",
+    "sessionConfirmedToast": "Session confirmed"
   },
   "sso": {
     "callback": {
@@ -931,7 +939,8 @@
       "errors": {
         "missing_token": "This link is missing its sign-in token. Start the sign-in again from the login page.",
         "verify_failed": "The sign-in link has expired or was already used.",
-        "no_user": "We signed you in but could not load your account. Please try again."
+        "no_user": "We signed you in but could not load your account. Please try again.",
+        "bind_mismatch": "This sign-in link was opened in a different browser from the one that started it. Start again with Amazon sign-in."
       },
       "tryAgain": "Try again with Amazon",
       "usePassword": "Use email and password"
@@ -941,7 +950,7 @@
     "noAccessTitle": "You don't have access to this page",
     "noAccessBody": "This page is only for {{role}} accounts. You are signed in as {{email}}.",
     "role": {
-      "admin": "programme admin",
+      "admin": "program admin",
       "mentor": "mentor",
       "mentee": "mentee"
     },
@@ -952,29 +961,29 @@
   },
   "access": {
     "title": "Access not yet approved",
-    "limited": "MentorConnect access is limited to approved members of the Amazon mentoring programme.",
+    "limited": "MentorConnect access is limited to approved members of the Amazon mentoring program.",
     "aliasLabel": "Amazon alias",
     "status": {
       "pending": "Pending review",
       "approved": "Approved",
       "rejected": "Not approved"
     },
-    "recorded": "Your request has been recorded and the programme team will review it. You will be able to sign in once it is approved.",
+    "recorded": "Your request has been recorded and the program team will review it. You will be able to sign in once it is approved.",
     "approvedBody": "Your access has been approved. Sign in with Amazon again to continue.",
-    "rejectedBody": "This request was not approved. If you believe this is a mistake, contact the programme team.",
-    "noAliasBody": "To request access, sign in with Amazon. Your alias is recorded automatically and the programme team reviews it.",
+    "rejectedBody": "This request was not approved. If you believe this is a mistake, contact the program team.",
+    "noAliasBody": "To request access, sign in with Amazon. Your alias is recorded automatically and the program team reviews it.",
     "whatNext": "Approval usually happens within a few working days. There is nothing else you need to do right now.",
     "backHome": "Back to home",
     "signInAgain": "Sign in with Amazon again"
   },
   "admin": {
     "title": "Admin",
-    "subtitle": "Programme administration for MentorConnect",
+    "subtitle": "Program administration for MentorConnect",
     "overview": "Overview",
     "tabsLabel": "Admin sections",
     "tabs": {
       "mentors": "Mentors",
-      "mentees": "Mentees & orgs",
+      "mentees": "Mentees",
       "bookings": "Bookings",
       "access": "Access"
     },
@@ -993,7 +1002,7 @@
       "bookings": "Bookings",
       "bookingsBreakdown": "{{pending}} pending · {{confirmed}} confirmed · {{completed}} completed",
       "pendingAccess": "Pending access requests",
-      "requestsTotal": "{{count}} requests in total"
+      "requestsTotal": "Total requests: {{count}}"
     },
     "role": {
       "mentor": "Mentor",
@@ -1144,30 +1153,30 @@
       "verified": "Verified organization"
     },
     "tooltip": {
-      "pending": "The programme team is reviewing this organisation's details.",
-      "unverified": "This organisation has not been reviewed by the programme team yet.",
-      "rejected": "The programme team could not verify this organisation.",
-      "verified": "The programme team has confirmed this organisation's details."
+      "pending": "The program team is reviewing this organization's details.",
+      "unverified": "This organization has not been reviewed by the program team yet.",
+      "rejected": "The program team could not verify this organization.",
+      "verified": "The program team has confirmed this organization's details."
     },
     "sectionTitle": "Verification",
     "referenceLabel": "Registration / licence number (optional)",
     "referencePlaceholder": "e.g. NGO licence or commercial registration number",
-    "referenceHelp": "Helps the programme team confirm your organisation faster.",
-    "registrationNoteTitle": "Organisations are marked \"pending review\" until confirmed",
-    "registrationNote": "We don't run automated checks yet. The MentorConnect programme team reviews each organisation manually before marking it verified. You can browse mentors and request sessions in the meantime.",
-    "inReviewToast": "Your organisation profile was created and is pending review.",
+    "referenceHelp": "Helps the program team confirm your organization faster.",
+    "registrationNoteTitle": "Organizations are marked \"pending review\" until confirmed",
+    "registrationNote": "We don't run automated checks yet. The MentorConnect program team reviews each organization manually before marking it verified. You can browse mentors and request sessions in the meantime.",
+    "inReviewToast": "Your organization profile was created and is pending review.",
     "inReviewTitle": "Verification in review",
-    "inReviewDescription": "{{name}} is registered. The programme team will review the details before marking the organisation verified.",
-    "inReviewStep1": "The MentorConnect programme team checks the details you provided.",
+    "inReviewDescription": "{{name}} is registered. The program team will review the details before marking the organization verified.",
+    "inReviewStep1": "The MentorConnect program team checks the details you provided.",
     "inReviewStep2": "You can browse mentors and request sessions while the review is open. Mentors will see that verification is pending.",
     "goToDashboard": "Go to dashboard",
     "redirectingShortly": "Taking you to your dashboard in a moment…",
-    "dashboardPendingBody": "The programme team is reviewing your organisation's details. You can keep browsing mentors and requesting sessions; mentors will see that verification is pending until it is confirmed.",
+    "dashboardPendingBody": "The program team is reviewing your organization's details. You can keep browsing mentors and requesting sessions; mentors will see that verification is pending until it is confirmed.",
     "referenceSubmitted": "Reference submitted: {{reference}}",
     "rejectedTitle": "Verification not approved",
-    "dashboardRejectedBody": "The programme team could not verify your organisation with the details provided. You can still browse mentors, but mentors will see that verification was not approved.",
-    "contactLine": "Contact the MentorConnect programme team to update your details or ask for another review.",
-    "mentorNoteUnverified": "This organisation has not been verified by the programme yet.",
-    "mentorNoteRejected": "The programme team did not approve this organisation's verification."
+    "dashboardRejectedBody": "The program team could not verify your organization with the details provided. You can still browse mentors, but mentors will see that verification was not approved.",
+    "contactLine": "Contact the MentorConnect program team to update your details or ask for another review.",
+    "mentorNoteUnverified": "This organization has not been verified by the program yet.",
+    "mentorNoteRejected": "The program team did not approve this organization's verification."
   }
 }

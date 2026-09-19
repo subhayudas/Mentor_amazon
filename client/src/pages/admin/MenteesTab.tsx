@@ -73,6 +73,11 @@ export default function MenteesTab() {
           ? t("admin.mentees.markedVerified", { name: updated.organization_name || updated.name })
           : t("admin.mentees.markedRejected", { name: updated.organization_name || updated.name }),
       );
+      // Keep the changed row on screen: an active status filter would drop it
+      // and the anchored highlight would have nothing to point at.
+      if (filter !== "all" && filter !== (updated.verification_status ?? "unverified")) {
+        setFilter("all");
+      }
       highlight(updated.id);
     },
     onError: (error) => toast.error(errorMessage(error, t("errors.somethingWentWrong"))),

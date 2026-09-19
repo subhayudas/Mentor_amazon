@@ -18,7 +18,7 @@ export function StatTile({ title, value, icon: Icon, secondary, unit, testId }: 
     <Card className="p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+          <p className="text-xs font-medium text-muted-foreground">{title}</p>
           <p className="text-3xl font-bold tabular-nums leading-none" data-testid={testId}>
             {value}
             {unit && <span className="ms-1 text-base font-medium text-muted-foreground">{unit}</span>}

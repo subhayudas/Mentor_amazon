@@ -161,7 +161,7 @@ export default function MentorProfileView() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{isArabic ? 'التوفر' : 'Availability'}</CardTitle>
+            <CardTitle>{t('mentorPortal.availability')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-3">

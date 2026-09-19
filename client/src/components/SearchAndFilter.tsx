@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Mentor } from "@shared/schema";
+import type { Mentor } from "@shared/schema";
 import { useTranslation } from "react-i18next";
 
 interface SearchAndFilterProps {

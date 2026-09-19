@@ -1,5 +1,4 @@
 import { useTranslation } from "react-i18next";
-import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -26,15 +25,22 @@ const STATUS_VARIANT: Record<StatusGroup, "default" | "secondary" | "outline"> =
   canceled: "outline",
 };
 
-function formatDate(value?: string): string {
+function formatDate(value: string | undefined, language: string): string {
   if (!value) return "-";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "-" : format(date, "MMM d, h:mm a");
+  if (Number.isNaN(date.getTime())) return "-";
+  // Locale-aware so Arabic readers get Arabic month names, matching the admin tables.
+  return new Intl.DateTimeFormat(language === "ar" ? "ar-AE" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 /** Dense booking records: mentor, mentee, status, dates, duration, country. Used by drill-downs and the Bookings tab. */
 export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table" }: BookingsTableProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const visible = typeof limit === "number" ? rows.slice(0, limit) : rows;
   const displayCountry = (country: string) => (country === NOT_SPECIFIED ? t("analytics.notSpecified") : country);
 
@@ -81,8 +87,8 @@ export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table
               <TableCell data-testid={`status-${row.id}`}>
                 <Badge variant={STATUS_VARIANT[row.statusGroup]}>{t(`analytics.chartLabels.${row.statusGroup}`)}</Badge>
               </TableCell>
-              <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(row.clickedAt)}</TableCell>
-              <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(row.scheduledAt)}</TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(row.clickedAt, i18n.language)}</TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">{formatDate(row.scheduledAt, i18n.language)}</TableCell>
               <TableCell className="text-end tabular-nums text-muted-foreground">
                 {typeof row.durationMinutes === "number" ? t("analytics.minutesShort", { count: row.durationMinutes }) : "-"}
               </TableCell>

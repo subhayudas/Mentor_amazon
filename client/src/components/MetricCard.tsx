@@ -13,7 +13,7 @@ export function MetricCard({ title, value, icon: Icon, testId }: MetricCardProps
     <Card className="p-8">
       <div className="flex items-start justify-between">
         <div className="space-y-2">
-          <p className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+          <p className="text-sm font-medium text-muted-foreground">
             {title}
           </p>
           <p className="text-4xl font-bold" data-testid={testId}>
