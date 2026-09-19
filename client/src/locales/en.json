@@ -1203,17 +1203,14 @@
     "aboutDialogDescription": "The full profile text.",
     "readMore": "Read more",
     "readLess": "Show less",
-    "sessionStyle": "Session style",
     "preference": {
       "ongoing": "Open to ongoing mentoring",
       "rotating": "Prefers one-off sessions",
       "either": "Open to one-off or ongoing"
     },
     "requestSession": "Request a session",
-    "tzNote": "Your time zone: <viewer>{{viewer}}</viewer> · <name>{{name}}</name>'s: <mentor>{{mentor}}</mentor>",
     "availabilityTitle": "Typical availability",
-    "availabilityCaption": "Typical availability, self-reported — the mentor's calendar link is the real schedule",
-    "availabilityZone": "Mentor's time (<tz>{{tz}}</tz>) · {{offset}}",
+    "availabilityCaption": "Self-reported, in the mentor's time zone — the calendar link is the real schedule",
     "notFound": {
       "title": "This mentor isn't available",
       "body": "The profile may have been removed, or the link is out of date."

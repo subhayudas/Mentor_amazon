@@ -5,13 +5,14 @@ import { skipToken, useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CircleAlert, UserX } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
-import { DEFAULT_STOPS, RequestRail } from "@/components/RequestRail";
+import { RequestRail } from "@/components/RequestRail";
+import { CalEmbed } from "@/components/CalEmbed";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { BookingRequestDialog, type BookingPrefill } from "@/components/booking/BookingRequestDialog";
 import { RequestStatusCard } from "@/components/booking/RequestStatusCard";
-import { resolveRequestState } from "@/components/booking/requestState";
+import { railStopsFor, resolveRequestState } from "@/components/booking/requestState";
 import { AboutSection } from "@/components/profile/AboutSection";
 import { AvailabilityWindows } from "@/components/profile/AvailabilityWindows";
 import { HelpsWith } from "@/components/profile/HelpsWith";
@@ -19,18 +20,19 @@ import { MobileActionBar } from "@/components/profile/MobileActionBar";
 import { ProfileHeader } from "@/components/profile/ProfileHeader";
 import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
 import { RequestRailCard } from "@/components/profile/RequestRailCard";
-import { SessionStyle } from "@/components/profile/SessionStyle";
-import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
 import { UnavailableBlock } from "@/components/profile/UnavailableBlock";
 import { mentorDisplay } from "@/components/profile/localized";
+import { backLinkRowClass, profileGridClass } from "@/components/profile/styles";
 import { DESKTOP_QUERY, useMediaQuery } from "@/hooks/useMediaQuery";
 import { useAuth } from "@/context/AuthContext";
 import { usePublicAvailability, windowsForMentor } from "@/lib/availability";
-import type { Booking, Mentee, PublicMentor } from "@/lib/database";
+import type { Booking, Mentee, Mentor, PublicMentor } from "@/lib/database";
+import { bidi } from "@/lib/format";
 import { discoveryUrl } from "@/lib/routes";
 import { getSentRequest, markSent } from "@/lib/sentRequests";
 import { menteeService, mentorService } from "@/lib/services";
 import { lastDiscoveryHref } from "@/lib/urlState";
+import { useConfirmOnCalBooking } from "@/pages/mentee/useConfirmOnCalBooking";
 
 /** localStorage mirror used by the anonymous request path (Login/registration read the same keys). */
 function readStored(key: string): string {
@@ -53,7 +55,7 @@ function BackLink() {
     <Link
       href={lastDiscoveryHref()}
       data-testid="link-back"
-      className="mt-6 inline-flex min-h-8 items-center gap-1 rounded-sm text-body-sm text-muted-foreground transition-colors duration-fast hover:text-foreground"
+      className={`${backLinkRowClass} rounded-sm text-body-sm text-muted-foreground transition-colors duration-fast hover:text-foreground`}
     >
       <ArrowLeft className="size-4 rtl:-scale-x-100" strokeWidth={1.5} aria-hidden="true" />
       <span data-testid="button-back">{t("mentorProfile.backToMentors")}</span>
@@ -138,11 +140,13 @@ export default function MentorProfile() {
   // duplicate; the two caches merge and the dashboard's polling keeps this
   // observer fresh. Anonymous visitors never fetch (`skipToken`) — RLS would
   // not return a row to them anyway.
-  const bookingsQuery = useQuery<Booking[]>({
+  const bookingsQuery = useQuery<(Booking & { mentor?: Mentor })[]>({
     queryKey: ["mentee", menteeId, "bookings"],
     queryFn: signedIn && menteeId ? () => menteeService.getBookings(menteeId) : skipToken,
     staleTime: 60_000,
   });
+  const onCalBooked = useConfirmOnCalBooking(menteeId ?? "");
+  const [calOpen, setCalOpen] = React.useState(false);
 
   const [localSent, setLocalSent] = React.useState(() => getSentRequest(mentorId));
   React.useEffect(() => {
@@ -159,10 +163,7 @@ export default function MentorProfile() {
   const display = React.useMemo(() => (mentor ? mentorDisplay(mentor, lang) : null), [mentor, lang]);
 
   const openDialog = React.useCallback(() => setDialogOpen(true), []);
-  const sendAnother = React.useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
-    returnFocusRef.current = event.currentTarget;
-    setDialogOpen(true);
-  }, []);
+  const openCal = React.useCallback(() => setCalOpen(true), []);
   const handleSent = React.useCallback(
     (sentEmail: string) => {
       markSent(mentorId, sentEmail);
@@ -202,7 +203,8 @@ export default function MentorProfile() {
     );
   }
   if (!mentor || !display) {
-    return <ProfileSkeleton />;
+    // Reserve the availability block until the rows say this mentor has none (F-31).
+    return <ProfileSkeleton reserveAvailability={!availability.isSuccess || windows.length > 0} />;
   }
 
   const request = resolveRequestState({
@@ -230,54 +232,51 @@ export default function MentorProfile() {
     signedIn,
     similarHref,
     onRequest: openDialog,
-    onSendAnother: sendAnother,
+    onChooseTime: openCal,
     registerReturnFocus,
   };
+  const railStops = railStopsFor(t, request, { signedIn, name: bidi(display.name) }).stops;
+  const calLink = request.kind === "sent" ? request.calLink : undefined;
 
   return (
     <Container className="pb-24 lg:pb-16 [@media(max-height:520px)]:pb-8">
       <BackLink />
-      <div className="mt-8">
-        <ProfileHeader mentor={mentor} display={display} />
-      </div>
+      {/* The accepting badge shows once: in the request card on desktop, here on mobile (F-30). */}
+      <ProfileHeader mentor={mentor} display={display} showBadge={!isDesktop} />
 
-      {!isDesktop && (
+      {!isDesktop && (!mentor.is_available || request.kind === "sent") && (
         <div className="mt-5 flex flex-col gap-4">
           {/* Not accepting keeps its block and the "Find similar mentors" escape even once a request was sent. */}
-          {!mentor.is_available ? (
+          {!mentor.is_available && (
             <UnavailableBlock
               mentorName={display.name}
               similarHref={similarHref}
               testId="mentor-unavailable"
               showBadge={false}
             />
-          ) : (
-            <TimeZoneNote mentorName={display.name} mentorTz={mentor.timezone} />
           )}
           {request.kind === "sent" && (
             <RequestStatusCard
               request={request}
               mentorName={display.name}
               signedIn={signedIn}
-              canSendAnother={mentor.is_available}
-              onSendAnother={sendAnother}
+              onChooseTime={openCal}
               firstLinkRef={registerReturnFocus}
             />
           )}
         </div>
       )}
 
-      <div className="mt-10 grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_336px] lg:gap-12">
+      <div className={profileGridClass}>
         <div className="flex min-w-0 flex-col gap-10">
           <HelpsWith expertise={display.expertise} industries={display.industries} />
           <AboutSection name={display.name} bio={display.bio} />
-          <SessionStyle preference={mentor.mentorship_preference} />
           {!isDesktop && (
             <section aria-labelledby="profile-rail-title">
               <h2 id="profile-rail-title" className="text-h2-sm text-foreground md:text-h2">
-                {t("common.rail.title")}
+                {request.kind === "sent" ? t("dashboardV2.rail.title") : t("common.rail.title")}
               </h2>
-              <RequestRail size="sm" stops={DEFAULT_STOPS(t, undefined, { signedIn })} className="mt-4" />
+              <RequestRail size="sm" stops={railStops} className="mt-4" />
             </section>
           )}
           {!isDesktop && windows.length > 0 && (
@@ -291,7 +290,7 @@ export default function MentorProfile() {
         )}
       </div>
 
-      {!isDesktop && <MobileActionBar {...slotProps} isAvailable={mentor.is_available} />}
+      {!isDesktop && <MobileActionBar {...slotProps} />}
 
       <BookingRequestDialog
         open={dialogOpen}
@@ -305,6 +304,19 @@ export default function MentorProfile() {
         onSent={handleSent}
         invalidateKeys={invalidateKeys}
       />
+
+      {calLink && request.kind === "sent" && request.bookingId && (
+        <CalEmbed
+          calLink={calLink}
+          mentorName={display.name}
+          menteeName={prefill.name}
+          menteeEmail={prefill.email}
+          bookingId={request.bookingId}
+          open={calOpen}
+          onOpenChange={setCalOpen}
+          onBookingSuccessful={onCalBooked(request.bookingId)}
+        />
+      )}
     </Container>
   );
 }

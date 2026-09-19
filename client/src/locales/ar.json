@@ -1203,17 +1203,14 @@
     "aboutDialogDescription": "النص الكامل للملف الشخصي.",
     "readMore": "اقرأ المزيد",
     "readLess": "عرض أقل",
-    "sessionStyle": "أسلوب الجلسات",
     "preference": {
       "ongoing": "منفتح على إرشاد مستمر",
       "rotating": "يفضّل الجلسات الفردية",
       "either": "منفتح على جلسة واحدة أو إرشاد مستمر"
     },
     "requestSession": "طلب جلسة",
-    "tzNote": "منطقتك الزمنية: <viewer>{{viewer}}</viewer> · منطقة <name>{{name}}</name> الزمنية: <mentor>{{mentor}}</mentor>",
     "availabilityTitle": "التوفر المعتاد",
-    "availabilityCaption": "توفر معتاد يحدده المرشد بنفسه — رابط تقويم المرشد هو الجدول الفعلي",
-    "availabilityZone": "بتوقيت المرشد (<tz>{{tz}}</tz>) · {{offset}}",
+    "availabilityCaption": "يحدده المرشد بنفسه، بتوقيته المحلي — رابط التقويم هو الجدول الفعلي",
     "notFound": {
       "title": "هذا المرشد غير متاح",
       "body": "ربما أُزيل الملف الشخصي، أو أن الرابط قديم."
