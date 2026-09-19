@@ -11,6 +11,7 @@ import { HowItHappens } from "@/components/discovery/HowItHappens";
 import { MentorPreview } from "@/components/discovery/MentorPreview";
 import { NeedsList } from "@/components/discovery/NeedsList";
 import { SearchIntent } from "@/components/discovery/SearchIntent";
+import { useAuth } from "@/context/AuthContext";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import { useMentors } from "@/components/discovery/useMentors";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -62,6 +63,7 @@ export default function Home() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const [, navigate] = useLocation();
+  const { user } = useAuth();
   const isPhone = useIsPhone();
   const heroRef = React.useRef<HTMLDivElement>(null);
   useHeroEnter(heroRef);
@@ -166,7 +168,7 @@ export default function Home() {
       {/* ===== Request rail (phones: after the preview, as a vertical list) ===== */}
       {isPhone && (
         <Container className="pb-6">
-          <HowItHappens size="sm" />
+          <HowItHappens size="sm" signedIn={!!user} />
         </Container>
       )}
 
