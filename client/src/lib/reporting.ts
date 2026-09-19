@@ -748,13 +748,14 @@ export function localizedName(entity: { name: string; name_ar?: string } | { nam
 
 const bucketFormatters = new Map<string, Intl.DateTimeFormat>();
 
-function bucketFormatter(kind: "tick-week" | "tick-month" | "week-of" | "month", language: string): Intl.DateTimeFormat {
+function bucketFormatter(kind: "tick-week" | "tick-month" | "tick-month-year" | "week-of" | "month", language: string): Intl.DateTimeFormat {
   const cacheKey = `${kind}:${language}`;
   let formatter = bucketFormatters.get(cacheKey);
   if (!formatter) {
     const options: Intl.DateTimeFormatOptions =
       kind === "tick-week" ? { day: "numeric", month: "short" }
       : kind === "tick-month" ? { month: "short" }
+      : kind === "tick-month-year" ? { month: "short", year: "numeric" }
       : kind === "week-of" ? { day: "numeric", month: "short" }
       : { month: "long", year: "numeric" };
     formatter = new Intl.DateTimeFormat(intlLocale(language), options);
@@ -763,11 +764,10 @@ function bucketFormatter(kind: "tick-week" | "tick-month" | "week-of" | "month",
   return formatter;
 }
 
-/** Short axis tick: "25 Aug" for weeks, "Aug" for months (year added on January). */
+/** Short axis tick: "25 Aug" for weeks, "Aug" for months ("Jan 2027" on a January bucket, one Intl call). */
 export function formatBucketTick(start: Date, bucket: Bucket, language: string): string {
   if (bucket === "week") return bucketFormatter("tick-week", language).format(start);
-  const month = bucketFormatter("tick-month", language).format(start);
-  return start.getMonth() === 0 ? `${month} ${start.getFullYear()}` : month;
+  return bucketFormatter(start.getMonth() === 0 ? "tick-month-year" : "tick-month", language).format(start);
 }
 
 /** Full bucket name for tooltips, legends and tables: "25 Aug" (callers wrap it in "Week of …") or "August 2026". */
@@ -786,4 +786,76 @@ export function formatList(items: string[], language: string): string {
     listFormatters.set(language, formatter);
   }
   return formatter.format(items);
+}
+
+// ---- Localized labels for the dimension filters (spec §10) ----
+
+/** Stored English language names → BCP-47 codes, for `Intl.DisplayNames`. Unknown names fall back to the stored string. */
+const LANGUAGE_CODES: Record<string, string> = {
+  english: "en",
+  arabic: "ar",
+  french: "fr",
+  german: "de",
+  spanish: "es",
+  italian: "it",
+  portuguese: "pt",
+  russian: "ru",
+  turkish: "tr",
+  hindi: "hi",
+  urdu: "ur",
+  bengali: "bn",
+  tamil: "ta",
+  malayalam: "ml",
+  tagalog: "tl",
+  filipino: "fil",
+  mandarin: "zh",
+  chinese: "zh",
+  japanese: "ja",
+  korean: "ko",
+  persian: "fa",
+  farsi: "fa",
+  hebrew: "he",
+  dutch: "nl",
+  swedish: "sv",
+  polish: "pl",
+  greek: "el",
+};
+
+const languageNamesCache = new Map<string, Intl.DisplayNames | null>();
+
+/** "Arabic" → "العربية" when the UI is Arabic (via Intl.DisplayNames); the stored string when unknown. */
+export function localizeLanguage(name: string, language: string): string {
+  const code = LANGUAGE_CODES[name.trim().toLowerCase()];
+  if (!code) return name;
+  let names = languageNamesCache.get(language);
+  if (names === undefined) {
+    try {
+      names = new Intl.DisplayNames([language], { type: "language" });
+    } catch {
+      names = null;
+    }
+    languageNamesCache.set(language, names);
+  }
+  try {
+    const localized = names?.of(code);
+    return localized && localized !== code ? localized : name;
+  } catch {
+    return name;
+  }
+}
+
+/**
+ * EN → AR map for expertise tags built from every mentor's `expertise` /
+ * `expertise_ar` index pairs. The filter keeps the English key; the label
+ * shows the Arabic when the language is Arabic and a mapping exists.
+ */
+export function expertiseLabels(mentors: ReadonlyArray<Pick<Mentor, "expertise" | "expertise_ar">>): Map<string, string> {
+  const map = new Map<string, string>();
+  mentors.forEach((mentor) => {
+    mentor.expertise?.forEach((tag, index) => {
+      const arabic = mentor.expertise_ar?.[index];
+      if (tag && arabic && !map.has(tag)) map.set(tag, arabic);
+    });
+  });
+  return map;
 }

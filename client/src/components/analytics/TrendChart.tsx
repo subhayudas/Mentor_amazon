@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, Tooltip, XAxis, YAxis } from "recharts";
+import { BarChart3 } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,11 +9,16 @@ import { ChartContainer } from "@/components/ui/chart";
 import { useDirection } from "@/hooks/useDirection";
 import { formatNumber } from "@/lib/format";
 import { formatBucketLabel, formatBucketTick, type Bucket, type Period, type SeriesPoint } from "@/lib/reporting";
-import { BarChart3 } from "lucide-react";
-import { AXIS_TICK, BrandTooltip, COLUMN_RADIUS, CURSOR_FILL, GRID_STROKE, SERIES, SURFACE, ValueLabel, markOpacity } from "./ChartTheme";
+import { AXIS_TICK, AxisUnitLabel, BrandTooltip, COLUMN_RADIUS, CURSOR_FILL, GRID_STROKE, SERIES, SURFACE, ValueLabel, markOpacity } from "./ChartTheme";
 import { ChartFigure } from "./ChartFigure";
 import { SegmentLegend, type SegmentLegendItem } from "./SegmentLegend";
 import { periodPhrase } from "./labels";
+
+/** A bucket selection: the stable key plus its human label for the drill heading. */
+export interface BucketSelection {
+  key: string;
+  label: string;
+}
 
 interface TrendChartProps {
   series: SeriesPoint[];
@@ -21,7 +27,7 @@ interface TrendChartProps {
   /** Bookings the drill for each bucket would list (requested or completed in it). */
   drillCounts: Map<string, number>;
   activeKey: string | null;
-  onSelect: (key: string | null) => void;
+  onSelect: (selection: BucketSelection | null) => void;
 }
 
 interface Datum {
@@ -59,6 +65,9 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
       }),
     [series, bucket, lang, t],
   );
+  // Looked up by key, never by tick index: recharts passes the index within
+  // the *rendered* ticks, which differs from the data index once ticks are thinned.
+  const byKey = useMemo(() => new Map(data.map((point) => [point.key, point])), [data]);
 
   const totals = useMemo(
     () => data.reduce((acc, point) => ({ requests: acc.requests + point.requests, completed: acc.completed + point.completed }), { requests: 0, completed: 0 }),
@@ -82,12 +91,17 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
 
   const seriesNames = { requests: t("analyticsV2.trend.requests"), completed: t("analyticsV2.trend.completed") };
   const isEmpty = totals.requests === 0 && totals.completed === 0;
-  const tickLabels = data.map((point) => point.tick);
+
+  const select = (key: string | null) => {
+    if (!key) return onSelect(null);
+    const point = byKey.get(key);
+    onSelect(point ? { key, label: point.label } : null);
+  };
 
   const handleClick = (state: { activeLabel?: string | number }) => {
     if (state?.activeLabel !== undefined) {
       const key = String(state.activeLabel);
-      onSelect(activeKey === key ? null : key);
+      select(activeKey === key ? null : key);
     }
   };
 
@@ -126,7 +140,7 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
       <SegmentLegend
         items={legendItems}
         activeKey={activeKey}
-        onSelect={onSelect}
+        onSelect={select}
         label={t("analytics.selectPeriod")}
         testId="legend-time-series"
         maxButtons={8}
@@ -137,7 +151,7 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
   return (
     <ChartFigure
       title={t("analyticsV2.trend.title")}
-      meta={`${t(`analyticsV2.trend.unit.${bucket}`)} · ${t(`analyticsV2.period.${period}`)}`}
+      meta={t("analyticsV2.chart.meta", { unit: t(`analyticsV2.trend.unit.${bucket}`), period: t(`analyticsV2.period.${period}`) })}
       definition={t(`analyticsV2.trend.definition.${bucket}`)}
       summary={summary}
       table={table}
@@ -153,7 +167,7 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
             accessibilityLayer
             title={t("analyticsV2.trend.title")}
             desc={summary}
-            margin={{ top: 20, right: 8, bottom: 0, left: 0 }}
+            margin={{ top: 28, right: 8, bottom: 0, left: 0 }}
             barGap={2}
             barCategoryGap="24%"
             onClick={handleClick}
@@ -162,25 +176,32 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
             <CartesianGrid vertical={false} stroke={GRID_STROKE} />
             <XAxis
               dataKey="key"
-              tickFormatter={(_value: string, index: number) => tickLabels[index] ?? ""}
+              tickFormatter={(value: string) => byKey.get(value)?.tick ?? ""}
               tick={AXIS_TICK}
               tickLine={false}
               axisLine={false}
               minTickGap={24}
               interval="preserveStartEnd"
             />
-            <YAxis tick={AXIS_TICK} tickLine={false} axisLine={false} allowDecimals={false} width={32} />
+            <YAxis
+              tick={AXIS_TICK}
+              tickLine={false}
+              axisLine={false}
+              allowDecimals={false}
+              width={40}
+              label={<AxisUnitLabel text={t("analyticsV2.trend.axis.count")} />}
+            />
             <Tooltip
               cursor={CURSOR_FILL}
-              content={<BrandTooltip dir={dir} lang={lang} labelFormatter={(key) => data.find((point) => point.key === key)?.label ?? key} />}
+              content={<BrandTooltip dir={dir} lang={lang} labelFormatter={(key) => byKey.get(key)?.label ?? key} />}
             />
-            <Bar dataKey="requests" name={seriesNames.requests} fill={SERIES.requests} stroke={SURFACE} strokeWidth={2} radius={COLUMN_RADIUS} maxBarSize={36} isAnimationActive={false}>
+            <Bar dataKey="requests" name={seriesNames.requests} fill={SERIES.requests} stroke={SURFACE} strokeWidth={2} radius={COLUMN_RADIUS} maxBarSize={24} isAnimationActive={false}>
               {data.map((point) => (
                 <Cell key={point.key} fillOpacity={markOpacity(point.key, activeKey)} />
               ))}
               <LabelList dataKey="requests" content={<ValueLabel placement="top" minSize={24} format={(value) => formatNumber(value, lang)} />} />
             </Bar>
-            <Bar dataKey="completed" name={seriesNames.completed} fill={SERIES.completed} stroke={SURFACE} strokeWidth={2} radius={COLUMN_RADIUS} maxBarSize={36} isAnimationActive={false}>
+            <Bar dataKey="completed" name={seriesNames.completed} fill={SERIES.completed} stroke={SURFACE} strokeWidth={2} radius={COLUMN_RADIUS} maxBarSize={24} isAnimationActive={false}>
               {data.map((point) => (
                 <Cell key={point.key} fillOpacity={markOpacity(point.key, activeKey)} />
               ))}
@@ -199,13 +220,13 @@ export function TrendChartSkeleton() {
     <div className="rounded-lg border border-border bg-card p-4 md:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-2">
-          <Skeleton className="h-6 w-64" />
+          <Skeleton className="h-6 w-64 max-w-full" />
           <Skeleton className="h-4 w-40" />
         </div>
         <Skeleton className="h-9 w-28" />
       </div>
       <Skeleton className="mt-4 h-72 w-full" />
-      <div className="mt-3 flex gap-2">
+      <div className="mt-3 flex flex-wrap gap-2">
         <Skeleton className="h-8 w-28" />
         <Skeleton className="h-8 w-28" />
         <Skeleton className="h-8 w-28" />

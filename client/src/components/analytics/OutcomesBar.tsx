@@ -86,7 +86,7 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
   return (
     <ChartFigure
       title={t("analyticsV2.outcomes.title")}
-      meta={`${t("analyticsV2.outcomes.unit")} · ${t(`analyticsV2.period.${period}`)}`}
+      meta={t("analyticsV2.chart.meta", { unit: t("analyticsV2.outcomes.unit"), period: t(`analyticsV2.period.${period}`) })}
       definition={t("analyticsV2.outcomes.definition")}
       summary={summary}
       table={table}
@@ -100,7 +100,7 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
       {total === 0 ? (
         <EmptyState icon={Inbox} title={t("analyticsV2.outcomes.empty")} titleAs="p" className="py-8" />
       ) : (
-        <ChartContainer config={Object.fromEntries(OUTCOME_ORDER.map((status) => [status, { label: labels[status] }]))} className="aspect-auto h-14 w-full">
+        <ChartContainer config={Object.fromEntries(OUTCOME_ORDER.map((status) => [status, { label: labels[status] }]))} className="aspect-auto h-10 w-full">
           <BarChart
             data={data}
             layout="vertical"
@@ -109,6 +109,7 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
             desc={summary}
             margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
             barCategoryGap={0}
+            barSize={32}
           >
             <XAxis type="number" hide domain={[0, total]} reversed={isRTL} />
             <YAxis type="category" dataKey="name" hide />
@@ -147,7 +148,7 @@ export function OutcomesBarSkeleton() {
         </div>
         <Skeleton className="h-9 w-28" />
       </div>
-      <Skeleton className="mt-4 h-14 w-full" />
+      <Skeleton className="mt-4 h-10 w-full" />
       <div className="mt-3 flex flex-wrap gap-2">
         <Skeleton className="h-8 w-32" />
         <Skeleton className="h-8 w-24" />

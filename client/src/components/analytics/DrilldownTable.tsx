@@ -15,6 +15,7 @@ interface DrilldownTableProps {
   testId?: string;
   limit?: number;
   showMentee?: boolean;
+  showMentor?: boolean;
 }
 
 /**
@@ -22,7 +23,7 @@ interface DrilldownTableProps {
  * been selected (TESTING g3: "Showing: <segment>" + Clear). Focus moves to
  * its heading when it opens (D7); the caller returns focus on Clear.
  */
-export function DrilldownTable({ segmentLabel, rows, onClear, testId = "drilldown", limit = 50, showMentee = true }: DrilldownTableProps) {
+export function DrilldownTable({ segmentLabel, rows, onClear, testId = "drilldown", limit = 50, showMentee = true, showMentor = true }: DrilldownTableProps) {
   const { t } = useTranslation();
   const headingRef = useRef<HTMLHeadingElement>(null);
 
@@ -46,7 +47,7 @@ export function DrilldownTable({ segmentLabel, rows, onClear, testId = "drilldow
             : t("analytics.rowCount", { count: rows.length })}
         </span>
       </div>
-      <BookingsTable rows={rows} limit={limit} emptyText={t("analytics.noSegmentRows")} testId={`${testId}-table`} showMentee={showMentee} />
+      <BookingsTable rows={rows} limit={limit} emptyText={t("analytics.noSegmentRows")} testId={`${testId}-table`} showMentee={showMentee} showMentor={showMentor} />
     </section>
   );
 }

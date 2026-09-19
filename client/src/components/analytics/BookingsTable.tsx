@@ -13,6 +13,8 @@ interface BookingsTableProps {
   testId?: string;
   /** Hidden for a mentee reading their own sessions (every row is theirs). */
   showMentee?: boolean;
+  /** Hidden for a mentor reading their own sessions (every row is theirs). */
+  showMentor?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface BookingsTableProps {
  * StatusBadge), localized dates, Intl-formatted duration, localized country.
  * Used by the Bookings tab and every drill-down.
  */
-export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table", showMentee = true }: BookingsTableProps) {
+export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table", showMentee = true, showMentor = true }: BookingsTableProps) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const visible = typeof limit === "number" ? rows.slice(0, limit) : rows;
@@ -41,7 +43,7 @@ export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t("analyticsV2.bookings.table.mentor")}</TableHead>
+            {showMentor && <TableHead>{t("analyticsV2.bookings.table.mentor")}</TableHead>}
             {showMentee && <TableHead>{t("analyticsV2.bookings.table.mentee")}</TableHead>}
             <TableHead>{t("analyticsV2.bookings.table.status")}</TableHead>
             <TableHead>{t("analyticsV2.bookings.table.requested")}</TableHead>
@@ -53,9 +55,11 @@ export function BookingsTable({ rows, limit, emptyText, testId = "bookings-table
         <TableBody>
           {visible.map((row) => (
             <TableRow key={row.id} data-testid={`row-booking-${row.id}`}>
-              <TableCell className="whitespace-nowrap font-medium text-foreground" data-testid={`text-mentor-${row.id}`}>
-                <bdi>{row.mentorName ? localizedName({ name: row.mentorName, nameAr: row.mentorNameAr }, lang) : t("analytics.unknown")}</bdi>
-              </TableCell>
+              {showMentor && (
+                <TableCell className="whitespace-nowrap font-medium text-foreground" data-testid={`text-mentor-${row.id}`}>
+                  <bdi>{row.mentorName ? localizedName({ name: row.mentorName, nameAr: row.mentorNameAr }, lang) : t("analytics.unknown")}</bdi>
+                </TableCell>
+              )}
               {showMentee && (
                 <TableCell data-testid={`text-mentee-${row.id}`}>
                   <div className="leading-tight">

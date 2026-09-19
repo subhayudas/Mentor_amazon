@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, BarChart3, CalendarDays, Globe, LayoutDashboard, Users } from "lucide-react";
+import { AlertTriangle, CalendarDays, Globe, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
@@ -10,14 +10,16 @@ import { formatTime } from "@/lib/format";
 import { csvFilename, downloadCsv, isoDate, toCsv, type CsvValue } from "@/lib/csv";
 import {
   NOT_SPECIFIED,
+  bookingCountry,
   bucketFor,
   bucketKey,
   completionDate,
   countryBreakdown,
   countryOptions,
-  bookingCountry,
+  expertiseLabels,
   inWindow,
   localizeCountry,
+  localizeLanguage,
   localizedName,
   mentorPerformance,
   outcomeCounts,
@@ -53,7 +55,7 @@ import { MentorTable } from "@/components/analytics/MentorTable";
 import { OutcomesBar, OutcomesBarSkeleton } from "@/components/analytics/OutcomesBar";
 import { PeriodControl } from "@/components/analytics/PeriodControl";
 import { SummarySentence, SummarySentenceSkeleton } from "@/components/analytics/SummarySentence";
-import { TrendChart, TrendChartSkeleton } from "@/components/analytics/TrendChart";
+import { TrendChart, TrendChartSkeleton, type BucketSelection } from "@/components/analytics/TrendChart";
 import type { Scope } from "@/components/analytics/labels";
 
 type TabKey = "overview" | "countries" | "mentors" | "bookings";
@@ -110,6 +112,7 @@ export default function Analytics() {
   const isError = bookingsQuery.isError || mentorsQuery.isError || menteesQuery.isError;
   const isFetching = bookingsQuery.isFetching || mentorsQuery.isFetching || menteesQuery.isFetching;
   const bookings = bookingsQuery.data;
+  // Freshness = the newest of the three queries (P2-16).
   const updatedAt = Math.max(bookingsQuery.dataUpdatedAt, mentorsQuery.dataUpdatedAt, menteesQuery.dataUpdatedAt);
 
   const retry = () => {
@@ -133,7 +136,7 @@ export default function Analytics() {
     [t, lang],
   );
 
-  // ---- Filters (admin) ----------------------------------------------------
+  // ---- Filters (admin): the stored English value is the key, the label follows the UI language (spec §10) ----
   const filterOptions = useMemo<Record<FilterKey, FilterOption[]>>(() => {
     const languages = new Set<string>();
     const expertises = new Set<string>();
@@ -142,18 +145,23 @@ export default function Analytics() {
       mentor.expertise?.forEach((value) => expertises.add(value));
     });
     sourceMentees.forEach((mentee) => mentee.languages_spoken?.forEach((value) => languages.add(value)));
+    const arabicExpertise = expertiseLabels(sourceMentors);
+    const expertiseLabel = (value: string) => (lang.startsWith("ar") ? arabicExpertise.get(value) ?? value : value);
     const countries = countryOptions(sourceBookings, sourceMentors);
     const hasUnspecified = sourceBookings.some((booking) => bookingCountry(booking, mentorsById.get(booking.mentor_id)) === NOT_SPECIFIED);
+    const byLabel = (a: FilterOption, b: FilterOption) => a.label.localeCompare(b.label, lang);
     return {
-      mentor: [...sourceMentors]
-        .sort((a, b) => localizedName(a, lang).localeCompare(localizedName(b, lang), lang))
-        .map((mentor) => ({ value: mentor.id, label: localizedName(mentor, lang) })),
+      mentor: sourceMentors.map((mentor) => ({ value: mentor.id, label: localizedName(mentor, lang) })).sort(byLabel),
       menteeType: [
         { value: "individual", label: t("menteeRegistration.individual") },
         { value: "organization", label: t("menteeRegistration.organization") },
       ],
-      language: Array.from(languages).sort().map((value) => ({ value, label: value })),
-      expertise: Array.from(expertises).sort().map((value) => ({ value, label: value })),
+      language: Array.from(languages)
+        .map((value) => ({ value, label: localizeLanguage(value, lang) }))
+        .sort(byLabel),
+      expertise: Array.from(expertises)
+        .map((value) => ({ value, label: expertiseLabel(value) }))
+        .sort(byLabel),
       country: (hasUnspecified ? [...countries, NOT_SPECIFIED] : countries).map((value) => ({ value, label: displayCountry(value) })),
     };
   }, [sourceBookings, sourceMentors, sourceMentees, mentorsById, lang, t, displayCountry]);
@@ -203,6 +211,7 @@ export default function Analytics() {
     return [...requestRows, ...completedRows.filter((booking) => !ids.has(booking.id))];
   }, [requestRows, completedRows]);
 
+  // One summarize() call feeds the sentence and the four tiles, so they always reconcile.
   const current = useMemo(() => summarize(requestRows, completedRows, sourceMentors), [requestRows, completedRows, sourceMentors]);
   const previousSummary = useMemo(
     () => (compareOn ? summarize(prevRequestRows, prevCompletedRows, sourceMentors) : null),
@@ -285,26 +294,19 @@ export default function Analytics() {
     setDrill(null);
   };
 
-  const bucketLabel = (key: string) => {
-    const point = series.find((item) => item.key === key);
-    if (!point) return key;
-    return t("analytics.selectPeriod");
-  };
-
-  const selectBucket = (key: string | null) => {
-    if (!key) return clearDrill();
-    const point = series.find((item) => item.key === key);
-    const label = point ? t("analyticsV2.trend.weekOf", { date: point.key }) : key;
-    openDrill({ kind: "bucket", value: key, label });
-  };
+  const selectBucket = (selection: BucketSelection | null) => (selection ? openDrill({ kind: "bucket", value: selection.key, label: selection.label }) : clearDrill());
   const selectStatus = (key: string | null) => (key ? openDrill({ kind: "status", value: key, label: bookingStatusLabel(key as BookingStatus, t) }) : clearDrill());
   const selectCountry = (country: string | null) => (country ? openDrill({ kind: "country", value: country, label: displayCountry(country) }) : clearDrill());
   const selectMentor = (mentor: { id: string; label: string } | null) => (mentor ? openDrill({ kind: "mentor", value: mentor.id, label: mentor.label }) : clearDrill());
 
+  const showMentee = scope !== "mentee";
+  const showMentor = scope !== "mentor";
   const renderDrill = (kind: DrillKind, testId: string) =>
-    drill?.kind === kind ? <DrilldownTable segmentLabel={drill.label} rows={drillRows} onClear={clearDrill} testId={testId} showMentee={scope !== "mentee"} /> : null;
+    drill?.kind === kind ? (
+      <DrilldownTable segmentLabel={drill.label} rows={drillRows} onClear={clearDrill} testId={testId} showMentee={showMentee} showMentor={showMentor} />
+    ) : null;
 
-  // ---- CSV export (admins) ------------------------------------------------
+  // ---- CSV export (admins; the file carries mentee e-mails) -----------------
   const exportRows = useCallback(
     (rowsToExport: BookingRow[], filename: string) => {
       const headers = [
@@ -345,6 +347,7 @@ export default function Analytics() {
         bookingStatusLabel(row.status, t),
         row.menteeType === "organization" ? t("menteeRegistration.organization") : row.menteeType === "individual" ? t("menteeRegistration.individual") : "",
       ]);
+      // The "# DEMO DATA" comment line is part of the TESTING g1 file contract, so it stays English.
       downloadCsv(filename, toCsv(headers, data, { commentLines: useMockData ? ["DEMO DATA"] : [] }));
     },
     [t, displayCountry, useMockData],
@@ -362,9 +365,8 @@ export default function Analytics() {
 
   // ---- Render -------------------------------------------------------------
   const title = t(isAdmin ? "analyticsV2.title.admin" : "analyticsV2.title.own");
-  const showMentee = scope !== "mentee";
 
-  const tabs: Array<{ key: TabKey; icon: typeof LayoutDashboard; label: string; adminOnly?: boolean }> = [
+  const tabs: Array<{ key: TabKey; icon: LucideIcon; label: string; adminOnly?: boolean }> = [
     { key: "overview", icon: LayoutDashboard, label: t("analytics.tabs.overview") },
     { key: "countries", icon: Globe, label: t("analytics.tabs.countries"), adminOnly: true },
     { key: "mentors", icon: Users, label: t("analytics.tabs.mentors"), adminOnly: true },
@@ -384,13 +386,13 @@ export default function Analytics() {
                 {t("analyticsV2.demoBadge")}
               </Badge>
             )}
-            {isAdmin && (
+            {isAdmin && !isError && (
               <ExportBar
                 onExportView={handleExportView}
                 onExportRange={handleExportRange}
                 defaultFrom={isoDate(window.start)}
                 defaultTo={isoDate(new Date())}
-                disabled={isLoading || isError}
+                disabled={isLoading}
               />
             )}
           </>
@@ -402,7 +404,7 @@ export default function Analytics() {
             <CompareToggle checked={compare} onChange={setCompare} unavailable={period === "all"} />
             {isAdmin && <FiltersPopover value={filters} onChange={changeFilters} options={filterOptions} activeCount={activeFilters.length} />}
             {updatedAt > 0 && !isError && (
-              <p className="ms-auto self-center text-caption text-muted-foreground" aria-live="polite">
+              <p className="ms-auto self-center text-caption text-muted-foreground" data-testid="analytics-updated">
                 {t("analyticsV2.updated", { time: formatTime(updatedAt, lang) })}
               </p>
             )}
@@ -433,7 +435,7 @@ export default function Analytics() {
             description={t("analyticsV2.error.body")}
             role="status"
             action={
-              <Button type="button" variant="secondary" onClick={retry} loading={isFetching}>
+              <Button type="button" variant="secondary" onClick={retry} loading={isFetching} data-testid="button-analytics-retry">
                 {t("common.tryAgain")}
               </Button>
             }
@@ -453,7 +455,7 @@ export default function Analytics() {
             ))}
           </TabsList>
 
-          {/* ---------------- Overview ---------------- */}
+          {/* ---------------- Overview: summary → tiles → trend → breakdowns ---------------- */}
           <TabsContent value="overview" className="mt-6 space-y-6">
             {isLoading ? (
               <div role="status" aria-busy="true" className="space-y-6">
@@ -461,7 +463,7 @@ export default function Analytics() {
                 <SummarySentenceSkeleton />
                 <KpiTilesSkeleton />
                 <TrendChartSkeleton />
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className={isAdmin ? "grid grid-cols-1 gap-6 lg:grid-cols-2" : ""}>
                   <OutcomesBarSkeleton />
                   {isAdmin && <CountryBreakdownSkeleton />}
                 </div>
@@ -474,7 +476,7 @@ export default function Analytics() {
                   <TrendChart series={series} bucket={bucket} period={period} drillCounts={drillCounts} activeKey={activeDrill("bucket")} onSelect={selectBucket} />
                   {renderDrill("bucket", "drilldown-date")}
                 </div>
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className={isAdmin ? "grid grid-cols-1 items-start gap-6 lg:grid-cols-2" : ""}>
                   <OutcomesBar counts={outcomes} period={period} activeKey={activeDrill("status")} onSelect={selectStatus} />
                   {isAdmin && (
                     <CountryBreakdown
@@ -506,7 +508,7 @@ export default function Analytics() {
             </TabsContent>
           )}
 
-          {/* ---------------- Mentors (admin) ---------------- */}
+          {/* ---------------- Mentors (admin): the ranked table ---------------- */}
           {isAdmin && (
             <TabsContent value="mentors" className="mt-6 space-y-3">
               {isLoading ? (
@@ -537,14 +539,19 @@ export default function Analytics() {
                       : t("analytics.rowCount", { count: rows.length })}
                   </p>
                 </div>
-                <BookingsTable rows={rows} limit={BOOKINGS_TAB_LIMIT} emptyText={t("analyticsV2.bookings.empty")} testId="bookings-table" showMentee={showMentee} />
+                <BookingsTable
+                  rows={rows}
+                  limit={BOOKINGS_TAB_LIMIT}
+                  emptyText={t("analyticsV2.bookings.empty")}
+                  testId="bookings-table"
+                  showMentee={showMentee}
+                  showMentor={showMentor}
+                />
               </section>
             )}
           </TabsContent>
         </Tabs>
       )}
-      {/* Keeps the unused-variable lint honest: the trend icon is used by the empty states inside TrendChart. */}
-      <span className="hidden" aria-hidden="true">{bucketLabel("")}</span>
     </Container>
   );
 }

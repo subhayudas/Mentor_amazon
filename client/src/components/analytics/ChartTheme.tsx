@@ -114,6 +114,26 @@ export function ValueLabel({ value, viewBox, placement, minSize, isRTL = false, 
   );
 }
 
+interface AxisUnitLabelProps {
+  viewBox?: LabelViewBox;
+  /** Translated unit, e.g. "Count" or "Completed sessions". */
+  text: string;
+}
+
+/**
+ * Unit label for a value axis (spec §9 "axes with unit"): start-anchored text
+ * above the axis column, never rotated, so Arabic and Latin read the same way.
+ */
+export function AxisUnitLabel({ viewBox, text }: AxisUnitLabelProps) {
+  if (!viewBox) return null;
+  const { x = 0, y = 0 } = viewBox;
+  return (
+    <text x={x} y={y - 10} textAnchor="start" fill={MUTED_INK} fontSize={12}>
+      {text}
+    </text>
+  );
+}
+
 interface BrandTooltipProps extends TooltipProps<number, string> {
   dir: Direction;
   lang: string;

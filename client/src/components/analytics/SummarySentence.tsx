@@ -37,7 +37,14 @@ export function SummarySentence({ scope, period, current, previous }: SummarySen
   if (current.completed === 0) {
     sentence = t(own ? "analyticsV2.summary.ownNone" : "analyticsV2.summary.adminNone", { period: periodPhrase(period, t), delta: deltaClause });
   } else {
-    const hours = formatNumber(current.hours.minutes / 60, lang, { style: "unit", unit: "hour", unitDisplay: "long", maximumFractionDigits: 1 });
+    // The hours clause is dropped when no completed session has a recorded
+    // duration: "for 0 hours" would misreport an unknown as a zero.
+    const hours =
+      current.hours.withDuration > 0
+        ? t(own ? "analyticsV2.summary.hoursOwn" : "analyticsV2.summary.hoursAdmin", {
+            hours: formatNumber(current.hours.minutes / 60, lang, { style: "unit", unit: "hour", unitDisplay: "long", maximumFractionDigits: 1 }),
+          })
+        : "";
     const countries = scope !== "mentee" && current.countries > 0 ? t("analyticsV2.summary.countries", { count: current.countries }) : "";
     sentence = t(own ? "analyticsV2.summary.own" : "analyticsV2.summary.admin", {
       count: current.completed,

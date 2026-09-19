@@ -58,6 +58,9 @@ export function KpiTiles({ scope, current, previous, period }: KpiTilesProps) {
   };
 
   const withoutDuration = current.hours.withoutDuration;
+  // Completed sessions exist but none has a recorded duration: the hours are
+  // unknown, not zero — "—" + "Not recorded" (spec §9 real zero vs unavailable).
+  const hoursUnavailable = current.completed > 0 && current.hours.withDuration === 0;
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -77,10 +80,16 @@ export function KpiTiles({ scope, current, previous, period }: KpiTilesProps) {
       />
       <StatTile
         title={t(`analyticsV2.tiles.hours.title.${scope}`)}
-        value={formatNumber(current.hours.hours, lang, { maximumFractionDigits: 1 })}
-        unit={t("analytics.hoursUnit")}
-        delta={hoursDelta()}
-        caveat={withoutDuration > 0 ? t("analyticsV2.tiles.withoutDuration", { count: withoutDuration }) : undefined}
+        value={hoursUnavailable ? UNAVAILABLE : formatNumber(current.hours.hours, lang, { maximumFractionDigits: 1 })}
+        unit={hoursUnavailable ? undefined : t("analytics.hoursUnit")}
+        delta={hoursUnavailable ? undefined : hoursDelta()}
+        caveat={
+          hoursUnavailable
+            ? t("analyticsV2.tiles.notRecordedCount", { count: withoutDuration })
+            : withoutDuration > 0
+              ? t("analyticsV2.tiles.withoutDuration", { count: withoutDuration })
+              : undefined
+        }
         definition={t("analyticsV2.tiles.hours.definition")}
         testId="metric-volunteer-hours"
       />

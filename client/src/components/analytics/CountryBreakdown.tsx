@@ -142,10 +142,11 @@ export function CountryBreakdown({ rows, period, activeCountry, onSelect, onSeeA
   return (
     <ChartFigure
       title={t("analyticsV2.country.title")}
-      meta={`${t("analyticsV2.country.unit")} · ${t(`analyticsV2.period.${period}`)}`}
+      meta={t("analyticsV2.chart.meta", { unit: t("analyticsV2.country.unit"), period: t(`analyticsV2.period.${period}`) })}
       definition={t("analyticsV2.country.definition")}
       summary={summary}
       table={table}
+      tableMode={data.length === 0 ? "hidden" : "beneath"}
       footer={
         <div className="mt-2">
           <Button type="button" variant="link" size="sm" onClick={onSeeAll}>
