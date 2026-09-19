@@ -236,6 +236,14 @@ export default function MentorProfile() {
     registerReturnFocus,
   };
   const railStops = railStopsFor(t, request, { signedIn, name: bidi(display.name) }).stops;
+  const mobileRail = (
+    <section aria-labelledby="profile-rail-title">
+      <h2 id="profile-rail-title" className="text-h2-sm text-foreground md:text-h2">
+        {request.kind === "sent" ? t("dashboardV2.rail.title") : t("common.rail.title")}
+      </h2>
+      <RequestRail size="sm" stops={railStops} className="mt-4" />
+    </section>
+  );
   const calLink = request.kind === "sent" ? request.calLink : undefined;
 
   return (
@@ -256,14 +264,18 @@ export default function MentorProfile() {
             />
           )}
           {request.kind === "sent" && (
-            // The fixed MobileActionBar carries the one "Choose a time" fill on phones;
-            // the block keeps the status, links and focus target only (one orange per viewport).
-            <RequestStatusCard
-              request={request}
-              mentorName={display.name}
-              signedIn={signedIn}
-              firstLinkRef={registerReturnFocus}
-            />
+            <>
+              {/* The fixed MobileActionBar carries the one "Choose a time" fill on phones;
+                  the block keeps the status, links and focus target only (one orange per viewport). */}
+              <RequestStatusCard
+                request={request}
+                mentorName={display.name}
+                signedIn={signedIn}
+                firstLinkRef={registerReturnFocus}
+              />
+              {/* The rail sits with the status it explains, not 600px lower after About (N-03). */}
+              {mobileRail}
+            </>
           )}
         </div>
       )}
@@ -272,14 +284,7 @@ export default function MentorProfile() {
         <div className="flex min-w-0 flex-col gap-10">
           <HelpsWith expertise={display.expertise} industries={display.industries} />
           <AboutSection name={display.name} bio={display.bio} />
-          {!isDesktop && (
-            <section aria-labelledby="profile-rail-title">
-              <h2 id="profile-rail-title" className="text-h2-sm text-foreground md:text-h2">
-                {request.kind === "sent" ? t("dashboardV2.rail.title") : t("common.rail.title")}
-              </h2>
-              <RequestRail size="sm" stops={railStops} className="mt-4" />
-            </section>
-          )}
+          {!isDesktop && request.kind !== "sent" && mobileRail}
           {!isDesktop && windows.length > 0 && (
             <AvailabilityWindows windows={windows} mentorTz={mentor.timezone} headingLevel="h2" />
           )}

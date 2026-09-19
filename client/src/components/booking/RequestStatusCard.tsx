@@ -86,12 +86,12 @@ export function RequestStatusCard({
   );
 
   if (variant === "compact") {
-    // The block under the header owns `booking-section`; the bar only mirrors it.
+    // The block under the header owns `booking-section` and the badge; the
+    // bar carries only the action so the status is said once per page (N-03).
     return (
-      <div data-state="sent" className={cn("flex min-h-11 items-center justify-between gap-3", className)}>
-        {badge}
+      <div data-state="sent" className={cn("flex min-h-11 items-center justify-end gap-3", className)}>
         {chooseTime ? (
-          <Button type="button" size="lg" onClick={onChooseTime} data-testid="button-choose-time">
+          <Button type="button" size="lg" className="w-full" onClick={onChooseTime} data-testid="button-choose-time">
             {t("dashboardV2.actions.chooseTime")}
           </Button>
         ) : (
