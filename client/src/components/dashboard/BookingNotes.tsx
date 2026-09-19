@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { FilterChip } from "@/components/discovery/FilterChip";
+import { ChipRadio, ChipRadioGroup } from "@/components/discovery/FilterChip";
 import { toast } from "sonner";
 import type { BookingNote } from "@/lib/database";
 import { formatDate } from "@/lib/format";
@@ -92,14 +92,18 @@ export function BookingNotes({ bookingId, authorType, authorEmail, extended = fa
           if (canSubmit && !addNote.isPending) addNote.mutate();
         }}
       >
-        <div role="radiogroup" aria-label={t("dashboardV2.notes.typeLabel")} className="flex flex-wrap gap-2">
-          <FilterChip role="radio" selected={noteType === "note"} onToggle={() => setNoteType("note")} data-testid="button-type-note">
+        <ChipRadioGroup
+          aria-label={t("dashboardV2.notes.typeLabel")}
+          value={noteType}
+          onValueChange={(value) => setNoteType(value === "task" ? "task" : "note")}
+        >
+          <ChipRadio value="note" data-testid="button-type-note">
             {t("dashboardV2.notes.typeNote")}
-          </FilterChip>
-          <FilterChip role="radio" selected={noteType === "task"} onToggle={() => setNoteType("task")} data-testid="button-type-task">
+          </ChipRadio>
+          <ChipRadio value="task" data-testid="button-type-task">
             {t("dashboardV2.notes.typeTask")}
-          </FilterChip>
-        </div>
+          </ChipRadio>
+        </ChipRadioGroup>
         <div className="space-y-1.5">
           <Label htmlFor={`${baseId}-content`}>
             {noteType === "note" ? t("dashboardV2.notes.noteLabel") : t("dashboardV2.notes.taskLabel")}

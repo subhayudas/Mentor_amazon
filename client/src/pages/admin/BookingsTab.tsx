@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import { BarChart3, Star } from "lucide-react";
 import { formatNumber, UNAVAILABLE } from "@/lib/format";
 import { localizeCountry } from "@/lib/format";
-import { FilterChip } from "@/components/discovery/FilterChip";
+import { ChipRadio, ChipRadioGroup } from "@/components/discovery/FilterChip";
 import { adminQueryKeys, adminService, type AdminBooking } from "@/lib/adminService";
 import type { Booking } from "@/lib/database";
 import { Button } from "@/components/ui/button";
@@ -71,20 +71,13 @@ export default function BookingsTab() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
-        <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("admin.bookings.filterLabel")}>
+        <ChipRadioGroup aria-label={t("admin.bookings.filterLabel")} value={filter} onValueChange={(value) => setFilter(value as Filter)}>
           {chips.map((chip) => (
-            <FilterChip
-              key={chip}
-              role="radio"
-              selected={filter === chip}
-              onToggle={() => setFilter(chip)}
-              count={formatNumber(counts[chip], i18n.language)}
-              data-testid={`chip-booking-${chip}`}
-            >
+            <ChipRadio key={chip} value={chip} count={formatNumber(counts[chip], i18n.language)} data-testid={`chip-booking-${chip}`}>
               {chip === "all" ? t("common.all") : t(`status.${chip}`)}
-            </FilterChip>
+            </ChipRadio>
           ))}
-        </div>
+        </ChipRadioGroup>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <SearchBox value={search} onChange={setSearch} placeholder={t("admin.bookings.searchPlaceholder")} testId="input-booking-search" />
           <Button asChild variant="outline" className="shrink-0" data-testid="link-open-analytics">

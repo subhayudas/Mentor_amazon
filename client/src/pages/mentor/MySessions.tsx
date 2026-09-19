@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { FilterChip } from "@/components/discovery/FilterChip";
+import { ChipRadio, ChipRadioGroup } from "@/components/discovery/FilterChip";
 import { EmptyState } from "@/components/EmptyState";
 import { StarRating } from "@/components/MenteeFeedbackDialog";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -299,19 +299,17 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
           <div className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="input-session-minutes">{t("mentorPortal.sessionDuration")}</Label>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={t("mentorPortal.sessionDuration")}>
+              <ChipRadioGroup
+                aria-label={t("mentorPortal.sessionDuration")}
+                value={SESSION_MINUTE_PRESETS.some((preset) => preset === parsedMinutes) ? String(parsedMinutes) : ""}
+                onValueChange={(value) => setMinutesInput(value)}
+              >
                 {SESSION_MINUTE_PRESETS.map((preset) => (
-                  <FilterChip
-                    key={preset}
-                    role="radio"
-                    selected={parsedMinutes === preset}
-                    onToggle={() => setMinutesInput(String(preset))}
-                    data-testid={`button-minutes-${preset}`}
-                  >
+                  <ChipRadio key={preset} value={String(preset)} data-testid={`button-minutes-${preset}`}>
                     {t("mentorPortal.durationMinutes", { count: preset })}
-                  </FilterChip>
+                  </ChipRadio>
                 ))}
-              </div>
+              </ChipRadioGroup>
               <div className="flex items-center gap-2">
                 <Input
                   id="input-session-minutes"
