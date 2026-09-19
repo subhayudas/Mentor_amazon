@@ -296,28 +296,19 @@ function escapeLikePattern(value: string): string {
 class DatabaseService {
   // ==================== MENTORS ====================
   
-  /** Public directory read. Goes through the `mentors_public` view (no contact data). */
-  async getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<PublicMentor[]> {
-    let query = supabase.from('mentors_public').select('*');
-
-    if (filters?.search) {
-      const searchPattern = `%${filters.search}%`;
-      query = query.or(`name.ilike.${searchPattern},position.ilike.${searchPattern},company.ilike.${searchPattern},bio.ilike.${searchPattern}`);
-    }
-
-    if (filters?.expertise) {
-      query = query.contains('expertise', [filters.expertise]);
-    }
-
-    if (filters?.industry) {
-      query = query.contains('industries', [filters.industry]);
-    }
-
-    if (filters?.language) {
-      query = query.contains('languages_spoken', [filters.language]);
-    }
-
-    const { data, error } = await query;
+  /**
+   * Public directory read: the WHOLE `mentors_public` view (no contact data),
+   * fetched once under queryKey ['mentors'] and filtered client-side by
+   * `lib/discovery.ts` (spec §0, P1-2).
+   *
+   * `filters` is accepted for signature compatibility with older callers but
+   * deliberately ignored: the previous `.or(name.ilike…)` branch interpolated
+   * user input unescaped into a PostgREST filter and only searched the English
+   * columns, and the `.contains` branches could not localize. Search now runs
+   * over EN and AR fields in the browser and never reaches PostgREST.
+   */
+  async getMentors(_filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<PublicMentor[]> {
+    const { data, error } = await supabase.from('mentors_public').select('*');
     if (error) throw error;
     return data || [];
   }

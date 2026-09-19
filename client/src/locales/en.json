@@ -1267,13 +1267,226 @@
     "mentorNoteRejected": "The program team did not approve this organization's verification."
   },
   "landing": {
-    "_owner": "A"
+    "hero": {
+      "eyebrow": "Amazon UAE mentorship programme",
+      "title": "Get unstuck with an Amazon mentor.",
+      "lede": "Tell us what you're working on, compare mentors whose experience fits, and send a request — they accept and you pick a time together.",
+      "searchLabel": "What are you working on?",
+      "searchPlaceholder": "Search by skill, role, team or what you're working on",
+      "searchPlaceholderShort": "Search by skill, role or team",
+      "search": "Search",
+      "examples": "Popular areas",
+      "browseAll_zero": "Browse all mentors",
+      "browseAll_one": "Browse the {{count}} mentor",
+      "browseAll_two": "Browse all {{count}} mentors",
+      "browseAll_few": "Browse all {{count}} mentors",
+      "browseAll_many": "Browse all {{count}} mentors",
+      "browseAll_other": "Browse all {{count}} mentors",
+      "browseAllNoCount": "Browse all mentors",
+      "howItWorks": "See how a session happens"
+    },
+    "trust": {
+      "mentors_zero": "No mentors yet",
+      "mentors_one": "{{count}} mentor",
+      "mentors_two": "{{count}} mentors",
+      "mentors_few": "{{count}} mentors",
+      "mentors_many": "{{count}} mentors",
+      "mentors_other": "{{count}} mentors",
+      "languages_zero": "No languages listed",
+      "languages_one": "{{count}} language",
+      "languages_two": "{{count}} languages",
+      "languages_few": "{{count}} languages",
+      "languages_many": "{{count}} languages",
+      "languages_other": "{{count}} languages",
+      "countries_zero": "No countries listed",
+      "countries_one": "{{count}} country",
+      "countries_two": "{{count}} countries",
+      "countries_few": "{{count}} countries",
+      "countries_many": "{{count}} countries",
+      "countries_other": "{{count}} countries"
+    },
+    "rail": {
+      "lede": "Requests come first — the calendar comes after the mentor says yes."
+    },
+    "preview": {
+      "title": "Mentors you can talk to",
+      "description": "Amazon employees who volunteer their time. Those accepting requests come first.",
+      "seeAll_zero": "See all mentors",
+      "seeAll_one": "See the {{count}} mentor",
+      "seeAll_two": "See all {{count}} mentors",
+      "seeAll_few": "See all {{count}} mentors",
+      "seeAll_many": "See all {{count}} mentors",
+      "seeAll_other": "See all {{count}} mentors",
+      "errorTitle": "Unable to load mentors",
+      "errorBody": "Check your connection and try again.",
+      "emptyTitle": "No mentors yet",
+      "emptyBody": "Mentors appear here once the programme team approves them."
+    },
+    "needs": {
+      "title": "What people come with",
+      "description": "Common starting points. Pick one to see who can help.",
+      "term": "Searches for “{{term}}”",
+      "count_zero": "No mentors",
+      "count_one": "{{count}} mentor",
+      "count_two": "{{count}} mentors",
+      "count_few": "{{count}} mentors",
+      "count_many": "{{count}} mentors",
+      "count_other": "{{count}} mentors",
+      "items": {
+        "careers": {
+          "label": "Career moves",
+          "term": "career"
+        },
+        "interviews": {
+          "label": "Interviews",
+          "term": "interview"
+        },
+        "leadership": {
+          "label": "Leadership",
+          "term": "leadership"
+        },
+        "product": {
+          "label": "Product and design",
+          "term": "product"
+        },
+        "cloud": {
+          "label": "Cloud and data",
+          "term": "cloud"
+        },
+        "founders": {
+          "label": "Founders and NGOs",
+          "term": "founders"
+        }
+      }
+    },
+    "faq": {
+      "title": "Questions people ask",
+      "spamQuestion": "Will I get a lot of email?",
+      "spamAnswer": "No. MentorConnect sends no marketing email. A mentor's reply appears under your bookings when you sign in with the email you used, and the only other messages come from the calendar tool you book a time with.",
+      "commitmentQuestion": "How much time do mentors commit?",
+      "commitmentAnswer": "Mentors set their own pace. Most offer an hour or two a month, and they can pause new requests at any time — the card then says \"Not accepting requests\".",
+      "matchingQuestion": "How are mentors and mentees matched?",
+      "matchingAnswer": "You choose. Browse or search the directory, read what each mentor helps with, and send a request to the one whose experience fits. There is no automatic matching.",
+      "cancelQuestion": "What if I need to cancel or reschedule?",
+      "cancelAnswer": "Use the calendar link the mentor shared to move or cancel a scheduled session, and give as much notice as you can so they can offer the slot to someone else."
+    },
+    "cta": {
+      "title": "Ready to send your first request?",
+      "body": "No account needed. Tell a mentor what you're working on; they reply, and you pick a time together.",
+      "button": "Browse mentors"
+    },
+    "footer": {
+      "programme": "Amazon mentorship programme",
+      "nav": "Footer",
+      "copyright": "© {{year}} Amazon"
+    }
   },
   "discovery": {
-    "_owner": "A"
+    "title": "Find a mentor",
+    "description": "Search by what you're working on, then narrow by expertise, language or availability.",
+    "searchLabel": "Search mentors",
+    "searchPlaceholder": "Search by skill, role, team or what you're working on",
+    "searchPlaceholderShort": "Search by skill, role or team",
+    "examples": "Popular areas",
+    "resultsHeading": "Results",
+    "resultCount_zero": "No mentors match",
+    "resultCount_one": "{{count}} mentor",
+    "resultCount_two": "{{count}} mentors",
+    "resultCount_few": "{{count}} mentors",
+    "resultCount_many": "{{count}} mentors",
+    "resultCount_other": "{{count}} mentors",
+    "resultCountOf_zero": "No mentors match",
+    "resultCountOf_one": "{{count}} of {{total}} mentors",
+    "resultCountOf_two": "{{count}} of {{total}} mentors",
+    "resultCountOf_few": "{{count}} of {{total}} mentors",
+    "resultCountOf_many": "{{count}} of {{total}} mentors",
+    "resultCountOf_other": "{{count}} of {{total}} mentors",
+    "loading": "Loading mentors",
+    "filters": {
+      "title": "Filters",
+      "open": "Filters",
+      "openCount_zero": "Filters",
+      "openCount_one": "Filters ({{count}})",
+      "openCount_two": "Filters ({{count}})",
+      "openCount_few": "Filters ({{count}})",
+      "openCount_many": "Filters ({{count}})",
+      "openCount_other": "Filters ({{count}})",
+      "drawerDescription": "Narrow the list. Nothing changes until you choose Show.",
+      "expertise": "Expertise",
+      "language": "Language",
+      "industry": "Industry",
+      "availability": "Availability",
+      "accepting": "Accepting requests",
+      "timezone": "Time zone",
+      "near": "Within 3 hours of my time zone",
+      "yourTimeZone": "Your time zone: {{tz}}",
+      "more": "More filters",
+      "less": "Fewer filters",
+      "showMore_zero": "Show more",
+      "showMore_one": "Show {{count}} more",
+      "showMore_two": "Show {{count}} more",
+      "showMore_few": "Show {{count}} more",
+      "showMore_many": "Show {{count}} more",
+      "showMore_other": "Show {{count}} more",
+      "showLess": "Show fewer",
+      "apply_zero": "Show no mentors",
+      "apply_one": "Show {{count}} mentor",
+      "apply_two": "Show {{count}} mentors",
+      "apply_few": "Show {{count}} mentors",
+      "apply_many": "Show {{count}} mentors",
+      "apply_other": "Show {{count}} mentors",
+      "clear": "Clear",
+      "clearAll": "Clear all",
+      "optionCount_zero": "no mentors",
+      "optionCount_one": "{{count}} mentor",
+      "optionCount_two": "{{count}} mentors",
+      "optionCount_few": "{{count}} mentors",
+      "optionCount_many": "{{count}} mentors",
+      "optionCount_other": "{{count}} mentors"
+    },
+    "sort": {
+      "label": "Sort by",
+      "relevance": "Relevance",
+      "reviewed": "Most reviewed",
+      "newest": "Newest"
+    },
+    "zero": {
+      "titleQuery": "No mentors match “{{q}}”",
+      "titleFilters": "No mentors match all of these filters",
+      "titleBoth": "No mentors match “{{q}}” and these filters",
+      "body": "Try fewer filters or a broader search term.",
+      "clearFilters": "Clear filters",
+      "searchAll": "Search everything instead"
+    },
+    "error": {
+      "title": "Unable to load mentors",
+      "body": "Check your connection and try again."
+    },
+    "empty": {
+      "title": "No mentors yet",
+      "body": "Mentors appear here once the programme team approves them."
+    }
   },
   "mentorCard": {
-    "_owner": "A"
+    "accepting": "Accepting requests",
+    "notAccepting": "Not accepting requests",
+    "viewProfile": "View profile",
+    "viewProfileOf": "View profile: {{name}}",
+    "moreExpertise_zero": "No more areas of expertise",
+    "moreExpertise_one": "{{count}} more area of expertise",
+    "moreExpertise_two": "{{count}} more areas of expertise",
+    "moreExpertise_few": "{{count}} more areas of expertise",
+    "moreExpertise_many": "{{count}} more areas of expertise",
+    "moreExpertise_other": "{{count}} more areas of expertise",
+    "moreExpertiseTitle": "Also helps with",
+    "ratingA11y_zero": "Not rated yet",
+    "ratingA11y_one": "Rated {{rating}} out of 5 from {{count}} rating",
+    "ratingA11y_two": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "ratingA11y_few": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "ratingA11y_many": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "ratingA11y_other": "Rated {{rating}} out of 5 from {{count}} ratings",
+    "listSeparator": ", ",
+    "requestSent": "Request sent"
   },
   "mentorProfile": {
     "_owner": "B"
