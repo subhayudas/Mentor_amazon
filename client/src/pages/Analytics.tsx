@@ -305,7 +305,8 @@ export default function Analytics() {
   const showMentor = scope !== "mentor";
   const renderDrill = (kind: DrillKind, testId: string) =>
     drill?.kind === kind ? (
-      <DrilldownTable segmentLabel={drill.label} rows={drillRows} onClear={clearDrill} testId={testId} showMentee={showMentee} showMentor={showMentor} />
+      // A mentor drill already names the mentor in its heading; the column would repeat it on every row.
+      <DrilldownTable segmentLabel={drill.label} rows={drillRows} onClear={clearDrill} testId={testId} showMentee={showMentee} showMentor={showMentor && kind !== "mentor"} />
     ) : null;
 
   // ---- CSV export (admins; the file carries mentee e-mails) -----------------

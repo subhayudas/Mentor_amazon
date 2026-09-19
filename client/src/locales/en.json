@@ -1363,8 +1363,8 @@
       "weekOf": "Week of {{date}}",
       "empty": "No sessions in this period",
       "summary": {
-        "week": "Weekly totals, {{period}}: {{requests}} and {{completed}}. Latest week: {{latestRequests}} and {{latestCompleted}}.",
-        "month": "Monthly totals, {{period}}: {{requests}} and {{completed}}. Latest month: {{latestRequests}} and {{latestCompleted}}."
+        "week": "{{period}}, weekly totals: {{requests}} and {{completed}}. Latest week: {{latestRequests}} and {{latestCompleted}}.",
+        "month": "{{period}}, monthly totals: {{requests}} and {{completed}}. Latest month: {{latestRequests}} and {{latestCompleted}}."
       },
       "table": {
         "week": "Week",
@@ -1399,6 +1399,7 @@
       "empty": "No completed sessions in this period",
       "seeAll": "All countries in a table",
       "summary": "{{countries}}; {{top}} leads with {{sessions}} and {{hours}}.",
+      "summaryNoHours": "{{countries}}; {{top}} leads with {{sessions}} (no recorded durations, so no hours).",
       "tabTitle": "Sessions by country",
       "tabDefinition": "Every country with a request or a completed session in the period. Hours count recorded durations only.",
       "table": {

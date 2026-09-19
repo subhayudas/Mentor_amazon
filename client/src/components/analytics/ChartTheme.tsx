@@ -85,6 +85,11 @@ interface ValueLabelProps {
   /** Page direction; a horizontal bar's data end is the left edge in `rtl`. */
   dir?: Direction;
   format: (value: number) => string;
+  /**
+   * Text drawn in place of the value when the mark is empty because the value
+   * is unknown, not zero (e.g. "—" for hours nobody recorded); `end` placement only.
+   */
+  fallback?: string;
 }
 
 const END_LABEL: Record<Direction, { offset: number; anchor: "start" | "end" }> = {
@@ -98,9 +103,11 @@ const END_LABEL: Record<Direction, { offset: number; anchor: "start" | "end" }> 
  * mark. Inside a coloured segment the label sits on a surface chip so it stays
  * ink-on-white whatever the segment colour.
  */
-export function ValueLabel({ value, viewBox, placement, minSize, dir = "ltr", format }: ValueLabelProps) {
+export function ValueLabel({ value, viewBox, placement, minSize, dir = "ltr", format, fallback }: ValueLabelProps) {
   const numeric = typeof value === "number" ? value : Number(value ?? 0);
-  if (!viewBox || !Number.isFinite(numeric) || numeric <= 0) return null;
+  if (!viewBox) return null;
+  const unavailable = fallback !== undefined && placement === "end" && !(numeric > 0);
+  if (!unavailable && (!Number.isFinite(numeric) || numeric <= 0)) return null;
   // A reversed axis (Arabic horizontal bars) hands recharts a negative width:
   // normalise to a left edge + positive size before measuring anything.
   const rawX = viewBox.x ?? 0;
@@ -111,9 +118,9 @@ export function ValueLabel({ value, viewBox, placement, minSize, dir = "ltr", fo
   const y = Math.min(rawY, rawY + rawHeight);
   const width = Math.abs(rawWidth);
   const height = Math.abs(rawHeight);
-  const text = format(numeric);
+  const text = unavailable ? fallback : format(numeric);
   const size = placement === "end" ? height : width;
-  if (size < minSize) return null;
+  if (!unavailable && size < minSize) return null;
 
   if (placement === "top") {
     return (
@@ -168,8 +175,8 @@ export function AxisUnitLabel({ viewBox, text }: AxisUnitLabelProps) {
 interface BrandTooltipProps extends TooltipProps<number, string> {
   dir: Direction;
   lang: string;
-  /** Formats a series value; receives the series dataKey so hours and counts can differ. */
-  valueFormatter?: (value: number, dataKey: string) => string;
+  /** Formats a series value; receives the series dataKey (hours vs counts) and the row's datum (unknown vs zero). */
+  valueFormatter?: (value: number, dataKey: string, datum: unknown) => string;
   labelFormatter?: (label: string) => ReactNode;
   hideLabel?: boolean;
 }
@@ -199,7 +206,7 @@ export function BrandTooltip({ active, payload, label, dir, lang, valueFormatter
                 <span aria-hidden="true" className="inline-block size-2.5 rounded-sm" style={{ background: swatch }} />
                 {String(entry.name ?? key)}
               </span>
-              <span className="font-medium tabular-nums">{valueFormatter ? valueFormatter(raw, key) : formatNumber(raw, lang)}</span>
+              <span className="font-medium tabular-nums">{valueFormatter ? valueFormatter(raw, key, entry.payload) : formatNumber(raw, lang)}</span>
             </li>
           );
         })}

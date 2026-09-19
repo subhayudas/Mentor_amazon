@@ -1245,9 +1245,9 @@
         "all": "على مدار الفترة كاملة"
       },
       "previous": {
-        "30": "30 يومًا السابقة",
-        "90": "90 يومًا السابقة",
-        "365": "12 شهرًا السابقة"
+        "30": "الأيام الثلاثين السابقة",
+        "90": "الأيام التسعين السابقة",
+        "365": "الأشهر الاثني عشر السابقة"
       }
     },
     "compare": {
@@ -1276,8 +1276,8 @@
       "own_many": "{{period}}، شاركت في {{count}} جلسة مكتملة{{delta}}{{hours}}{{countries}}.",
       "own_other": "{{period}}، شاركت في {{count}} جلسة مكتملة{{delta}}{{hours}}{{countries}}.",
       "ownNone": "{{period}}، لم تشارك في أي جلسة مكتملة{{delta}}.",
-      "delta": " ({{delta}} مقارنةً بالـ {{previous}})",
-      "deltaNoChange": " (دون تغيير مقارنةً بالـ {{previous}})",
+      "delta": " ({{delta}} مقارنةً ب{{previous}})",
+      "deltaNoChange": " (دون تغيير مقارنةً ب{{previous}})",
       "countries_one": " في دولة واحدة",
       "countries_two": " في دولتين",
       "countries_few": " في {{count}} دول",
@@ -1303,10 +1303,10 @@
         "title": "نسبة الرد",
         "definition": "الطلبات التي قبلها المرشد أو رفضها، كنسبة من الطلبات المستلمة خلال الفترة."
       },
-      "delta": "{{delta}} مقارنةً بالـ {{previous}}",
-      "deltaPercent": "{{delta}} ({{percent}}) مقارنةً بالـ {{previous}}",
-      "deltaPoints": "{{delta}} نقطة مقارنةً بالـ {{previous}}",
-      "noChange": "دون تغيير مقارنةً بالـ {{previous}}",
+      "delta": "{{delta}} مقارنةً ب{{previous}}",
+      "deltaPercent": "{{delta}} ({{percent}}) مقارنةً ب{{previous}}",
+      "deltaPoints": "{{delta}} نقطة مقارنةً ب{{previous}}",
+      "noChange": "دون تغيير مقارنةً ب{{previous}}",
       "noRequests": "لا توجد طلبات في هذه الفترة",
       "withoutDuration_zero": "لا جلسات بدون مدة مسجّلة",
       "withoutDuration_one": "جلسة واحدة بدون مدة مسجّلة",
@@ -1363,8 +1363,8 @@
       "weekOf": "أسبوع {{date}}",
       "empty": "لا توجد جلسات في هذه الفترة",
       "summary": {
-        "week": "الإجمالي الأسبوعي {{period}}: {{requests}} و{{completed}}. الأسبوع الأخير: {{latestRequests}} و{{latestCompleted}}.",
-        "month": "الإجمالي الشهري {{period}}: {{requests}} و{{completed}}. الشهر الأخير: {{latestRequests}} و{{latestCompleted}}."
+        "week": "{{period}}، الإجمالي الأسبوعي: {{requests}} و{{completed}}. الأسبوع الأخير: {{latestRequests}} و{{latestCompleted}}.",
+        "month": "{{period}}، الإجمالي الشهري: {{requests}} و{{completed}}. الشهر الأخير: {{latestRequests}} و{{latestCompleted}}."
       },
       "table": {
         "week": "الأسبوع",
@@ -1399,6 +1399,7 @@
       "empty": "لا توجد جلسات مكتملة في هذه الفترة",
       "seeAll": "جميع الدول في جدول",
       "summary": "{{countries}}؛ تتصدر {{top}} بـ{{sessions}} و{{hours}}.",
+      "summaryNoHours": "{{countries}}؛ تتصدر {{top}} بـ{{sessions}} (بدون مدد مسجّلة، فلا ساعات).",
       "tabTitle": "الجلسات حسب الدولة",
       "tabDefinition": "كل دولة لها طلب أو جلسة مكتملة خلال الفترة. الساعات تحتسب المدد المسجّلة فقط.",
       "table": {

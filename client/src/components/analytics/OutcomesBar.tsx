@@ -113,7 +113,7 @@ export function OutcomesBar({ counts, period, activeKey, onSelect }: OutcomesBar
           >
             <XAxis type="number" hide domain={[0, total]} reversed={HORIZONTAL_CHART[dir].reversed} />
             <YAxis type="category" dataKey="name" hide />
-            <Tooltip cursor={false} content={<BrandTooltip dir={dir} lang={lang} hideLabel />} />
+            <Tooltip cursor={false} isAnimationActive={false} content={<BrandTooltip dir={dir} lang={lang} hideLabel />} />
             {OUTCOME_ORDER.map((status) => (
               <Bar
                 key={status}

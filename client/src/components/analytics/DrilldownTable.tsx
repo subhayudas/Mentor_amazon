@@ -32,7 +32,9 @@ export function DrilldownTable({ segmentLabel, rows, onClear, testId = "drilldow
   }, [segmentLabel]);
 
   return (
-    <section className="overflow-hidden rounded-lg border border-border bg-card" data-testid={testId} aria-live="polite">
+    // Not a live region: the heading takes focus when the drill opens, which
+    // already announces it; a polite region on top would read the table twice.
+    <section className="overflow-hidden rounded-lg border border-border bg-card" data-testid={testId}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-4 py-2">
         <h3 ref={headingRef} tabIndex={-1} className="text-body-sm font-medium text-foreground" data-testid={`${testId}-chip`}>
           {t("analyticsV2.drill.showing", { label: bidi(segmentLabel) })}

@@ -192,6 +192,7 @@ export function TrendChart({ series, bucket, period, drillCounts, activeKey, onS
             />
             <Tooltip
               cursor={CURSOR_FILL}
+              isAnimationActive={false}
               content={<BrandTooltip dir={dir} lang={lang} labelFormatter={(key) => byKey.get(key)?.label ?? key} />}
             />
             <Bar dataKey="requests" name={seriesNames.requests} fill={SERIES.requests} stroke={SURFACE} strokeWidth={2} radius={COLUMN_RADIUS} maxBarSize={24} isAnimationActive={false}>
