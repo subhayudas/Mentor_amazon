@@ -1,20 +1,20 @@
 import * as React from "react";
-import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
 /**
- * KPI tile (spec §9, P2-15): label, 24px tabular value, optional unit,
- * optional delta slot, caveat line and a definition footnote slot that is
- * always visible (a tooltip alone is not enough). Numbers are never larger
- * than `text-2xl`; a missing value is rendered by the caller as "—", a real
- * zero as 0. Test ids: `${testId}` on the value, `${testId}-secondary` on the
- * caveat. Icons are decorative.
+ * KPI tile (spec §9, P2-15, F-14): ONE silhouette for admin, mentor and
+ * analytics — label, 24px tabular value with an optional unit, a reserved
+ * secondary line (delta and/or caveat; `min-h-5` so tiles with and without
+ * one share geometry) and a bottom-aligned definition footnote over a
+ * hairline, so paired tiles in a grid row keep their dividers on one line.
+ * No decorative icon. Numbers are never larger than `text-2xl`; a missing
+ * value is rendered by the caller as "—", a real zero as 0. Test ids:
+ * `${testId}` on the value, `${testId}-secondary` on the caveat.
  */
 export interface StatTileProps {
   title: string;
   value: string | number;
-  icon?: LucideIcon;
   /** Small caveat under the number (e.g. "3 sessions without a recorded duration"). */
   secondary?: string;
   /** Alias of `secondary`. */
@@ -29,37 +29,27 @@ export interface StatTileProps {
   className?: string;
 }
 
-export function StatTile({
-  title,
-  value,
-  icon: Icon,
-  secondary,
-  caveat,
-  unit,
-  delta,
-  definition,
-  testId,
-  className,
-}: StatTileProps) {
+export function StatTile({ title, value, secondary, caveat, unit, delta, definition, testId, className }: StatTileProps) {
   const note = caveat ?? secondary;
   return (
-    <div className={cn("flex flex-col rounded-lg border border-border bg-card p-4 text-card-foreground", className)}>
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 text-caption text-muted-foreground">{title}</p>
-        {Icon && <Icon className="size-5 shrink-0 text-muted-foreground" strokeWidth={1.5} aria-hidden="true" />}
-      </div>
+    <div className={cn("flex h-full flex-col rounded-lg border border-border bg-card p-4 text-card-foreground", className)}>
+      <p className="min-w-0 text-caption text-muted-foreground">{title}</p>
       <p className="mt-2 text-2xl font-semibold leading-none tabular-nums text-foreground" data-testid={testId}>
         {value}
         {unit && <span className="ms-1 text-caption font-medium text-muted-foreground">{unit}</span>}
       </p>
-      {delta && <div className="mt-1 text-caption text-muted-foreground tabular-nums">{delta}</div>}
-      {note && (
-        <p className="mt-1 text-caption text-muted-foreground" data-testid={testId ? `${testId}-secondary` : undefined}>
-          {note}
-        </p>
-      )}
+      <div className="mt-1 min-h-5 text-caption text-muted-foreground">
+        {delta && <div className="tabular-nums">{delta}</div>}
+        {note && (
+          <p className="text-pretty" data-testid={testId ? `${testId}-secondary` : undefined}>
+            {note}
+          </p>
+        )}
+      </div>
       {definition && (
-        <p className="mt-3 border-t border-border pt-2 text-caption text-muted-foreground text-pretty">{definition}</p>
+        <div className="mt-auto pt-3">
+          <p className="border-t border-border pt-2 text-caption text-muted-foreground text-pretty">{definition}</p>
+        </div>
       )}
     </div>
   );

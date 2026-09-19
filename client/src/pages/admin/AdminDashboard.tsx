@@ -133,14 +133,12 @@ function OverviewStrip({ mentors, mentees, bookings, requests }: ReturnType<type
           title={t("admin.stats.activeMentors")}
           value={mentors.isError ? UNAVAILABLE : n(stats.mentorsActive)}
           caveat={mentors.isError ? t("admin.stats.unavailable") : t("admin.stats.inactiveMentors", { count: stats.mentorsInactive })}
-          icon={Users}
           testId="stat-active-mentors"
         />
         <StatTile
           title={t("admin.stats.verifiedOrgs")}
           value={mentees.isError ? UNAVAILABLE : n(stats.orgsVerified)}
           caveat={mentees.isError ? t("admin.stats.unavailable") : t("admin.stats.orgsBreakdown", { pending: n(stats.orgsPending), individuals: n(stats.individuals) })}
-          icon={Building2}
           testId="stat-verified-orgs"
         />
         <StatTile
@@ -151,14 +149,12 @@ function OverviewStrip({ mentors, mentees, bookings, requests }: ReturnType<type
               ? t("admin.stats.unavailable")
               : t("admin.stats.bookingsBreakdown", { pending: n(stats.bookingsPending), confirmed: n(stats.bookingsConfirmed), completed: n(stats.bookingsCompleted) })
           }
-          icon={CalendarCheck}
           testId="stat-bookings"
         />
         <StatTile
           title={t("admin.stats.pendingAccess")}
           value={requests.isError ? UNAVAILABLE : n(stats.requestsPending)}
           caveat={requests.isError ? t("admin.stats.unavailable") : t("admin.stats.requestsTotal", { count: stats.requestsTotal })}
-          icon={KeyRound}
           testId="stat-pending-access"
         />
       </section>
