@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
  * mount (or when `focusKey` changes) so keyboard and screen-reader users land
  * on the explanation instead of an empty page. When the card is the page,
  * pass `titleAs="h1"`: the heading then carries `id="page-title"` so the
- * route-change effect targets it too.
+ * route-change effect targets it too. The ring for this programmatic focus is
+ * keyboard-only (index.css + lib/inputModality, F-18).
  */
 export type StatusTone = "neutral" | "danger" | "warning" | "success" | "busy";
 

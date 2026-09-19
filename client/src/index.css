@@ -139,9 +139,13 @@
     box-shadow: 0 0 0 2px #fff;
   }
 
-  /* Programmatic focus targets: the page h1 shows the ring only for keyboard
-     users; the main landmark (skip-link target) never draws one. */
+  /* Programmatic focus targets (page h1, StatusCard heading, tab panels): the
+     ring shows only for keyboard-driven focus. Chromium treats script focus on
+     a fresh page as :focus-visible, so lib/inputModality.ts records the last
+     input kind on <html> and the ring is hidden until a key has been pressed
+     (F-18). The main landmark (skip-link target) never draws one. */
   #page-title:focus:not(:focus-visible),
+  html:not([data-input-modality="keyboard"]) [tabindex="-1"]:focus,
   #main:focus {
     outline: none;
   }
