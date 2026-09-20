@@ -421,8 +421,7 @@ html[lang="ar"] .sc-serif-h1 h1 {
 
 /* ===== Content guard (components/ContentGuard.tsx) =====
    Selection, drag and print are off everywhere except form fields; the page
-   blurs while the window is unfocused (what capture tools trigger); a faint
-   forensic watermark tiles the viewer's identity across every page. */
+   blanks while the window is unfocused (what capture tools trigger). */
 html.guard-active,
 html.guard-active body {
   -webkit-user-select: none;
@@ -446,30 +445,6 @@ html.guard-active video {
 /* Photos keep their clicks (cards, links) but cannot be dragged or opened. */
 html.guard-active img {
   pointer-events: none;
-}
-
-.guard-watermark {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  gap: 140px 120px;
-  padding: 80px 40px;
-  overflow: hidden;
-  pointer-events: none;
-  transform: rotate(-24deg) scale(1.6);
-  transform-origin: center;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  color: rgba(20, 20, 20, 0.055);
-  white-space: nowrap;
-}
-
-.guard-watermark span {
-  flex: 0 0 auto;
 }
 
 .guard-veil {
@@ -504,10 +479,4 @@ html.guard-veiled .guard-veil * {
     display: none !important;
   }
 
-  html.guard-active body::after {
-    content: "MentorConnect · confidential";
-    display: block;
-    padding: 40px;
-    font-family: Inter, sans-serif;
-  }
 }

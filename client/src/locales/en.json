@@ -707,8 +707,6 @@
     "errorTitle": "We couldn't check your access",
     "errorBody": "You are signed in, but your account details could not be loaded. Try again, or sign out and sign in later.",
     "signOut": "Sign out",
-    "guest": "guest",
-    "confidential": "MentorConnect · confidential",
     "veiled": "Content hidden while the window is not active."
   },
   "access": {
