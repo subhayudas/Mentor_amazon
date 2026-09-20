@@ -4,12 +4,21 @@ import * as React from "react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { cn } from "@/lib/utils";
 
+/**
+ * Drawer (vaul). Used only for bottom sheets such as the mobile filter drawer;
+ * dialogs stay Radix (P0-3). `shouldScaleBackground` defaults to false so the
+ * page behind never transforms; vaul keeps its own gesture-driven timing.
+ * `autoFocus` defaults to true so keyboard and screen-reader focus enters the
+ * drawer on open instead of staying on the page behind it.
+ */
 const Drawer = ({
-  shouldScaleBackground = true,
+  shouldScaleBackground = false,
+  autoFocus = true,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) => (
   <DrawerPrimitive.Root
     shouldScaleBackground={shouldScaleBackground}
+    autoFocus={autoFocus}
     {...props}
   />
 );
@@ -27,7 +36,7 @@ const DrawerOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Overlay
     ref={ref}
-    className={cn("fixed inset-0 z-50 bg-black/40", className)}
+    className={cn("fixed inset-0 z-50 bg-black/50", className)}
     {...props}
   />
 ));
@@ -42,12 +51,12 @@ const DrawerContent = React.forwardRef<
     <DrawerPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto flex-col rounded-t-2xl border bg-background",
+        "fixed inset-x-0 bottom-0 z-50 mt-24 flex h-auto max-h-[calc(100dvh-1rem)] flex-col rounded-t-xl border border-border bg-card text-card-foreground pb-[env(safe-area-inset-bottom)]",
         className
       )}
       {...props}
     >
-      <div className="mx-auto mt-4 h-1.5 w-12 rounded-full bg-muted" />
+      <div aria-hidden="true" className="mx-auto mt-4 h-1.5 w-12 shrink-0 rounded-full bg-muted" />
       {children}
     </DrawerPrimitive.Content>
   </DrawerPortal>
@@ -59,7 +68,7 @@ const DrawerHeader = ({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
-    className={cn("grid gap-1.5 p-4 text-center sm:text-left", className)}
+    className={cn("grid gap-1.5 p-4 text-start", className)}
     {...props}
   />
 );
@@ -82,11 +91,7 @@ const DrawerTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Title
     ref={ref}
-    className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
-      className
-    )}
-    style={{ fontFamily: 'var(--font-display)' }}
+    className={cn("text-h3 font-semibold text-foreground", className)}
     {...props}
   />
 ));
@@ -98,7 +103,7 @@ const DrawerDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DrawerPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-body-sm text-muted-foreground", className)}
     {...props}
   />
 ));

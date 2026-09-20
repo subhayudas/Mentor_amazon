@@ -4,9 +4,23 @@ import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
 import { cn } from "@/lib/utils"
+import { formatNumber } from "@/lib/format"
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: "", dark: ".dark" } as const
+
+/**
+ * Series colours read from the design tokens (P0-2): navy, burnt orange
+ * (4.5:1 on white and 3:1 against navy), teal, slate, brown. Use them as
+ * `color` in a ChartConfig; never a JS palette, never the brand orange.
+ */
+export const CHART_SERIES = {
+  1: "hsl(var(--chart-1))",
+  2: "hsl(var(--chart-2))",
+  3: "hsl(var(--chart-3))",
+  4: "hsl(var(--chart-4))",
+  5: "hsl(var(--chart-5))",
+} as const
 
 export type ChartConfig = {
   [k in string]: {
@@ -51,8 +65,11 @@ const ChartContainer = React.forwardRef<
       <div
         data-chart={chartId}
         ref={ref}
+        dir="ltr"
         className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface]:outline-none",
+          // The surface is focusable under `accessibilityLayer`, so it keeps the
+          // global `:focus-visible` ring; only pointer focus is suppressed.
+          "chart-container flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-none [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-sector]:outline-none [&_.recharts-surface:focus:not(:focus-visible)]:outline-none [&_.recharts-surface:focus-visible]:rounded-sm",
           className
         )}
         {...props}
@@ -179,7 +196,7 @@ const ChartTooltipContent = React.forwardRef<
       <div
         ref={ref}
         className={cn(
-          "grid min-w-[8rem] items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl",
+          "grid min-w-[8rem] items-start gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-xs shadow-elevated",
           className
         )}
       >
@@ -239,8 +256,8 @@ const ChartTooltipContent = React.forwardRef<
                         </span>
                       </div>
                       {item.value && (
-                        <span className="font-mono font-medium tabular-nums text-foreground">
-                          {item.value.toLocaleString()}
+                        <span className="font-medium tabular-nums text-foreground">
+                          {formatNumber(Number(item.value))}
                         </span>
                       )}
                     </div>
@@ -363,3 +380,4 @@ export {
   ChartLegendContent,
   ChartStyle,
 }
+

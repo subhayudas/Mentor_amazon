@@ -1,11 +1,12 @@
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { LogOut, Menu, ChevronDown, Globe } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { ArrowRight, ChevronDown, LogOut, Menu } from "lucide-react";
+
+import { AmazonLogo } from "@/components/AmazonSmile";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { NotificationBell } from "@/components/NotificationBell";
-import { AmazonLogo } from "@/components/AmazonSmile";
-import { useTranslation } from "react-i18next";
-import { useState, useEffect } from "react";
-import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,15 +15,52 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useAuth } from "@/context/AuthContext";
+import { syncRoleStorage } from "@/lib/auth";
+import { IS_LOCAL } from "@/lib/demo";
+import { ROUTES } from "@/lib/routes";
+import { cn } from "@/lib/utils";
+
+/**
+ * Global header (spec §4 as amended by P0-6/C1, P1-23, P1-26, P2-9).
+ * Sticky 56px white bar with a hairline; it occupies flow space, so `main`
+ * needs no top padding. No orange anywhere in the header.
+ *
+ * Visitors: Mentors link · language toggle · "Sign in" (ghost) · "Browse
+ * mentors" (outline sm, hidden on /mentors where the page is the action).
+ * Signed in: Mentors · role item (Mentee dashboard / Mentor portal / Admin) ·
+ * Analytics (admins) · language toggle · bell · avatar menu with the role item
+ * and Log out. Active item = navy text + 2px navy underline.
+ * Mobile (< lg): logo · language toggle · 44px menu button opening a Sheet at
+ * the inline-end with 44px rows; "Become a mentor" lives there (and in the
+ * footer), never in the desktop bar.
+ *
+ * Identity logic is unchanged: roles come from the session only; the mentee
+ * localStorage mirror keeps the legacy anonymous mentee path alive.
+ */
+type NavItem = { href: string; label: string; testId?: string };
+
+const navLinkClass = (active: boolean) =>
+  cn(
+    "relative inline-flex h-14 items-center rounded-md px-3 text-[15px] font-medium transition-colors duration-fast focus-visible:-outline-offset-4 lg:h-[72px]",
+    "after:absolute after:inset-x-3 after:bottom-4 after:h-0.5 after:rounded-full after:content-['']",
+    active
+      ? "text-[var(--sc-ink)] after:bg-[var(--sc-ink)]"
+      : "text-[var(--sc-ink-soft)] hover:text-[var(--sc-ink)] after:bg-transparent",
+  );
+
+const sheetLinkClass = (active: boolean) =>
+  cn(
+    "flex min-h-11 items-center rounded-md px-3 text-base font-medium transition-colors duration-fast",
+    active ? "bg-muted text-secondary" : "text-foreground hover:bg-muted",
+  );
 
 export function Navigation() {
   const { t } = useTranslation();
-  const { user, isLoading, logout } = useAuth();
-  const [location] = useLocation();
-  const [, setLocationPath] = useLocation();
+  const { user, isLoading, error, logout } = useAuth();
+  const [location, setLocationPath] = useLocation();
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [mentorId, setMentorId] = useState<string | null>(null);
   const [menteeId, setMenteeId] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -31,7 +69,6 @@ export function Navigation() {
       const menteeEmail = localStorage.getItem("menteeEmail");
       const mentorEmail = localStorage.getItem("mentorEmail");
       setUserEmail(menteeEmail || mentorEmail || null);
-      setMentorId(localStorage.getItem("mentorId"));
       setMenteeId(localStorage.getItem("menteeId"));
     };
 
@@ -44,216 +81,241 @@ export function Navigation() {
     };
   }, []);
 
+  // Close the mobile sheet on navigation.
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location]);
+
   const handleLogout = async () => {
     await logout();
-    localStorage.clear();
-    setMentorId(null);
+    syncRoleStorage(null);
     setMenteeId(null);
     setUserEmail(null);
-    setLocationPath("/");
+    setLocationPath(ROUTES.home);
   };
 
   const handleLocalLogout = () => {
-    localStorage.clear();
-    setMentorId(null);
+    syncRoleStorage(null);
     setMenteeId(null);
     setUserEmail(null);
-    setLocationPath("/");
+    setLocationPath(ROUTES.home);
   };
 
-  const isLoggedIn = user || mentorId || menteeId;
-  
-  // Determine user role from auth context or localStorage
-  const isMentor = user?.user_type === 'mentor' || !!mentorId;
-  const isMentee = user?.user_type === 'mentee' || !!menteeId;
+  const isLoggedIn = Boolean(user || menteeId);
 
-  // Navigation items
-  const coreNavItems = [
-    { href: "/", label: t('nav.browseMentors') },
-    { href: "/analytics", label: t('nav.analytics') },
+  // Roles that unlock protected surfaces come from the authenticated session
+  // only. A stored mentorId is never enough: mentor ids are world-readable.
+  // The mentee mirror is kept for the legacy anonymous mentee-dashboard path.
+  const isMentor = user?.user_type === "mentor";
+  const isMentee = user?.user_type === "mentee" || (!user && !!menteeId);
+  const isAdmin = user?.user_type === "admin";
+
+  const isActive = (href: string) =>
+    href === ROUTES.home ? location === href : location === href || location.startsWith(`${href}/`);
+
+  const primaryItems: NavItem[] = [
+    { href: ROUTES.mentors, label: t("nav.mentors"), testId: "nav-mentors" },
+    // The showcase dashboard (demo, or any signed-in account) and the mentor sign-up live in the bar itself.
+    ...(IS_LOCAL || user ? [{ href: "/dashboard", label: user ? t(user.user_type === "mentee" ? "showcase.nav.myDashboard" : "showcase.nav.dashboard") : t("showcase.nav.dashboard"), testId: "nav-dashboard" }] : []),
+    ...(!isLoggedIn
+      ? [
+          { href: ROUTES.menteeRegistration, label: t("showcase.footer.joinAsMentee"), testId: "nav-join-mentee" },
+          { href: ROUTES.mentorOnboarding, label: t("nav.becomeMentor"), testId: "nav-become-mentor" },
+        ]
+      : []),
   ];
 
-  const guestItems = [
-    { href: "/mentee-registration", label: t('nav.joinMentee') },
-    { href: "/mentor-onboarding", label: t('nav.becomeMentor') },
-  ];
+  const roleItems: NavItem[] = IS_LOCAL
+    ? []
+    : [
+        ...(isMentor ? [{ href: ROUTES.mentorPortal, label: t("nav.mentorPortal") }] : []),
+        ...(isMentee ? [{ href: ROUTES.menteeDashboard, label: t("nav.menteeDashboard") }] : []),
+        ...(isAdmin ? [{ href: ROUTES.admin, label: t("nav.admin") }, { href: ROUTES.analytics, label: t("nav.analytics") }] : []),
+      ];
 
-  // Role-specific navigation items
-  const userItems = [
-    ...(isMentor ? [{ href: "/mentor-portal", label: t('nav.mentorPortal') }] : []),
-    ...(isMentee ? [{ href: "/mentee-dashboard", label: t('nav.menteeDashboard') }] : []),
-  ];
+  const desktopItems = [...primaryItems, ...roleItems];
+  const showBrowse = !isLoading && !isLoggedIn && !isActive(ROUTES.mentors);
+  const bellEmail = user?.email || userEmail;
+  const accountName = user?.name || user?.email || userEmail || "";
+  const initial = (user?.name || user?.email || userEmail || "?").charAt(0).toUpperCase();
 
   return (
-    <>
-      {/* Clean, Spacious Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 px-4 py-4">
-        <div
-          className="max-w-5xl mx-auto flex items-center justify-between px-6 py-3 rounded-full"
-          style={{
-            background: 'rgba(255, 255, 255, 0.95)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0, 0, 0, 0.06)',
-            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.06)',
-          }}
-        >
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <AmazonLogo size="md" />
-            <span className="font-bold text-base hidden sm:block" style={{ color: 'var(--ink)' }}>
-              MentorConnect
-            </span>
-          </Link>
+    <header className="sticky top-0 z-40 h-14 border-b border-[var(--sc-hairline)] bg-white lg:h-[72px]">
+      <div className="container-page flex h-14 items-center gap-2 lg:h-[72px]">
+        <Link href={ROUTES.home} className="me-4 flex shrink-0 items-center gap-2.5 rounded-md" aria-label={t("nav.homeLink")}>
+          <AmazonLogo size="md" className="size-7 lg:size-8" />
+          <span className="text-[17px] font-bold text-[var(--sc-ink)] lg:text-[19px]">MentorConnect</span>
+        </Link>
 
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center gap-2">
-            {coreNavItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <button
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${location === item.href
-                      ? 'bg-[var(--amazon-squid)] text-white'
-                      : 'text-[var(--ink-light)] hover:bg-[var(--cream-dark)] hover:text-[var(--ink)]'
-                    }`}
+        <nav aria-label={t("nav.primaryNav")} className="hidden lg:flex lg:flex-1 lg:items-center">
+          <ul className="flex items-center">
+            {desktopItems.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={navLinkClass(isActive(item.href))}
+                  aria-current={isActive(item.href) ? "page" : undefined}
+                  data-testid={item.testId}
                 >
                   {item.label}
-                </button>
-              </Link>
+                </Link>
+              </li>
             ))}
+          </ul>
+        </nav>
 
-            {!isLoggedIn && guestItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <button
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${location === item.href
-                      ? 'bg-[var(--amazon-squid)] text-white'
-                      : 'text-[var(--ink-light)] hover:bg-[var(--cream-dark)] hover:text-[var(--ink)]'
-                    }`}
-                >
-                  {item.label}
-                </button>
-              </Link>
-            ))}
+        <div className="ms-auto flex min-w-0 items-center gap-0.5 sm:gap-2">
+          <LanguageToggle />
 
-            {isLoggedIn && userItems.map((item) => (
-              <Link key={item.href} href={item.href}>
-                <button
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${location === item.href
-                      ? 'bg-[var(--amazon-squid)] text-white'
-                      : 'text-[var(--ink-light)] hover:bg-[var(--cream-dark)] hover:text-[var(--ink)]'
-                    }`}
-                >
-                  {item.label}
-                </button>
-              </Link>
-            ))}
-          </div>
+          {bellEmail && !IS_LOCAL && <NotificationBell email={bellEmail} />}
 
-          {/* Right side actions */}
-          <div className="flex items-center gap-3">
-            {userEmail && <NotificationBell email={userEmail} />}
-            <LanguageToggle />
-
-            {!isLoading && !isLoggedIn && (
-              <Link href="/login">
-                <button
-                  className="px-6 py-2.5 rounded-full text-sm font-semibold transition-all duration-200"
-                  style={{
-                    background: 'var(--amazon-orange)',
-                    color: 'white'
-                  }}
-                >
-                  {t('auth.login')}
-                </button>
-              </Link>
-            )}
-
-            {user && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-[var(--cream-dark)] transition-colors">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--amazon-orange)] to-[#E68A00] flex items-center justify-center text-white text-sm font-bold">
-                      {user.email?.charAt(0).toUpperCase()}
-                    </div>
-                    <ChevronDown className="w-4 h-4 text-[var(--ink-muted)]" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56 rounded-2xl">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium">{user.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
-                    <LogOut className="w-4 h-4 mr-2" />
-                    {t('auth.logout')}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
-            {!user && (mentorId || menteeId) && (
-              <button
-                onClick={handleLocalLogout}
-                className="flex items-center gap-2 px-3 py-2 rounded-full hover:bg-red-50 text-red-600 transition-colors"
+          {/* Visitor CTAs never top the access-error card: with a session whose users row failed to load (F-02), the header stays neutral. */}
+          {!isLoading && !isLoggedIn && !error && (
+            <>
+              <Link
+                href={ROUTES.login}
+                className="hidden h-10 items-center rounded-[10px] px-3 text-[15px] font-medium text-[var(--sc-ink)] hover:bg-[var(--sc-grey)] lg:inline-flex"
+                data-testid="link-sign-in"
               >
-                <LogOut className="w-4 h-4" />
-              </button>
-            )}
+                {t("nav.signIn")}
+              </Link>
+              {showBrowse && (
+                <Link
+                  href={ROUTES.mentors}
+                  className="hidden h-11 items-center gap-2 rounded-[12px] bg-[var(--sc-ink)] ps-4 pe-2 text-[15px] font-medium text-white transition-colors duration-fast hover:bg-black lg:inline-flex"
+                  data-testid="link-browse-mentors"
+                >
+                  {t("showcase.hero.cta")}
+                  <span className="inline-flex size-7 items-center justify-center rounded-[6px] bg-white text-[var(--sc-ink)]">
+                    <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+                  </span>
+                </Link>
+              )}
+            </>
+          )}
 
-            {/* Mobile menu */}
-            <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <button className="lg:hidden p-2 rounded-full hover:bg-[var(--cream-dark)] transition-colors">
-                  <Menu className="w-5 h-5" />
-                </button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-80" style={{ background: 'var(--cream)' }}>
-                <SheetTitle className="sr-only">{t('nav.menu')}</SheetTitle>
-                <div className="flex flex-col gap-2 mt-8">
-                  <div className="flex items-center gap-3 mb-6 px-2">
-                    <AmazonLogo size="md" />
-                    <span className="font-bold text-lg" style={{ color: 'var(--ink)' }}>
-                      MentorConnect
-                    </span>
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden gap-1.5 px-2 lg:inline-flex"
+                  aria-label={t("nav.accountMenu")}
+                  data-testid="button-account-menu"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="grid size-8 place-items-center rounded-full bg-secondary text-sm font-semibold text-secondary-foreground"
+                  >
+                    {initial}
+                  </span>
+                  <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col gap-0.5">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      <bdi>{accountName}</bdi>
+                    </p>
+                    {user.email && user.name && (
+                      <p className="truncate text-caption text-muted-foreground" dir="ltr">
+                        <bdi>{user.email}</bdi>
+                      </p>
+                    )}
                   </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {roleItems.map((item) => (
+                  <DropdownMenuItem key={item.href} asChild>
+                    <Link href={item.href}>{item.label}</Link>
+                  </DropdownMenuItem>
+                ))}
+                {roleItems.length > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
+                  <LogOut aria-hidden="true" />
+                  {t("auth.logout")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
-                  {[...coreNavItems, ...(isLoggedIn ? userItems : guestItems)].map((item) => (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      <button className="w-full text-left px-4 py-3 rounded-xl hover:bg-white font-medium transition-colors">
-                        {item.label}
-                      </button>
+          {!user && menteeId && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLocalLogout}
+              className="hidden text-destructive hover:text-destructive lg:inline-flex"
+              data-testid="button-local-logout"
+            >
+              <LogOut aria-hidden="true" />
+              {t("auth.logout")}
+            </Button>
+          )}
+
+          {/* Mobile menu */}
+          <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-11 lg:hidden"
+                aria-label={t("nav.openMenu")}
+                data-testid="button-mobile-menu"
+              >
+                <Menu className="size-5" aria-hidden="true" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="end" className="w-80 max-w-[calc(100%-3rem)] gap-0 p-0" closeClassName="top-2.5">
+              <div className="flex h-14 items-center gap-2 border-b border-border px-4">
+                <AmazonLogo size="sm" />
+                <SheetTitle className="text-base font-semibold">{t("nav.menu")}</SheetTitle>
+                <SheetDescription className="sr-only">{t("nav.navigation")}</SheetDescription>
+              </div>
+              <nav aria-label={t("nav.primaryNav")} className="flex flex-col gap-1 p-3">
+                {[...primaryItems, ...roleItems].map((item) => (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={sheetLinkClass(isActive(item.href))}
+                    aria-current={isActive(item.href) ? "page" : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+                {!isLoading && !isLoggedIn && (
+                  <>
+                    <Link href={ROUTES.login} className={sheetLinkClass(isActive(ROUTES.login))}>
+                      {t("nav.signIn")}
                     </Link>
-                  ))}
-
-                  {isLoggedIn && (
-                    <>
-                      <div className="border-t my-4" />
-                      <button
-                        className="w-full text-left px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 font-medium transition-colors"
-                        onClick={() => {
-                          setMobileMenuOpen(false);
-                          user ? handleLogout() : handleLocalLogout();
-                        }}
-                      >
-                        {t('auth.logout')}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-          </div>
+                    <Link href={ROUTES.mentorOnboarding} className={sheetLinkClass(isActive(ROUTES.mentorOnboarding))}>
+                      {t("nav.becomeMentor")}
+                    </Link>
+                  </>
+                )}
+                {isLoggedIn && (
+                  <>
+                    <div className="my-2 border-t border-border" role="presentation" />
+                    <button
+                      type="button"
+                      className={cn(sheetLinkClass(false), "w-full gap-2 text-destructive hover:text-destructive")}
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        if (user) void handleLogout();
+                        else handleLocalLogout();
+                      }}
+                    >
+                      <LogOut className="size-4" aria-hidden="true" />
+                      {t("auth.logout")}
+                    </button>
+                  </>
+                )}
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
-      </nav>
-
-      {/* Spacer */}
-      <div className="h-24" />
-    </>
+      </div>
+    </header>
   );
 }

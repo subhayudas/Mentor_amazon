@@ -1,272 +1,236 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useLocation, useSearch } from "wouter";
+import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
-import { Lock, Eye, EyeOff, CheckCircle, AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AuthCard, AuthPage, IconInput, passwordStrength, STRENGTH_CLASS } from "@/components/auth/AuthCard";
+import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { authService } from "@/lib/services";
+import { supabase } from "@/lib/supabase";
+import { ROUTES } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 
-type ResetPasswordValues = {
-  password: string;
-  confirmPassword: string;
-};
+/** How long to wait for the recovery fragment to become a session before calling the link invalid. */
+const RECOVERY_GRACE_MS = 4000;
 
+type Gate = "checking" | "ready" | "invalid";
+
+/**
+ * Set a new password from a Supabase recovery link. The link carries the
+ * recovery token in the URL fragment and becomes a session (`PASSWORD_RECOVERY`
+ * event or an already-present session) — there is no `?token=` query
+ * parameter, so the form is gated on the session, never on the query string.
+ */
 export default function ResetPassword() {
   const { t } = useTranslation();
-  const [, setLocation] = useLocation();
-  const searchString = useSearch();
-  const { toast } = useToast();
+  const [gate, setGate] = useState<Gate>("checking");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [resetSuccess, setResetSuccess] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [done, setDone] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const searchParams = new URLSearchParams(searchString);
-  const token = searchParams.get("token");
-
-  const resetPasswordSchema = z
-    .object({
-      password: z
-        .string()
-        .min(8, t("auth.validation.passwordMinLength"))
-        .regex(/[A-Z]/, t("auth.validation.passwordUppercase"))
-        .regex(/[a-z]/, t("auth.validation.passwordLowercase"))
-        .regex(/[0-9]/, t("auth.validation.passwordNumber")),
-      confirmPassword: z.string(),
-    })
-    .refine((data) => data.password === data.confirmPassword, {
-      message: t("auth.validation.passwordsDoNotMatch"),
-      path: ["confirmPassword"],
+  useEffect(() => {
+    let cancelled = false;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
+      if (event === "PASSWORD_RECOVERY" || session) setGate("ready");
     });
+    supabase.auth.getSession().then(({ data }) => {
+      if (!cancelled && data.session) setGate("ready");
+    });
+    const giveUp = window.setTimeout(() => {
+      if (!cancelled) setGate((current) => (current === "checking" ? "invalid" : current));
+    }, RECOVERY_GRACE_MS);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(giveUp);
+      subscription.unsubscribe();
+    };
+  }, []);
 
-  const form = useForm<ResetPasswordValues>({
-    resolver: zodResolver(resetPasswordSchema),
-    defaultValues: {
-      password: "",
-      confirmPassword: "",
-    },
-  });
+  const schema = useMemo(
+    () =>
+      z
+        .object({
+          password: z
+            .string()
+            .min(8, t("auth.validation.passwordMinLength"))
+            .regex(/[A-Z]/, t("auth.validation.passwordUppercase"))
+            .regex(/[a-z]/, t("auth.validation.passwordLowercase"))
+            .regex(/[0-9]/, t("auth.validation.passwordNumber")),
+          confirmPassword: z.string().min(1, t("auth.validation.confirmRequired")),
+        })
+        .refine((data) => data.password === data.confirmPassword, {
+          message: t("auth.validation.passwordsDoNotMatch"),
+          path: ["confirmPassword"],
+        }),
+    [t],
+  );
+  type Values = z.infer<typeof schema>;
 
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { password: "", confirmPassword: "" } });
   const password = form.watch("password");
+  const strength = passwordStrength(password || "");
 
-  function getPasswordStrength(password: string): { score: number; label: string } {
-    let score = 0;
-    if (password.length >= 8) score += 25;
-    if (/[A-Z]/.test(password)) score += 25;
-    if (/[a-z]/.test(password)) score += 25;
-    if (/[0-9]/.test(password)) score += 25;
-
-    if (score <= 25) return { score, label: "weak" };
-    if (score <= 50) return { score, label: "fair" };
-    if (score <= 75) return { score, label: "good" };
-    return { score, label: "strong" };
-  }
-
-  const strength = getPasswordStrength(password || "");
-
-  const getStrengthColor = (label: string) => {
-    switch (label) {
-      case "weak": return "bg-[#C40000]";
-      case "fair": return "bg-[#FF9900]";
-      case "good": return "bg-[#232F3E]";
-      case "strong": return "bg-[#067D62]";
-      default: return "bg-[#D5D9D9]";
-    }
-  };
-
-  const resetPasswordMutation = useMutation({
-    mutationFn: async (data: ResetPasswordValues) => {
-      await authService.resetPassword(data.password);
-      return { success: true };
-    },
-    onSuccess: () => {
-      setResetSuccess(true);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: t("auth.error"),
-        description: error.message || t("auth.resetPasswordError"),
-        variant: "destructive",
-      });
-    },
+  const reset = useMutation({
+    mutationFn: (data: Values) => authService.resetPassword(data.password),
+    onSuccess: () => setDone(true),
+    onError: () => setFormError(t("auth.resetPasswordError")),
   });
 
-  const onSubmit = (data: ResetPasswordValues) => {
-    resetPasswordMutation.mutate(data);
-  };
-
-  if (!token) {
+  if (done) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-[#D5D9D9]">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 bg-[#C40000]/10 rounded-full flex items-center justify-center">
-              <AlertCircle className="w-8 h-8 text-[#C40000]" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-[#232F3E]">
-              {t("auth.invalidResetLink")}
-            </CardTitle>
-            <CardDescription className="text-[#565959]">
-              {t("auth.invalidResetLinkDescription")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              className="w-full bg-[#FF9900] hover:bg-[#E68A00] text-white font-semibold"
-              data-testid="button-request-new-link"
-              onClick={() => setLocation("/forgot-password")}
-            >
-              {t("auth.requestNewLink")}
+      <StatusPage>
+        <StatusCard
+          titleAs="h1"
+          tone="success"
+          icon={CheckCircle2}
+          title={t("auth.passwordResetSuccess")}
+          description={t("auth.passwordResetSuccessDescription")}
+          data-testid="card-reset-success"
+          actions={
+            <Button asChild variant="primary" data-testid="button-go-to-login">
+              <Link href={ROUTES.login}>{t("auth.goToLogin")}</Link>
             </Button>
-          </CardContent>
-        </Card>
-      </div>
+          }
+        />
+      </StatusPage>
     );
   }
 
-  if (resetSuccess) {
+  if (gate === "checking") {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-[#D5D9D9]">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 bg-[#067D62]/10 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-[#067D62]" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-[#232F3E]">
-              {t("auth.passwordResetSuccess")}
-            </CardTitle>
-            <CardDescription className="text-[#565959]">
-              {t("auth.passwordResetSuccessDescription")}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              className="w-full bg-[#FF9900] hover:bg-[#E68A00] text-white font-semibold"
-              data-testid="button-go-to-login"
-              onClick={() => setLocation("/login")}
-            >
-              {t("auth.goToLogin")}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <StatusPage>
+        <StatusCard titleAs="h1" tone="busy" title={t("auth.resetPasswordTitle")} description={t("auth.checkingResetLink")} aria-busy="true" data-testid="card-reset-checking" />
+      </StatusPage>
     );
   }
+
+  if (gate === "invalid") {
+    return (
+      <StatusPage>
+        <StatusCard
+          titleAs="h1"
+          tone="danger"
+          icon={AlertCircle}
+          title={t("auth.invalidResetLink")}
+          description={t("auth.invalidResetLinkDescription")}
+          data-testid="card-reset-invalid"
+          actions={
+            <Button asChild variant="primary" data-testid="button-request-new-link">
+              <Link href={ROUTES.forgotPassword}>{t("auth.requestNewLink")}</Link>
+            </Button>
+          }
+        />
+      </StatusPage>
+    );
+  }
+
+  const eyeToggle = (shown: boolean, toggle: () => void, testId: string) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="size-9"
+      onClick={toggle}
+      aria-pressed={shown}
+      aria-label={shown ? t("auth.hidePassword") : t("auth.showPassword")}
+      data-testid={testId}
+    >
+      {shown ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
+    </Button>
+  );
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-[#D5D9D9]">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-[#232F3E]">
-            {t("auth.resetPasswordTitle")}
-          </CardTitle>
-          <CardDescription className="text-[#565959]">
-            {t("auth.resetPasswordDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-[#0F1111]">
-                      {t("auth.newPassword")}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#565959]" />
-                        <Input
-                          {...field}
-                          type={showPassword ? "text" : "password"}
-                          placeholder={t("auth.newPasswordPlaceholder")}
-                          className="pl-10 pr-10 border-[#D5D9D9] focus:border-[#FF9900] focus:ring-[#FF9900]"
-                          data-testid="input-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#565959] hover:text-[#232F3E]"
-                          data-testid="button-toggle-password"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </FormControl>
-                    {password && (
-                      <div className="mt-2 space-y-1">
-                        <div className="h-2 w-full bg-[#D5D9D9] rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full transition-all duration-300 ${getStrengthColor(strength.label)}`}
-                            style={{ width: `${strength.score}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-[#565959]">
-                          {t("auth.passwordStrength")}: {t(`auth.strength.${strength.label}`)}
-                        </p>
-                      </div>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    <AuthPage>
+      <AuthCard title={t("auth.resetPasswordTitle")} description={t("auth.resetPasswordDescription")}>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit((data) => {
+              setFormError(null);
+              reset.mutate(data);
+            })}
+            className="space-y-5"
+            noValidate
+          >
+            {formError && (
+              <Alert variant="destructive" role="alert">
+                <AlertCircle aria-hidden="true" />
+                <AlertTitle className="leading-snug">{t("auth.error")}</AlertTitle>
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            )}
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("auth.newPassword")}</FormLabel>
+                  <FormControl>
+                    <IconInput
+                      {...field}
+                      icon={Lock}
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      dir="ltr"
+                      className="text-start"
+                      placeholder={t("auth.newPasswordPlaceholder")}
+                      aria-describedby={password ? "reset-password-strength" : undefined}
+                      trailing={eyeToggle(showPassword, () => setShowPassword((s) => !s), "button-toggle-password")}
+                      data-testid="input-password"
+                    />
+                  </FormControl>
+                  {password && (
+                    <div className="space-y-1 pt-1">
+                      <Progress value={strength.score} className={cn("h-2", STRENGTH_CLASS[strength.label])} aria-hidden="true" />
+                      <p id="reset-password-strength" className="text-caption text-muted-foreground">
+                        {t("auth.passwordStrength")}: {t(`auth.strength.${strength.label}`)}
+                      </p>
+                    </div>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-[#0F1111]">
-                      {t("auth.confirmNewPassword")}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#565959]" />
-                        <Input
-                          {...field}
-                          type={showConfirmPassword ? "text" : "password"}
-                          placeholder={t("auth.confirmNewPasswordPlaceholder")}
-                          className="pl-10 pr-10 border-[#D5D9D9] focus:border-[#FF9900] focus:ring-[#FF9900]"
-                          data-testid="input-confirm-password"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-[#565959] hover:text-[#232F3E]"
-                          data-testid="button-toggle-confirm-password"
-                        >
-                          {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            <FormField
+              control={form.control}
+              name="confirmPassword"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("auth.confirmNewPassword")}</FormLabel>
+                  <FormControl>
+                    <IconInput
+                      {...field}
+                      icon={Lock}
+                      type={showConfirm ? "text" : "password"}
+                      autoComplete="new-password"
+                      dir="ltr"
+                      className="text-start"
+                      placeholder={t("auth.confirmNewPasswordPlaceholder")}
+                      trailing={eyeToggle(showConfirm, () => setShowConfirm((s) => !s), "button-toggle-confirm-password")}
+                      data-testid="input-confirm-password"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <Button
-                type="submit"
-                disabled={resetPasswordMutation.isPending}
-                className="w-full bg-[#FF9900] hover:bg-[#E68A00] text-white font-semibold"
-                data-testid="button-reset-password"
-              >
-                {resetPasswordMutation.isPending
-                  ? t("auth.resetting")
-                  : t("auth.resetPassword")}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+            <Button type="submit" variant="primary" size="lg" className="w-full" loading={reset.isPending} data-testid="button-reset-password">
+              {reset.isPending ? t("auth.resetting") : t("auth.resetPassword")}
+            </Button>
+          </form>
+        </Form>
+      </AuthCard>
+    </AuthPage>
   );
 }

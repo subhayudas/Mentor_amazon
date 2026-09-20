@@ -1,0 +1,2 @@
+# Netlify: single-page app — every path serves index.html (Vercel does the same via vercel.json)
+/*    /index.html   200

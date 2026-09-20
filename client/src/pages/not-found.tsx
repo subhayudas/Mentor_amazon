@@ -1,21 +1,37 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertCircle } from "lucide-react";
+import { Link } from "wouter";
+import { useTranslation } from "react-i18next";
 
+import { Container } from "@/components/layout/Container";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button } from "@/components/ui/button";
+import { ROUTES } from "@/lib/routes";
+import { lastDiscoveryHref } from "@/lib/urlState";
+
+/**
+ * The only 404 (vercel.json rewrites every non-/api path here). One
+ * hierarchy (F-44): the PageHeader carries the eyebrow, the h1, the one
+ * sentence and the two exits — no second heading, no illustration. The
+ * route-change effect focuses the h1.
+ */
 export default function NotFound() {
+  const { t } = useTranslation();
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardContent className="pt-6">
-          <div className="flex mb-4 gap-2">
-            <AlertCircle className="h-8 w-8 text-red-500" />
-            <h1 className="text-2xl font-bold text-gray-900">404 Page Not Found</h1>
-          </div>
-
-          <p className="mt-4 text-sm text-gray-600">
-            Did you forget to add the page to the router?
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <Container className="pb-16">
+      <PageHeader
+        eyebrow="404"
+        title={t("errors.notFoundTitle")}
+        description={t("errors.notFoundBody")}
+        actions={
+          <>
+            <Button asChild variant="secondary" data-testid="button-notfound-home">
+              <Link href={ROUTES.home}>{t("errors.notFoundHome")}</Link>
+            </Button>
+            <Button asChild variant="outline" data-testid="button-notfound-mentors">
+              <Link href={lastDiscoveryHref()}>{t("errors.notFoundBrowse")}</Link>
+            </Button>
+          </>
+        }
+      />
+    </Container>
   );
 }

@@ -6,11 +6,18 @@
 import { supabase } from './supabase';
 
 // Type definitions based on the database schema
+
+/**
+ * Full mentors row. Contact and scheduling fields are optional because RLS only
+ * returns them to the owning mentor and admins; public reads come back as
+ * `PublicMentor` (the `mentors_public` view), which is assignable to `Mentor`.
+ */
 export interface Mentor {
   id: string;
   name: string;
   name_ar?: string;
-  email: string;
+  /** Owner/admin only. */
+  email?: string;
   company?: string;
   company_ar?: string;
   position?: string;
@@ -20,8 +27,10 @@ export interface Mentor {
   photo_url?: string;
   bio: string;
   bio_ar?: string;
+  /** Owner/admin only. */
   linkedin_url?: string;
-  cal_link: string;
+  /** Owner/admin only; mentees receive it per booking via `mentor_scheduling_links`. */
+  cal_link?: string;
   cal_15min?: string;
   cal_30min?: string;
   cal_60min?: string;
@@ -30,16 +39,61 @@ export interface Mentor {
   industries: string[];
   industries_ar?: string[];
   languages_spoken: string[];
-  comms_owner: 'exec' | 'assistant';
+  /** Owner/admin only. */
+  comms_owner?: 'exec' | 'assistant';
+  /** Owner/admin only. */
   assistant_email?: string;
   mentorship_preference?: 'ongoing' | 'rotating' | 'either';
+  /** Owner/admin only. */
   why_joined?: string;
   is_available: boolean;
   average_rating?: string;
   total_ratings?: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
+
+/** Columns of the `mentors_public` view: everything a visitor may see about a mentor. */
+export type PublicMentor = Pick<
+  Mentor,
+  | 'id' | 'name' | 'name_ar' | 'company' | 'company_ar' | 'position' | 'position_ar'
+  | 'timezone' | 'country' | 'photo_url' | 'bio' | 'bio_ar' | 'expertise' | 'expertise_ar'
+  | 'industries' | 'industries_ar' | 'languages_spoken' | 'mentorship_preference'
+  | 'is_available' | 'average_rating' | 'total_ratings' | 'created_at'
+>;
+
+/** Row of the `mentor_scheduling_links` view (only the caller's schedulable bookings). */
+export interface MentorSchedulingLinks {
+  booking_id: string;
+  mentor_id: string;
+  cal_link?: string;
+  cal_15min?: string;
+  cal_30min?: string;
+  cal_60min?: string;
+}
+
+/** Events accepted by the `notify_booking_event` RPC, which derives recipient and text. */
+export type BookingEvent =
+  | 'booking_request'
+  | 'booking_accepted'
+  | 'booking_rejected'
+  | 'booking_confirmed'
+  | 'booking_completed'
+  | 'booking_canceled'
+  | 'feedback_received_by_mentor'
+  | 'feedback_received_by_mentee';
+
+export interface CompleteBookingOptions {
+  /** Actual session length in minutes (1..600); feeds volunteer hours. */
+  sessionDurationMinutes: number;
+  /** Reporting country; the database falls back to the mentor's country when omitted. */
+  country?: string;
+}
+
+/** `users` row without secrets, as returned to admins. */
+export type UserSummary = Pick<User, 'id' | 'email' | 'user_type' | 'profile_id' | 'amazon_alias' | 'is_verified' | 'created_at'>;
+
+export type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'rejected';
 
 export interface Mentee {
   id: string;
@@ -52,6 +106,10 @@ export interface Mentee {
   organization_size?: string;
   organization_mission?: string;
   organization_needs?: string;
+  /** NGO verification state. Organizations start 'pending'; individuals stay 'unverified'. */
+  verification_status?: VerificationStatus;
+  /** Registration / licence number or third-party check reference supplied at registration. */
+  verification_reference?: string;
   country?: string;
   timezone: string;
   photo_url?: string;
@@ -79,6 +137,10 @@ export interface Booking {
   mentee_feedback?: string;
   mentor_rating?: number;
   mentor_feedback?: string;
+  /** Actual session length, captured when the session is marked completed. Feeds volunteer hours. */
+  session_duration_minutes?: number;
+  /** Country the session is attributed to for reporting (defaults to the mentor's country). */
+  country?: string;
   created_at: string;
 }
 
@@ -110,12 +172,38 @@ export interface User {
   id: string;
   email: string;
   password: string;
-  user_type: 'mentor' | 'mentee';
+  user_type: 'mentor' | 'mentee' | 'admin';
   profile_id?: string;
+  /** Amazon Federate alias (OIDC subject). Unique; the identity key for SSO users. */
+  amazon_alias?: string;
   is_verified: boolean;
   reset_token?: string;
   reset_token_expires?: string;
   created_at: string;
+}
+
+export interface ApprovedUser {
+  id: string;
+  amazon_alias: string;
+  email?: string;
+  role: 'mentor' | 'admin';
+  mentor_id?: string;
+  is_active: boolean;
+  approved_by?: string;
+  approved_at: string;
+  note?: string;
+}
+
+export interface AccessRequest {
+  id: string;
+  amazon_alias: string;
+  email?: string;
+  name?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_at: string;
+  resolved_at?: string;
+  resolved_by?: string;
+  note?: string;
 }
 
 export interface MentorAvailability {
@@ -169,8 +257,10 @@ export interface MentorDashboardStats {
   totalSessions: number;
   completedSessions: number;
   averageRating: number;
-  totalEarnings: number;
-  monthlyEarnings: number;
+  /** Sum of session_duration_minutes across completed sessions (volunteer hours = /60). */
+  volunteerMinutes: number;
+  /** Volunteer minutes in the current calendar month. */
+  monthlyVolunteerMinutes: number;
   pendingBookings: number;
   feedbackCount: number;
 }
@@ -180,38 +270,53 @@ function generateId(): string {
   return crypto.randomUUID();
 }
 
+/**
+ * Whether a Supabase session is present (local check, no network). Anonymous
+ * visitors have no grant on `mentors`, so PostgREST embeds of it must be
+ * skipped for them.
+ */
+async function hasSession(): Promise<boolean> {
+  const { data } = await supabase.auth.getSession();
+  return !!data.session;
+}
+
+const SCHEDULABLE_STATUSES = new Set<Booking['status']>(['accepted', 'confirmed', 'completed']);
+
+/**
+ * Case-insensitive exact match for an email column. RLS compares emails with
+ * lower(), Supabase Auth lowercases sign-in emails, but profile rows keep the
+ * case typed at registration, so lookups must ignore case too. LIKE wildcards
+ * in the value are escaped so this stays an exact match.
+ */
+function escapeLikePattern(value: string): string {
+  return value.trim().replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 // Database Service Class
 class DatabaseService {
   // ==================== MENTORS ====================
   
-  async getMentors(filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<Mentor[]> {
-    let query = supabase.from('mentors').select('*');
-
-    if (filters?.search) {
-      const searchPattern = `%${filters.search}%`;
-      query = query.or(`name.ilike.${searchPattern},position.ilike.${searchPattern},company.ilike.${searchPattern},bio.ilike.${searchPattern}`);
-    }
-
-    if (filters?.expertise) {
-      query = query.contains('expertise', [filters.expertise]);
-    }
-
-    if (filters?.industry) {
-      query = query.contains('industries', [filters.industry]);
-    }
-
-    if (filters?.language) {
-      query = query.contains('languages_spoken', [filters.language]);
-    }
-
-    const { data, error } = await query;
+  /**
+   * Public directory read: the WHOLE `mentors_public` view (no contact data),
+   * fetched once under queryKey ['mentors'] and filtered client-side by
+   * `lib/discovery.ts` (spec §0, P1-2).
+   *
+   * `filters` is accepted for signature compatibility with older callers but
+   * deliberately ignored: the previous `.or(name.ilike…)` branch interpolated
+   * user input unescaped into a PostgREST filter and only searched the English
+   * columns, and the `.contains` branches could not localize. Search now runs
+   * over EN and AR fields in the browser and never reaches PostgREST.
+   */
+  async getMentors(_filters?: { search?: string; expertise?: string; industry?: string; language?: string }): Promise<PublicMentor[]> {
+    const { data, error } = await supabase.from('mentors_public').select('*');
     if (error) throw error;
     return data || [];
   }
 
-  async getMentor(id: string): Promise<Mentor | null> {
+  /** Public profile read (directory + /mentor/:id). Use `getMentorByEmail`/`getOwnMentor` for full rows. */
+  async getMentor(id: string): Promise<PublicMentor | null> {
     const { data, error } = await supabase
-      .from('mentors')
+      .from('mentors_public')
       .select('*')
       .eq('id', id)
       .single();
@@ -220,13 +325,41 @@ class DatabaseService {
     return data;
   }
 
+  /** Full row; RLS only returns it to the owning mentor (session email) or an admin. */
   async getMentorByEmail(email: string): Promise<Mentor | null> {
     const { data, error } = await supabase
       .from('mentors')
       .select('*')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .single();
     
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  }
+
+  /**
+   * Full row for the signed-in mentor, or null when there is no session / no
+   * profile yet. Matches by session email, or by the users.profile_id link an
+   * admin created (the mentors row may carry a different address than the
+   * Amazon identity). RLS enforces both predicates server-side.
+   */
+  async getOwnMentor(identity?: { email: string; profileId?: string }): Promise<Mentor | null> {
+    let email = identity?.email;
+    let profileId = identity?.profileId;
+    if (!email) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) return null;
+      email = user.email;
+      profileId = profileId ?? (user.user_metadata?.profile_id as string | undefined);
+    }
+    const byEmail = await this.getMentorByEmail(email);
+    if (byEmail || !profileId) return byEmail;
+
+    const { data, error } = await supabase
+      .from('mentors')
+      .select('*')
+      .eq('id', profileId)
+      .single();
     if (error && error.code !== 'PGRST116') throw error;
     return data;
   }
@@ -269,25 +402,89 @@ class DatabaseService {
     return this.updateMentor(id, { is_available: isAvailable });
   }
 
+  /**
+   * Recomputes average_rating/total_ratings from all of the mentor's bookings.
+   * A database trigger already does this whenever a rating changes; this is a
+   * best-effort explicit call (a mentee cannot update the mentors table).
+   */
   async updateMentorRating(mentorId: string): Promise<void> {
-    const { data: bookings } = await supabase
-      .from('bookings')
-      .select('mentee_rating')
-      .eq('mentor_id', mentorId)
-      .not('mentee_rating', 'is', null);
+    const { error } = await supabase.rpc('recompute_mentor_rating', { p_mentor_id: mentorId });
+    if (error) console.warn('Mentor rating recompute deferred to the database trigger');
+  }
 
-    if (!bookings || bookings.length === 0) return;
+  // ==================== ADMIN ====================
+  // Plain reads/writes; RLS (`public.is_admin()`) is what authorizes them.
 
-    const totalRating = bookings.reduce((sum, b) => sum + (b.mentee_rating || 0), 0);
-    const avgRating = totalRating / bookings.length;
+  async getUsers(): Promise<UserSummary[]> {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, user_type, profile_id, amazon_alias, is_verified, created_at')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
 
-    await supabase
-      .from('mentors')
-      .update({
-        average_rating: avgRating.toFixed(2),
-        total_ratings: bookings.length,
-      })
-      .eq('id', mentorId);
+  async getApprovedUsers(): Promise<ApprovedUser[]> {
+    const { data, error } = await supabase
+      .from('approved_users')
+      .select('*')
+      .order('approved_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  async getAccessRequests(status?: AccessRequest['status']): Promise<AccessRequest[]> {
+    let query = supabase.from('access_requests').select('*');
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query.order('requested_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Insert or update the allow-list row for an alias (unique on amazon_alias, stored lowercase). */
+  async upsertApprovedUser(row: Omit<ApprovedUser, 'id' | 'approved_at'> & { id?: string; approved_at?: string }): Promise<ApprovedUser> {
+    const payload = {
+      ...row,
+      id: row.id || generateId(),
+      amazon_alias: row.amazon_alias.trim().toLowerCase(),
+      email: row.email?.trim().toLowerCase() || null,
+      approved_at: row.approved_at || new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from('approved_users')
+      .upsert(payload, { onConflict: 'amazon_alias' })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async updateAccessRequest(id: string, updates: Partial<AccessRequest>): Promise<AccessRequest | null> {
+    const { data, error } = await supabase
+      .from('access_requests')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  }
+
+  /**
+   * Admin-only (enforced by a database trigger). `note` is accepted for API
+   * stability but not persisted: mentees has no admin-note column yet.
+   */
+  async setMenteeVerification(menteeId: string, status: VerificationStatus, _note?: string): Promise<Mentee | null> {
+    return this.updateMentee(menteeId, { verification_status: status });
+  }
+
+  /** Hides the mentor from the directory and blocks new booking requests. */
+  async deactivateMentor(id: string): Promise<Mentor | null> {
+    return this.updateMentor(id, { is_available: false });
+  }
+
+  async getAllBookingsForAdmin(): Promise<Booking[]> {
+    return this.getBookings();
   }
 
   // ==================== MENTEES ====================
@@ -313,7 +510,7 @@ class DatabaseService {
     const { data, error } = await supabase
       .from('mentees')
       .select('*')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .single();
     
     if (error && error.code !== 'PGRST116') throw error;
@@ -321,20 +518,31 @@ class DatabaseService {
   }
 
   async createMentee(mentee: Omit<Mentee, 'id' | 'created_at'>): Promise<Mentee> {
-    const id = generateId();
-    const now = new Date().toISOString();
-    
-    const { data, error } = await supabase
-      .from('mentees')
-      .insert({
-        ...mentee,
-        id,
-        created_at: now,
-      })
-      .select()
-      .single();
+    const row: Mentee = {
+      ...mentee,
+      // Organisations queue for review; individuals are never verified.
+      verification_status: mentee.verification_status ?? (mentee.user_type === 'organization' ? 'pending' : 'unverified'),
+      id: generateId(),
+      created_at: new Date().toISOString(),
+    };
 
+    // No RETURNING: an anonymous requester has no SELECT policy on mentees, so
+    // `.select()` would fail after a successful insert. The row we sent is complete.
+    const { error } = await supabase.from('mentees').insert(row);
     if (error) throw error;
+    return row;
+  }
+
+  /**
+   * Resolves (or creates) the mentee row for a booking request and returns only
+   * its id, via a SECURITY DEFINER RPC. Needed when the caller cannot read the
+   * row: anonymous returning requesters, or a mentor recording a session with a
+   * mentee they have no booking with yet.
+   */
+  async resolveMenteeIdForBooking(email: string, name: string): Promise<string> {
+    const { data, error } = await supabase.rpc('get_or_create_mentee', { p_email: email.trim(), p_name: name.trim() });
+    if (error) throw error;
+    if (typeof data !== 'string' || !data) throw new Error('Could not resolve mentee');
     return data;
   }
 
@@ -391,44 +599,34 @@ class DatabaseService {
     return data;
   }
 
-  async createBooking(booking: Omit<Booking, 'id' | 'created_at'>): Promise<Booking> {
-    const id = generateId();
-    const now = new Date().toISOString();
-    
-    const { data, error } = await supabase
-      .from('bookings')
-      .insert({
-        ...booking,
-        id,
-        clicked_at: now,
-        created_at: now,
-      })
-      .select()
-      .single();
-
+  /**
+   * Inserts a booking and echoes the row we sent. No RETURNING: the caller may
+   * not be a party that can SELECT it (anonymous requester, or a signed-in user
+   * requesting for another email). The database stamps created_at itself and
+   * enforces status/mentor availability/rate limits.
+   */
+  private async insertBooking(row: Booking): Promise<Booking> {
+    const { error } = await supabase.from('bookings').insert(row);
     if (error) throw error;
-    return data;
+    return row;
+  }
+
+  async createBooking(booking: Omit<Booking, 'id' | 'created_at'>): Promise<Booking> {
+    const now = new Date().toISOString();
+    return this.insertBooking({ ...booking, id: generateId(), clicked_at: now, created_at: now });
   }
 
   async createBookingRequest(mentorId: string, menteeId: string, goal: string): Promise<Booking> {
-    const id = generateId();
     const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .insert({
-        id,
-        mentor_id: mentorId,
-        mentee_id: menteeId,
-        goal,
-        status: 'pending',
-        created_at: now,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
+    return this.insertBooking({
+      id: generateId(),
+      mentor_id: mentorId,
+      mentee_id: menteeId,
+      goal,
+      status: 'pending',
+      clicked_at: now,
+      created_at: now,
+    });
   }
 
   async getMentorBookings(mentorId: string): Promise<Booking[]> {
@@ -442,10 +640,16 @@ class DatabaseService {
     return data || [];
   }
 
-  async getMentorBookingsWithStatus(mentorId: string, status?: string): Promise<Booking[]> {
+  /**
+   * The mentor's bookings with the mentee embedded (name, organisation,
+   * verification) so the portal never shows a raw mentee id. The same
+   * `mentees_select` policy that serves pending rows lets the booked mentor
+   * read these rows.
+   */
+  async getMentorBookingsWithStatus(mentorId: string, status?: string): Promise<(Booking & { mentee?: Mentee })[]> {
     let query = supabase
       .from('bookings')
-      .select('*')
+      .select('*, mentee:mentees(*)')
       .eq('mentor_id', mentorId);
 
     if (status) {
@@ -454,13 +658,52 @@ class DatabaseService {
 
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return (data || []) as unknown as (Booking & { mentee?: Mentee })[];
+  }
+
+  /**
+   * Attaches `mentor` to each of a mentee's bookings. The `mentors` embed only
+   * resolves for owners/admins under RLS, so the public profile comes from
+   * `mentors_public` and, for accepted/confirmed/completed bookings, the Cal.com
+   * links from `mentor_scheduling_links` (filtered server-side to the caller).
+   */
+  private async attachMentorsForMentee<T extends Booking & { mentor?: Mentor | null }>(rows: T[]): Promise<(Omit<T, 'mentor'> & { mentor?: Mentor })[]> {
+    if (rows.length === 0) return [];
+    const signedIn = await hasSession();
+    const mentorIds = Array.from(new Set(rows.map((r) => r.mentor_id)));
+    const schedulableIds = rows.filter((r) => SCHEDULABLE_STATUSES.has(r.status)).map((r) => r.id);
+
+    const [publicRes, linksRes] = await Promise.all([
+      supabase.from('mentors_public').select('*').in('id', mentorIds),
+      signedIn && schedulableIds.length > 0
+        ? supabase.from('mentor_scheduling_links').select('*').in('booking_id', schedulableIds)
+        : Promise.resolve({ data: [] as MentorSchedulingLinks[], error: null }),
+    ]);
+    if (publicRes.error) throw publicRes.error;
+    if (linksRes.error) throw linksRes.error;
+
+    const publicById = new Map<string, PublicMentor>((publicRes.data || []).map((m: PublicMentor) => [m.id, m]));
+    const linksByBooking = new Map<string, MentorSchedulingLinks>((linksRes.data || []).map((l: MentorSchedulingLinks) => [l.booking_id, l]));
+
+    return rows.map((row) => {
+      const { mentor: embedded, ...rest } = row;
+      const pub = publicById.get(row.mentor_id);
+      if (!embedded && !pub) return rest;
+      const links = linksByBooking.get(row.id);
+      const mentor: Mentor = {
+        ...(pub as Mentor),
+        ...(embedded || {}),
+        ...(links ? { cal_link: links.cal_link, cal_15min: links.cal_15min, cal_30min: links.cal_30min, cal_60min: links.cal_60min } : {}),
+      };
+      return { ...rest, mentor };
+    });
   }
 
   async getMenteeBookings(menteeId: string, status?: string): Promise<(Booking & { mentor?: Mentor })[]> {
+    const embed = (await hasSession()) ? '*, mentor:mentors(*)' : '*';
     let query = supabase
       .from('bookings')
-      .select('*, mentor:mentors(*)')
+      .select(embed)
       .eq('mentee_id', menteeId);
 
     if (status) {
@@ -469,7 +712,8 @@ class DatabaseService {
 
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    // supabase-js cannot type a select string chosen at runtime
+    return this.attachMentorsForMentee((data || []) as unknown as (Booking & { mentor?: Mentor | null })[]);
   }
 
   async getPendingBookingsForMentor(mentorId: string): Promise<(Booking & { mentee?: Mentee })[]> {
@@ -482,6 +726,52 @@ class DatabaseService {
 
     if (error) throw error;
     return data || [];
+  }
+
+  /** Marks a session completed with its real duration (mentor or admin only, enforced by a trigger). */
+  async completeBooking(bookingId: string, options: CompleteBookingOptions): Promise<Booking | null> {
+    const minutes = Math.round(Number(options.sessionDurationMinutes));
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 600) {
+      throw new RangeError('Session duration must be between 1 and 600 minutes');
+    }
+    const update: Partial<Booking> = {
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      session_duration_minutes: minutes,
+    };
+    const country = options.country?.trim();
+    if (country) update.country = country;
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .update(update)
+      .eq('id', bookingId)
+      .select()
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
+  }
+
+  /** Mentee scheduled the accepted request through Cal.com: accepted -> confirmed. */
+  async confirmBooking(bookingId: string, details: { scheduledAt?: string; calEventUri?: string } = {}): Promise<Booking | null> {
+    const updateData: Partial<Booking> = {
+      status: 'confirmed',
+      responded_at: new Date().toISOString(),
+    };
+    if (details.scheduledAt) updateData.scheduled_at = details.scheduledAt;
+    if (details.calEventUri) updateData.cal_event_uri = details.calEventUri;
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .update(updateData)
+      .eq('id', bookingId)
+      .eq('status', 'accepted')
+      .select()
+      .single();
+
+    if (error && error.code !== 'PGRST116') throw error;
+    return data;
   }
 
   async updateBookingStatus(bookingId: string, status: string): Promise<Booking | null> {
@@ -574,15 +864,16 @@ class DatabaseService {
   }
 
   async getMenteeFeedback(menteeId: string): Promise<(Booking & { mentor?: Mentor })[]> {
+    const embed = (await hasSession()) ? '*, mentor:mentors(*)' : '*';
     const { data, error } = await supabase
       .from('bookings')
-      .select('*, mentor:mentors(*)')
+      .select(embed)
       .eq('mentee_id', menteeId)
       .not('mentor_rating', 'is', null)
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return this.attachMentorsForMentee((data || []) as unknown as (Booking & { mentor?: Mentor | null })[]);
   }
 
   async findAndConfirmAcceptedBooking(
@@ -678,11 +969,12 @@ class DatabaseService {
 
   // ==================== NOTIFICATIONS ====================
 
+  // Recipients are stored lowercase by notify_booking_event(); session emails are lowercase too.
   async getNotifications(email: string): Promise<Notification[]> {
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
-      .eq('recipient_email', email)
+      .eq('recipient_email', email.toLowerCase())
       .order('created_at', { ascending: false });
 
     if (error) throw error;
@@ -693,30 +985,24 @@ class DatabaseService {
     const { count, error } = await supabase
       .from('notifications')
       .select('*', { count: 'exact', head: true })
-      .eq('recipient_email', email)
+      .eq('recipient_email', email.toLowerCase())
       .eq('is_read', false);
 
     if (error) throw error;
     return count || 0;
   }
 
-  async createNotification(notification: Omit<Notification, 'id' | 'created_at' | 'is_read'>): Promise<Notification> {
-    const id = generateId();
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({
-        ...notification,
-        id,
-        is_read: false,
-        created_at: now,
-      })
-      .select()
-      .single();
-
+  /**
+   * The only way notifications are created. The SECURITY DEFINER RPC loads the
+   * booking, checks the caller is a party (anonymous callers may only announce a
+   * request they created in the last 10 minutes), verifies the event matches the
+   * booking's state and writes the recipient/title/message itself. Returns the
+   * notification id (an existing id when the same event was sent recently).
+   */
+  async notifyBookingEvent(bookingId: string, event: BookingEvent): Promise<string | null> {
+    const { data, error } = await supabase.rpc('notify_booking_event', { p_booking_id: bookingId, p_event: event });
     if (error) throw error;
-    return data;
+    return typeof data === 'string' ? data : null;
   }
 
   async markNotificationAsRead(id: string): Promise<Notification | null> {
@@ -735,7 +1021,7 @@ class DatabaseService {
     await supabase
       .from('notifications')
       .update({ is_read: true })
-      .eq('recipient_email', email);
+      .eq('recipient_email', email.toLowerCase());
   }
 
   // ==================== USERS ====================
@@ -744,7 +1030,7 @@ class DatabaseService {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('email', email)
+      .ilike('email', escapeLikePattern(email))
       .single();
 
     if (error && error.code !== 'PGRST116') throw error;
@@ -800,25 +1086,21 @@ class DatabaseService {
       : 0;
     const feedbackCount = ratingsData.length;
 
-    const { data: earnings } = await supabase
-      .from('mentor_earnings')
-      .select('*')
-      .eq('mentor_id', mentorId);
-
-    const earningsData = earnings || [];
-    const totalEarnings = earningsData.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    // Amazon mentors are volunteers: the programme reports hours, not earnings.
+    const completed = allBookings.filter(b => b.status === 'completed');
+    const volunteerMinutes = completed.reduce((sum, b) => sum + (b.session_duration_minutes || 0), 0);
 
     const currentMonth = new Date().toISOString().slice(0, 7);
-    const monthlyEarnings = earningsData
-      .filter(e => e.payout_month === currentMonth)
-      .reduce((sum, e) => sum + parseFloat(e.amount), 0);
+    const monthlyVolunteerMinutes = completed
+      .filter(b => (b.completed_at || b.scheduled_at || '').slice(0, 7) === currentMonth)
+      .reduce((sum, b) => sum + (b.session_duration_minutes || 0), 0);
 
     return {
       totalSessions,
       completedSessions,
       averageRating: Math.round(averageRating * 100) / 100,
-      totalEarnings,
-      monthlyEarnings,
+      volunteerMinutes,
+      monthlyVolunteerMinutes,
       pendingBookings,
       feedbackCount,
     };
@@ -858,13 +1140,16 @@ class DatabaseService {
 
   async updateMentorTask(taskId: string, updates: Partial<MentorTask>): Promise<MentorTask | null> {
     const now = new Date().toISOString();
-    const updateData: Partial<MentorTask> = {
+    const updateData: Record<string, unknown> = {
       ...updates,
       updated_at: now,
     };
 
     if (updates.status === 'completed' && !updates.completed_at) {
       updateData.completed_at = now;
+    } else if (updates.status && updates.status !== 'completed') {
+      // Re-opening a task clears its completion timestamp
+      updateData.completed_at = null;
     }
 
     const { data, error } = await supabase
@@ -919,6 +1204,10 @@ class DatabaseService {
 
   // ==================== MENTOR EARNINGS ====================
 
+  /**
+   * @deprecated The Amazon programme reports volunteer hours, not earnings; no UI
+   * reads this. Rows can only be written by the admin-only `record_mentor_earning` RPC.
+   */
   async getMentorEarnings(mentorId: string): Promise<MentorEarnings[]> {
     const { data, error } = await supabase
       .from('mentor_earnings')
@@ -944,274 +1233,26 @@ class DatabaseService {
     return data || [];
   }
 
+  /**
+   * Writes an activity entry through the `log_mentor_activity` RPC, which only
+   * accepts the mentor themself, a party to the referenced booking, or an admin.
+   * Booking lifecycle entries are written automatically by a database trigger.
+   */
   async createActivityLog(log: Omit<MentorActivityLog, 'id' | 'created_at'>): Promise<MentorActivityLog> {
-    const id = generateId();
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('mentor_activity_log')
-      .insert({
-        ...log,
-        id,
-        created_at: now,
-      })
-      .select()
-      .single();
-
+    const { data, error } = await supabase.rpc('log_mentor_activity', {
+      p_mentor_id: log.mentor_id,
+      p_activity_type: log.activity_type,
+      p_title: log.title,
+      p_description: log.description ?? null,
+      p_booking_id: log.booking_id ?? null,
+      p_mentee_id: log.mentee_id ?? null,
+    });
     if (error) throw error;
-    return data;
-  }
-
-  // ==================== SEED DATABASE ====================
-
-  async seedDatabase(): Promise<{ seeded: boolean; mentorCount: number }> {
-    try {
-      // Check if mentors already exist
-      const { data: existingMentors, error: checkError } = await supabase
-        .from('mentors')
-        .select('id')
-        .limit(1);
-
-      if (checkError) throw checkError;
-
-      if (existingMentors && existingMentors.length > 0) {
-        return { seeded: false, mentorCount: 0 };
-      }
-
-      const seedMentors = [
-        {
-          name: "Vats Shah",
-          name_ar: "فاتس شاه",
-          email: "vats.shah@amazon.com",
-          company: "Amazon",
-          company_ar: "أمازون",
-          position: "Senior Product Manager",
-          position_ar: "مدير منتجات أول",
-          timezone: "Asia/Dubai",
-          country: "United Arab Emirates",
-          photo_url: "/attached_assets/image_1763386758212.png",
-          bio: "Leading product development for Amazon's Middle East marketplace. 8+ years of experience in e-commerce and digital transformation. Passionate about mentoring aspiring product managers in the MENA region.",
-          bio_ar: "قيادة تطوير المنتجات لسوق أمازون في الشرق الأوسط. أكثر من 8 سنوات من الخبرة في التجارة الإلكترونية والتحول الرقمي. شغوف بتوجيه مديري المنتجات الطموحين في منطقة الشرق الأوسط وشمال أفريقيا.",
-          linkedin_url: "https://linkedin.com/in/vatsshah",
-          cal_link: "vats-s.-shah-2krirj/30min",
-          cal_15min: "vats-s.-shah-2krirj/30min",
-          cal_30min: "vats-s.-shah-2krirj/30min",
-          cal_60min: "vats-s.-shah-2krirj/30min",
-          expertise: ["Product Management", "E-commerce", "Digital Transformation", "Agile Methodologies", "Market Strategy"],
-          expertise_ar: ["إدارة المنتجات", "التجارة الإلكترونية", "التحول الرقمي", "منهجيات أجايل", "استراتيجية السوق"],
-          industries: ["E-commerce", "Technology", "Retail"],
-          industries_ar: ["التجارة الإلكترونية", "التكنولوجيا", "التجزئة"],
-          languages_spoken: ["English", "Hindi"],
-          comms_owner: "exec" as const,
-          mentorship_preference: "rotating" as const,
-          is_available: true,
-        },
-        {
-          name: "Layla Mahmoud",
-          name_ar: "ليلى محمود",
-          email: "layla.mahmoud@amazon.com",
-          company: "Amazon",
-          company_ar: "أمازون",
-          position: "Engineering Manager, AWS",
-          position_ar: "مديرة هندسة، AWS",
-          timezone: "Asia/Dubai",
-          country: "United Arab Emirates",
-          photo_url: "/attached_assets/image_1763386693493.png",
-          bio: "Building scalable cloud infrastructure for AWS customers across EMEA. 10+ years in distributed systems and team leadership. I mentor engineers on career growth, system design, and technical excellence.",
-          bio_ar: "بناء بنية تحتية سحابية قابلة للتوسع لعملاء AWS في منطقة أوروبا والشرق الأوسط وأفريقيا. أكثر من 10 سنوات في الأنظمة الموزعة وقيادة الفرق. أقوم بتوجيه المهندسين حول النمو المهني وتصميم الأنظمة والتميز التقني.",
-          linkedin_url: "https://linkedin.com/in/laylamahmoud",
-          cal_link: "layla-mahmoud/30min",
-          cal_15min: "layla-mahmoud/15min",
-          cal_30min: "layla-mahmoud/30min",
-          cal_60min: "layla-mahmoud/60min",
-          expertise: ["Cloud Computing", "System Design", "Engineering Leadership", "AWS Services", "DevOps"],
-          expertise_ar: ["الحوسبة السحابية", "تصميم الأنظمة", "القيادة الهندسية", "خدمات AWS", "DevOps"],
-          industries: ["Cloud Computing", "Technology", "Infrastructure"],
-          industries_ar: ["الحوسبة السحابية", "التكنولوجيا", "البنية التحتية"],
-          languages_spoken: ["English", "Arabic", "French"],
-          comms_owner: "exec" as const,
-          mentorship_preference: "ongoing" as const,
-          is_available: true,
-        },
-        {
-          name: "Omar Khalil",
-          name_ar: "عمر خليل",
-          email: "omar.khalil@amazon.com",
-          company: "Amazon",
-          company_ar: "أمازون",
-          position: "Senior UX Designer",
-          position_ar: "مصمم تجربة مستخدم أول",
-          timezone: "Africa/Cairo",
-          country: "Egypt",
-          photo_url: "/attached_assets/image_1763386720221.png",
-          bio: "Crafting localized shopping experiences for Middle East customers. Specializing in Arabic UX, accessibility, and cross-cultural design. Happy to help designers navigate the unique challenges of regional markets.",
-          bio_ar: "تصميم تجارب تسوق محلية لعملاء الشرق الأوسط. متخصص في تجربة المستخدم العربية وإمكانية الوصول والتصميم عبر الثقافات. سعيد بمساعدة المصممين في التعامل مع التحديات الفريدة للأسواق الإقليمية.",
-          linkedin_url: "https://linkedin.com/in/omarkhalil",
-          cal_link: "omar-khalil/30min",
-          cal_15min: "omar-khalil/15min",
-          cal_30min: "omar-khalil/30min",
-          cal_60min: "omar-khalil/60min",
-          expertise: ["UX Design", "Localization", "Design Systems", "User Research", "Accessibility"],
-          expertise_ar: ["تصميم تجربة المستخدم", "التوطين", "أنظمة التصميم", "بحث المستخدم", "إمكانية الوصول"],
-          industries: ["E-commerce", "Technology", "Design"],
-          industries_ar: ["التجارة الإلكترونية", "التكنولوجيا", "التصميم"],
-          languages_spoken: ["English", "Arabic"],
-          comms_owner: "assistant" as const,
-          mentorship_preference: "rotating" as const,
-          is_available: true,
-        },
-        {
-          name: "Levi Lewandowski",
-          name_ar: "ليفي ليفاندوفسكي",
-          email: "levi.lewandowski@amazon.com",
-          company: "Amazon",
-          company_ar: "أمازون",
-          position: "Strategic Partnerships Lead",
-          position_ar: "قائد الشراكات الاستراتيجية",
-          timezone: "America/New_York",
-          country: "United States",
-          photo_url: "/attached_assets/image_1763387494054.png",
-          bio: "Building strategic partnerships and accelerating growth initiatives for Amazon's innovation programs. Expert in startup ecosystems, venture partnerships, and business development. I mentor entrepreneurs and partnership professionals on scaling strategies.",
-          bio_ar: "بناء الشراكات الاستراتيجية وتسريع مبادرات النمو لبرامج الابتكار في أمازون. خبير في منظومات الشركات الناشئة وشراكات رأس المال الجريء وتطوير الأعمال. أقوم بتوجيه رواد الأعمال ومحترفي الشراكات حول استراتيجيات التوسع.",
-          linkedin_url: "https://linkedin.com/in/levilewandowski",
-          cal_link: "levi-lewandowski/30min",
-          cal_15min: "levi-lewandowski/15min",
-          cal_30min: "levi-lewandowski/30min",
-          cal_60min: "levi-lewandowski/60min",
-          expertise: ["Strategic Partnerships", "Business Development", "Startup Ecosystems", "Innovation Programs", "Venture Relations"],
-          expertise_ar: ["الشراكات الاستراتيجية", "تطوير الأعمال", "منظومات الشركات الناشئة", "برامج الابتكار", "علاقات رأس المال الجريء"],
-          industries: ["Technology", "Startups", "Innovation"],
-          industries_ar: ["التكنولوجيا", "الشركات الناشئة", "الابتكار"],
-          languages_spoken: ["English"],
-          comms_owner: "exec" as const,
-          mentorship_preference: "rotating" as const,
-          is_available: true,
-        },
-        {
-          name: "Karim Nasser",
-          name_ar: "كريم ناصر",
-          email: "karim.nasser@amazon.com",
-          company: "Amazon",
-          company_ar: "أمازون",
-          position: "Data Science Lead",
-          position_ar: "قائد علوم البيانات",
-          timezone: "Africa/Cairo",
-          country: "Egypt",
-          photo_url: "/attached_assets/image_1763386661657.png",
-          bio: "Building recommendation systems and predictive models for Amazon's Middle East operations. 12+ years in machine learning and analytics. I help data professionals develop ML skills and advance their careers.",
-          bio_ar: "بناء أنظمة التوصيات والنماذج التنبؤية لعمليات أمازون في الشرق الأوسط. أكثر من 12 عاماً في تعلم الآلة والتحليلات. أساعد محترفي البيانات على تطوير مهارات ML والتقدم في حياتهم المهنية.",
-          linkedin_url: "https://linkedin.com/in/karimnasser",
-          cal_link: "karim-nasser/30min",
-          cal_15min: "karim-nasser/15min",
-          cal_30min: "karim-nasser/30min",
-          cal_60min: "karim-nasser/60min",
-          expertise: ["Machine Learning", "Data Science", "Predictive Analytics", "Recommendation Systems", "Python"],
-          expertise_ar: ["تعلم الآلة", "علوم البيانات", "التحليلات التنبؤية", "أنظمة التوصيات", "بايثون"],
-          industries: ["Technology", "E-commerce", "Data Analytics"],
-          industries_ar: ["التكنولوجيا", "التجارة الإلكترونية", "تحليلات البيانات"],
-          languages_spoken: ["English", "Arabic"],
-          comms_owner: "exec" as const,
-          mentorship_preference: "ongoing" as const,
-          is_available: true,
-        },
-        {
-          name: "Nour Ibrahim",
-          name_ar: "نور إبراهيم",
-          email: "nour.ibrahim@amazon.com",
-          company: "Amazon",
-          company_ar: "أمازون",
-          position: "Operations Manager, Fulfillment",
-          position_ar: "مديرة العمليات، التوزيع",
-          timezone: "Asia/Dubai",
-          country: "United Arab Emirates",
-          photo_url: "/attached_assets/image_1763386772495.png",
-          bio: "Optimizing logistics and supply chain operations across Middle East fulfillment centers. Expert in operational excellence, process improvement, and team management. Mentoring operations professionals on leadership and efficiency.",
-          bio_ar: "تحسين عمليات اللوجستيات وسلسلة التوريد في مراكز التوزيع بالشرق الأوسط. خبيرة في التميز التشغيلي وتحسين العمليات وإدارة الفرق. أقوم بتوجيه محترفي العمليات حول القيادة والكفاءة.",
-          linkedin_url: "https://linkedin.com/in/nouribrahim",
-          cal_link: "nour-ibrahim/30min",
-          cal_15min: "nour-ibrahim/15min",
-          cal_30min: "nour-ibrahim/30min",
-          cal_60min: "nour-ibrahim/60min",
-          expertise: ["Operations Management", "Supply Chain", "Logistics", "Process Improvement", "Leadership"],
-          expertise_ar: ["إدارة العمليات", "سلسلة التوريد", "اللوجستيات", "تحسين العمليات", "القيادة"],
-          industries: ["E-commerce", "Logistics", "Operations"],
-          industries_ar: ["التجارة الإلكترونية", "اللوجستيات", "العمليات"],
-          languages_spoken: ["English", "Arabic"],
-          comms_owner: "assistant" as const,
-          mentorship_preference: "rotating" as const,
-          is_available: true,
-        },
-        {
-          name: "Youssef Fahmy",
-          name_ar: "يوسف فهمي",
-          email: "youssef.fahmy@amazon.com",
-          company: "Amazon",
-          company_ar: "أمازون",
-          position: "Senior Business Analyst",
-          position_ar: "محلل أعمال أول",
-          timezone: "Africa/Cairo",
-          country: "Egypt",
-          photo_url: "/attached_assets/image_1763386732789.png",
-          bio: "Transforming data into strategic insights for retail operations. Specialized in business intelligence, SQL, and data visualization. I mentor analysts on technical skills and business acumen.",
-          bio_ar: "تحويل البيانات إلى رؤى استراتيجية لعمليات التجزئة. متخصص في ذكاء الأعمال وSQL وتصور البيانات. أقوم بتوجيه المحللين حول المهارات التقنية والفطنة التجارية.",
-          linkedin_url: "https://linkedin.com/in/yousseffahmy",
-          cal_link: "youssef-fahmy/30min",
-          cal_15min: "youssef-fahmy/15min",
-          cal_30min: "youssef-fahmy/30min",
-          cal_60min: "youssef-fahmy/60min",
-          expertise: ["Business Analysis", "Data Analytics", "SQL", "Business Intelligence", "Data Visualization"],
-          expertise_ar: ["تحليل الأعمال", "تحليلات البيانات", "SQL", "ذكاء الأعمال", "تصور البيانات"],
-          industries: ["E-commerce", "Retail", "Analytics"],
-          industries_ar: ["التجارة الإلكترونية", "التجزئة", "التحليلات"],
-          languages_spoken: ["English", "Arabic"],
-          comms_owner: "exec" as const,
-          mentorship_preference: "ongoing" as const,
-          is_available: true,
-        },
-      ];
-
-      const now = new Date().toISOString();
-      const mentorsToInsert = seedMentors.map(mentor => ({
-        ...mentor,
-        id: generateId(),
-        average_rating: '0',
-        total_ratings: 0,
-        created_at: now,
-        updated_at: now,
-      }));
-
-      const { error: insertError } = await supabase
-        .from('mentors')
-        .insert(mentorsToInsert);
-
-      if (insertError) throw insertError;
-
-      return { seeded: true, mentorCount: seedMentors.length };
-    } catch (error) {
-      console.error('Error seeding database:', error);
-      throw error;
-    }
-  }
-
-  async checkAndSeed(): Promise<void> {
-    try {
-      const result = await this.seedDatabase();
-      if (result.seeded) {
-        console.log(`Database seeded with ${result.mentorCount} mentors`);
-      } else {
-        console.log('Database already has data, skipping seed');
-      }
-    } catch (error) {
-      console.error('Failed to seed database:', error);
-    }
+    return { ...log, id: String(data), created_at: new Date().toISOString() };
   }
 }
 
 // Export singleton instance
 export const db = new DatabaseService();
 
-// Auto-seed on module load (only in development)
-if (typeof window !== 'undefined') {
-  db.checkAndSeed();
-}
 

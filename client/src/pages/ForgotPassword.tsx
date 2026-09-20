@@ -1,175 +1,142 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
-import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { AlertCircle, ArrowLeft, Mail, MailCheck } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AuthCard, AuthPage, IconInput } from "@/components/auth/AuthCard";
+import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { authService } from "@/lib/services";
+import { ROUTES } from "@/lib/routes";
 
-type ForgotPasswordValues = {
-  email: string;
-};
-
+/** Request a password-reset email. The service never reveals whether the email exists. */
 export default function ForgotPassword() {
   const { t } = useTranslation();
-  const [, setLocation] = useLocation();
-  const { toast } = useToast();
-  const [emailSent, setEmailSent] = useState(false);
-  const [submittedEmail, setSubmittedEmail] = useState("");
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const forgotPasswordSchema = z.object({
-    email: z.string().email(t("auth.validation.emailInvalid")),
-  });
+  const schema = useMemo(
+    () => z.object({ email: z.string().trim().min(1, t("auth.validation.emailRequired")).email(t("auth.validation.emailInvalid")) }),
+    [t],
+  );
+  type Values = z.infer<typeof schema>;
 
-  const form = useForm<ForgotPasswordValues>({
-    resolver: zodResolver(forgotPasswordSchema),
-    defaultValues: {
-      email: "",
-    },
-  });
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: "" } });
 
-  const forgotPasswordMutation = useMutation({
-    mutationFn: async (data: ForgotPasswordValues) => {
+  const send = useMutation({
+    mutationFn: async (data: Values) => {
       await authService.forgotPassword(data.email);
-      return { success: true };
+      return data.email;
     },
-    onSuccess: (_data, variables) => {
-      setSubmittedEmail(variables.email);
-      setEmailSent(true);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: t("auth.error"),
-        description: error.message || t("auth.forgotPasswordError"),
-        variant: "destructive",
-      });
-    },
+    onSuccess: (email) => setSubmittedEmail(email),
+    onError: () => setFormError(t("auth.forgotPasswordError")),
   });
 
-  const onSubmit = (data: ForgotPasswordValues) => {
-    forgotPasswordMutation.mutate(data);
-  };
-
-  if (emailSent) {
+  if (submittedEmail) {
     return (
-      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-        <Card className="w-full max-w-md border-[#D5D9D9]">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-16 h-16 bg-[#067D62]/10 rounded-full flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-[#067D62]" />
-            </div>
-            <CardTitle className="text-2xl font-bold text-[#232F3E]">
-              {t("auth.checkYourEmail")}
-            </CardTitle>
-            <CardDescription className="text-[#565959]">
-              {t("auth.resetEmailSent", { email: submittedEmail })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-center text-[#565959]">
-              {t("auth.resetEmailInstructions")}
-            </p>
-            <div className="flex flex-col gap-3">
+      <StatusPage>
+        <StatusCard
+          titleAs="h1"
+          tone="success"
+          icon={MailCheck}
+          title={t("auth.checkYourEmail")}
+          description={
+            <>
+              <p>{t("auth.resetEmailSent", { email: submittedEmail })}</p>
+              <p className="mt-2">{t("auth.resetEmailInstructions")}</p>
+            </>
+          }
+          data-testid="card-reset-email-sent"
+          actions={
+            <>
               <Button
                 variant="outline"
                 onClick={() => {
-                  setEmailSent(false);
+                  setSubmittedEmail(null);
                   form.reset();
                 }}
-                className="w-full border-[#D5D9D9] text-[#232F3E]"
                 data-testid="button-try-different-email"
               >
                 {t("auth.tryDifferentEmail")}
               </Button>
-              <Button
-                variant="ghost"
-                className="w-full text-[#FF9900] hover:text-[#CC7A00]"
-                data-testid="link-back-to-login"
-                onClick={() => setLocation("/login")}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                {t("auth.backToLogin")}
+              <Button asChild variant="ghost" data-testid="link-back-to-login-success">
+                <Link href={ROUTES.login}>
+                  <ArrowLeft className="rtl:-scale-x-100" aria-hidden="true" />
+                  {t("auth.backToLogin")}
+                </Link>
               </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </>
+          }
+        />
+      </StatusPage>
     );
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md border-[#D5D9D9]">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-[#232F3E]">
-            {t("auth.forgotPasswordTitle")}
-          </CardTitle>
-          <CardDescription className="text-[#565959]">
-            {t("auth.forgotPasswordDescription")}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm font-medium text-[#0F1111]">
-                      {t("auth.email")}
-                    </FormLabel>
-                    <FormControl>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#565959]" />
-                        <Input
-                          {...field}
-                          type="email"
-                          placeholder={t("auth.emailPlaceholder")}
-                          className="pl-10 border-[#D5D9D9] focus:border-[#FF9900] focus:ring-[#FF9900]"
-                          data-testid="input-email"
-                        />
-                      </div>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+    <AuthPage>
+      <AuthCard title={t("auth.forgotPasswordTitle")} description={t("auth.forgotPasswordDescription")}>
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit((data) => {
+              setFormError(null);
+              send.mutate(data);
+            })}
+            className="space-y-5"
+            noValidate
+          >
+            {formError && (
+              <Alert variant="destructive" role="alert">
+                <AlertCircle aria-hidden="true" />
+                <AlertTitle className="leading-snug">{t("auth.error")}</AlertTitle>
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            )}
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t("auth.email")}</FormLabel>
+                  <FormControl>
+                    <IconInput
+                      {...field}
+                      icon={Mail}
+                      type="email"
+                      inputMode="email"
+                      autoComplete="email"
+                      spellCheck={false}
+                      dir="ltr"
+                      className="text-start"
+                      placeholder={t("auth.emailPlaceholder")}
+                      data-testid="input-email"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-              <Button
-                type="submit"
-                disabled={forgotPasswordMutation.isPending}
-                className="w-full bg-[#FF9900] hover:bg-[#E68A00] text-white font-semibold"
-                data-testid="button-send-reset-link"
-              >
-                {forgotPasswordMutation.isPending
-                  ? t("auth.sending")
-                  : t("auth.sendResetLink")}
-              </Button>
+            <Button type="submit" variant="primary" size="lg" className="w-full" loading={send.isPending} data-testid="button-send-reset-link">
+              {send.isPending ? t("auth.sending") : t("auth.sendResetLink")}
+            </Button>
 
-              <div className="text-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-[#FF9900] hover:text-[#CC7A00]"
-                  data-testid="link-back-to-login"
-                  onClick={() => setLocation("/login")}
-                >
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+            <div className="text-center">
+              <Button asChild variant="ghost" data-testid="link-back-to-login">
+                <Link href={ROUTES.login}>
+                  <ArrowLeft className="rtl:-scale-x-100" aria-hidden="true" />
                   {t("auth.backToLogin")}
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-    </div>
+                </Link>
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </AuthCard>
+    </AuthPage>
   );
 }

@@ -1,51 +1,66 @@
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/context/LanguageContext";
-import { Globe, Check } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { ensureLanguageLoaded } from "@/lib/i18n";
+import { cn } from "@/lib/utils";
 
-export function LanguageToggle() {
+/**
+ * Language toggle (spec §4, P2-9): one button whose visible text is the OTHER
+ * language's own name ("عربي" while in English, "English" while in Arabic),
+ * with `lang` set to that language and an accessible name that contains the
+ * visible text. While ar.json downloads it is `aria-busy` and a polite
+ * `role="status"` announces `common.loadingLanguage`; focus stays on the
+ * button and the document title is refreshed by the App route effect.
+ *
+ * Test ids: `button-language-toggle` on the button; the legacy
+ * `menu-item-arabic` / `menu-item-english` ids sit on the label of the
+ * language the button switches to, so either id still switches that language.
+ */
+export function LanguageToggle({ className }: { className?: string }) {
   const { language, setLanguage } = useLanguage();
+  const { t, i18n } = useTranslation();
+  const [loading, setLoading] = useState(false);
+  const alive = useRef(true);
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const target = language === "en" ? "ar" : "en";
+  const targetLabel = target === "ar" ? "عربي" : "English";
+
+  const toggle = () => {
+    setLanguage(target);
+    if (target !== "ar" || i18n.hasResourceBundle("ar", "translation")) return;
+    setLoading(true);
+    void ensureLanguageLoaded("ar").finally(() => {
+      if (alive.current) setLoading(false);
+    });
+  };
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-[var(--ink)] hover:bg-[var(--cream-dark)] rounded-full"
-          data-testid="button-language-toggle"
-        >
-          <Globe className="h-5 w-5" />
-          <span className="sr-only">Toggle language</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem
-          onClick={() => setLanguage('en')}
-          className={language === 'en' ? 'bg-accent' : ''}
-          data-testid="menu-item-english"
-        >
-          <span className="w-4 h-4 mr-2 flex items-center justify-center text-xs font-medium">
-            {language === 'en' ? <Check className="w-4 h-4" /> : 'EN'}
-          </span>
-          English
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => setLanguage('ar')}
-          className={language === 'ar' ? 'bg-accent' : ''}
-          data-testid="menu-item-arabic"
-        >
-          <span className="w-4 h-4 mr-2 flex items-center justify-center text-xs font-medium">
-            {language === 'ar' ? <Check className="w-4 h-4" /> : 'AR'}
-          </span>
-          العربية
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        lang={target}
+        aria-label={t("nav.switchLanguage")}
+        aria-busy={loading || undefined}
+        onClick={toggle}
+        className={cn("px-3 font-medium text-foreground", className)}
+        data-testid="button-language-toggle"
+      >
+        <span data-testid={target === "ar" ? "menu-item-arabic" : "menu-item-english"}>{targetLabel}</span>
+      </Button>
+      <span role="status" aria-live="polite" className="sr-only">
+        {loading ? t("common.loadingLanguage") : ""}
+      </span>
+    </>
   );
 }
