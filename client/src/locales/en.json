@@ -165,7 +165,8 @@
         "sso_state": "Your sign-in session expired or the link was already used. Please start again.",
         "sso_token": "Amazon accepted your login but we could not complete the exchange. Please try again.",
         "sso_failed": "We could not sign you in with Amazon. Please try again or contact the MentorConnect team.",
-        "generic": "Something went wrong during sign-in. Please try again."
+        "generic": "Something went wrong during sign-in. Please try again.",
+        "unavailableLocal": "Amazon sign-in is only available on the deployed site. Sign in with your registered email below."
       },
       "errorReference": "Reference: {{reason}}"
     },
@@ -223,7 +224,13 @@
       "mentorDashboard": "Mentor dashboard",
       "mentorPortal": "Mentor portal",
       "admin": "Admin",
-      "notFound": "Page not found"
+      "notFound": "Page not found",
+      "book": "Book a session",
+      "dashboard": "Dashboard",
+      "dashboardBookings": "Bookings",
+      "dashboardCalendar": "Calendar",
+      "legal": "Terms & privacy",
+      "dashboardProfile": "Profile settings"
     }
   },
   "hero": {
@@ -1916,6 +1923,370 @@
       "mentorTitle": "No requests yet",
       "mentorBody": "Requests mentees send you appear here, with the sessions that follow.",
       "browse": "Browse mentors"
+    }
+  },
+  "showcase": {
+    "hero": {
+      "titleA": "Your All-in-One",
+      "titleB": "Mentorship ",
+      "titleBold": "Hub",
+      "lede": "Book 1:1 calls with vetted mentors, get feedback on real work, and grow your career — all from a single link.",
+      "cta": "Find a mentor",
+      "rating": "4.9",
+      "ratingLabel": "average rating",
+      "sessions": "1,000+ sessions booked"
+    },
+    "bento": {
+      "titleBold": "Learn & Grow",
+      "titleRest": "more with MentorConnect",
+      "t1a": "faster progress with",
+      "t1b": "a dedicated mentor",
+      "review1": "Loved the session",
+      "review2": "Best advice ever",
+      "t2a": "of sessions rated",
+      "t2b": "5 stars by mentees",
+      "city1": "Dubai",
+      "city2": "Riyadh",
+      "t3big": "Across MENA",
+      "t3a": "mentors who work in",
+      "t3b": "your market and time zone",
+      "meet": "Google Meet",
+      "invite": "Calendar invite",
+      "t4big": "Instant scheduling",
+      "t4a": "No back-and-forth. Pick a slot and the invite with the video link lands in both calendars.",
+      "t5a": "free, volunteer-led",
+      "t5b": "sessions for Amazon mentees",
+      "you": "You",
+      "yourSession": "Your session",
+      "t6big": "Get matched",
+      "t6a": "Smart matching",
+      "t6b": "that pairs you with the right mentor for what you're working on."
+    },
+    "rail": {
+      "title": "See what the best mentors bring to Amazon",
+      "lede": "1:1 sessions and office hours, run by operators who've actually done it.",
+      "mentored": "{{total}}+ sessions",
+      "minutes": "{{minutes}} mins",
+      "view": "View profile",
+      "prev": "Previous mentors",
+      "next": "Next mentors"
+    },
+    "profile": {
+      "verified": "Verified mentor",
+      "ratings": "{{count}} ratings",
+      "testimonialsTitle": "Testimonials",
+      "serviceKind": "1:1 session",
+      "about": "About me",
+      "sessions": "sessions",
+      "facts": "Mentor facts",
+      "book": "Book a {{minutes}}-min session",
+      "newMentor": "New mentor · first sessions open"
+    },
+    "session": {
+      "free": "Free",
+      "areYou": "Looking for help with",
+      "who": "Who is {{name}}?",
+      "forWho": "Who is this 1-on-1 call for?",
+      "learn": "What you'll learn",
+      "bookNow": "Book your 1-on-1 call now",
+      "testimonials": "Testimonials",
+      "when": "When should we meet?",
+      "whenHint": "Pick a slot in {{name}}'s calendar — the invite lands in both calendars.",
+      "volunteer": "volunteer-led"
+    },
+    "auth": {
+      "quotes": {
+        "1": {
+          "text": "MentorConnect made it seamless to schedule mentoring sessions. Big fan of the calendar integration.",
+          "name": "Aishwarya S.",
+          "role": "Product manager, Dubai"
+        },
+        "2": {
+          "text": "Love the integrations with Calendar and Meet. Makes my life easier!",
+          "name": "Xinran W.",
+          "role": "Data engineer"
+        },
+        "3": {
+          "text": "I got matched with a mentor who had done exactly what I was trying to do. Two calls changed my roadmap.",
+          "name": "Payal G.",
+          "role": "Founder"
+        },
+        "4": {
+          "text": "The entire experience is just so seamless. My mentees love it.",
+          "name": "Jessica L.",
+          "role": "Global data lead"
+        },
+        "5": {
+          "text": "Everything from booking to notes happens in one place. Finally.",
+          "name": "Omar H.",
+          "role": "Programme manager"
+        },
+        "6": {
+          "text": "Candid, practical advice and a mentor who actually follows up. Rare.",
+          "name": "Lina R.",
+          "role": "Marketing lead"
+        }
+      },
+      "localSso": "Amazon sign-in runs on the deployed site (Vercel API). Here, sign in with the email you registered with — no password is checked until the database is connected.",
+      "localNotFound": "No account with that email yet. Register as a mentee or become a mentor first."
+    },
+    "analytics": {
+      "sidebar": "Dashboard navigation",
+      "brand": "Mentor Dashboard",
+      "programme": "Amazon UAE programme",
+      "pill": "Sharing posters for you",
+      "create": "New session",
+      "guide": "Programme guide",
+      "title": "Profile Analytics",
+      "period": "Period",
+      "grain": "Granularity",
+      "periods": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "3d": "3D",
+        "7d": "7D",
+        "30d": "30D",
+        "3m": "3M",
+        "6m": "6M",
+        "custom": "Custom"
+      },
+      "grains": {
+        "hour": "Hour",
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+      },
+      "kpi": {
+        "views": "Profile views",
+        "viewsSub": "Clicks into your profile",
+        "hours": "Hours mentored",
+        "hoursSub": "Completed session time",
+        "sessions": "Sessions",
+        "sessionsSub": "Completed sessions"
+      },
+      "trend": "Profile views over time",
+      "refreshed": "Last refreshed: {{time}}",
+      "sources": "Traffic sources",
+      "source": {
+        "direct": "Direct",
+        "directSub": "Typed or bookmarked link",
+        "linkedin": "LinkedIn",
+        "linkedinSub": "Posts and profile link",
+        "internal": "Amazon internal",
+        "internalSub": "Wiki, Slack and email",
+        "search": "Search",
+        "searchSub": "Google and Bing",
+        "other": "Other",
+        "otherSub": "Referrals"
+      },
+      "funnelTitle": "Booking funnel",
+      "funnel": {
+        "views": "Views",
+        "requests": "Requests",
+        "accepted": "Accepted",
+        "completed": "Completed"
+      },
+      "location": "Location",
+      "devices": "Device analytics",
+      "device": {
+        "desktop": "Desktop",
+        "mobile": "Mobile",
+        "tablet": "Tablet"
+      },
+      "topMentors": "Most booked mentors",
+      "empty": "No data for this period yet",
+      "nav": {
+        "home": "Home",
+        "bookings": "Bookings",
+        "sessions": "Sessions",
+        "mentees": "Mentees",
+        "hours": "Hours",
+        "share": "Share & Grow",
+        "analytics": "Analytics",
+        "growth": "Growth Analytics",
+        "profile": "Profile Analytics",
+        "settings": "Settings",
+        "calendar": "Calendar",
+        "mentors": "Mentors",
+        "mySessions": "My sessions",
+        "profileSettings": "Profile"
+      },
+      "brandMentee": "Mentee Dashboard",
+      "book": "Book a session",
+      "showcaseAccount": "Showcase account — not signed in"
+    },
+    "legal": {
+      "terms": "Terms",
+      "privacy": "Privacy"
+    },
+    "nav": {
+      "dashboard": "Dashboard",
+      "myDashboard": "My dashboard"
+    },
+    "footer": {
+      "pitch": "Free 1:1 mentoring for the Amazon UAE community — vetted mentors, real feedback, one link.",
+      "product": "Product",
+      "programme": "Programme",
+      "legal": "Legal",
+      "joinAsMentee": "Join as a mentee",
+      "howItWorks": "How it works",
+      "meetMentors": "Meet the mentors"
+    },
+    "picker": {
+      "sentTitle": "Request sent to {{name}}",
+      "sentBody": "{{name}} confirms within two working days. The calendar invite with the video link lands in your inbox once it is accepted.",
+      "session": "Session",
+      "slot": "Requested slot"
+    },
+    "bookings": {
+      "upcoming": "Upcoming",
+      "completed": "Completed",
+      "kind": {
+        "calls": "1:1 Calls",
+        "office": "Office hours",
+        "programmes": "Programmes"
+      },
+      "emptyTitle": "Share your page",
+      "emptyBody": "A new booking might just be around the corner — share your profile link today!",
+      "sharePage": "Share page",
+      "mentee": "Mentee",
+      "session": "Mentoring session",
+      "with": "with {{name}}",
+      "mentor": "Mentor",
+      "requests": "Requests",
+      "timeTbc": "Time to be confirmed",
+      "accept": "Accept",
+      "decline": "Decline"
+    },
+    "calendar": {
+      "settings": "Settings",
+      "schedule": "Schedule",
+      "howItWorks": "How it works",
+      "timezone": "Timezone",
+      "timezoneSub": "Required for timely communications",
+      "policy": "Reschedule policy",
+      "policySub": "How mentees can reschedule calls",
+      "policies": {
+        "free": "Anytime, free",
+        "24h": "Up to 24 hours before",
+        "none": "No rescheduling"
+      },
+      "bookingPeriod": "Booking period",
+      "bookingPeriodSub": "How far in the future mentees can book",
+      "periods": {
+        "1m": "1 month",
+        "2m": "2 months",
+        "3m": "3 months",
+        "6m": "6 months"
+      },
+      "notice": "Notice period",
+      "noticeSub": "Set the minimum amount of notice that is required",
+      "unit": "Unit",
+      "minutes": "Minutes",
+      "hours": "Hours",
+      "integrationTitle": "Calendar integration",
+      "integrationSub": "Connect Google or Outlook so invites and video links are created for every confirmed session.",
+      "integrationCta": "Connect calendar",
+      "scheduleSub": "Weekly office hours in {{zone}}. Mentees only see slots inside these windows.",
+      "days": {
+        "mon": "Monday",
+        "tue": "Tuesday",
+        "wed": "Wednesday",
+        "thu": "Thursday",
+        "fri": "Friday",
+        "sat": "Saturday",
+        "sun": "Sunday"
+      },
+      "from": "From",
+      "to": "To",
+      "unavailable": "Unavailable",
+      "save": "Save changes",
+      "saved": "Saved",
+      "saveHint": "Changes apply to new bookings only."
+    },
+    "dashboard": {
+      "hi": "Hi, {{name}}",
+      "morning": "Good morning, {{name}}",
+      "afternoon": "Good afternoon, {{name}}",
+      "evening": "Good evening, {{name}}",
+      "copy": "Copy",
+      "copied": "Copied",
+      "yourPage": "Your page",
+      "yourLinkIs": "Your link is",
+      "shareHint": "Share it to get your first booking.",
+      "hoursThisMonth": "Hours mentored",
+      "pendingRequests": "Pending requests",
+      "pendingCount": "{{count}} pending",
+      "calendar": "Calendar",
+      "calendarStatus": "Connect · set hours",
+      "addSession": "Add session type",
+      "shareProfile": "Share profile",
+      "logHours": "Log hours",
+      "makeYours": "Make the page yours!",
+      "makeYoursSub": "Unlock the potential of your MentorConnect page",
+      "steps": {
+        "availability": "Set availability",
+        "availabilitySub": "Pick the days and times you're open for bookings.",
+        "profile": "Customize your profile",
+        "profileSub": "Photo, headline and the areas you mentor on.",
+        "sessions": "Add your 1:1 session",
+        "sessionsSub": "Title, duration and who the call is for.",
+        "calendar": "Connect your calendar",
+        "calendarSub": "Invites and video links are created automatically.",
+        "share": "Share your link",
+        "shareSub": "Post it on LinkedIn or drop it in your team channel."
+      },
+      "markDone": "Mark as done",
+      "inspired": "Get inspired",
+      "inspiredSub": "Mentors who fill their calendar with the programme",
+      "upcomingTitle": "{{count}} upcoming sessions",
+      "upcomingSub": "Where you appeared · next 14 days",
+      "seeDetails": "See details",
+      "referTitle": "Refer a colleague, grow the mentor pool",
+      "referNow": "Refer now",
+      "referPerks": "Referral perks",
+      "stat": {
+        "requests": "Requests",
+        "hours": "Hours",
+        "completed": "Sessions completed",
+        "upcoming": "Upcoming"
+      },
+      "fullAnalytics": "Open full analytics",
+      "menteeEmptyTitle": "No sessions yet",
+      "menteeEmptyBody": "Pick a mentor, choose a time, and it shows up here.",
+      "suggested": "Mentors for you",
+      "suggestedSub": "Start with a 30-minute session",
+      "awaitingMentor": "Awaiting the mentor's reply"
+    },
+    "onboarding": {
+      "stepsLabel": "Form sections",
+      "mentorWork": "Expertise & work",
+      "mentorScheduling": "Scheduling",
+      "menteeType": "Account type",
+      "menteeAbout": "About you",
+      "menteeInterests": "Interests & goals"
+    },
+    "scheduler": {
+      "title": "Book a session with {{name}}",
+      "confirmedTitle": "Booked with {{name}}",
+      "confirmedBody": "The calendar invite with the video link is on its way to your inbox.",
+      "viewBookings": "View my bookings",
+      "noCalendar": "{{name}} hasn't connected a calendar yet. Send a request and you'll get the invite once it's accepted.",
+      "send": "Send request",
+      "sharedCalendar": "Times come from the programme's shared calendar until {{name}} connects a Cal.com account from the dashboard."
+    },
+    "profileSettings": {
+      "saved": "Profile saved",
+      "viewPublic": "View public page",
+      "noAccountTitle": "No profile to edit yet",
+      "noAccountBody": "Register as a mentor or mentee, or sign in with the email you registered with, and your profile becomes editable here.",
+      "photoUrl": "Photo URL",
+      "photoHint": "A link to a square photo (LinkedIn photo URL works).",
+      "commaHint": "Separate with commas",
+      "calLink": "Cal.com link",
+      "calHint": "Your booking page; it is embedded on your session page.",
+      "organisation": "Organisation",
+      "goals": "What you want from mentoring"
     }
   }
 }

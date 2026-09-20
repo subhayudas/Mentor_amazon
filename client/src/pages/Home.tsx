@@ -1,263 +1,343 @@
 import * as React from "react";
-import { Link, useLocation } from "wouter";
-import { ArrowRight } from "lucide-react";
+import { Link } from "wouter";
+import { ArrowRight, ArrowLeft, CalendarCheck, Star, Video, CalendarPlus, ShoppingBag } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { Container } from "@/components/layout/Container";
-import { PageHeader } from "@/components/layout/PageHeader";
-import { ExampleChips, ExampleChipsSkeleton } from "@/components/discovery/ExampleChips";
-import { HowItHappens } from "@/components/discovery/HowItHappens";
-import { MentorPreview } from "@/components/discovery/MentorPreview";
-import { NeedsList } from "@/components/discovery/NeedsList";
-import { SearchIntent } from "@/components/discovery/SearchIntent";
-import { useAuth } from "@/context/AuthContext";
-import { useIsPhone } from "@/hooks/useMediaQuery";
-import { useMentors } from "@/components/discovery/useMentors";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { EXAMPLE_CHIP_LIMIT, topTags, trustStats } from "@/lib/discovery";
-import { ROUTES, discoveryUrl } from "@/lib/routes";
+import { FEATURED_MENTORS, type FeaturedMentor } from "@/data/featuredMentors";
+import { ROUTES } from "@/lib/routes";
+import { cn } from "@/lib/utils";
 
 /**
- * Landing `/` (spec §5 as amended by P0-6/C1/C2, P0-7, P1-13, P1-14, P1-16,
- * P2-8, C19). Sections, in order: hero (search is the primary action; the
- * request-rail card is the product artifact) → "Mentors you can talk to" →
- * "What people come with" → FAQ → final CTA band → compact footer.
- *
- * The page sits on `--background`; only the CTA band changes surface. The
- * hero search submit is the ONE orange fill above the fold, the CTA band
- * button the one below it. Every number on the page is computed from the
- * `mentors_public` list; nothing is invented, nothing renders as `0` before
- * data arrives.
- *
- * Phones get a separate composition (P0-7): three example chips in a snap
- * scroller, no visible submit, the two hero links stacked, a snap scroller of
- * four compact cards, the rail card after the preview, needs as a single
- * column of one-line rows.
- *
- * Nothing below the search box shifts when the catalogue arrives (F-06):
- * four chips fit the hero column on one reserved row, the trust line and the
- * link rows reserve their heights, and on phones the links are stacked so the
- * count arriving in "Browse all {n} mentors" cannot push the second link onto
- * a new line.
+ * Landing `/` — the Figma "verosek explorations page 4" landing, content
+ * swapped to MentorConnect: peach hero with the scrolling mentor wall, the
+ * six-tile bento on grey, the orange "meet the mentors" rail of dark cards,
+ * then the app footer. Every person shown is a curated featured mentor
+ * (`data/featuredMentors.ts`); the wall and the rail link to their profiles.
  */
-const FAQ_KEYS = ["spam", "commitment", "matching", "cancel"] as const;
-/** The legacy directory search id lives on the hero input here and on the `/mentors` input there (one per page). */
-const SEARCH_INPUT_PROPS = { "data-testid": "input-search-mentors" } as React.InputHTMLAttributes<HTMLInputElement>;
 
-/** Reduced-motion aware, once-per-session hero fade (spec §2: one 200 ms opacity + 8px travel on first paint). */
-let heroPlayed = false;
-function useHeroEnter(ref: React.RefObject<HTMLElement>) {
-  // Layout effect: the first keyframe applies before the first paint, so the
-  // hero never flashes at full opacity before fading in.
-  React.useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el || heroPlayed || typeof el.animate !== "function") return;
-    heroPlayed = true;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    el.animate(
-      [
-        { opacity: 0, transform: "translateY(8px)" },
-        { opacity: 1, transform: "translateY(0)" },
-      ],
-      { duration: 200, easing: "cubic-bezier(0.23, 1, 0.32, 1)", fill: "none" },
-    );
-  }, [ref]);
+function localizedHeadline(m: FeaturedMentor, lang: string) {
+  return lang === "ar" ? m.headline_ar : m.headline;
+}
+function localizedName(m: FeaturedMentor, lang: string) {
+  return lang === "ar" && m.name_ar ? m.name_ar : m.name;
 }
 
-export default function Home() {
+/* ===================== Hero wall ===================== */
+
+function WallCard({ mentor, lang }: { mentor: FeaturedMentor; lang: string }) {
+  return (
+    <Link
+      href={`/mentor/${mentor.id}`}
+      className="block w-[226px] shrink-0 rounded-[12px] bg-white p-[9px] shadow-[0_2px_4px_rgba(0,0,0,0.05)] outline-offset-4 transition-transform duration-fast hover:-translate-y-0.5"
+    >
+      <div className={cn("sc-duotone aspect-[210/120] rounded-[8px]", `sc-tint-${mentor.tint}`)}>
+        <img src={mentor.photo_url} alt="" loading="lazy" />
+        <span className="absolute bottom-2 end-2 z-[1] rounded-[24px] bg-black/55 px-3 py-1 text-[13px] font-medium text-white backdrop-blur">
+          {mentor.chip}
+        </span>
+      </div>
+      <p className="mt-3 truncate text-[18px] font-bold leading-[28px] text-[var(--sc-ink)]">{localizedName(mentor, lang)}</p>
+      <p className="truncate text-[15px] font-medium leading-[24px] text-[var(--sc-ink-soft)]">{localizedHeadline(mentor, lang)}</p>
+    </Link>
+  );
+}
+
+function WallColumn({ mentors, reverse, lang }: { mentors: FeaturedMentor[]; reverse?: boolean; lang: string }) {
+  // The list is rendered twice so the marquee loops seamlessly; the copy is decorative.
+  return (
+    <div className="h-full overflow-hidden">
+      <div className={cn("flex flex-col gap-6", reverse ? "sc-marquee-reverse" : "sc-marquee")}>
+        {mentors.map((m) => (
+          <WallCard key={m.id} mentor={m} lang={lang} />
+        ))}
+        <div aria-hidden="true" className="flex flex-col gap-6">
+          {mentors.map((m) => (
+            <WallCard key={`${m.id}-copy`} mentor={m} lang={lang} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Hero() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const [, navigate] = useLocation();
-  const { user } = useAuth();
-  const isPhone = useIsPhone();
-  const heroRef = React.useRef<HTMLDivElement>(null);
-  useHeroEnter(heroRef);
-
-  const mentorsQuery = useMentors();
-  const mentors = mentorsQuery.data;
-  const [query, setQuery] = React.useState("");
-
-  const stats = React.useMemo(() => (mentors ? trustStats(mentors) : null), [mentors]);
-  const exampleTags = React.useMemo(
-    () => (mentors ? topTags(mentors, "expertise", EXAMPLE_CHIP_LIMIT, lang) : []),
-    [mentors, lang],
-  );
-
-  const trustLine = stats
-    ? [
-        t("landing.trust.mentors", { count: stats.mentors }),
-        stats.languages > 0 ? t("landing.trust.languages", { count: stats.languages }) : "",
-        stats.countries > 0 ? t("landing.trust.countries", { count: stats.countries }) : "",
-      ]
-        .filter(Boolean)
-        .join(" · ")
-    : "";
-
-  const year = new Date().getFullYear();
-  const faqId = React.useId();
-  const ctaId = React.useId();
+  const colA = FEATURED_MENTORS;
+  const colB = [...FEATURED_MENTORS.slice(2), ...FEATURED_MENTORS.slice(0, 2)];
 
   return (
-    <div className="flex flex-col">
-      {/* ===== Hero ===== */}
-      <section aria-labelledby="page-title" className="pb-6 pt-6 md:pb-12 md:pt-14">
-        <Container className="lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:items-start lg:gap-12">
-          <div ref={heroRef} className="hero-enter">
-            <PageHeader
-              size="display"
-              className="py-0 md:py-0"
-              eyebrow={t("landing.hero.eyebrow")}
-              title={t("landing.hero.title")}
-              description={t("landing.hero.lede")}
+    <section aria-labelledby="page-title" className="overflow-hidden bg-[var(--sc-peach)]">
+      <Container className="relative flex min-h-[560px] flex-col justify-center py-12 lg:min-h-[732px] lg:py-0">
+        <div className="max-w-[700px]">
+          <h1
+            id="page-title"
+            tabIndex={-1}
+            className="font-serif-display text-[44px] font-normal leading-[1] tracking-[-0.05em] text-[var(--sc-ink)] md:text-[68px]"
+          >
+            {t("showcase.hero.titleA")}
+            <br />
+            {t("showcase.hero.titleB")}
+            <strong className="font-bold">{t("showcase.hero.titleBold")}</strong>
+          </h1>
+          <p className="mt-6 max-w-[640px] text-[18px] leading-[32px] text-[var(--sc-ink)] md:text-[22px]">{t("showcase.hero.lede")}</p>
+          <div className="mt-10 flex flex-wrap items-start gap-6">
+            <Link
+              href={ROUTES.mentors}
+              data-testid="link-hero-find"
+              className="inline-flex h-[78px] items-center gap-4 rounded-[16px] bg-[var(--sc-ink)] px-6 text-[20px] font-medium text-white transition-transform duration-fast hover:-translate-y-0.5 active:scale-[0.98]"
             >
-              <div className="mt-6 max-w-2xl">
-                <SearchIntent
-                  id="hero-search"
-                  size="lg"
-                  value={query}
-                  onChange={setQuery}
-                  onSubmit={(value) => navigate(discoveryUrl({ q: value }))}
-                  label={t("landing.hero.searchLabel")}
-                  placeholder={isPhone ? t("landing.hero.searchPlaceholderShort") : t("landing.hero.searchPlaceholder")}
-                  submitLabel={t("landing.hero.search")}
-                  iconOnlySubmit={isPhone}
-                  primaryAction
-                  inputProps={SEARCH_INPUT_PROPS}
-                  chips={
-                    exampleTags.length > 0 ? (
-                      <ExampleChips tags={exampleTags} label={t("landing.hero.examples")} />
-                    ) : mentorsQuery.isLoading ? (
-                      <ExampleChipsSkeleton />
-                    ) : undefined
-                  }
-                />
-              </div>
-              <p className="mt-3 min-h-5 text-caption text-muted-foreground tabular-nums" data-testid="text-trust-line">
-                {trustLine}
-              </p>
-              {/*
-                Both hero links share the `link` button vocabulary (F-22); the
-                arrow marks the one that navigates. On phones they stack
-                deliberately (one per line, each a 24px row) so the count
-                arriving never re-wraps the row (F-06).
-              */}
-              <p className="mt-3 flex min-h-6 flex-col items-start gap-1 text-body-sm">
-                <Button asChild variant="link" className="min-h-6 gap-1">
-                  <Link href={ROUTES.mentors} data-testid="link-browse-all">
-                    {stats ? t("landing.hero.browseAll", { count: stats.mentors }) : t("landing.hero.browseAllNoCount")}
-                    <ArrowRight className="rtl:-scale-x-100" strokeWidth={2} aria-hidden="true" />
-                  </Link>
-                </Button>
-                {isPhone && (
-                  <Button asChild variant="link" className="min-h-6">
-                    <a href="#how-it-works">{t("landing.hero.howItWorks")}</a>
-                  </Button>
-                )}
-              </p>
-            </PageHeader>
-          </div>
-          {!isPhone && <HowItHappens signedIn={!!user} className="mt-10 lg:mt-0" />}
-        </Container>
-      </section>
-
-      {/* ===== Mentors you can talk to ===== */}
-      <Container className="py-6 md:py-14">
-        <MentorPreview
-          mentors={mentors}
-          isLoading={mentorsQuery.isLoading}
-          isError={mentorsQuery.isError && !mentors}
-          isFetching={mentorsQuery.isFetching}
-          onRetry={() => void mentorsQuery.refetch()}
-          isPhone={isPhone}
-        />
-      </Container>
-
-      {/* ===== Request rail (phones: after the preview, as a vertical list) ===== */}
-      {isPhone && (
-        <Container className="pb-6">
-          <HowItHappens size="sm" signedIn={!!user} />
-        </Container>
-      )}
-
-      {/* ===== What people come with (renders nothing, padding included, under 3 rows) ===== */}
-      <NeedsList mentors={mentors} isLoading={mentorsQuery.isLoading} className="py-6 md:py-14" />
-
-      {/* ===== FAQ ===== */}
-      <section aria-labelledby={faqId}>
-        <Container className="py-6 md:py-14">
-          <h2 id={faqId} className="text-h2-sm text-foreground md:text-h2">
-            {t("landing.faq.title")}
-          </h2>
-          <Accordion type="single" collapsible className="mt-4 max-w-3xl rounded-lg border border-border bg-card px-4 md:mt-6 md:px-6">
-            {FAQ_KEYS.map((key, index) => (
-              <AccordionItem key={key} value={key} className={index === FAQ_KEYS.length - 1 ? "border-b-0" : undefined}>
-                <AccordionTrigger className="py-3 text-body md:py-4">{t(`landing.faq.${key}Question`)}</AccordionTrigger>
-                <AccordionContent className="max-w-prose text-body-sm text-muted-foreground text-pretty">
-                  {t(`landing.faq.${key}Answer`)}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
-          </Accordion>
-        </Container>
-      </section>
-
-      {/* ===== Final CTA band (the only surface change on the page) ===== */}
-      <section aria-labelledby={ctaId} data-surface="dark" className="bg-secondary text-secondary-foreground">
-        <Container className="flex flex-col gap-5 py-10 md:flex-row md:items-center md:justify-between md:py-16">
-          <div className="min-w-0">
-            <h2 id={ctaId} className="text-h2-sm md:text-h2">
-              {t("landing.cta.title")}
-            </h2>
-            <p className="mt-2 max-w-prose text-body text-secondary-foreground/80 text-pretty">{t("landing.cta.body")}</p>
-          </div>
-          <Button asChild variant="primary" size="lg" className="shrink-0 md:self-center">
-            <Link href={ROUTES.mentors} data-testid="link-cta-browse">
-              {t("landing.cta.button")}
+              {t("showcase.hero.cta")}
+              <span className="inline-flex size-10 items-center justify-center rounded-[8px] bg-white text-[var(--sc-ink)]">
+                <ArrowRight className="size-5 rtl:-scale-x-100" aria-hidden="true" />
+              </span>
             </Link>
-          </Button>
-        </Container>
-      </section>
-
-      {/* ===== Footer ===== */}
-      <footer className="border-t border-border bg-background">
-        <Container className="flex flex-col gap-3 py-6 md:flex-row md:items-center md:justify-between md:py-8">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-body-sm">
-            <span className="inline-flex items-center gap-2">
-              <AmazonLogo size="sm" />
-              <span className="font-medium text-foreground">MentorConnect</span>
-            </span>
-            <span className="hidden text-muted-foreground md:inline" aria-hidden="true">
-              ·
-            </span>
-            <span className="basis-full text-muted-foreground md:basis-auto">{t("landing.footer.programme")}</span>
+            <div className="flex flex-col gap-3">
+              <div className="inline-flex h-[46px] items-center gap-2 rounded-[8px] border border-[#d9d9d9] bg-white/40 px-4 text-[16px] font-medium text-[var(--sc-ink)]">
+                <span>{t("showcase.hero.rating")}</span>
+                <span className="inline-flex items-center gap-0.5 text-[#f5a623]" aria-hidden="true">
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Star key={i} className="size-4 fill-current" />
+                  ))}
+                </span>
+                <span>{t("showcase.hero.ratingLabel")}</span>
+              </div>
+              <div className="inline-flex h-[46px] items-center justify-center rounded-[8px] border border-[#d9d9d9] bg-white/40 px-4 text-[16px] font-medium text-[var(--sc-ink)]">
+                {t("showcase.hero.sessions")}
+              </div>
+            </div>
           </div>
-          <nav aria-label={t("landing.footer.nav")}>
-            <ul className="flex flex-wrap gap-x-6 gap-y-2 text-body-sm">
-              <li>
-                <Link href={ROUTES.mentors} className="inline-flex min-h-6 items-center text-foreground underline-offset-4 hover:underline">
-                  {t("nav.mentors")}
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href={ROUTES.mentorOnboarding}
-                  className="inline-flex min-h-6 items-center text-foreground underline-offset-4 hover:underline"
-                >
-                  {t("nav.becomeMentor")}
-                </Link>
-              </li>
-              <li>
-                <Link href={ROUTES.login} className="inline-flex min-h-6 items-center text-foreground underline-offset-4 hover:underline">
-                  {t("nav.signIn")}
-                </Link>
-              </li>
-            </ul>
-          </nav>
-          <p className="text-caption text-muted-foreground">{t("landing.footer.copyright", { year })}</p>
-        </Container>
-      </footer>
+        </div>
+
+        {/* Mentor wall: two counter-scrolling columns on desktop, one snap row on phones. */}
+        <div className="sc-marquee-wrap sc-wall-fade absolute inset-y-0 end-0 hidden w-[490px] gap-6 lg:flex" aria-hidden="true">
+          <WallColumn mentors={colA} lang={lang} />
+          <WallColumn mentors={colB} reverse lang={lang} />
+        </div>
+        <div className="sc-rail -mx-4 mt-10 flex gap-4 overflow-x-auto px-4 lg:hidden">
+          {FEATURED_MENTORS.map((m) => (
+            <WallCard key={m.id} mentor={m} lang={lang} />
+          ))}
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+/* ===================== Bento ===================== */
+
+function Pill({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <span className={cn("inline-flex h-[42px] items-center gap-2 rounded-[12px] bg-white px-4 text-[15px] font-semibold text-[var(--sc-ink)] shadow-[0_2px_4px_rgba(0,0,0,0.08)]", className)}>
+      {children}
+    </span>
+  );
+}
+
+function Bento() {
+  const { t } = useTranslation();
+  const tile = "relative overflow-hidden rounded-[38px] p-8 min-h-[300px] flex flex-col";
+  return (
+    <section aria-labelledby="bento-title" className="bg-[var(--sc-grey)] py-16 md:pb-[140px] md:pt-[90px]">
+      <Container>
+        <h2 id="bento-title" className="text-center text-[36px] font-medium leading-[1.15] text-black md:text-[64px] md:leading-[84px]">
+          <strong className="font-black">{t("showcase.bento.titleBold")}</strong> {t("showcase.bento.titleRest")}
+        </h2>
+
+        <div className="mt-12 grid gap-5 md:mt-[64px] md:grid-cols-12">
+          {/* 1 — dedicated mentor */}
+          <div className={cn(tile, "bg-[var(--sc-tile-peach)] md:col-span-3")}>
+            <ShoppingBag className="size-14 text-[var(--sc-ink)]" strokeWidth={1.5} aria-hidden="true" />
+            <div className="mt-auto text-end">
+              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">2X</p>
+              <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                {t("showcase.bento.t1a")}
+                <br />
+                <strong className="font-bold">{t("showcase.bento.t1b")}</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* 2 — rated sessions */}
+          <div className={cn(tile, "bg-[var(--sc-tile-lavender)] md:col-span-5")}>
+            <div className="pointer-events-none absolute inset-x-6 top-8 space-y-4" aria-hidden="true">
+              <div className="w-fit -rotate-6 rounded-full bg-white/60 py-2 pe-6 ps-3 text-[13px] text-[var(--sc-ink-soft)]">
+                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-peach)] align-middle" /> 5/5 “{t("showcase.bento.review1")}”
+              </div>
+              <div className="ms-10 w-fit -rotate-6 rounded-full bg-white/60 py-2 pe-6 ps-3 text-[13px] text-[var(--sc-ink-soft)]">
+                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-green)] align-middle" /> 5/5 “{t("showcase.bento.review2")}”
+              </div>
+            </div>
+            <div className="mt-auto text-end">
+              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">96%</p>
+              <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                {t("showcase.bento.t2a")}
+                <br />
+                <strong className="font-bold">{t("showcase.bento.t2b")}</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* 3 — across MENA */}
+          <div className={cn(tile, "bg-[var(--sc-tile-green)] md:col-span-4")}>
+            <div className="pointer-events-none absolute -end-16 -top-24 size-64 rounded-full bg-[#8cc152]/70" aria-hidden="true" />
+            <div className="pointer-events-none absolute -bottom-20 -start-10 size-56 rounded-full bg-[#8cc152]/70" aria-hidden="true" />
+            <div className="relative flex flex-col items-end gap-3">
+              <Pill>🇦🇪 {t("showcase.bento.city1")}</Pill>
+              <Pill className="me-24">🇸🇦 {t("showcase.bento.city2")}</Pill>
+            </div>
+            <div className="relative mt-auto text-end">
+              <p className="text-[44px] font-black leading-none text-[var(--sc-ink)] md:text-[52px]">{t("showcase.bento.t3big")}</p>
+              <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                {t("showcase.bento.t3a")} <strong className="font-bold">{t("showcase.bento.t3b")}</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* 4 — instant scheduling */}
+          <div className={cn(tile, "bg-[var(--sc-tile-blue)] md:col-span-5")}>
+            <div className="flex flex-col items-start gap-3">
+              <Pill>
+                <Video className="size-4" aria-hidden="true" /> {t("showcase.bento.meet")}
+              </Pill>
+              <Pill>
+                <CalendarPlus className="size-4" aria-hidden="true" /> {t("showcase.bento.invite")}
+              </Pill>
+            </div>
+            <div className="mt-auto">
+              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t4big")}</p>
+              <p className="mt-3 max-w-[360px] text-[18px] leading-[26px] text-[var(--sc-ink)]">{t("showcase.bento.t4a")}</p>
+            </div>
+          </div>
+
+          {/* 5 — free */}
+          <div className={cn(tile, "bg-[var(--sc-tile-sand)] md:col-span-3")}>
+            <CalendarCheck className="size-14 text-[#a8894e]" strokeWidth={1.5} aria-hidden="true" />
+            <div className="mt-auto text-end">
+              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">100%</p>
+              <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                {t("showcase.bento.t5a")}
+                <br />
+                <strong className="font-bold">{t("showcase.bento.t5b")}</strong>
+              </p>
+            </div>
+          </div>
+
+          {/* 6 — matched */}
+          <div className={cn(tile, "bg-[var(--sc-tile-teal)] md:col-span-4")}>
+            <div className="flex flex-col items-center gap-1 text-[14px] text-[var(--sc-ink)]" aria-hidden="true">
+              <span className="rounded-[12px] bg-white px-4 py-2 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">{t("showcase.bento.you")}</span>
+              <span className="h-5 w-px bg-[var(--sc-ink)]/40" />
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-2 rounded-[12px] bg-white/70 px-4 py-2 font-semibold">
+                  <AmazonLogo size="sm" /> MentorConnect
+                </span>
+                <ArrowRight className="size-4 rtl:-scale-x-100" />
+                <span className="rounded-[12px] bg-white px-4 py-2 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">{t("showcase.bento.yourSession")}</span>
+              </div>
+            </div>
+            <div className="mt-auto text-end">
+              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t6big")}</p>
+              <p className="mt-3 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                <strong className="font-bold">{t("showcase.bento.t6a")}</strong> {t("showcase.bento.t6b")}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
+/* ===================== Mentor rail ===================== */
+
+function RailCard({ mentor, lang }: { mentor: FeaturedMentor; lang: string }) {
+  const { t } = useTranslation();
+  const session = lang === "ar" ? mentor.session.title_ar : mentor.session.title;
+  const subtitle = lang === "ar" ? mentor.session.subtitle_ar : mentor.session.subtitle;
+  return (
+    <article className="flex w-[300px] shrink-0 flex-col bg-[var(--sc-card-dark)] p-7 text-white md:w-[356px]">
+      <h3 className="text-[22px] font-bold leading-[1.2] md:text-[25px]">{session}</h3>
+      <p className="mt-3 text-[15.5px] leading-[23px] text-white/70">{subtitle}</p>
+      <div className="mt-auto flex items-end justify-between gap-4 pt-10">
+        <div className="flex flex-col items-start gap-2.5">
+          <span className="rounded-[4px] bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold">
+            {t("showcase.rail.mentored", { total: mentor.bookings })}
+          </span>
+          <span className="rounded-[4px] border border-white/25 px-3 py-1.5 text-[12.5px] font-semibold">
+            {t("showcase.rail.minutes", { minutes: mentor.session.minutes })}
+          </span>
+        </div>
+        <div className="flex w-[145px] shrink-0 flex-col items-center">
+          <img src={mentor.photo_url} alt="" className="h-[157px] w-[145px] rounded-[2px] object-cover" loading="lazy" />
+          <p className="mt-3 text-center text-[14px] font-semibold">{localizedName(mentor, lang)}</p>
+        </div>
+      </div>
+      <Link
+        href={`/mentor/${mentor.id}`}
+        className="mt-6 inline-flex h-[46px] items-center justify-center gap-2 bg-white text-[14px] font-bold text-[var(--sc-ink)] transition-colors duration-fast hover:bg-[var(--sc-peach)]"
+        data-testid={`link-rail-${mentor.id}`}
+      >
+        {t("showcase.rail.view")}
+        <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+      </Link>
+    </article>
+  );
+}
+
+function MentorRail() {
+  const { t, i18n } = useTranslation();
+  const railRef = React.useRef<HTMLDivElement>(null);
+  const scrollBy = (dir: 1 | -1) => {
+    const el = railRef.current;
+    if (!el) return;
+    const rtl = document.documentElement.dir === "rtl";
+    el.scrollBy({ left: dir * (rtl ? -380 : 380), behavior: "smooth" });
+  };
+  const arrow = "inline-flex size-[46px] items-center justify-center bg-white text-[var(--sc-ink)] transition-colors duration-fast hover:bg-[var(--sc-peach)]";
+
+  return (
+    <section aria-labelledby="rail-title" className="overflow-hidden bg-[var(--sc-orange)] py-16 md:py-[84px]">
+      <Container>
+        <div className="flex items-end justify-between gap-6">
+          <div className="max-w-[700px]">
+            <h2 id="rail-title" className="font-serif-soft text-[36px] font-light leading-[1.1] text-[var(--sc-ink)] md:text-[56px]">
+              {t("showcase.rail.title")}
+            </h2>
+            <p className="mt-5 text-[17px] text-[var(--sc-ink)]/80">{t("showcase.rail.lede")}</p>
+          </div>
+          <div className="hidden gap-1.5 md:flex">
+            <button type="button" className={arrow} onClick={() => scrollBy(-1)} aria-label={t("showcase.rail.prev")}>
+              <ArrowLeft className="size-5 rtl:-scale-x-100" aria-hidden="true" />
+            </button>
+            <button type="button" className={arrow} onClick={() => scrollBy(1)} aria-label={t("showcase.rail.next")}>
+              <ArrowRight className="size-5 rtl:-scale-x-100" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </Container>
+      <div className="mx-auto mt-10 w-full max-w-[1200px] px-4 sm:px-6 md:mt-12 lg:px-8">
+        <div ref={railRef} className="sc-rail -mx-4 flex gap-6 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8" tabIndex={0}>
+          {FEATURED_MENTORS.map((m) => (
+            <RailCard key={m.id} mentor={m} lang={i18n.language} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ===================== Page ===================== */
+
+export default function Home() {
+  return (
+    <div className="flex flex-col">
+      <Hero />
+      <Bento />
+      <MentorRail />
+
     </div>
   );
 }

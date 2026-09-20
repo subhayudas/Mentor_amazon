@@ -1,21 +1,61 @@
 import * as React from "react";
-import type { LucideIcon } from "lucide-react";
+import { Quote, type LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 /**
- * Auth page chrome shared by sign-in, sign-up, forgot and reset password:
- * a centred white card with the page `h1` (`id="page-title"`, focus target of
- * the route-change effect) and an optional description. No arbitrary hex,
- * no orange text; the one orange fill on these pages is the page's primary
- * action passed by the caller.
+ * Auth page chrome shared by sign-in, sign-up, forgot and reset password
+ * (Figma "Start your creator business today"): the form column sits on white
+ * at the inline-start, anchored to the TOP so validation messages, strength
+ * meters and error banners never move the form vertically (the old
+ * vertically-centred card jumped every time its height changed); the
+ * inline-end half is the peach testimonial wall, hidden below `lg`.
  */
 export function AuthPage({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={cn("container-page flex min-h-[calc(100dvh-3.5rem)] items-start justify-center py-10 md:items-center md:py-12", className)}>
-      {children}
+    <div className={cn("grid min-h-[calc(100dvh-3.5rem)] bg-white lg:grid-cols-2", className)}>
+      <div className="flex justify-center px-4 pb-16 pt-10 sm:px-8 md:pt-16 lg:justify-end lg:pe-[72px] lg:ps-8">{children}</div>
+      <TestimonialWall />
     </div>
+  );
+}
+
+const WALL_QUOTES = [1, 2, 3, 4, 5, 6] as const;
+
+function TestimonialWall() {
+  const { t } = useTranslation();
+  const Card = ({ n }: { n: (typeof WALL_QUOTES)[number] }) => (
+    <figure className="rounded-[24px] bg-white p-7 shadow-[0_2px_0_rgba(33,33,33,0.02)]">
+      <Quote className="size-5 text-[#c9c9c9]" aria-hidden="true" />
+      <blockquote className="mt-4 text-[18px] leading-[26px] text-[var(--sc-ink)]">{t(`showcase.auth.quotes.${n}.text`)}</blockquote>
+      <figcaption className="mt-6 flex items-center gap-3">
+        <span className="inline-flex size-12 items-center justify-center rounded-full bg-[var(--sc-peach)] text-[15px] font-bold text-[var(--sc-ink)]" aria-hidden="true">
+          {t(`showcase.auth.quotes.${n}.name`).slice(0, 1)}
+        </span>
+        <span>
+          <span className="block text-[16px] font-semibold text-[var(--sc-ink)]">{t(`showcase.auth.quotes.${n}.name`)}</span>
+          <span className="block text-[14px] text-[var(--sc-ink-soft)]">{t(`showcase.auth.quotes.${n}.role`)}</span>
+        </span>
+      </figcaption>
+    </figure>
+  );
+  return (
+    <aside className="sc-marquee-wrap relative hidden overflow-hidden bg-[var(--sc-peach)] lg:block" aria-hidden="true">
+      <div className="sc-wall-fade absolute inset-0 grid grid-cols-2 gap-6 px-6">
+        <div className="sc-marquee flex flex-col gap-6 pt-6">
+          {[1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3].map((n, i) => (
+            <Card key={i} n={n as 1} />
+          ))}
+        </div>
+        <div className="sc-marquee-reverse flex flex-col gap-6 pt-6">
+          {[4, 5, 6, 4, 5, 6, 4, 5, 6, 4, 5, 6].map((n, i) => (
+            <Card key={i} n={n as 4} />
+          ))}
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -27,12 +67,12 @@ export function AuthCard({
   ...props
 }: React.HTMLAttributes<HTMLDivElement> & { title: React.ReactNode; description?: React.ReactNode }) {
   return (
-    <div className={cn("w-full max-w-md rounded-lg border border-border bg-card p-6 text-card-foreground md:p-8", className)} {...props}>
-      <div className="mb-6 text-center">
-        <h1 id="page-title" tabIndex={-1} className="text-h2-sm text-foreground md:text-h2">
+    <div className={cn("w-full max-w-[458px] text-card-foreground", className)} {...props}>
+      <div className="mb-8">
+        <h1 id="page-title" tabIndex={-1} className="text-[36px] font-bold leading-tight text-[var(--sc-ink)] md:text-[44px]">
           {title}
         </h1>
-        {description && <p className="mt-2 text-body-sm text-muted-foreground text-pretty">{description}</p>}
+        {description && <p className="mt-3 text-[16px] text-[var(--sc-ink-soft)] text-pretty">{description}</p>}
       </div>
       {children}
     </div>

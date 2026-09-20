@@ -242,15 +242,22 @@ export default function Mentors() {
     ) : undefined;
 
   return (
-    <Container className="pb-16">
-      <PageHeader title={t("discovery.title")} description={t("discovery.description")} className="pb-6 md:pb-8">
+    <>
+    {/* Peach band (showcase hero language): serif title, lede, live count and the search. */}
+    <section className="bg-[var(--sc-peach)]">
+      <Container className="pb-8 pt-10 md:pb-12 md:pt-14">
+      <PageHeader
+        title={t("discovery.title")}
+        description={t("discovery.description")}
+        className="sc-serif-h1 pb-6 md:pb-8 [&_h1]:text-[44px] [&_h1]:font-normal [&_h1]:leading-[1] [&_h1]:tracking-[-0.04em] [&_h1]:text-[var(--sc-ink)] md:[&_h1]:text-[64px] [&_p]:text-[var(--sc-ink)]"
+      >
         {/* Reserved at exactly one line of its own leading (21px EN, 24px AR) so the count arriving never moves what follows. */}
-        <p role="status" aria-live="polite" className="mt-3 min-h-[1lh] text-body-sm text-muted-foreground tabular-nums" data-testid="text-result-count">
+        <p role="status" aria-live="polite" className="mt-3 min-h-[1lh] text-body-sm text-[var(--sc-ink-soft)] tabular-nums" data-testid="text-result-count">
           {countText}
         </p>
       </PageHeader>
 
-      <div className="max-w-[720px]">
+      <div className="max-w-[720px] [&_input]:bg-white">
         <SearchIntent
           id="search-mentors"
           size="md"
@@ -264,7 +271,10 @@ export default function Mentors() {
           inputProps={SEARCH_INPUT_PROPS}
         />
       </div>
+      </Container>
+    </section>
 
+    <Container className="pb-16">
       <div className="mt-8 lg:grid lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-10">
         {/* Filters exist only once there is a catalogue to filter: a rail skeleton while
             loading (desktop), nothing on error (the results column carries the retry). */}
@@ -361,5 +371,6 @@ export default function Mentors() {
         </div>
       </div>
     </Container>
+    </>
   );
 }

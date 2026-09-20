@@ -5,3 +5,10 @@ vite.config.ts.*
 *.tar.gz
 .env
 .local/
+
+# Local working files (knowledge graph output, prompt notes, source photos already copied to client/public/mentors)
+graphify-out/
+/mentor-amazon-*.txt
+/mentorconnect-ui-prompt-*.txt
+/*.jpeg
+/*.png

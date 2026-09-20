@@ -50,7 +50,8 @@ export interface MentorCardProps {
 }
 
 const cardSurface =
-  "relative isolate flex h-full flex-col gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground";
+  "relative isolate flex h-full flex-col gap-3 rounded-[16px] border border-[var(--sc-hairline)] bg-white p-3 pb-4 text-card-foreground shadow-[0_2px_4px_rgba(0,0,0,0.05)]";
+
 
 function useCardFields(mentor: PublicMentor) {
   const { t, i18n } = useTranslation();
@@ -117,34 +118,40 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
         the name on one line. `min-h-14` (not `h-14`) lets the stacked variant
         grow; the skeleton mirrors the same structure.
       */}
-      <div className="flex min-h-14 items-center gap-3">
-        <Avatar className="size-12">
-          <AvatarImage src={mentor.photo_url || undefined} alt="" />
-          <AvatarFallback className="bg-muted text-base font-medium text-foreground">{f.initials}</AvatarFallback>
-        </Avatar>
-        <div className="flex min-w-0 flex-1 flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-          <h3
-            id={nameId}
-            data-testid={`text-mentor-name-${mentor.id}`}
-            className="line-clamp-2 min-w-0 text-base leading-snug text-foreground [font-weight:var(--heading-weight,600)] [overflow-wrap:anywhere] sm:flex-1"
-          >
-            <bdi>{f.name}</bdi>
-          </h3>
-          <Badge
-            tone={mentor.is_available ? "success" : "neutral"}
-            className="self-start sm:self-auto sm:shrink-0"
-            data-status={mentor.is_available ? "accepting" : "closed"}
-          >
-            {f.statusLabel}
-          </Badge>
-        </div>
+      <div className="relative aspect-[4/3] overflow-hidden rounded-[10px] bg-[var(--sc-grey)]">
+        {mentor.photo_url ? (
+          <img src={mentor.photo_url} alt="" loading="lazy" className="size-full object-cover object-[center_28%]" />
+        ) : (
+          <div className="grid size-full place-items-center text-3xl font-bold text-[var(--sc-ink-soft)]" aria-hidden="true">
+            {f.initials}
+          </div>
+        )}
+        <Badge
+          tone={mentor.is_available ? "success" : "neutral"}
+          className="absolute bottom-2 start-2 z-[1] shadow-sm"
+          data-status={mentor.is_available ? "accepting" : "closed"}
+        >
+          {f.statusLabel}
+        </Badge>
+        {f.company && (
+          <span className="absolute bottom-2 end-2 z-[1] max-w-[55%] truncate rounded-[24px] bg-black/55 px-3 py-1 text-[12px] font-medium text-white backdrop-blur">
+            <bdi>{f.company}</bdi>
+          </span>
+        )}
       </div>
+      <h3
+        id={nameId}
+        data-testid={`text-mentor-name-${mentor.id}`}
+        className="line-clamp-1 min-w-0 px-1 text-[18px] font-bold leading-[28px] text-[var(--sc-ink)] [overflow-wrap:anywhere]"
+      >
+        <bdi>{f.name}</bdi>
+      </h3>
 
-      <Credential position={f.position} company={f.company} className="h-6 leading-6" />
+      <Credential position={f.position} company={f.company} className="-mt-3 h-6 px-1 leading-6 text-[var(--sc-ink-soft)]" />
 
-      <p className="line-clamp-2 h-12 text-body-sm leading-6 text-foreground text-pretty">{f.helpsWith}</p>
+      <p className="line-clamp-2 h-12 px-1 text-body-sm leading-6 text-foreground text-pretty">{f.helpsWith}</p>
 
-      <div className="flex min-h-8 items-start gap-2">
+      <div className="flex min-h-8 items-start gap-2 px-1">
         {f.visibleTags.map((tag, i) => (
           <Badge key={tag.key} tone="neutral" className="min-w-0 max-w-full shrink" data-testid={`badge-expertise-${i}`}>
             <span className="truncate">{tag.label}</span>
@@ -180,7 +187,7 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
         )}
       </div>
 
-      <div className="h-10 text-caption text-muted-foreground">
+      <div className="h-10 px-1 text-caption text-muted-foreground">
         <p className="h-5 truncate leading-5">
           {f.languages.length > 0 && <span>{f.languages.join(t("mentorCard.listSeparator"))}</span>}
           {f.languages.length > 0 && f.country && <span aria-hidden="true"> · </span>}
@@ -204,7 +211,7 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
         </p>
       </div>
 
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-3">
+      <div className="mt-auto flex flex-wrap items-center justify-between gap-3 px-1 pt-3">
         {/*
           The single link. Its `after:` pseudo-element covers the card (the
           article is `relative isolate`), so the whole surface is clickable and
@@ -217,11 +224,11 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
         <Link
           href={ROUTES.mentor(mentor.id)}
           data-testid={`link-mentor-${mentor.id}`}
-          className="group/link inline-flex w-full rounded-lg after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ring sm:w-auto"
+          className="group/link inline-flex w-full rounded-lg after:absolute after:inset-0 after:rounded-[16px] after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ring sm:w-auto"
         >
           <span
             data-testid={`button-book-${mentor.id}`}
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full group-hover/link:bg-muted sm:w-auto")}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "w-full rounded-[10px] border-transparent bg-[var(--sc-ink)] text-white group-hover/link:bg-black group-hover/link:text-white sm:w-auto")}
           >
             {t("mentorCard.viewProfile")}
             <span className="sr-only">
@@ -301,7 +308,7 @@ export function MentorCardSkeleton({ className }: { className?: string }) {
       </div>
       <Skeleton className="h-6 w-2/3" />
       <Skeleton className="h-12 w-full" />
-      <div className="flex min-h-8 items-start gap-2">
+      <div className="flex min-h-8 items-start gap-2 px-1">
         <Skeleton className="h-5 w-24 rounded-full" />
         <Skeleton className="h-5 w-28 rounded-full" />
         <Skeleton className="h-5 w-20 rounded-full" />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, LogOut, Menu } from "lucide-react";
+import { ArrowRight, ChevronDown, LogOut, Menu } from "lucide-react";
 
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { LanguageToggle } from "@/components/LanguageToggle";
@@ -18,6 +18,7 @@ import {
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/context/AuthContext";
 import { syncRoleStorage } from "@/lib/auth";
+import { IS_LOCAL } from "@/lib/demo";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -42,11 +43,11 @@ type NavItem = { href: string; label: string; testId?: string };
 
 const navLinkClass = (active: boolean) =>
   cn(
-    "relative inline-flex h-14 items-center rounded-md px-3 text-sm font-medium transition-colors duration-fast focus-visible:-outline-offset-4",
-    "after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+    "relative inline-flex h-14 items-center rounded-md px-3 text-[15px] font-medium transition-colors duration-fast focus-visible:-outline-offset-4 lg:h-[72px]",
+    "after:absolute after:inset-x-3 after:bottom-4 after:h-0.5 after:rounded-full after:content-['']",
     active
-      ? "text-secondary after:bg-secondary"
-      : "text-muted-foreground hover:text-foreground after:bg-transparent",
+      ? "text-[var(--sc-ink)] after:bg-[var(--sc-ink)]"
+      : "text-[var(--sc-ink-soft)] hover:text-[var(--sc-ink)] after:bg-transparent",
   );
 
 const sheetLinkClass = (active: boolean) =>
@@ -112,13 +113,25 @@ export function Navigation() {
   const isActive = (href: string) =>
     href === ROUTES.home ? location === href : location === href || location.startsWith(`${href}/`);
 
-  const primaryItems: NavItem[] = [{ href: ROUTES.mentors, label: t("nav.mentors"), testId: "nav-mentors" }];
-
-  const roleItems: NavItem[] = [
-    ...(isMentor ? [{ href: ROUTES.mentorPortal, label: t("nav.mentorPortal") }] : []),
-    ...(isMentee ? [{ href: ROUTES.menteeDashboard, label: t("nav.menteeDashboard") }] : []),
-    ...(isAdmin ? [{ href: ROUTES.admin, label: t("nav.admin") }, { href: ROUTES.analytics, label: t("nav.analytics") }] : []),
+  const primaryItems: NavItem[] = [
+    { href: ROUTES.mentors, label: t("nav.mentors"), testId: "nav-mentors" },
+    // The showcase dashboard (demo, or any signed-in account) and the mentor sign-up live in the bar itself.
+    ...(IS_LOCAL || user ? [{ href: "/dashboard", label: user ? t(user.user_type === "mentee" ? "showcase.nav.myDashboard" : "showcase.nav.dashboard") : t("showcase.nav.dashboard"), testId: "nav-dashboard" }] : []),
+    ...(!isLoggedIn
+      ? [
+          { href: ROUTES.menteeRegistration, label: t("showcase.footer.joinAsMentee"), testId: "nav-join-mentee" },
+          { href: ROUTES.mentorOnboarding, label: t("nav.becomeMentor"), testId: "nav-become-mentor" },
+        ]
+      : []),
   ];
+
+  const roleItems: NavItem[] = IS_LOCAL
+    ? []
+    : [
+        ...(isMentor ? [{ href: ROUTES.mentorPortal, label: t("nav.mentorPortal") }] : []),
+        ...(isMentee ? [{ href: ROUTES.menteeDashboard, label: t("nav.menteeDashboard") }] : []),
+        ...(isAdmin ? [{ href: ROUTES.admin, label: t("nav.admin") }, { href: ROUTES.analytics, label: t("nav.analytics") }] : []),
+      ];
 
   const desktopItems = [...primaryItems, ...roleItems];
   const showBrowse = !isLoading && !isLoggedIn && !isActive(ROUTES.mentors);
@@ -127,11 +140,11 @@ export function Navigation() {
   const initial = (user?.name || user?.email || userEmail || "?").charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-40 h-14 border-b border-border bg-card">
-      <div className="container-page flex h-14 items-center gap-2">
-        <Link href={ROUTES.home} className="me-2 flex shrink-0 items-center gap-2 rounded-md" aria-label={t("nav.homeLink")}>
-          <AmazonLogo size="sm" />
-          <span className="text-base font-semibold text-foreground">MentorConnect</span>
+    <header className="sticky top-0 z-40 h-14 border-b border-[var(--sc-hairline)] bg-white lg:h-[72px]">
+      <div className="container-page flex h-14 items-center gap-2 lg:h-[72px]">
+        <Link href={ROUTES.home} className="me-4 flex shrink-0 items-center gap-2.5 rounded-md" aria-label={t("nav.homeLink")}>
+          <AmazonLogo size="md" className="size-7 lg:size-8" />
+          <span className="text-[17px] font-bold text-[var(--sc-ink)] lg:text-[19px]">MentorConnect</span>
         </Link>
 
         <nav aria-label={t("nav.primaryNav")} className="hidden lg:flex lg:flex-1 lg:items-center">
@@ -154,18 +167,29 @@ export function Navigation() {
         <div className="ms-auto flex min-w-0 items-center gap-0.5 sm:gap-2">
           <LanguageToggle />
 
-          {bellEmail && <NotificationBell email={bellEmail} />}
+          {bellEmail && !IS_LOCAL && <NotificationBell email={bellEmail} />}
 
           {/* Visitor CTAs never top the access-error card: with a session whose users row failed to load (F-02), the header stays neutral. */}
           {!isLoading && !isLoggedIn && !error && (
             <>
-              <Button asChild variant="ghost" size="sm" className="hidden lg:inline-flex" data-testid="link-sign-in">
-                <Link href={ROUTES.login}>{t("nav.signIn")}</Link>
-              </Button>
+              <Link
+                href={ROUTES.login}
+                className="hidden h-10 items-center rounded-[10px] px-3 text-[15px] font-medium text-[var(--sc-ink)] hover:bg-[var(--sc-grey)] lg:inline-flex"
+                data-testid="link-sign-in"
+              >
+                {t("nav.signIn")}
+              </Link>
               {showBrowse && (
-                <Button asChild variant="outline" size="sm" className="hidden lg:inline-flex" data-testid="link-browse-mentors">
-                  <Link href={ROUTES.mentors}>{t("nav.browseMentors")}</Link>
-                </Button>
+                <Link
+                  href={ROUTES.mentors}
+                  className="hidden h-11 items-center gap-2 rounded-[12px] bg-[var(--sc-ink)] ps-4 pe-2 text-[15px] font-medium text-white transition-colors duration-fast hover:bg-black lg:inline-flex"
+                  data-testid="link-browse-mentors"
+                >
+                  {t("showcase.hero.cta")}
+                  <span className="inline-flex size-7 items-center justify-center rounded-[6px] bg-white text-[var(--sc-ink)]">
+                    <ArrowRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+                  </span>
+                </Link>
               )}
             </>
           )}
