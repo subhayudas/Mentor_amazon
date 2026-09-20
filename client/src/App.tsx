@@ -13,6 +13,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Navigation } from "@/components/Navigation";
 import { SiteFooter } from "@/components/SiteFooter";
+import { ContentGuard } from "@/components/ContentGuard";
 import { SkipLink } from "@/components/SkipLink";
 import { RequireAuth, RequireRole } from "@/components/RouteGuard";
 import { useDirection } from "@/hooks/useDirection";
@@ -236,6 +237,7 @@ function Shell() {
     <DirectionProvider dir={dir}>
       <SkipLink />
       <RouteEffects />
+      <ContentGuard />
       <div className="flex min-h-screen flex-col bg-background">
         <Navigation />
         <main id="main" tabIndex={-1} className="flex-1 scroll-mt-14 lg:scroll-mt-[72px]">
