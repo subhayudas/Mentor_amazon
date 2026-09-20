@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { CalendarCog, CalendarDays, ChevronDown, Clock3, MapPin, Play, Settings2, Check } from "lucide-react";
+import { CalendarCog, CalendarDays, ChevronDown, Clock3, MapPin, Settings2, Check } from "lucide-react";
 
 import { DashboardHeader, DashboardShell, Pill, useDashboardIdentity } from "@/components/dashboard/DashboardShell";
 import { getLocalValue, setLocalValue } from "@/lib/localStore";
@@ -86,12 +86,6 @@ export default function DashboardCalendar() {
             {t(`showcase.calendar.${k}`)}
           </Pill>
         ))}
-        trailing={
-          <a href="#how-it-works" className="inline-flex h-10 items-center gap-2 rounded-full border border-[#c9c2f5] bg-[#ece8ff] px-4 text-[14px] font-semibold text-[#4b3fb8]">
-            {t("showcase.calendar.howItWorks")}
-            <Play className="size-3.5 fill-current" aria-hidden="true" />
-          </a>
-        }
       />
       <div className="px-4 py-2 sm:px-8 lg:px-12">
         {tab === "settings" ? (
@@ -194,7 +188,7 @@ export default function DashboardCalendar() {
             {saved ? <Check className="size-4" aria-hidden="true" /> : null}
             {saved ? t("showcase.calendar.saved") : t("showcase.calendar.save")}
           </button>
-          <p className="text-[13px] text-[#6c6c84]" id="how-it-works">
+          <p className="text-[13px] text-[#6c6c84]">
             {t("showcase.calendar.saveHint")}
           </p>
         </div>

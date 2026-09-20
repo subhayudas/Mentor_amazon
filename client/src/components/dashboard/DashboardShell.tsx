@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { BarChart3, CalendarClock, CalendarDays, ChevronDown, ChevronRight, Home as HomeIcon, LogOut, Megaphone, Plus, Search, Settings, UserRound, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, CalendarClock, CalendarDays, ChevronRight, Home as HomeIcon, LogOut, Plus, Search, Settings, UserRound, Users, type LucideIcon } from "lucide-react";
 
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { useAuth } from "@/context/AuthContext";
@@ -89,16 +89,9 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
             <p className="truncate text-[12px] text-[#6c6c84]">{t("showcase.analytics.programme")}</p>
           </div>
         </div>
-        <span className="mt-4 inline-flex h-9 items-center gap-2 rounded-full bg-[#e6f3e6] px-3 text-[13px] font-medium text-[var(--sc-ink)]">
-          <Megaphone className="size-4" aria-hidden="true" />
-          {t("showcase.analytics.pill")}
-        </span>
-        <Link href={isMentee ? ROUTES.mentors : DASHBOARD_ROUTES.profile} className="mt-3 inline-flex h-10 items-center justify-between rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
-          <span className="inline-flex items-center gap-2">
-            <Plus className="size-4" aria-hidden="true" />
-            {t(isMentee ? "showcase.analytics.book" : "showcase.analytics.create")}
-          </span>
-          <ChevronDown className="size-4" aria-hidden="true" />
+        <Link href={isMentee ? ROUTES.mentors : DASHBOARD_ROUTES.profile} className="mt-4 inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
+          {isMentee ? <Plus className="size-4" aria-hidden="true" /> : <UserRound className="size-4" aria-hidden="true" />}
+          {t(isMentee ? "showcase.analytics.book" : "showcase.analytics.editProfile")}
         </Link>
 
         <nav className="mt-4 flex flex-col gap-0.5" aria-label={t("showcase.analytics.sidebar")}>
@@ -120,8 +113,8 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
-          <Link href={ROUTES.home} className="inline-flex h-10 items-center justify-between rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
-            {t("showcase.analytics.guide")}
+          <Link href={`${ROUTES.home}#bento-title`} className="inline-flex h-10 items-center justify-between rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
+            {t("showcase.footer.howItWorks")}
             <ChevronRight className="size-4 rtl:-scale-x-100" aria-hidden="true" />
           </Link>
           <div className="flex items-center gap-3 px-1">

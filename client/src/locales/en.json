@@ -2035,9 +2035,6 @@
       "sidebar": "Dashboard navigation",
       "brand": "Mentor Dashboard",
       "programme": "Amazon UAE programme",
-      "pill": "Sharing posters for you",
-      "create": "New session",
-      "guide": "Programme guide",
       "title": "Profile Analytics",
       "period": "Period",
       "grain": "Granularity",
@@ -2114,7 +2111,8 @@
       },
       "brandMentee": "Mentee Dashboard",
       "book": "Book a session",
-      "showcaseAccount": "Showcase account — not signed in"
+      "showcaseAccount": "Showcase account — not signed in",
+      "editProfile": "Edit my profile"
     },
     "legal": {
       "terms": "Terms",
@@ -2142,11 +2140,6 @@
     "bookings": {
       "upcoming": "Upcoming",
       "completed": "Completed",
-      "kind": {
-        "calls": "1:1 Calls",
-        "office": "Office hours",
-        "programmes": "Programmes"
-      },
       "emptyTitle": "Share your page",
       "emptyBody": "A new booking might just be around the corner — share your profile link today!",
       "sharePage": "Share page",
@@ -2162,7 +2155,6 @@
     "calendar": {
       "settings": "Settings",
       "schedule": "Schedule",
-      "howItWorks": "How it works",
       "timezone": "Timezone",
       "timezoneSub": "Required for timely communications",
       "policy": "Reschedule policy",
@@ -2241,11 +2233,10 @@
       "inspired": "Get inspired",
       "inspiredSub": "Mentors who fill their calendar with the programme",
       "upcomingTitle": "{{count}} upcoming sessions",
-      "upcomingSub": "Where you appeared · next 14 days",
+      "upcomingSub": "Next 14 days",
       "seeDetails": "See details",
       "referTitle": "Refer a colleague, grow the mentor pool",
       "referNow": "Refer now",
-      "referPerks": "Referral perks",
       "stat": {
         "requests": "Requests",
         "hours": "Hours",
@@ -2265,7 +2256,8 @@
       "mentorScheduling": "Scheduling",
       "menteeType": "Account type",
       "menteeAbout": "About you",
-      "menteeInterests": "Interests & goals"
+      "menteeInterests": "Interests & goals",
+      "emailIsAccount": "You will sign in with this email."
     },
     "scheduler": {
       "title": "Book a session with {{name}}",
@@ -2281,8 +2273,6 @@
       "viewPublic": "View public page",
       "noAccountTitle": "No profile to edit yet",
       "noAccountBody": "Register as a mentor or mentee, or sign in with the email you registered with, and your profile becomes editable here.",
-      "photoUrl": "Photo URL",
-      "photoHint": "A link to a square photo (LinkedIn photo URL works).",
       "commaHint": "Separate with commas",
       "calLink": "Cal.com link",
       "calHint": "Your booking page; it is embedded on your session page.",

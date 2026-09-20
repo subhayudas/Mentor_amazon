@@ -3,7 +3,7 @@ import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { CalendarDays, Check, Share2, Video, X } from "lucide-react";
 
-import { DashboardHeader, DashboardShell, Pill } from "@/components/dashboard/DashboardShell";
+import { DashboardHeader, DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FEATURED_MENTORS } from "@/data/featuredMentors";
@@ -19,7 +19,6 @@ import { UPCOMING_STATUSES, useDashboardData } from "@/pages/dashboard/data";
  * status. The empty state keeps the design's "Share your page" prompt.
  */
 type Tab = "requests" | "upcoming" | "completed";
-const KINDS = ["calls", "office", "programmes"] as const;
 
 export default function DashboardBookings() {
   const { t, i18n } = useTranslation();
@@ -28,7 +27,6 @@ export default function DashboardBookings() {
   const isMentee = role === "mentee";
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
   const [tab, setTab] = React.useState<Tab>(() => (pendingCount > 0 ? "requests" : "upcoming"));
-  const [kind, setKind] = React.useState<(typeof KINDS)[number]>("calls");
 
   const menteeById = React.useMemo(() => new Map(mentees.map((m) => [m.id, m])), [mentees]);
   const mentorById = React.useMemo(() => new Map(mentors.map((m) => [m.id, m])), [mentors]);
@@ -59,11 +57,6 @@ export default function DashboardBookings() {
     <DashboardShell active="bookings">
       <DashboardHeader
         title={t(isMentee ? "showcase.analytics.nav.mySessions" : "showcase.analytics.nav.bookings")}
-        pills={KINDS.map((k) => (
-          <Pill key={k} active={kind === k} onClick={() => setKind(k)}>
-            {t(`showcase.bookings.kind.${k}`)}
-          </Pill>
-        ))}
         trailing={demo ? <Badge tone="warning">{t("analyticsV2.demoBadge")}</Badge> : undefined}
       />
       <div className="px-4 py-6 sm:px-8 lg:px-12">
@@ -78,7 +71,7 @@ export default function DashboardBookings() {
           ))}
         </div>
 
-        {kind !== "calls" || rows.length === 0 ? (
+        {rows.length === 0 ? (
           <div className="mx-auto max-w-[420px] py-16 text-center">
             <div className="mx-auto grid size-[140px] place-items-center rounded-full bg-[#ffd23f]/60" aria-hidden="true">
               <Share2 className="size-14 text-[var(--sc-ink)]" strokeWidth={1.25} />

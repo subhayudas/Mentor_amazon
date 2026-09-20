@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { DashboardHeader, DashboardShell, useDashboardIdentity } from "@/components/dashboard/DashboardShell";
@@ -50,6 +50,14 @@ export default function DashboardProfile() {
   const mentee = role === "mentee" ? mentees.find((m) => m.id === user?.profile_id) : undefined;
   const ids = React.useId();
   const [saved, setSaved] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+  const onPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setMForm((f) => ({ ...f, photo_url: String(reader.result ?? "") }));
+    reader.readAsDataURL(file);
+  };
 
   const [mForm, setMForm] = React.useState(() => ({
     name: mentor?.name ?? "",
@@ -165,9 +173,23 @@ export default function DashboardProfile() {
               <Field id={`${ids}-name`} title={t("mentorOnboarding.fullName")}>
                 <input id={`${ids}-name`} className={input} value={mForm.name} onChange={(e) => setMForm({ ...mForm, name: e.target.value })} />
               </Field>
-              <Field id={`${ids}-photo`} title={t("showcase.profileSettings.photoUrl")} hint={t("showcase.profileSettings.photoHint")}>
-                <input id={`${ids}-photo`} className={input} value={mForm.photo_url} onChange={(e) => setMForm({ ...mForm, photo_url: e.target.value })} dir="ltr" />
-              </Field>
+              <div>
+                <p className={label}>{t("mentorOnboarding.profilePhoto")}</p>
+                <div className="mt-1 flex items-center gap-3">
+                  {mForm.photo_url ? (
+                    <img src={mForm.photo_url} alt="" className="size-14 rounded-full object-cover" />
+                  ) : (
+                    <span className="inline-flex size-14 items-center justify-center rounded-full bg-[var(--sc-grey)] text-[18px] font-bold text-[var(--sc-ink-soft)]" aria-hidden="true">
+                      {mForm.name.slice(0, 1)}
+                    </span>
+                  )}
+                  <input ref={fileRef} id={`${ids}-photo`} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={onPhoto} />
+                  <label htmlFor={`${ids}-photo`} className="inline-flex h-10 cursor-pointer items-center gap-2 rounded-[6px] border border-[#d9d9d9] px-3 text-[14px] font-semibold text-[var(--sc-ink)] hover:bg-[var(--sc-sand)]">
+                    <Upload className="size-4" aria-hidden="true" />
+                    {t("mentorOnboarding.uploadPhoto")}
+                  </label>
+                </div>
+              </div>
               <Field id={`${ids}-position`} title={t("mentorOnboarding.position")}>
                 <input id={`${ids}-position`} className={input} value={mForm.position} onChange={(e) => setMForm({ ...mForm, position: e.target.value })} />
               </Field>

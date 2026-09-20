@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Plus, Share2, Clock3, HelpCircle } from "lucide-react";
+import { ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Plus, Share2, Clock3 } from "lucide-react";
 
 import { DASHBOARD_ROUTES, DashboardShell, useDashboardIdentity } from "@/components/dashboard/DashboardShell";
 import { getLocalValue, setLocalValue } from "@/lib/localStore";
@@ -244,9 +244,6 @@ export default function DashboardHome() {
             <Link href={ROUTES.mentorOnboarding} className="inline-flex h-12 items-center rounded-[8px] bg-white px-5 text-[15px] font-bold text-[var(--sc-ink)] hover:bg-[var(--sc-peach)]">
               {t("showcase.dashboard.referNow")}
             </Link>
-            <Link href={ROUTES.home} className="inline-flex h-12 items-center rounded-[8px] border border-white/70 px-5 text-[15px] font-medium text-white hover:bg-white/10">
-              {t("showcase.dashboard.referPerks")}
-            </Link>
           </div>
         </section>
 
@@ -268,10 +265,7 @@ export default function DashboardHome() {
             { label: t("showcase.dashboard.stat.completed"), value: nf.format(completed.length) },
           ].map((s) => (
             <div key={s.label} className={stat}>
-              <p className="flex items-center justify-between text-[14px] text-[var(--sc-ink)]">
-                {s.label}
-                <HelpCircle className="size-4 text-[#b0b0b0]" aria-hidden="true" />
-              </p>
+              <p className="text-[14px] text-[var(--sc-ink)]">{s.label}</p>
               <p className="mt-2 text-[32px] font-bold leading-none text-[var(--sc-ink)]">{s.value}</p>
             </div>
           ))}

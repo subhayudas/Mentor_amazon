@@ -1,6 +1,5 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
-import { Check } from "lucide-react";
 
 import { Container } from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
@@ -9,8 +8,9 @@ import { cn } from "@/lib/utils";
  * Onboarding chrome shared by the mentor and mentee forms (showcase
  * language): peach band with the serif title, the lede and the sections
  * the form walks through, then the white two-column body — the form and a
- * sticky "how it works" aside. Steps light up as their section scrolls
- * into view, so long forms read as a guided flow rather than one sheet.
+ * sticky "how it works" aside. The step chips are anchors that highlight
+ * the section currently in view (position, not completion — nothing is
+ * ticked until the form is submitted).
  */
 export interface OnboardingStep {
   id: string;
@@ -46,7 +46,7 @@ export function OnboardingShell({
         const index = els.indexOf(visible[0].target as HTMLElement);
         if (index >= 0) setCurrent(index);
       },
-      { rootMargin: "-20% 0px -60% 0px" },
+      { rootMargin: "0px 0px -65% 0px" },
     );
     els.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
@@ -63,21 +63,19 @@ export function OnboardingShell({
           {description && <p className="mt-5 max-w-[640px] text-[17px] leading-[28px] text-[var(--sc-ink)] text-pretty">{description}</p>}
           <ol className="mt-8 flex flex-wrap gap-2" aria-label={t("showcase.onboarding.stepsLabel")}>
             {steps.map((s, i) => {
-              const state = i < current ? "done" : i === current ? "current" : "todo";
+              const active = i === current;
               return (
                 <li key={s.id}>
                   <a
                     href={`#${s.id}`}
-                    aria-current={state === "current" ? "step" : undefined}
+                    aria-current={active ? "location" : undefined}
                     className={cn(
                       "inline-flex h-10 items-center gap-2 rounded-full border px-3.5 text-[14px] font-medium transition-colors duration-fast",
-                      state === "current" && "border-[var(--sc-ink)] bg-[var(--sc-ink)] text-white",
-                      state === "done" && "border-transparent bg-white text-[var(--sc-ink)]",
-                      state === "todo" && "border-[var(--sc-ink)]/25 bg-white/50 text-[var(--sc-ink)]",
+                      active ? "border-[var(--sc-ink)] bg-[var(--sc-ink)] text-white" : "border-[var(--sc-ink)]/25 bg-white/50 text-[var(--sc-ink)] hover:bg-white",
                     )}
                   >
-                    <span className={cn("inline-flex size-5 items-center justify-center rounded-full text-[11px] font-bold", state === "current" ? "bg-white text-[var(--sc-ink)]" : "bg-[var(--sc-ink)] text-white")} aria-hidden="true">
-                      {state === "done" ? <Check className="size-3" /> : i + 1}
+                    <span className={cn("inline-flex size-5 items-center justify-center rounded-full text-[11px] font-bold", active ? "bg-white text-[var(--sc-ink)]" : "bg-[var(--sc-ink)] text-white")} aria-hidden="true">
+                      {i + 1}
                     </span>
                     {s.label}
                   </a>

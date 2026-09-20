@@ -555,14 +555,14 @@ export default function MentorOnboarding() {
                           {...field}
                           value={sessionEmail || field.value}
                           type="email"
-                          readOnly
+                          readOnly={Boolean(sessionEmail)}
                           dir="ltr"
                           className="text-start"
                           aria-describedby={`${ids}-email-hint`}
                           data-testid="input-email"
                         />
                       </FormControl>
-                      <FormDescription id={`${ids}-email-hint`}>{t("mentorOnboarding.emailFromSession")}</FormDescription>
+                      <FormDescription id={`${ids}-email-hint`}>{sessionEmail ? t("mentorOnboarding.emailFromSession") : t("showcase.onboarding.emailIsAccount")}</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

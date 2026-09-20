@@ -59,7 +59,7 @@ export default function Login() {
     () =>
       z.object({
         email: z.string().trim().min(1, t("auth.validation.emailRequired")).email(t("auth.validation.emailInvalid")),
-        password: z.string().min(1, t("auth.validation.passwordRequired")),
+        password: IS_LOCAL ? z.string().optional() : z.string().min(1, t("auth.validation.passwordRequired")),
         rememberMe: z.boolean().optional(),
       }),
     [t],
@@ -68,7 +68,7 @@ export default function Login() {
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: rememberedEmail, password: "", rememberMe: false },
+    defaultValues: { email: rememberedEmail, password: IS_LOCAL ? "local" : "", rememberMe: false },
   });
 
   // Expanding the disclosure moves focus into the form (D7). On the mentee
@@ -89,7 +89,7 @@ export default function Login() {
         setLocalSession(account);
         return account;
       }
-      return authService.login({ email: data.email, password: data.password });
+      return authService.login({ email: data.email, password: data.password ?? "" });
     },
     onSuccess: (data) => {
       localStorage.setItem("user", JSON.stringify(data));
@@ -162,6 +162,7 @@ export default function Login() {
 
   const passwordSection = (
     <Collapsible open={passwordOpen} onOpenChange={setPasswordOpen}>
+      {!IS_LOCAL && (
       <CollapsibleTrigger asChild>
         {/* A ghost disclosure with a leading chevron, not a bordered box with a trailing one — that silhouette read as a Select (N-07). */}
         <button
@@ -179,6 +180,7 @@ export default function Login() {
           </span>
         </button>
       </CollapsibleTrigger>
+      )}
       <CollapsibleContent className="pt-4">
         <Form {...form}>
           <form
@@ -225,6 +227,7 @@ export default function Login() {
               )}
             />
 
+            {!IS_LOCAL && (
             <FormField
               control={form.control}
               name="password"
@@ -247,7 +250,9 @@ export default function Login() {
                 </FormItem>
               )}
             />
+            )}
 
+            {!IS_LOCAL && (
             <FormField
               control={form.control}
               name="rememberMe"
@@ -260,6 +265,7 @@ export default function Login() {
                 </FormItem>
               )}
             />
+            )}
 
             <Button type="submit" variant={menteePath ? "primary" : "secondary"} size="lg" className="w-full" loading={loginMutation.isPending} data-testid="button-login">
               {loginMutation.isPending ? t("auth.loggingIn") : t("auth.loginButton")}
@@ -289,20 +295,31 @@ export default function Login() {
             </Alert>
           )}
 
-          {menteePath ? passwordSection : ssoBlock}
+          {IS_LOCAL ? (
+            <>
+              {passwordSection}
+              {ssoBlock}
+            </>
+          ) : (
+            <>
+              {menteePath ? passwordSection : ssoBlock}
 
-          <div className="flex items-center gap-3" aria-hidden="true">
-            <span className="h-px flex-1 bg-border" />
-            <span className="text-caption text-muted-foreground">{t("auth.sso.or")}</span>
-            <span className="h-px flex-1 bg-border" />
-          </div>
+              <div className="flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                <span className="text-caption text-muted-foreground">{t("auth.sso.or")}</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
 
-          {menteePath ? ssoBlock : passwordSection}
+              {menteePath ? ssoBlock : passwordSection}
+            </>
+          )}
 
           <div className="space-y-2 text-center text-body-sm">
+            {!IS_LOCAL && (
             <Link href={ROUTES.forgotPassword} className="inline-block font-medium text-secondary underline-offset-4 hover:underline" data-testid="link-forgot-password">
               {t("auth.forgotPassword")}
             </Link>
+            )}
             <p className="text-muted-foreground">
               {t("auth.noAccount")}{" "}
               <Link href={nextPath ? `${ROUTES.signup}?next=${encodeURIComponent(nextPath)}` : ROUTES.signup} className={inlineLinkClass} data-testid="link-signup">
