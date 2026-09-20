@@ -24,6 +24,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Container } from "@/components/layout/Container";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { OnboardingShell, onboardingSectionClass } from "@/components/onboarding/OnboardingShell";
+import { IS_LOCAL } from "@/lib/demo";
+import { localStore, newId } from "@/lib/localStore";
+import { sessionFromMentee, setLocalSession } from "@/lib/localAuth";
 import { FilterChip } from "@/components/discovery/FilterChip";
 import { RequestRail, DEFAULT_STOPS } from "@/components/RequestRail";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
@@ -249,6 +253,10 @@ export default function MenteeRegistration() {
           verification_status: keepStatus ? existing.verification_status : payload.verification_status,
         });
       }
+      if (IS_LOCAL) {
+        // No Supabase project yet: the registration is saved in this browser and counted on the dashboard.
+        return localStore.add("mentees", { ...payload, id: newId("mentee"), created_at: new Date().toISOString() } as Mentee);
+      }
       return menteeService.create(payload);
     },
     onSuccess: (row) => {
@@ -270,6 +278,11 @@ export default function MenteeRegistration() {
         // Anchored confirmation first; the person chooses when to continue.
         setRegisteredOrg(row);
       } else {
+        if (IS_LOCAL) {
+          setLocalSession(sessionFromMentee(row));
+          setLocation("/dashboard");
+          return;
+        }
         setLocation(ROUTES.menteeDashboard);
       }
     },
@@ -344,22 +357,43 @@ export default function MenteeRegistration() {
     );
   }
 
-  const sectionClass = "grid gap-4 rounded-lg border border-border bg-card p-4 md:p-6";
+  const sectionClass = onboardingSectionClass;
   const heading = (id: string, label: string) => (
     <h2 id={id} className="text-h2-sm text-foreground">
       {label}
     </h2>
   );
 
-  return (
-    <Container className="pb-16">
-      <PageHeader
-        eyebrow={t("menteeRegistration.eyebrow")}
-        title={completing ? t("menteeRegistration.completeTitle") : t("menteeRegistration.title")}
-        description={completing ? t("menteeRegistration.completeDescription", { email: bidi(sessionEmail) }) : t("menteeRegistration.description")}
-      />
+  const steps = [
+    { id: `${ids}-type`, label: t("showcase.onboarding.menteeType") },
+    { id: `${ids}-about`, label: t("showcase.onboarding.menteeAbout") },
+    { id: `${ids}-interests`, label: t("showcase.onboarding.menteeInterests") },
+  ];
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+  return (
+    <OnboardingShell
+      eyebrow={t("menteeRegistration.eyebrow")}
+      title={completing ? t("menteeRegistration.completeTitle") : t("menteeRegistration.title")}
+      description={completing ? t("menteeRegistration.completeDescription", { email: bidi(sessionEmail) }) : t("menteeRegistration.description")}
+      steps={steps}
+      aside={
+        <>
+          <h2 id={`${ids}-how`} className="text-[18px] font-bold text-[var(--sc-ink)]">
+            {t("menteeRegistration.contextTitle")}
+          </h2>
+          <p className="mt-2 text-body-sm text-[var(--sc-ink-soft)] text-pretty">{t("menteeRegistration.contextDescription")}</p>
+          <RequestRail size="sm" className="mt-5" stops={DEFAULT_STOPS(t, undefined, { signedIn: true })} />
+          <ul className="mt-5 space-y-3 border-t border-[var(--sc-hairline)] pt-5">
+            {(["benefit1", "benefit2", "benefit3"] as const).map((key) => (
+              <li key={key}>
+                <p className="text-body-sm font-semibold text-[var(--sc-ink)]">{t(`menteeRegistration.${key}Title`)}</p>
+                <p className="text-caption text-[var(--sc-ink-soft)] text-pretty">{t(`menteeRegistration.${key}Desc`)}</p>
+              </li>
+            ))}
+          </ul>
+        </>
+      }
+    >
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => save.mutate(data))} className="space-y-8" noValidate>
             {completing && (autoName || autoTimezone) && (
@@ -809,22 +843,6 @@ export default function MenteeRegistration() {
           </form>
         </Form>
 
-        <aside className="rounded-lg border border-border bg-card p-6 lg:sticky lg:top-20" aria-labelledby={`${ids}-how`}>
-          <h2 id={`${ids}-how`} className="text-h3 text-foreground">
-            {t("menteeRegistration.contextTitle")}
-          </h2>
-          <p className="mt-2 text-body-sm text-muted-foreground text-pretty">{t("menteeRegistration.contextDescription")}</p>
-          <RequestRail size="sm" className="mt-5" stops={DEFAULT_STOPS(t, undefined, { signedIn: true })} />
-          <ul className="mt-5 space-y-3 border-t border-border pt-5">
-            {(["benefit1", "benefit2", "benefit3"] as const).map((key) => (
-              <li key={key}>
-                <p className="text-body-sm font-medium text-foreground">{t(`menteeRegistration.${key}Title`)}</p>
-                <p className="text-caption text-muted-foreground text-pretty">{t(`menteeRegistration.${key}Desc`)}</p>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      </div>
-    </Container>
+    </OnboardingShell>
   );
 }

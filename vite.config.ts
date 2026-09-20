@@ -5,6 +5,27 @@ import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
   plugins: [
+    // `api/` are Vercel serverless functions (Amazon SSO, callbacks). Vite cannot run
+    // them, so in dev the SSO entry returns to /login with a clear reason and every
+    // other /api path answers 503 instead of the SPA's not-found page.
+    {
+      name: "mentorconnect-local-api-notice",
+      configureServer(server) {
+        server.middlewares.use((req, res, next) => {
+          const url = req.url ?? "";
+          if (!url.startsWith("/api/")) return next();
+          if (url.startsWith("/api/auth/login/amazon")) {
+            res.statusCode = 302;
+            res.setHeader("Location", "/login?error=sso_unavailable_local");
+            res.end();
+            return;
+          }
+          res.statusCode = 503;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ error: "api_unavailable_in_vite_dev", hint: "Vercel serverless routes run with `vercel dev` or on the deployment." }));
+        });
+      },
+    },
     react(),
     runtimeErrorOverlay(),
     ...(process.env.NODE_ENV !== "production" &&

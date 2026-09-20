@@ -1,5 +1,8 @@
 import { createContext, useCallback, useContext, ReactNode, useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
+import { IS_LOCAL } from "@/lib/demo";
+import { findLocalAccount, getLocalSession, setLocalSession } from "@/lib/localAuth";
+import { localStore } from "@/lib/localStore";
 import { auth, AuthUser } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 
@@ -52,6 +55,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Initialize auth state
   useEffect(() => {
     mountedRef.current = true;
+    if (IS_LOCAL) {
+      // No Supabase project behind the placeholder env: the session is the
+      // locally registered account (lib/localAuth) and follows its changes.
+      setUser(getLocalSession());
+      setIsLoading(false);
+      const unsubscribe = localStore.subscribe(() => {
+        if (mountedRef.current) setUser(getLocalSession());
+      });
+      return () => {
+        mountedRef.current = false;
+        unsubscribe();
+      };
+    }
     resolve();
 
     // Listen for auth state changes
@@ -74,6 +90,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [resolve]);
 
   const login = async (data: LoginData): Promise<AuthUser> => {
+    if (IS_LOCAL) {
+      const account = findLocalAccount(data.email);
+      if (!account) throw new Error("local-account-not-found");
+      setLocalSession(account);
+      setUser(account);
+      setError(null);
+      queryClient.clear();
+      return account;
+    }
     const authUser = await auth.login(data);
     setUser(authUser);
     setError(null);
@@ -85,7 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async (): Promise<void> => {
-    await auth.logout();
+    if (IS_LOCAL) setLocalSession(null);
+    else await auth.logout();
     setUser(null);
     setError(null);
 

@@ -12,11 +12,14 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { AuthProvider } from "@/context/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Navigation } from "@/components/Navigation";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SkipLink } from "@/components/SkipLink";
 import { RequireAuth, RequireRole } from "@/components/RouteGuard";
 import { useDirection } from "@/hooks/useDirection";
 import { pageTitleKey } from "@/lib/routes";
 import Home from "@/pages/Home";
+import { resolveShowcaseMentor } from "@/data/featuredMentors";
+import { IS_LOCAL } from "@/lib/demo";
 import NotFound from "@/pages/not-found";
 
 // Every page except Home and NotFound is code-split so the entry chunk stays
@@ -27,13 +30,21 @@ const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
 const Mentors = lazy(() => import("@/pages/Mentors"));
 const MentorProfile = lazy(() => import("@/pages/MentorProfile"));
+const FeaturedMentorProfile = lazy(() => import("@/pages/FeaturedMentorProfile"));
+const FeaturedMentorSession = lazy(() => import("@/pages/FeaturedMentorSession"));
 const Analytics = lazy(() => import("@/pages/Analytics"));
+const AnalyticsReports = lazy(() => import("@/pages/AnalyticsReports"));
+const DashboardHome = lazy(() => import("@/pages/dashboard/DashboardHome"));
+const DashboardBookings = lazy(() => import("@/pages/dashboard/DashboardBookings"));
+const DashboardCalendar = lazy(() => import("@/pages/dashboard/DashboardCalendar"));
+const DashboardProfile = lazy(() => import("@/pages/dashboard/DashboardProfile"));
 const MentorOnboarding = lazy(() => import("@/pages/MentorOnboarding"));
 const MenteeRegistration = lazy(() => import("@/pages/MenteeRegistration"));
 const MentorPortal = lazy(() => import("@/pages/MentorPortal"));
 const MenteeDashboard = lazy(() => import("@/pages/MenteeDashboard"));
 const SsoCallback = lazy(() => import("@/pages/SsoCallback"));
 const RequestAccess = lazy(() => import("@/pages/RequestAccess"));
+const Legal = lazy(() => import("@/pages/Legal"));
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
 
 /** Shown while a lazy page chunk downloads. Announced once; the bars are decorative. */
@@ -102,13 +113,17 @@ function Router() {
         <Route path="/" component={Home} />
         <Route path="/mentors" component={Mentors} />
         <Route path="/login" component={Login} />
-        <Route path="/signup" component={Signup} />
+        {/* Without an auth backend the account step is skipped: sign-up IS the mentee form. */}
+        <Route path="/signup">{IS_LOCAL ? <Redirect to="/mentee-registration" replace /> : <Signup />}</Route>
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/auth/sso" component={SsoCallback} />
         <Route path="/request-access" component={RequestAccess} />
-        <Route path="/mentor/:id" component={MentorProfile} />
-        <Route path="/mentors/:id" component={MentorProfile} />
+        <Route path="/legal" component={Legal} />
+        {/* Curated (featured) mentors get the showcase profile + session pages; DB mentors keep the standard profile. */}
+        <Route path="/mentor/:id/book" component={FeaturedMentorSession} />
+        <Route path="/mentor/:id">{(params) => (resolveShowcaseMentor(params.id) ? <FeaturedMentorProfile /> : <MentorProfile />)}</Route>
+        <Route path="/mentors/:id">{(params) => (resolveShowcaseMentor(params.id) ? <FeaturedMentorProfile /> : <MentorProfile />)}</Route>
         {/* Legacy public profile URL → the single mentor profile route (id preserved). */}
         <Route path="/profile/mentor/:id">
           {(params) => <Redirect to={`/mentor/${params.id}`} replace />}
@@ -141,9 +156,36 @@ function Router() {
             <MenteeDashboard />
           </RequireAuth>
         </Route>
+        {/* Showcase dashboard (Figma "Creator Dashboard" suite): home, bookings, calendar; analytics below. */}
+        <Route path="/dashboard">
+          <RequireAuth>
+            <DashboardHome />
+          </RequireAuth>
+        </Route>
+        <Route path="/dashboard/bookings">
+          <RequireAuth>
+            <DashboardBookings />
+          </RequireAuth>
+        </Route>
+        <Route path="/dashboard/calendar">
+          <RequireAuth>
+            <DashboardCalendar />
+          </RequireAuth>
+        </Route>
+        <Route path="/dashboard/profile">
+          <RequireAuth>
+            <DashboardProfile />
+          </RequireAuth>
+        </Route>
         <Route path="/analytics">
           <RequireAuth>
             <Analytics />
+          </RequireAuth>
+        </Route>
+        {/* Growth analytics: the full reporting page (filters, drill-downs, CSV export) inside the same shell. */}
+        <Route path="/analytics/reports">
+          <RequireAuth>
+            <AnalyticsReports />
           </RequireAuth>
         </Route>
         <Route path="/mentor-onboarding">
@@ -196,9 +238,10 @@ function Shell() {
       <RouteEffects />
       <div className="flex min-h-screen flex-col bg-background">
         <Navigation />
-        <main id="main" tabIndex={-1} className="flex-1 scroll-mt-14">
+        <main id="main" tabIndex={-1} className="flex-1 scroll-mt-14 lg:scroll-mt-[72px]">
           <Router />
         </main>
+        <SiteFooter />
       </div>
       <Toaster />
     </DirectionProvider>

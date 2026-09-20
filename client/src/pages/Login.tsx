@@ -8,9 +8,11 @@ import { z } from "zod";
 import { AlertCircle, ChevronRight, Lock, Mail, ShieldCheck } from "lucide-react";
 
 import { authService } from "@/lib/services";
+import { findLocalAccount, setLocalSession } from "@/lib/localAuth";
 import { clearRoleStorage, rememberedMenteeEmail } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES, isMenteePath } from "@/lib/routes";
+import { IS_LOCAL } from "@/lib/demo";
 import { safeNext, ssoErrorKey, ssoLoginHref } from "@/lib/ssoClient";
 import { toast } from "sonner";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -49,7 +51,7 @@ export default function Login() {
   const [rememberedEmail] = useState(rememberedMenteeEmail);
   const menteePath = Boolean(rememberedEmail) || (nextPath !== "" && isMenteePath(nextPath));
 
-  const [passwordOpen, setPasswordOpen] = useState(menteePath);
+  const [passwordOpen, setPasswordOpen] = useState(menteePath || IS_LOCAL);
   const [formError, setFormError] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
 
@@ -79,7 +81,16 @@ export default function Login() {
   }, [passwordOpen, menteePath]);
 
   const loginMutation = useMutation({
-    mutationFn: (data: LoginFormData) => authService.login({ email: data.email, password: data.password }),
+    mutationFn: async (data: LoginFormData) => {
+      if (IS_LOCAL) {
+        // No auth backend: the account is the locally registered email (lib/localAuth).
+        const account = findLocalAccount(data.email);
+        if (!account) throw new Error("local-account-not-found");
+        setLocalSession(account);
+        return account;
+      }
+      return authService.login({ email: data.email, password: data.password });
+    },
     onSuccess: (data) => {
       localStorage.setItem("user", JSON.stringify(data));
 
@@ -106,6 +117,10 @@ export default function Login() {
         setLocation(nextPath);
         return;
       }
+      if (IS_LOCAL) {
+        setLocation("/dashboard");
+        return;
+      }
       if (data.user_type === "mentor") {
         setLocation(data.profile_id ? ROUTES.mentorPortal : ROUTES.mentorOnboarding);
       } else if (data.user_type === "admin") {
@@ -118,14 +133,20 @@ export default function Login() {
     onError: () => {
       // lib/auth throws a fixed English message for every credential failure;
       // the translated copy says what to do instead of echoing it.
-      setFormError(t("auth.invalidCredentials"));
+      setFormError(t(IS_LOCAL ? "showcase.auth.localNotFound" : "auth.invalidCredentials"));
       form.setFocus("password");
     },
   });
 
   // Exactly one orange fill per viewport: SSO when the visitor is (probably)
   // an Amazon employee, the password submit when they are a mentee.
-  const ssoBlock = (
+  const ssoBlock = IS_LOCAL ? (
+    // Amazon Federate lives in the Vercel API + a database; neither exists in local mode.
+    <div className="rounded-[12px] border border-[var(--sc-hairline)] bg-[var(--sc-sand)] p-4 text-[14px] leading-[22px] text-[var(--sc-ink-soft)]" data-testid="sso-local-note">
+      <p className="font-semibold text-[var(--sc-ink)]">{t("auth.sso.signInWithAmazon")}</p>
+      <p className="mt-1">{t("showcase.auth.localSso")}</p>
+    </div>
+  ) : (
     <div className="space-y-2">
       <a
         href={ssoLoginHref(nextPath)}

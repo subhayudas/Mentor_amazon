@@ -22,8 +22,10 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrig
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Container } from "@/components/layout/Container";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { OnboardingShell, onboardingSectionClass } from "@/components/onboarding/OnboardingShell";
+import { IS_LOCAL } from "@/lib/demo";
+import { localStore, slugFor } from "@/lib/localStore";
+import { sessionFromMentor, setLocalSession } from "@/lib/localAuth";
 import { RequestRail } from "@/components/RequestRail";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { bidi } from "@/lib/format";
@@ -214,7 +216,7 @@ export default function MentorOnboarding() {
 
   const approvalQuery = useQuery<OnboardingApproval>({
     queryKey: ["mentor-onboarding", "approval", sessionEmail, sessionAlias],
-    enabled: isMentorSession,
+    enabled: isMentorSession && !IS_LOCAL,
     // Always re-check on entry: the answer changes the moment a profile is created or an alias is approved.
     staleTime: 0,
     gcTime: 0,
@@ -304,7 +306,26 @@ export default function MentorOnboarding() {
 
   const createMentorMutation = useMutation<Mentor, Error, MentorFormData>({
     mutationFn: (data) =>
-      mentorService.create({
+      IS_LOCAL
+        ? // No Supabase project yet: the profile is saved in this browser and is live in the directory at once.
+          Promise.resolve(
+            localStore.add("mentors", {
+              ...data,
+              id: slugFor(data.name),
+              name: data.name.trim(),
+              email: sessionEmail || data.email,
+              cal_link: normalizeCalLink(data.cal_link),
+              company: data.company?.trim() || undefined,
+              position: data.position?.trim() || undefined,
+              country: data.country || undefined,
+              photo_url: data.photo_url || photoPreview || undefined,
+              linkedin_url: data.linkedin_url || undefined,
+              why_joined: data.why_joined?.trim() || undefined,
+              is_available: true,
+              created_at: new Date().toISOString(),
+            } as Mentor),
+          )
+        : mentorService.create({
         ...data,
         name: data.name.trim(),
         // Always the session email, whatever the form state says.
@@ -330,6 +351,12 @@ export default function MentorOnboarding() {
       localStorage.setItem("mentorEmail", newMentor.email ?? "");
       localStorage.setItem("mentorName", newMentor.name);
       window.dispatchEvent(new Event("userRegistered"));
+      if (IS_LOCAL) {
+        // The new profile is the signed-in account from here on; the dashboard opens in the mentor view.
+        setLocalSession(sessionFromMentor(newMentor));
+        setLocation("/dashboard");
+        return;
+      }
       setLocation(ROUTES.mentorPortal);
     },
     onError: () => {
@@ -365,11 +392,11 @@ export default function MentorOnboarding() {
   const zones = useMemo(() => timeZoneChoices(), []);
 
   // ---- Gate: only approved Amazon mentors without a profile see the form ----
-  if (authStatus !== "ok" || !user) {
+  if (authStatus !== "ok" || (!user && !IS_LOCAL)) {
     return <OnboardingSkeleton />;
   }
 
-  if (user.user_type !== "mentor") {
+  if (user && user.user_type !== "mentor") {
     // No alias here on purpose: a mentee/admin email is not an Amazon alias,
     // and the request itself is recorded by the SSO callback, not by this link.
     return (
@@ -381,25 +408,26 @@ export default function MentorOnboarding() {
     );
   }
 
-  if (approvalQuery.isLoading || approvalQuery.data?.existingMentorId) {
+  if (!IS_LOCAL && (approvalQuery.isLoading || approvalQuery.data?.existingMentorId)) {
     return <OnboardingSkeleton />;
   }
 
-  if (approvalQuery.isError) {
+  if (!IS_LOCAL && approvalQuery.isError) {
     return <OnboardingGateCard title={t("mentorOnboarding.gate.checkFailedTitle")} body={t("mentorOnboarding.gate.checkFailedBody")} />;
   }
 
-  if (!approvalQuery.data?.approved) {
+  if (!IS_LOCAL && !approvalQuery.data?.approved) {
+    const alias = user?.amazon_alias || user?.email || "";
     return (
       <OnboardingGateCard
         title={t("mentorOnboarding.gate.notApprovedTitle")}
-        body={t("mentorOnboarding.gate.notApprovedBody", { alias: bidi(user.amazon_alias || user.email) })}
-        requestAccessHref={`${ROUTES.requestAccess}?alias=${encodeURIComponent(user.amazon_alias || user.email)}`}
+        body={t("mentorOnboarding.gate.notApprovedBody", { alias: bidi(alias) })}
+        requestAccessHref={`${ROUTES.requestAccess}?alias=${encodeURIComponent(alias)}`}
       />
     );
   }
 
-  const sectionClass = "grid gap-4 rounded-lg border border-border bg-card p-4 md:p-6";
+  const sectionClass = onboardingSectionClass;
   const heading = (id: string, label: string) => (
     <h2 id={id} className="text-h2-sm text-foreground">
       {label}
@@ -460,11 +488,44 @@ export default function MentorOnboarding() {
     />
   );
 
-  return (
-    <Container className="pb-16">
-      <PageHeader eyebrow={t("mentorOnboarding.eyebrow")} title={t("mentorOnboarding.title")} description={t("mentorOnboarding.description")} />
+  const steps = [
+    { id: `${ids}-about`, label: t("mentorOnboarding.personalInfo") },
+    { id: `${ids}-work`, label: t("showcase.onboarding.mentorWork") },
+    { id: `${ids}-scheduling`, label: t("showcase.onboarding.mentorScheduling") },
+  ];
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+  return (
+    <OnboardingShell
+      eyebrow={t("mentorOnboarding.eyebrow")}
+      title={t("mentorOnboarding.title")}
+      description={t("mentorOnboarding.description")}
+      steps={steps}
+      aside={
+        <>
+          <h2 id={`${ids}-how`} className="text-[18px] font-bold text-[var(--sc-ink)]">
+            {t("mentorOnboarding.contextTitle")}
+          </h2>
+          <p className="mt-2 text-body-sm text-[var(--sc-ink-soft)] text-pretty">{t("mentorOnboarding.contextDescription")}</p>
+          <RequestRail
+            size="sm"
+            className="mt-5"
+            stops={[
+              { label: t("dashboardV2.inbox.how1"), state: "next" },
+              { label: t("dashboardV2.inbox.how2"), state: "next" },
+              { label: t("dashboardV2.inbox.how3"), state: "next" },
+            ]}
+          />
+          <ul className="mt-5 space-y-3 border-t border-[var(--sc-hairline)] pt-5">
+            {(["benefit1", "benefit2", "benefit3"] as const).map((key) => (
+              <li key={key}>
+                <p className="text-body-sm font-semibold text-[var(--sc-ink)]">{t(`mentorOnboarding.${key}Title`)}</p>
+                <p className="text-caption text-[var(--sc-ink-soft)] text-pretty">{t(`mentorOnboarding.${key}Desc`)}</p>
+              </li>
+            ))}
+          </ul>
+        </>
+      }
+    >
         <Form {...form}>
           <form onSubmit={form.handleSubmit((data) => createMentorMutation.mutate(data))} className="space-y-8" noValidate>
             <section aria-labelledby={`${ids}-about`} className="space-y-3">
@@ -834,30 +895,6 @@ export default function MentorOnboarding() {
           </form>
         </Form>
 
-        <aside className="rounded-lg border border-border bg-card p-6 lg:sticky lg:top-20" aria-labelledby={`${ids}-how`}>
-          <h2 id={`${ids}-how`} className="text-h3 text-foreground">
-            {t("mentorOnboarding.contextTitle")}
-          </h2>
-          <p className="mt-2 text-body-sm text-muted-foreground text-pretty">{t("mentorOnboarding.contextDescription")}</p>
-          <RequestRail
-            size="sm"
-            className="mt-5"
-            stops={[
-              { label: t("dashboardV2.inbox.how1"), state: "next" },
-              { label: t("dashboardV2.inbox.how2"), state: "next" },
-              { label: t("dashboardV2.inbox.how3"), state: "next" },
-            ]}
-          />
-          <ul className="mt-5 space-y-3 border-t border-border pt-5">
-            {(["benefit1", "benefit2", "benefit3"] as const).map((key) => (
-              <li key={key}>
-                <p className="text-body-sm font-medium text-foreground">{t(`mentorOnboarding.${key}Title`)}</p>
-                <p className="text-caption text-muted-foreground text-pretty">{t(`mentorOnboarding.${key}Desc`)}</p>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      </div>
-    </Container>
+    </OnboardingShell>
   );
 }

@@ -77,6 +77,7 @@ export function ssoDestination(user: AuthUser, next: string): string {
 
 /** Maps `?error=sso_*` codes from api/auth/callback to translation keys. */
 export const SSO_ERROR_KEYS: Record<string, string> = {
+  sso_unavailable_local: "auth.sso.errors.unavailableLocal",
   sso_state: "auth.sso.errors.sso_state",
   sso_token: "auth.sso.errors.sso_token",
   sso_failed: "auth.sso.errors.sso_failed",

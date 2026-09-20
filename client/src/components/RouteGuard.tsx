@@ -5,6 +5,7 @@ import { ShieldAlert, TriangleAlert } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { auth, type AuthUser, type UserRole } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
+import { IS_LOCAL } from "@/lib/demo";
 import { bidi } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,7 +64,9 @@ export function useRequireRole(role?: UserRole, redirectTo = "/login"): { status
     };
   }, [isLoading, user, error]);
 
-  const status: GuardStatus = isLoading
+  const status: GuardStatus = IS_LOCAL
+    ? "ok"
+    : isLoading
     ? "loading"
     : !user
       ? sessionPresent === false
