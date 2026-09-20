@@ -29,7 +29,8 @@ export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: Featu
   // The mentor's own Cal.com page, else the shared account with the event that matches this
   // session's length (the sample account exposes 15min / 30min); the header stays the mentor's.
   const usingShared = !mentor.cal_link;
-  const calLink = mentor.cal_link || `${DEFAULT_CAL_LINK.replace(/\/+$/, "")}${DEFAULT_CAL_LINK.includes("/") ? "" : `/${mentor.session.minutes <= 15 ? "15min" : "30min"}`}`;
+  const shared = DEFAULT_CAL_LINK.replace(/\/+$/, "");
+  const calLink = mentor.cal_link || (shared ? `${shared}${shared.includes("/") ? "" : `/${mentor.session.minutes <= 15 ? "15min" : "30min"}`}` : "");
   const [done, setDone] = React.useState<{ kind: "confirmed" | "requested"; when?: string } | null>(null);
   const [ready, setReady] = React.useState(false);
   const [form, setForm] = React.useState({ name: "", email: "", goal: "" });
