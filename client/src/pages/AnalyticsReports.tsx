@@ -38,6 +38,8 @@ import {
 import { MOCK_BOOKINGS, MOCK_MENTEES, MOCK_MENTORS } from "@/data/mockAnalytics";
 import { bookingStatusLabel, type BookingStatus } from "@/components/StatusBadge";
 import { Container } from "@/components/layout/Container";
+import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { IS_LOCAL } from "@/lib/demo";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
 import { ActiveFilters, type ActiveFilter } from "@/components/discovery/ActiveFilters";
@@ -98,7 +100,7 @@ export default function Analytics() {
   const lang = i18n.language;
   const { user } = useAuth();
   const scope: Scope = user?.user_type === "admin" ? "admin" : user?.user_type === "mentor" ? "mentor" : "mentee";
-  const isAdmin = scope === "admin";
+  const isAdmin = scope === "admin" || IS_LOCAL;
   // Below `md` the page is a second composition (F-11), not the desktop one stacked.
   const isPhone = useIsPhone();
 
@@ -109,9 +111,9 @@ export default function Analytics() {
   const [drill, setDrill] = useState<Drill | null>(null);
   const drillReturnRef = useRef<HTMLElement | null>(null);
 
-  const bookingsQuery = useQuery<Booking[]>({ queryKey: ["analytics", "bookings"], queryFn: () => bookingService.getAll() });
-  const mentorsQuery = useQuery<Mentor[]>({ queryKey: ["analytics", "mentors"], queryFn: () => mentorService.getAll() });
-  const menteesQuery = useQuery<Mentee[]>({ queryKey: ["analytics", "mentees"], queryFn: () => menteeService.getAll() });
+  const bookingsQuery = useQuery<Booking[]>({ queryKey: ["analytics", "bookings"], queryFn: () => bookingService.getAll(), enabled: !IS_LOCAL });
+  const mentorsQuery = useQuery<Mentor[]>({ queryKey: ["analytics", "mentors"], queryFn: () => mentorService.getAll(), enabled: !IS_LOCAL });
+  const menteesQuery = useQuery<Mentee[]>({ queryKey: ["analytics", "mentees"], queryFn: () => menteeService.getAll(), enabled: !IS_LOCAL });
 
   const isLoading = bookingsQuery.isLoading || mentorsQuery.isLoading || menteesQuery.isLoading;
   const isError = bookingsQuery.isError || mentorsQuery.isError || menteesQuery.isError;
@@ -127,7 +129,7 @@ export default function Analytics() {
   };
 
   // Demo mode: a successful admin fetch with too few real rows to read anything from (never on error, never for a personal view).
-  const useMockData = isAdmin && !isLoading && !isError && Array.isArray(bookings) && bookings.length < MOCK_DATA_THRESHOLD;
+  const useMockData = IS_LOCAL || (isAdmin && !isLoading && !isError && Array.isArray(bookings) && bookings.length < MOCK_DATA_THRESHOLD);
 
   const sourceBookings = useMemo<Booking[]>(() => (useMockData ? MOCK_BOOKINGS : bookings ?? []), [useMockData, bookings]);
   const sourceMentors = useMemo<Mentor[]>(() => (useMockData ? MOCK_MENTORS : mentorsQuery.data ?? []), [useMockData, mentorsQuery.data]);
@@ -383,6 +385,7 @@ export default function Analytics() {
   const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
   return (
+    <DashboardShell active="analytics-growth">
     <Container className="pb-16">
       <PageHeader
         className="max-md:pb-4"
@@ -604,6 +607,7 @@ export default function Analytics() {
         </Tabs>
       )}
     </Container>
+    </DashboardShell>
   );
 }
 
