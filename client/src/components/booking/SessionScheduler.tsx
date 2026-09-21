@@ -8,8 +8,9 @@ import { loadCalApi } from "@/components/CalEmbed";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { FeaturedMentor } from "@/data/featuredMentors";
 import type { Booking, Mentee } from "@/lib/database";
-import { DEFAULT_CAL_LINK } from "@/lib/demo";
+import { DEFAULT_CAL_LINK, normalizeCalLink } from "@/lib/demo";
 import { localStore, newId } from "@/lib/localStore";
+import { logActivity } from "@/lib/activity";
 import { ROUTES } from "@/lib/routes";
 
 // Same on-demand chunk the scheduling dialog uses; nothing Cal-related ships in the route bundle.
@@ -23,14 +24,52 @@ const Cal = lazy(() => import("@calcom/embed-react"));
  * is recorded (local store now, database once Supabase is configured) and
  * shows up on the dashboard.
  */
+const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
+
+declare global {
+  interface Window {
+    turnstile?: { render: (el: HTMLElement, opts: { sitekey: string; callback: (token: string) => void; "expired-callback"?: () => void; theme?: string }) => string; reset: (id?: string) => void };
+  }
+}
+
+/** Cloudflare Turnstile widget; renders nothing unless VITE_TURNSTILE_SITE_KEY is set. */
+function Turnstile({ onToken }: { onToken: (token: string | null) => void }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!TURNSTILE_SITE_KEY || !ref.current) return;
+    let widgetId: string | undefined;
+    const mount = () => {
+      if (!ref.current || !window.turnstile) return;
+      widgetId = window.turnstile.render(ref.current, { sitekey: TURNSTILE_SITE_KEY, theme: "light", callback: onToken, "expired-callback": () => onToken(null) });
+    };
+    if (window.turnstile) mount();
+    else {
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.onload = mount;
+      document.head.appendChild(script);
+    }
+    return () => {
+      if (widgetId && window.turnstile) window.turnstile.reset(widgetId);
+    };
+  }, [onToken]);
+  if (!TURNSTILE_SITE_KEY) return null;
+  return <div ref={ref} className="mt-2" data-testid="turnstile" />;
+}
+
 export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: FeaturedMentor; sessionTitle: string; name: string }) {
   const { t, i18n } = useTranslation();
+  const [botToken, setBotToken] = React.useState<string | null>(null);
+  const [botError, setBotError] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
   const firstName = name.split(" ")[0] || name;
   // The mentor's own Cal.com page, else the shared account with the event that matches this
   // session's length (the sample account exposes 15min / 30min); the header stays the mentor's.
-  const usingShared = !mentor.cal_link;
-  const shared = DEFAULT_CAL_LINK.replace(/\/+$/, "");
-  const calLink = mentor.cal_link || (shared ? `${shared}${shared.includes("/") ? "" : `/${mentor.session.minutes <= 15 ? "15min" : "30min"}`}` : "");
+  const own = normalizeCalLink(mentor.cal_link);
+  const usingShared = !own;
+  const shared = normalizeCalLink(DEFAULT_CAL_LINK);
+  const calLink = own || (shared ? `${shared}${shared.includes("/") ? "" : `/${mentor.session.minutes <= 15 ? "15min" : "30min"}`}` : "");
   const [done, setDone] = React.useState<{ kind: "confirmed" | "requested"; when?: string } | null>(null);
   const [ready, setReady] = React.useState(false);
   const [form, setForm] = React.useState({ name: "", email: "", goal: "" });
@@ -51,8 +90,8 @@ export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: Featu
   }, []);
 
   const record = React.useCallback(
-    (row: Partial<Booking> & Pick<Booking, "status">) => {
-      localStore.add("bookings", {
+    (row: Partial<Booking> & Pick<Booking, "status">, actorName?: string) => {
+      const booking = localStore.add("bookings", {
         id: newId("booking"),
         mentor_id: mentor.id,
         mentee_id: row.mentee_id ?? "guest",
@@ -61,8 +100,19 @@ export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: Featu
         created_at: new Date().toISOString(),
         ...row,
       } as Booking);
+      logActivity({
+        actor_type: "mentee",
+        actor_id: booking.mentee_id,
+        actor_name: actorName,
+        type: row.status === "confirmed" ? "booking_confirmed" : "request_sent",
+        subject_type: "booking",
+        subject_id: booking.id,
+        visible_to: [mentor.id, booking.mentee_id],
+        summary: t(row.status === "confirmed" ? "showcase.activity.summaries.bookingConfirmed" : "showcase.activity.summaries.requestSent", { mentor: name, session: sessionTitle }),
+      });
+      return booking;
     },
-    [mentor.id, mentor.session.minutes, sessionTitle],
+    [mentor.id, mentor.session.minutes, sessionTitle, name, t],
   );
 
   // Cal.com reports the confirmed slot; that is the booking.
@@ -83,7 +133,7 @@ export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: Featu
         scheduled_at: startTime,
         cal_event_uri: typeof booking.uid === "string" ? booking.uid : undefined,
         mentee_id: attendeeEmail ? menteeFor(attendeeName ?? "", attendeeEmail) : "guest",
-      });
+      }, attendeeName);
       setDone({ kind: "confirmed", when: startTime });
     };
     const onReady = () => {
@@ -107,14 +157,36 @@ export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: Featu
     };
   }, [calLink, done, record, menteeFor]);
 
-  const submitRequest = (e: React.FormEvent) => {
+  const submitRequest = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (TURNSTILE_SITE_KEY) {
+      // Fail closed: no token, or the server does not confirm it, means no request.
+      setBotError(false);
+      if (!botToken) {
+        setBotError(true);
+        return;
+      }
+      setSending(true);
+      try {
+        const res = await fetch("/api/turnstile", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: botToken }) });
+        const json = (await res.json()) as { ok?: boolean };
+        if (!json.ok) {
+          setBotError(true);
+          return;
+        }
+      } catch {
+        setBotError(true);
+        return;
+      } finally {
+        setSending(false);
+      }
+    }
     record({
       status: "pending",
       clicked_at: new Date().toISOString(),
       goal: form.goal.trim() || sessionTitle,
       mentee_id: menteeFor(form.name.trim(), form.email.trim()),
-    });
+    }, form.name.trim());
     try {
       localStorage.setItem("menteeName", form.name.trim());
       localStorage.setItem("menteeEmail", form.email.trim());
@@ -218,7 +290,13 @@ export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: Featu
             </label>
             <textarea id={`${ids}-goal`} rows={3} value={form.goal} onChange={(e) => setForm({ ...form, goal: e.target.value })} className="mt-1 w-full rounded-[6px] border border-[#d9d9d9] px-3 py-2 text-[14px]" />
           </div>
-          <button type="submit" className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[6px] bg-[var(--sc-ink)] text-[15px] font-bold text-white hover:bg-black" data-testid="button-send-request">
+          <Turnstile onToken={setBotToken} />
+          {botError && (
+            <p className="text-[13px] text-[#c40000]" role="alert">
+              {botToken ? t("showcase.scheduler.botFailed") : t("showcase.scheduler.botCheck")}
+            </p>
+          )}
+          <button type="submit" disabled={sending} className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[6px] bg-[var(--sc-ink)] text-[15px] font-bold text-white hover:bg-black disabled:opacity-60" data-testid="button-send-request">
             <Send className="size-4" aria-hidden="true" />
             {t("showcase.scheduler.send")}
           </button>

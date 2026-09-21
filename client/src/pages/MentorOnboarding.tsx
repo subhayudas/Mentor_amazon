@@ -23,9 +23,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { OnboardingShell, onboardingSectionClass } from "@/components/onboarding/OnboardingShell";
-import { IS_LOCAL } from "@/lib/demo";
+import { IS_LOCAL, normalizeCalLink } from "@/lib/demo";
 import { localStore, slugFor } from "@/lib/localStore";
 import { sessionFromMentor, setLocalSession } from "@/lib/localAuth";
+import { logActivity } from "@/lib/activity";
 import { RequestRail } from "@/components/RequestRail";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { bidi } from "@/lib/format";
@@ -193,7 +194,6 @@ const LANGUAGE_OPTIONS = [
 ];
 
 const CAL_PATTERN = /^[a-z0-9._-]+\/[a-z0-9_-]+$/i;
-const normalizeCalLink = (value: string) => value.trim().replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 export default function MentorOnboarding() {
@@ -351,6 +351,7 @@ export default function MentorOnboarding() {
       localStorage.setItem("mentorEmail", newMentor.email ?? "");
       localStorage.setItem("mentorName", newMentor.name);
       window.dispatchEvent(new Event("userRegistered"));
+      logActivity({ actor_type: "mentor", actor_id: newMentor.id, actor_name: newMentor.name, type: "mentor_registered", subject_type: "mentor", subject_id: newMentor.id, summary: t("showcase.activity.summaries.mentorRegistered", { name: newMentor.name }) });
       if (IS_LOCAL) {
         // The new profile is the signed-in account from here on; the dashboard opens in the mentor view.
         setLocalSession(sessionFromMentor(newMentor));
