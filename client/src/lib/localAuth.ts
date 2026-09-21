@@ -11,6 +11,10 @@ import { getLocalValue, localStore, setLocalValue } from "@/lib/localStore";
  */
 export const LOCAL_SESSION_KEY = "session";
 
+/** The programme-admin account available in local mode (shown on the sign-in page). */
+export const LOCAL_ADMIN_EMAIL = "admin@mentorconnect.local";
+export const LOCAL_ADMIN: AuthUser = { id: "local-admin", email: LOCAL_ADMIN_EMAIL, name: "Programme admin", user_type: "admin", profile_id: "admin" };
+
 export function sessionFromMentor(m: Mentor): AuthUser {
   return { id: `local-${m.id}`, email: m.email ?? "", name: m.name, user_type: "mentor", profile_id: m.id };
 }
@@ -31,6 +35,7 @@ export function setLocalSession(user: AuthUser | null) {
 export function findLocalAccount(email: string): AuthUser | null {
   const needle = email.trim().toLowerCase();
   if (!needle) return null;
+  if (needle === LOCAL_ADMIN_EMAIL) return LOCAL_ADMIN;
   const mentor = localStore.list("mentors").find((m) => (m.email ?? "").toLowerCase() === needle);
   if (mentor) return sessionFromMentor(mentor);
   const mentee = localStore.list("mentees").find((m) => m.email.toLowerCase() === needle);

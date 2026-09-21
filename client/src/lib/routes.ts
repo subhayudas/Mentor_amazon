@@ -64,6 +64,7 @@ const TITLE_RULES: TitleRule[] = [
   { test: (p) => p === "/dashboard/calendar", key: "nav.titles.dashboardCalendar" },
   { test: (p) => p === "/dashboard/profile", key: "nav.titles.dashboardProfile" },
   { test: (p) => p === "/dashboard/activity", key: "nav.titles.dashboardActivity" },
+  { test: (p) => p === "/dashboard/admin", key: "nav.titles.dashboardAdmin" },
   { test: (p) => p === "/analytics/report", key: "nav.titles.analyticsReport" },
   { test: (p) => p === "/mentor-onboarding", key: "nav.titles.mentorOnboarding" },
   { test: (p) => p === "/mentor-dashboard", key: "nav.titles.mentorDashboard" },

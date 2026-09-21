@@ -276,16 +276,13 @@ export default function MenteeRegistration() {
       toast.success(completing ? t("menteeRegistration.updatedMessage") : t("menteeRegistration.successTitle"), {
         description: newOrgReview ? t("verification.inReviewToast") : completing ? undefined : t("menteeRegistration.successMessage"),
       });
+      // Local mode: the new profile is the signed-in account from here on, whichever branch follows.
+      if (IS_LOCAL) setLocalSession(sessionFromMentee(row));
       if (newOrgReview) {
         // Anchored confirmation first; the person chooses when to continue.
         setRegisteredOrg(row);
       } else {
-        if (IS_LOCAL) {
-          setLocalSession(sessionFromMentee(row));
-          setLocation("/dashboard");
-          return;
-        }
-        setLocation(ROUTES.menteeDashboard);
+        setLocation(IS_LOCAL ? "/dashboard" : ROUTES.menteeDashboard);
       }
     },
     onError: () => {
@@ -306,7 +303,7 @@ export default function MenteeRegistration() {
           data-testid="card-verification-in-review"
           actions={
             <Button asChild variant="secondary" data-testid="button-go-to-dashboard">
-              <Link href={ROUTES.menteeDashboard}>
+              <Link href={IS_LOCAL ? "/dashboard" : ROUTES.menteeDashboard}>
                 {t("verification.goToDashboard")}
                 <ArrowRight className="rtl:-scale-x-100" aria-hidden="true" />
               </Link>

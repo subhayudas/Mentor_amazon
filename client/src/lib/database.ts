@@ -276,7 +276,11 @@ export type ActivityType =
   | 'feedback_left'
   | 'favorite_added'
   | 'favorite_removed'
-  | 'reminder_sent';
+  | 'reminder_sent'
+  | 'mentor_listed'
+  | 'mentor_unlisted'
+  | 'mentee_verified'
+  | 'mentee_rejected';
 
 /**
  * Append-only audit event (`activity_events`). Written by the app at every

@@ -42,7 +42,13 @@ export default function FeaturedMentorSession() {
               <h1 id="page-title" tabIndex={-1} className="max-w-[420px] text-[26px] font-bold leading-[1.25] text-[var(--sc-ink)] lg:text-[32px]">
                 {title}
               </h1>
-              <img src={mentor.photo_url} alt="" className="size-[84px] shrink-0 rounded-full border-4 border-white object-cover lg:size-[104px]" />
+              {mentor.photo_url ? (
+                <img src={mentor.photo_url} alt="" className="size-[84px] shrink-0 rounded-full border-4 border-white object-cover lg:size-[104px]" />
+              ) : (
+                <span className="inline-flex size-[84px] shrink-0 items-center justify-center rounded-full border-4 border-white bg-[var(--sc-ink)] text-[28px] font-bold text-white lg:size-[104px]" aria-hidden="true">
+                  {name.slice(0, 1)}
+                </span>
+              )}
             </div>
           </header>
 
@@ -92,8 +98,12 @@ export default function FeaturedMentorSession() {
               {t("showcase.session.bookNow")}
             </a>
 
-            <h2 className="mt-12 text-[24px] font-bold text-[var(--sc-ink)]">{t("showcase.session.testimonials")}</h2>
-            <TestimonialRail items={mentor.testimonials} className="mt-5" />
+            {mentor.testimonials.length > 0 && (
+              <>
+                <h2 className="mt-12 text-[24px] font-bold text-[var(--sc-ink)]">{t("showcase.session.testimonials")}</h2>
+                <TestimonialRail items={mentor.testimonials} className="mt-5" />
+              </>
+            )}
 
             <p className="mt-10 text-[12px] text-[#6c6c84]">
               <Link href="/legal" className="underline underline-offset-4 hover:text-[var(--sc-ink)]">

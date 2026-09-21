@@ -204,7 +204,13 @@ export function SessionScheduler({ mentor, sessionTitle, name }: { mentor: Featu
     <div>
       {/* The mentor's own details, always */}
       <div className="flex items-center gap-4">
-        <img src={mentor.photo_url} alt="" className="size-14 rounded-full object-cover" />
+        {mentor.photo_url ? (
+          <img src={mentor.photo_url} alt="" className="size-14 rounded-full object-cover" />
+        ) : (
+          <span className="inline-flex size-14 items-center justify-center rounded-full bg-[var(--sc-ink)] text-[20px] font-bold text-white" aria-hidden="true">
+            {name.slice(0, 1)}
+          </span>
+        )}
         <div className="min-w-0">
           <h2 id="when-title" className="text-[18px] font-bold leading-tight text-[var(--sc-ink)]">
             {t("showcase.scheduler.title", { name: firstName })}

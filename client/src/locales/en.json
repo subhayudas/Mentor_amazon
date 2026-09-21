@@ -232,7 +232,8 @@
       "legal": "Terms & privacy",
       "dashboardProfile": "Profile settings",
       "dashboardActivity": "Activity",
-      "analyticsReport": "Impact report"
+      "analyticsReport": "Impact report",
+      "dashboardAdmin": "Programme admin"
     }
   },
   "hero": {
@@ -1051,7 +1052,7 @@
     "faq": {
       "title": "Questions people ask",
       "spamQuestion": "Will I get a lot of email?",
-      "spamAnswer": "Absolutely not. You only receive what the programme needs: confirmations and updates about your own sessions, plus in-app reminders 24 hours and 1 hour before a confirmed session (email reminders switch on once the programme's email service is connected). Your address is never shared with third parties.",
+      "spamAnswer": "Absolutely not. You only receive what the programme needs: confirmations and updates about your own sessions, plus in-app reminders 24 hours and 1 hour before a confirmed session. Your address is never shared with third parties.",
       "commitmentQuestion": "How much time do mentors commit?",
       "commitmentAnswer": "Mentors set their own pace and can pause new requests at any time — the card then says \"Not accepting requests\".",
       "matchingQuestion": "How are mentors and mentees matched?",
@@ -2031,7 +2032,8 @@
         }
       },
       "localSso": "Amazon sign-in runs on the deployed site (Vercel API). Here, sign in with the email you registered with — no password is checked until the database is connected.",
-      "localNotFound": "No account with that email yet. Register as a mentee or become a mentor first."
+      "localNotFound": "No account with that email yet. Register as a mentee or become a mentor first.",
+      "localAdmin": "Programme admin (approve mentees, list mentors, export):"
     },
     "analytics": {
       "sidebar": "Dashboard navigation",
@@ -2116,7 +2118,8 @@
       "showcaseAccount": "Showcase account — not signed in",
       "editProfile": "Edit my profile",
       "sampleTitle": "Sample data — not programme outcomes.",
-      "sampleBody": "Fewer than five real bookings exist, so every number and chart here is illustrative. Do not quote these as results; real metrics replace them automatically as sessions accumulate."
+      "sampleBody": "Fewer than five real bookings exist, so every number and chart here is illustrative. Do not quote these as results; real metrics replace them automatically as sessions accumulate.",
+      "brandAdmin": "Programme Admin"
     },
     "legal": {
       "terms": "Terms",
@@ -2154,7 +2157,25 @@
       "requests": "Requests",
       "timeTbc": "Time to be confirmed",
       "accept": "Accept",
-      "decline": "Decline"
+      "decline": "Decline",
+      "canceled": "Cancelled",
+      "manage": "Manage",
+      "markCompleted": "Mark completed",
+      "reschedule": "Reschedule",
+      "cancel": "Cancel session",
+      "empty": {
+        "requests": "No pending requests",
+        "completed": "No completed sessions yet",
+        "canceled": "No cancelled sessions",
+        "body": "Sessions move here as their status changes."
+      },
+      "toast": {
+        "accepted": "Request accepted",
+        "declined": "Request declined",
+        "canceled": "Session cancelled",
+        "completed": "Session marked completed",
+        "rescheduled": "Session rescheduled"
+      }
     },
     "calendar": {
       "settings": "Settings",
@@ -2313,7 +2334,11 @@
         "feedback_left": "Feedback left",
         "favorite_added": "Favourite added",
         "favorite_removed": "Favourite removed",
-        "reminder_sent": "Reminder sent"
+        "reminder_sent": "Reminder sent",
+        "mentor_listed": "Mentor listed",
+        "mentor_unlisted": "Mentor unlisted",
+        "mentee_verified": "Organisation verified",
+        "mentee_rejected": "Organisation declined"
       },
       "summaries": {
         "mentorRegistered": "{{name}} joined as a mentor",
@@ -2323,7 +2348,10 @@
         "requestSent": "Session request sent to {{mentor}} — {{session}}",
         "requestAccepted": "Request from {{mentee}} accepted",
         "requestDeclined": "Request from {{mentee}} declined",
-        "bookingConfirmed": "Session booked with {{mentor}} on Cal.com — {{session}}"
+        "bookingConfirmed": "Session booked with {{mentor}} on Cal.com — {{session}}",
+        "canceled": "Session with {{mentor}} cancelled ({{mentee}})",
+        "completed": "Session with {{mentee}} marked completed",
+        "rescheduled": "Session with {{mentor}} rescheduled on Cal.com"
       }
     },
     "favorites": {
@@ -2375,6 +2403,87 @@
         "sessions": "Sessions",
         "area": "Area",
         "country": "Country"
+      }
+    },
+    "admin": {
+      "title": "Programme admin",
+      "queue": "Open the queues",
+      "signInTitle": "Admin sign-in required",
+      "signInBody": "Sign in with the programme admin account to approve organisations, list mentors and export bookings.",
+      "tabs": {
+        "mentees": "Mentees & organisations",
+        "mentors": "Mentors",
+        "bookings": "Bookings"
+      },
+      "exportCsv": "Export CSV",
+      "scopeNote": "Counts cover accounts and sessions created on this site.",
+      "kpi": {
+        "mentors": "Mentors listed / registered",
+        "mentees": "Mentees registered",
+        "pending": "Organisations awaiting review",
+        "bookings": "Bookings"
+      },
+      "col": {
+        "role": "Role",
+        "expertise": "Expertise",
+        "joined": "Joined",
+        "status": "Status",
+        "actions": "Actions",
+        "type": "Type",
+        "organisation": "Organisation",
+        "verification": "Verification",
+        "scheduled": "Scheduled",
+        "created": "Created"
+      },
+      "listed": "Listed",
+      "unlisted": "Not listed",
+      "list": "Approve & list",
+      "unlist": "Unlist",
+      "view": "View",
+      "org": "Organisation",
+      "individual": "Individual",
+      "approve": "Approve",
+      "reject": "Reject",
+      "revoke": "Revoke",
+      "verification": {
+        "pending": "Awaiting review",
+        "verified": "Verified",
+        "rejected": "Rejected",
+        "unverified": "Not required"
+      },
+      "empty": {
+        "mentors": "No mentors have registered on this site yet.",
+        "mentees": "No mentees have registered on this site yet.",
+        "bookings": "No bookings yet."
+      },
+      "log": {
+        "listed": "{{name}} approved and listed in the directory",
+        "unlisted": "{{name}} removed from the directory",
+        "verified": "{{name}} verified as a partner organisation",
+        "rejected": "{{name}}'s organisation verification was declined",
+        "canceled": "Session between {{mentee}} and {{mentor}} cancelled by the programme"
+      },
+      "toast": {
+        "listed": "{{name}} is now listed",
+        "unlisted": "{{name}} is no longer listed",
+        "verified": "{{name}} verified",
+        "rejected": "{{name}} declined",
+        "canceled": "Session cancelled",
+        "exported": "{{count}} bookings exported"
+      }
+    },
+    "verification": {
+      "pending": {
+        "title": "{{name}}: verification in review",
+        "body": "The programme team reviews new organisations before their members can book. You can browse mentors meanwhile; you will see the decision here."
+      },
+      "verified": {
+        "title": "{{name}}: verified partner organisation",
+        "body": "Your organisation is approved. Members can book sessions with any listed mentor."
+      },
+      "rejected": {
+        "title": "{{name}}: verification declined",
+        "body": "The programme team could not verify the organisation from the details given. Update the registration and the team will look again."
       }
     }
   }

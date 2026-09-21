@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Plus, Share2, Clock3 } from "lucide-react";
 
 import { DASHBOARD_ROUTES, DashboardShell, useDashboardIdentity } from "@/components/dashboard/DashboardShell";
-import { getLocalValue, setLocalValue } from "@/lib/localStore";
+import { getLocalValue, setLocalValue, useLocalCollection } from "@/lib/localStore";
 import { Badge } from "@/components/ui/badge";
 import { FEATURED_MENTORS } from "@/data/featuredMentors";
 import { ROUTES } from "@/lib/routes";
@@ -327,6 +327,9 @@ function MenteeHome({
 }) {
   const { t } = useTranslation();
   const { favorites } = useFavorites(menteeId, menteeName);
+  const mentees = useLocalCollection("mentees");
+  const me = mentees.find((m) => m.id === menteeId);
+  const verification = me?.user_type === "organization" ? (me.verification_status ?? "pending") : null;
   const favoriteMentors = favorites
     .map((f) => mentors.find((m) => m.id === f.mentor_id) ?? FEATURED_MENTORS.find((m) => m.id === f.mentor_id))
     .filter((m): m is NonNullable<typeof m> => Boolean(m));
@@ -345,11 +348,28 @@ function MenteeHome({
           {t("showcase.dashboard.hi", { name: firstName })}
         </h1>
         <RemindersBanner reminders={reminders} lang={lang} />
+        {verification && (
+          <section
+            className={cn("mt-6 rounded-[12px] border p-4", verification === "verified" ? "border-[#bfe3d3] bg-[#e6f4f1] text-[#055f4b]" : verification === "rejected" ? "border-[#f5c2c2] bg-[#fdecec] text-[#8a1f1f]" : "border-[#f5d98a] bg-[#fffaeb] text-[#7a4b00]")}
+            aria-labelledby="verification-title"
+            data-testid="verification-banner"
+          >
+            <h2 id="verification-title" className="text-[15px] font-bold">
+              {t(`showcase.verification.${verification}.title`, { name: me?.organization_name ?? me?.name })}
+            </h2>
+            <p className="mt-1 text-[14px]">{t(`showcase.verification.${verification}.body`)}</p>
+          </section>
+        )}
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.7fr_1fr]">
           <section className={cn(card, "p-6")} aria-labelledby="my-sessions">
-            <h2 id="my-sessions" className="text-[20px] font-bold text-[var(--sc-ink)]">
-              {t("showcase.analytics.nav.mySessions")}
-            </h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="my-sessions" className="text-[20px] font-bold text-[var(--sc-ink)]">
+                {t("showcase.analytics.nav.mySessions")}
+              </h2>
+              <Link href={DASHBOARD_ROUTES.bookings} className="text-[14px] font-semibold text-[var(--sc-ink)] underline underline-offset-4">
+                {t("showcase.bookings.manage")}
+              </Link>
+            </div>
             {upcoming.length === 0 ? (
               <div className="mt-6 rounded-[10px] bg-[#f7f6f2] p-6 text-center">
                 <p className="text-[15px] font-semibold text-[var(--sc-ink)]">{t("showcase.dashboard.menteeEmptyTitle")}</p>

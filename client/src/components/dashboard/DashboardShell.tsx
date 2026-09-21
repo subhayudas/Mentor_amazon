@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { Activity, BarChart3, CalendarClock, CalendarDays, ChevronRight, Home as HomeIcon, LogOut, Plus, Search, Settings, UserRound, Users, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, CalendarClock, CalendarDays, ChevronRight, Home as HomeIcon, LogOut, Plus, Search, Settings, ShieldCheck, UserRound, Users, type LucideIcon } from "lucide-react";
 
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { useAuth } from "@/context/AuthContext";
@@ -10,7 +10,7 @@ import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 /** Which sidebar entry is lit. */
-export type DashboardSection = "home" | "bookings" | "calendar" | "profile" | "activity" | "mentors" | "analytics-growth" | "analytics-profile" | "settings";
+export type DashboardSection = "home" | "bookings" | "calendar" | "profile" | "activity" | "mentors" | "admin" | "analytics-growth" | "analytics-profile" | "settings";
 
 export const DASHBOARD_ROUTES = {
   home: "/dashboard",
@@ -18,6 +18,7 @@ export const DASHBOARD_ROUTES = {
   calendar: "/dashboard/calendar",
   profile: "/dashboard/profile",
   activity: "/dashboard/activity",
+  admin: "/dashboard/admin",
   analyticsProfile: ROUTES.analytics,
   analyticsGrowth: "/analytics/reports",
 } as const;
@@ -46,7 +47,7 @@ export function useDashboardIdentity() {
   const displayName = user?.name ?? (IS_LOCAL ? "Vats S." : "");
   const email = user?.email ?? (IS_LOCAL ? "vatssshah04@gmail.com" : "");
   const firstName = displayName.split(" ")[0] || displayName;
-  const role: "mentor" | "mentee" = user?.user_type === "mentee" ? "mentee" : "mentor";
+  const role: "mentor" | "mentee" | "admin" = user?.user_type === "mentee" ? "mentee" : user?.user_type === "admin" ? "admin" : "mentor";
   return { displayName, email, firstName, initial: (displayName || "M").slice(0, 1), role, signedIn: Boolean(user) };
 }
 
@@ -63,9 +64,18 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
   const { displayName, email, initial, role, signedIn } = useDashboardIdentity();
   const analyticsOpen = active === "analytics-growth" || active === "analytics-profile";
   const isMentee = role === "mentee";
+  const isAdmin = role === "admin";
 
-  // Mentees get a shorter map: their sessions, the directory and their profile.
-  const items: { key: DashboardSection; icon: LucideIcon; label: string; href: string; chevron?: boolean }[] = isMentee
+  // Mentees get a shorter map: their sessions, the directory and their profile. Admins get the programme view.
+  const items: { key: DashboardSection; icon: LucideIcon; label: string; href: string; chevron?: boolean }[] = isAdmin
+    ? [
+        { key: "home", icon: HomeIcon, label: t("showcase.analytics.nav.home"), href: DASHBOARD_ROUTES.home },
+        { key: "admin", icon: ShieldCheck, label: t("showcase.admin.title"), href: DASHBOARD_ROUTES.admin },
+        { key: "bookings", icon: CalendarClock, label: t("showcase.analytics.nav.bookings"), href: DASHBOARD_ROUTES.bookings },
+        { key: "activity", icon: Activity, label: t("showcase.activity.title"), href: DASHBOARD_ROUTES.activity },
+        { key: "mentors", icon: Users, label: t("showcase.analytics.nav.mentors"), href: ROUTES.mentors },
+      ]
+    : isMentee
     ? [
         { key: "home", icon: HomeIcon, label: t("showcase.analytics.nav.home"), href: DASHBOARD_ROUTES.home },
         { key: "bookings", icon: CalendarClock, label: t("showcase.analytics.nav.mySessions"), href: DASHBOARD_ROUTES.bookings },
@@ -88,13 +98,13 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
         <div className="flex items-center gap-3 px-2">
           <AmazonLogo size="md" />
           <div className="min-w-0">
-            <p className="truncate text-[15px] font-bold text-[var(--sc-ink)]">{t(isMentee ? "showcase.analytics.brandMentee" : "showcase.analytics.brand")}</p>
+            <p className="truncate text-[15px] font-bold text-[var(--sc-ink)]">{t(isAdmin ? "showcase.analytics.brandAdmin" : isMentee ? "showcase.analytics.brandMentee" : "showcase.analytics.brand")}</p>
             <p className="truncate text-[12px] text-[#6c6c84]">{t("showcase.analytics.programme")}</p>
           </div>
         </div>
-        <Link href={isMentee ? ROUTES.mentors : DASHBOARD_ROUTES.profile} className="mt-4 inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
-          {isMentee ? <Plus className="size-4" aria-hidden="true" /> : <UserRound className="size-4" aria-hidden="true" />}
-          {t(isMentee ? "showcase.analytics.book" : "showcase.analytics.editProfile")}
+        <Link href={isAdmin ? DASHBOARD_ROUTES.admin : isMentee ? ROUTES.mentors : DASHBOARD_ROUTES.profile} className="mt-4 inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
+          {isAdmin ? <ShieldCheck className="size-4" aria-hidden="true" /> : isMentee ? <Plus className="size-4" aria-hidden="true" /> : <UserRound className="size-4" aria-hidden="true" />}
+          {t(isAdmin ? "showcase.admin.queue" : isMentee ? "showcase.analytics.book" : "showcase.analytics.editProfile")}
         </Link>
 
         <nav className="mt-4 flex flex-col gap-0.5" aria-label={t("showcase.analytics.sidebar")}>
@@ -110,7 +120,7 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
                   <SideLink label={t("showcase.analytics.nav.profile")} href={DASHBOARD_ROUTES.analyticsProfile} active={active === "analytics-profile"} sub />
                 </>
               )}
-              <SideLink icon={Settings} label={t("showcase.analytics.nav.settings")} href={DASHBOARD_ROUTES.calendar} active={active === "settings"} chevron />
+              {!isAdmin && <SideLink icon={Settings} label={t("showcase.analytics.nav.settings")} href={DASHBOARD_ROUTES.calendar} active={active === "settings"} chevron />}
             </>
           )}
         </nav>
@@ -125,8 +135,8 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
               {initial}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[14px] font-semibold text-[var(--sc-ink)]">{displayName || t("showcase.analytics.brand")}</p>
-              <p className="truncate text-[12px] text-[#6c6c84]">{signedIn ? email : t("showcase.analytics.showcaseAccount")}</p>
+              <p className="truncate text-[14px] font-semibold text-[var(--sc-ink)]" dir="auto">{displayName || t("showcase.analytics.brand")}</p>
+              <p className="truncate text-[12px] text-[#6c6c84]" dir={signedIn ? "ltr" : undefined}>{signedIn ? email : t("showcase.analytics.showcaseAccount")}</p>
             </div>
             {signedIn && (
               <button type="button" onClick={() => void logout()} className="inline-flex size-8 items-center justify-center rounded-[6px] text-[#6c6c84] hover:bg-black/5 hover:text-[var(--sc-ink)]" aria-label={t("auth.logout")}>

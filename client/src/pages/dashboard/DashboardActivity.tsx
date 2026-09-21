@@ -29,12 +29,16 @@ const ICONS: Record<ActivityType, LucideIcon> = {
   favorite_added: Heart,
   favorite_removed: HeartOff,
   reminder_sent: Bell,
+  mentor_listed: CheckCircle2,
+  mentor_unlisted: CalendarX,
+  mentee_verified: CheckCircle2,
+  mentee_rejected: CalendarX,
 };
 
 type Group = "all" | "bookings" | "accounts" | "favorites" | "settings";
 const GROUPS: Record<Exclude<Group, "all">, ActivityType[]> = {
   bookings: ["request_sent", "request_accepted", "request_declined", "booking_confirmed", "booking_rescheduled", "booking_canceled", "session_completed", "feedback_left", "reminder_sent"],
-  accounts: ["mentor_registered", "mentee_registered"],
+  accounts: ["mentor_registered", "mentee_registered", "mentor_listed", "mentor_unlisted", "mentee_verified", "mentee_rejected"],
   favorites: ["favorite_added", "favorite_removed"],
   settings: ["profile_updated", "calendar_updated"],
 };
