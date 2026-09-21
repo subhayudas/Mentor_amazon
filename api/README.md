@@ -9,10 +9,14 @@ with secrets that must **never** be prefixed `VITE_` or imported from `client/`.
 | `GET /api/auth/callback/amazon` | `auth/callback/amazon.ts` | Registered redirect URI — token exchange, allow-list, Supabase bridge |
 | `POST /api/auth/logout` | `auth/logout.ts` | Clear `mc_oidc*` cookies, 302 to `/login` |
 | `GET /api/auth/debug-claims` | `auth/debug-claims.ts` | Integ-only: show the claims from the last sign-in (404 unless `AMAZON_OIDC_DEBUG=true`) |
+| `POST /api/webhooks/cal` | `webhooks/cal.ts` | Cal.com booking webhooks — HMAC-SHA256 verified, idempotent; confirms / reschedules / cancels the matching booking, creates it when booked directly on cal.com |
+| `GET /api/cron/reminders` | `cron/reminders.ts` | Hourly (GitHub Actions `reminders.yml`, bearer `CRON_SECRET`): 24h and 1h session reminders as in-app notifications (+ email via Resend when configured) |
+| `POST /api/turnstile` | `turnstile.ts` | Verifies a Cloudflare Turnstile token for the public request form (no-op when not configured) |
 
 Shared helpers live in `_lib/` (the leading underscore keeps Vercel from
-exposing them as routes): `env.ts`, `http.ts`, `cookies.ts`, `oidc.ts`,
-`supabaseAdmin.ts`. Relative imports use the `.js` suffix on purpose — the
+exposing them as routes): `env.ts` (Zod-validated variables), `http.ts`,
+`cookies.ts`, `oidc.ts`, `supabaseAdmin.ts`, `ratelimit.ts` (per-IP fixed
+window; Upstash Redis when configured, in-memory per instance otherwise). Relative imports use the `.js` suffix on purpose — the
 project is `"type": "module"` and Vercel emits each `.ts` as an ES module, so
 Node needs the full filename at runtime.
 

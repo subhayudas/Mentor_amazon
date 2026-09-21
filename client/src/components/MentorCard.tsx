@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { Clock, MailCheck, Star } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -236,12 +237,15 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
             </span>
           </span>
         </Link>
-        {sent && (
-          <Badge tone="info" className="shrink-0">
-            <MailCheck aria-hidden="true" strokeWidth={2} />
-            {t("mentorCard.requestSent")}
-          </Badge>
-        )}
+        <span className="flex items-center gap-2">
+          {sent && (
+            <Badge tone="info" className="shrink-0">
+              <MailCheck aria-hidden="true" strokeWidth={2} />
+              {t("mentorCard.requestSent")}
+            </Badge>
+          )}
+          <FavoriteButton mentorId={mentor.id} mentorName={f.name} size="sm" />
+        </span>
       </div>
     </article>
   );

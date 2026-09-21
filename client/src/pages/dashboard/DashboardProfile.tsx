@@ -11,6 +11,8 @@ import { getLocalSession, setLocalSession } from "@/lib/localAuth";
 import { localStore, useLocalCollection } from "@/lib/localStore";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES } from "@/lib/routes";
+import { normalizeCalLink } from "@/lib/demo";
+import { logActivity } from "@/lib/activity";
 
 /**
  * Profile settings `/dashboard/profile`: the signed-in mentor or mentee
@@ -100,7 +102,7 @@ export default function DashboardProfile() {
       expertise: list(mForm.expertise),
       industries: list(mForm.industries),
       languages_spoken: list(mForm.languages),
-      cal_link: mForm.cal_link.trim() || undefined,
+      cal_link: normalizeCalLink(mForm.cal_link) || undefined,
       linkedin_url: mForm.linkedin_url.trim() || undefined,
       photo_url: mForm.photo_url.trim() || undefined,
       is_available: mForm.is_available,
@@ -110,6 +112,7 @@ export default function DashboardProfile() {
     const session = getLocalSession();
     if (session) setLocalSession({ ...session, name: patch.name });
     queryClient.invalidateQueries({ queryKey: ["mentors"] });
+    logActivity({ actor_type: "mentor", actor_id: mentor.id, actor_name: patch.name, type: "profile_updated", subject_type: "mentor", subject_id: mentor.id, summary: t("showcase.activity.summaries.profileUpdated", { name: patch.name }) });
     flash();
   };
 
@@ -127,6 +130,7 @@ export default function DashboardProfile() {
     localStore.update("mentees", mentee.id, patch);
     const session = getLocalSession();
     if (session) setLocalSession({ ...session, name: patch.name });
+    logActivity({ actor_type: "mentee", actor_id: mentee.id, actor_name: patch.name, type: "profile_updated", subject_type: "mentee", subject_id: mentee.id, summary: t("showcase.activity.summaries.profileUpdated", { name: patch.name }) });
     flash();
   };
 

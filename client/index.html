@@ -12,7 +12,13 @@
     <meta name="description" content="Find an Amazon mentor, send a request with your goal, and pick a time together once they accept.">
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Shown only until the app mounts (the backend probe in main.tsx takes up to a few seconds against a dead project). -->
+      <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:Inter,system-ui,sans-serif;color:#565959;font-size:15px">
+        <span style="display:inline-flex;align-items:center;gap:10px"><span style="display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid #d5d9d9;border-top-color:#ff9900;animation:mc-spin .8s linear infinite"></span>MentorConnect</span>
+      </div>
+      <style>@keyframes mc-spin{to{transform:rotate(360deg)}}</style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

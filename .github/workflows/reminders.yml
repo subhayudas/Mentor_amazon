@@ -1,0 +1,30 @@
+name: Session reminders
+
+# Triggers GET /api/cron/reminders every hour. Vercel's own `crons` would do the
+# same but hourly schedules are not available on the Hobby plan (the deployment
+# fails), so the schedule lives here and works on any plan.
+#
+# Repository secrets: CRON_SECRET (same value as the Vercel env var).
+# Repository variable (optional): APP_ORIGIN — defaults to production.
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the reminder route
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          APP_ORIGIN: ${{ vars.APP_ORIGIN || 'https://mentor-amazon.vercel.app' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then echo "CRON_SECRET secret not set; skipping"; exit 0; fi
+          code=$(curl -s -o /tmp/out.json -w "%{http_code}" -H "Authorization: Bearer $CRON_SECRET" "$APP_ORIGIN/api/cron/reminders")
+          echo "HTTP $code"; cat /tmp/out.json; echo
+          test "$code" = "200"

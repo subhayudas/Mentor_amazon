@@ -8,7 +8,9 @@ import { useTranslation } from "react-i18next";
  * possible:
  *
  * - No right-click, text selection, copy/cut, image drag/save or printing
- *   anywhere except inside form fields (print renders an empty page).
+ *   anywhere except inside form fields (print renders an empty page) — a
+ *   page that sets `document.body.dataset.printable = "true"` (the impact
+ *   report) is exempt from the print/save block and prints normally.
  * - The page blurs the moment the window loses focus, which is what
  *   capture tools on Windows (Snipping Tool & co.) trigger; PrintScreen
  *   also blanks the page and empties the clipboard.
@@ -39,27 +41,19 @@ export function ContentGuard() {
       e.clipboardData?.setData("text/plain", "");
     };
     const onKey = (e: KeyboardEvent) => {
+      if (document.body.dataset.printable === "true") return;
       const mod = e.metaKey || e.ctrlKey;
       // Save page / print / view source / Windows "snip" shortcut / PrintScreen.
       if ((mod && ["s", "p", "u"].includes(e.key.toLowerCase())) || (mod && e.shiftKey && e.key.toLowerCase() === "s") || e.key === "PrintScreen") {
         e.preventDefault();
         setVeiled(true);
-        try {
-          void navigator.clipboard?.writeText("");
-        } catch {
-          /* clipboard unavailable */
-        }
+        // The clipboard promise rejects when the document is not focused; that is fine.
+        navigator.clipboard?.writeText("").catch(() => undefined);
         window.setTimeout(() => setVeiled(false), 1500);
       }
     };
     const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "PrintScreen") {
-        try {
-          void navigator.clipboard?.writeText("");
-        } catch {
-          /* clipboard unavailable */
-        }
-      }
+      if (e.key === "PrintScreen") navigator.clipboard?.writeText("").catch(() => undefined);
     };
     // Focus moving into an embedded frame (the Cal.com calendar) also fires window blur; that is not a capture.
     const veil = () => {

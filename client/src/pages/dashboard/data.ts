@@ -28,7 +28,9 @@ export function useDashboardData() {
   const localMentors = useLocalCollection("mentors");
   const own = IS_LOCAL && Boolean(profileId);
   const ownBookings = own
-    ? localBookings.filter((b) => (role === "mentor" ? b.mentor_id === profileId : b.mentee_id === profileId))
+    ? role === "admin"
+      ? localBookings
+      : localBookings.filter((b) => (role === "mentor" ? b.mentor_id === profileId : b.mentee_id === profileId))
     : null;
   return {
     demo: own ? false : demo,
@@ -36,8 +38,8 @@ export function useDashboardData() {
     profileId,
     isLoading: enabled && (bookingsQuery.isLoading || menteesQuery.isLoading),
     bookings: ownBookings ?? (demo ? [...localBookings, ...MOCK_BOOKINGS] : bookingsQuery.data ?? []),
-    mentees: demo ? [...localMentees, ...MOCK_MENTEES] : menteesQuery.data ?? [],
-    mentors: demo ? [...localMentors, ...MOCK_MENTORS] : mentorsQuery.data ?? [],
+    mentees: own ? localMentees : demo ? [...localMentees, ...MOCK_MENTEES] : menteesQuery.data ?? [],
+    mentors: own ? localMentors : demo ? [...localMentors, ...MOCK_MENTORS] : mentorsQuery.data ?? [],
     localCount: { bookings: localBookings.length, mentees: localMentees.length, mentors: localMentors.length },
   };
 }

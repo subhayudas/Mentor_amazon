@@ -8,7 +8,7 @@ import { z } from "zod";
 import { AlertCircle, ChevronRight, Lock, Mail, ShieldCheck } from "lucide-react";
 
 import { authService } from "@/lib/services";
-import { findLocalAccount, setLocalSession } from "@/lib/localAuth";
+import { LOCAL_ADMIN_EMAIL, findLocalAccount, setLocalSession } from "@/lib/localAuth";
 import { clearRoleStorage, rememberedMenteeEmail } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES, isMenteePath } from "@/lib/routes";
@@ -145,6 +145,9 @@ export default function Login() {
     <div className="rounded-[12px] border border-[var(--sc-hairline)] bg-[var(--sc-sand)] p-4 text-[14px] leading-[22px] text-[var(--sc-ink-soft)]" data-testid="sso-local-note">
       <p className="font-semibold text-[var(--sc-ink)]">{t("auth.sso.signInWithAmazon")}</p>
       <p className="mt-1">{t("showcase.auth.localSso")}</p>
+      <p className="mt-2">
+        {t("showcase.auth.localAdmin")} <code className="rounded bg-white px-1.5 py-0.5 text-[13px]" dir="ltr">{LOCAL_ADMIN_EMAIL}</code>
+      </p>
     </div>
   ) : (
     <div className="space-y-2">

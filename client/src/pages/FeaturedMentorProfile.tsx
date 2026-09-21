@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, BadgeCheck, CalendarCheck, Clock, Globe, Languag
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FEATURED_MENTORS, resolveShowcaseMentor, type FeaturedMentor } from "@/data/featuredMentors";
 import { lastDiscoveryHref } from "@/lib/urlState";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { utcOffsetLabel } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
@@ -88,7 +89,13 @@ export default function FeaturedMentorProfile() {
           {t("mentorProfile.backToMentors")}
         </Link>
         <div className="relative mt-8 size-[120px]">
-          <img src={mentor.photo_url} alt="" className="size-full rounded-full border-4 border-white object-cover" />
+          {mentor.photo_url ? (
+            <img src={mentor.photo_url} alt="" className="size-full rounded-full border-4 border-white object-cover" />
+          ) : (
+            <span className="inline-flex size-full items-center justify-center rounded-full border-4 border-white bg-[var(--sc-ink)] text-[40px] font-bold text-white" aria-hidden="true">
+              {name.slice(0, 1)}
+            </span>
+          )}
           <span className="absolute -bottom-1 end-1 inline-flex size-8 items-center justify-center rounded-full bg-[#f5a623] text-white ring-2 ring-[var(--sc-red)]" title={t("showcase.profile.verified")}>
             <BadgeCheck className="size-5" aria-hidden="true" />
             <span className="sr-only">{t("showcase.profile.verified")}</span>
@@ -136,6 +143,7 @@ export default function FeaturedMentorProfile() {
             <CalendarCheck className="size-4" aria-hidden="true" />
             {t("showcase.profile.book", { minutes: mentor.session.minutes })}
           </Link>
+          <FavoriteButton mentorId={mentor.id} mentorName={name} className="border-white/60 bg-transparent text-white hover:bg-white/10 aria-pressed:bg-white aria-pressed:text-[#d5534d]" />
           {mentor.linkedin && (
             <a
               href={mentor.linkedin}

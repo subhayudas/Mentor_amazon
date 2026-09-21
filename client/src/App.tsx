@@ -39,6 +39,9 @@ const DashboardHome = lazy(() => import("@/pages/dashboard/DashboardHome"));
 const DashboardBookings = lazy(() => import("@/pages/dashboard/DashboardBookings"));
 const DashboardCalendar = lazy(() => import("@/pages/dashboard/DashboardCalendar"));
 const DashboardProfile = lazy(() => import("@/pages/dashboard/DashboardProfile"));
+const DashboardActivity = lazy(() => import("@/pages/dashboard/DashboardActivity"));
+const DashboardAdmin = lazy(() => import("@/pages/dashboard/DashboardAdmin"));
+const AnalyticsReport = lazy(() => import("@/pages/AnalyticsReport"));
 const MentorOnboarding = lazy(() => import("@/pages/MentorOnboarding"));
 const MenteeRegistration = lazy(() => import("@/pages/MenteeRegistration"));
 const MentorPortal = lazy(() => import("@/pages/MentorPortal"));
@@ -136,6 +139,47 @@ function Router() {
         </Route>
 
         {/* Any signed-in session */}
+        {/* Local mode: the legacy portals read the database directly, so they hand over to the dashboard suite. */}
+        {IS_LOCAL && (
+          <Route path="/my-bookings">
+            <Redirect to="/dashboard/bookings" replace />
+          </Route>
+        )}
+        {IS_LOCAL && (
+          <Route path="/mentee-dashboard/:rest*">
+            <Redirect to="/dashboard" replace />
+          </Route>
+        )}
+        {IS_LOCAL && (
+          <Route path="/mentee-dashboard">
+            <Redirect to="/dashboard" replace />
+          </Route>
+        )}
+        {IS_LOCAL && (
+          <Route path="/mentor-portal/:rest*">
+            <Redirect to="/dashboard" replace />
+          </Route>
+        )}
+        {IS_LOCAL && (
+          <Route path="/mentor-portal">
+            <Redirect to="/dashboard" replace />
+          </Route>
+        )}
+        {IS_LOCAL && (
+          <Route path="/mentor-dashboard">
+            <Redirect to="/dashboard" replace />
+          </Route>
+        )}
+        {IS_LOCAL && (
+          <Route path="/admin/:rest*">
+            <Redirect to="/dashboard/admin" replace />
+          </Route>
+        )}
+        {IS_LOCAL && (
+          <Route path="/admin">
+            <Redirect to="/dashboard/admin" replace />
+          </Route>
+        )}
         {/* Mentee surfaces read the caller's own rows under RLS, so a session is required;
             registration is gated too so the created mentee row matches the session email. */}
         <Route path="/mentee-registration">
@@ -176,6 +220,22 @@ function Router() {
         <Route path="/dashboard/profile">
           <RequireAuth>
             <DashboardProfile />
+          </RequireAuth>
+        </Route>
+        <Route path="/dashboard/activity">
+          <RequireAuth>
+            <DashboardActivity />
+          </RequireAuth>
+        </Route>
+        <Route path="/dashboard/admin">
+          <RequireAuth>
+            <DashboardAdmin />
+          </RequireAuth>
+        </Route>
+        {/* Printable impact report (Download PDF = the browser's print-to-PDF; the content guard allows printing here). */}
+        <Route path="/analytics/report">
+          <RequireAuth>
+            <AnalyticsReport />
           </RequireAuth>
         </Route>
         <Route path="/analytics">
