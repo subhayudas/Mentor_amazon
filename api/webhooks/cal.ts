@@ -30,8 +30,6 @@ import { createAdminClient } from '../_lib/supabaseAdmin.js';
  * Configure in Cal.com: Settings → Developer → Webhooks → subscriber URL
  * `https://<app>/api/webhooks/cal`, secret = `CAL_WEBHOOK_SECRET`.
  */
-export const config = { api: { bodyParser: false } };
-
 type CalPayload = {
   triggerEvent?: string;
   createdAt?: string;
@@ -49,6 +47,7 @@ type CalPayload = {
   };
 };
 
+// @vercel/node reads the body for `req.body` and then restores the stream, so the raw bytes are still readable here.
 async function rawBody(req: VercelRequest): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);

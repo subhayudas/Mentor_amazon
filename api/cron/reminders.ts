@@ -4,7 +4,8 @@ import { noStore, sendJson, sendMisconfigured } from '../_lib/http.js';
 import { createAdminClient } from '../_lib/supabaseAdmin.js';
 
 /**
- * GET /api/cron/reminders — hourly (vercel.json `crons`).
+ * GET /api/cron/reminders — hourly (.github/workflows/reminders.yml; Vercel's
+ * own `crons` cannot run hourly on the Hobby plan).
  *
  * For every confirmed booking that starts in the next 24 hours (24h
  * reminder) or the next hour (1h reminder) and has not had that reminder
@@ -12,7 +13,7 @@ import { createAdminClient } from '../_lib/supabaseAdmin.js';
  * when `RESEND_API_KEY` is set, sends the email. One row per
  * (booking, kind) in `booking_reminders` keeps it idempotent across runs.
  *
- * Authenticated by Vercel's cron header (`Authorization: Bearer CRON_SECRET`).
+ * Authenticated by `Authorization: Bearer CRON_SECRET`.
  */
 type Row = {
   id: string;

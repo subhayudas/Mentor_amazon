@@ -10,7 +10,7 @@ with secrets that must **never** be prefixed `VITE_` or imported from `client/`.
 | `POST /api/auth/logout` | `auth/logout.ts` | Clear `mc_oidc*` cookies, 302 to `/login` |
 | `GET /api/auth/debug-claims` | `auth/debug-claims.ts` | Integ-only: show the claims from the last sign-in (404 unless `AMAZON_OIDC_DEBUG=true`) |
 | `POST /api/webhooks/cal` | `webhooks/cal.ts` | Cal.com booking webhooks — HMAC-SHA256 verified, idempotent; confirms / reschedules / cancels the matching booking, creates it when booked directly on cal.com |
-| `GET /api/cron/reminders` | `cron/reminders.ts` | Hourly (vercel.json `crons`): 24h and 1h session reminders as in-app notifications (+ email via Resend when configured) |
+| `GET /api/cron/reminders` | `cron/reminders.ts` | Hourly (GitHub Actions `reminders.yml`, bearer `CRON_SECRET`): 24h and 1h session reminders as in-app notifications (+ email via Resend when configured) |
 | `POST /api/turnstile` | `turnstile.ts` | Verifies a Cloudflare Turnstile token for the public request form (no-op when not configured) |
 
 Shared helpers live in `_lib/` (the leading underscore keeps Vercel from
