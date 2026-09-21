@@ -1,30 +1,43 @@
-/**
- * Server-only environment for the Amazon Federate SSO functions.
- *
- * Every handler reads exactly the variables it needs through `readEnv` and
- * fails closed with `{ error: 'server_misconfigured', missing: [...] }` when
- * any are absent. Nothing here is ever prefixed VITE_ and nothing here is
- * imported from client/.
- */
+import { z } from 'zod';
 
-export const ENV_KEYS = {
-  issuer: 'AMAZON_OIDC_ISSUER',
-  clientId: 'AMAZON_OIDC_CLIENT_ID',
-  clientSecret: 'AMAZON_OIDC_CLIENT_SECRET',
-  redirectUri: 'AMAZON_OIDC_REDIRECT_URI',
-  scopes: 'AMAZON_OIDC_SCOPES',
-  debug: 'AMAZON_OIDC_DEBUG',
-  supabaseUrl: 'SUPABASE_URL',
-  supabaseServiceRoleKey: 'SUPABASE_SERVICE_ROLE_KEY',
-  appOrigin: 'APP_ORIGIN',
+/**
+ * Server-only environment for the Vercel functions (Amazon Federate SSO,
+ * the Cal.com webhook, the reminder cron, Turnstile).
+ *
+ * Every variable is declared once in `ENV_SCHEMA` with its shape; handlers
+ * read exactly the keys they need through `readEnv` and fail closed with
+ * `{ error: 'server_misconfigured', missing: [...] }` when a required one is
+ * absent or malformed. Nothing here is ever prefixed VITE_ and nothing here
+ * is imported from client/.
+ */
+const url = z.string().url();
+const nonEmpty = z.string().min(1);
+
+export const ENV_SCHEMA = {
+  issuer: { name: 'AMAZON_OIDC_ISSUER', schema: url.transform((v) => v.replace(/\/+$/, '')) },
+  clientId: { name: 'AMAZON_OIDC_CLIENT_ID', schema: nonEmpty },
+  clientSecret: { name: 'AMAZON_OIDC_CLIENT_SECRET', schema: nonEmpty },
+  redirectUri: { name: 'AMAZON_OIDC_REDIRECT_URI', schema: url },
+  scopes: { name: 'AMAZON_OIDC_SCOPES', schema: nonEmpty, default: 'openid profile email' },
+  debug: { name: 'AMAZON_OIDC_DEBUG', schema: z.string(), default: '' },
+  supabaseUrl: { name: 'SUPABASE_URL', schema: url },
+  supabaseServiceRoleKey: { name: 'SUPABASE_SERVICE_ROLE_KEY', schema: nonEmpty },
+  appOrigin: { name: 'APP_ORIGIN', schema: url.transform((v) => v.replace(/\/+$/, '')) },
+  calWebhookSecret: { name: 'CAL_WEBHOOK_SECRET', schema: z.string().min(16) },
+  cronSecret: { name: 'CRON_SECRET', schema: z.string().min(16) },
+  resendApiKey: { name: 'RESEND_API_KEY', schema: nonEmpty, default: '' },
+  mailFrom: { name: 'MAIL_FROM', schema: nonEmpty, default: 'MentorConnect <no-reply@mentorconnect.local>' },
+  turnstileSecret: { name: 'TURNSTILE_SECRET_KEY', schema: nonEmpty, default: '' },
+  upstashUrl: { name: 'UPSTASH_REDIS_REST_URL', schema: url, default: '' },
+  upstashToken: { name: 'UPSTASH_REDIS_REST_TOKEN', schema: nonEmpty, default: '' },
 } as const;
 
-export type EnvKey = keyof typeof ENV_KEYS;
+export type EnvKey = keyof typeof ENV_SCHEMA;
 
-/** Variables that have a safe default and never count as "missing". */
-const OPTIONAL: ReadonlySet<EnvKey> = new Set<EnvKey>(['scopes', 'debug']);
+/** Kept for callers that only need the variable's public name. */
+export const ENV_KEYS = Object.fromEntries(Object.entries(ENV_SCHEMA).map(([k, v]) => [k, v.name])) as { [K in EnvKey]: (typeof ENV_SCHEMA)[K]['name'] };
 
-export const DEFAULT_SCOPES = 'openid profile email';
+export const DEFAULT_SCOPES = ENV_SCHEMA.scopes.default;
 
 export type EnvResult<K extends EnvKey> =
   | { ok: true; env: Record<K, string> }
@@ -38,34 +51,38 @@ function readRaw(name: string): string | undefined {
 }
 
 /**
- * Read the named variables. Optional keys resolve to their default ('' for
- * debug, the OIDC default scope set for scopes); required keys that are unset
- * or blank are reported in `missing`. Issuer and app origin lose any trailing
- * slash so URL building is predictable.
+ * Read and validate the named variables. Keys with a default never count as
+ * missing (an empty default means "feature off"); required keys that are
+ * unset, blank or fail their schema are reported in `missing` (malformed
+ * ones as `NAME (invalid)`).
  */
 export function readEnv<K extends EnvKey>(keys: readonly K[]): EnvResult<K> {
   const env = {} as Record<K, string>;
   const missing: string[] = [];
 
   for (const key of keys) {
-    const name = ENV_KEYS[key];
-    const raw = readRaw(name);
-    if (raw !== undefined) {
-      env[key] = key === 'issuer' || key === 'appOrigin' ? raw.replace(/\/+$/, '') : raw;
+    const spec = ENV_SCHEMA[key] as { name: string; schema: z.ZodType<string>; default?: string };
+    const raw = readRaw(spec.name);
+    if (raw === undefined) {
+      if (spec.default !== undefined) {
+        env[key] = spec.default;
+        continue;
+      }
+      missing.push(spec.name);
       continue;
     }
-    if (OPTIONAL.has(key)) {
-      env[key] = key === 'scopes' ? DEFAULT_SCOPES : '';
+    const parsed = spec.schema.safeParse(raw);
+    if (!parsed.success) {
+      missing.push(`${spec.name} (invalid)`);
       continue;
     }
-    missing.push(name);
+    env[key] = parsed.data;
   }
 
-  if (missing.length > 0) return { ok: false, missing };
-  return { ok: true, env };
+  return missing.length > 0 ? { ok: false, missing } : { ok: true, env };
 }
 
-/** True only when AMAZON_OIDC_DEBUG is exactly the string 'true'. */
+/** Debug output is enabled only when `AMAZON_OIDC_DEBUG` is literally `true`. */
 export function isDebugEnabled(): boolean {
-  return process.env[ENV_KEYS.debug] === 'true';
+  return readRaw(ENV_SCHEMA.debug.name) === 'true';
 }

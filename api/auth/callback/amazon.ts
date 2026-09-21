@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { readEnv, isDebugEnabled } from '../../_lib/env.js';
+import { RULES, enforceRateLimit } from '../../_lib/ratelimit.js';
 import {
   appendSetCookie,
   deriveCookieKey,
@@ -112,6 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMethodNotAllowed(res, ['GET', 'HEAD']);
     return;
   }
+  if (!(await enforceRateLimit(req, res, RULES.authCallback))) return;
 
   const envResult = readEnv([
     'issuer',
