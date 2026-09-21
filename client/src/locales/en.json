@@ -230,7 +230,9 @@
       "dashboardBookings": "Bookings",
       "dashboardCalendar": "Calendar",
       "legal": "Terms & privacy",
-      "dashboardProfile": "Profile settings"
+      "dashboardProfile": "Profile settings",
+      "dashboardActivity": "Activity",
+      "analyticsReport": "Impact report"
     }
   },
   "hero": {
@@ -1049,7 +1051,7 @@
     "faq": {
       "title": "Questions people ask",
       "spamQuestion": "Will I get a lot of email?",
-      "spamAnswer": "No. MentorConnect sends no marketing email. A mentor's reply appears under your bookings when you sign in with the email you used, and the only other messages come from the calendar tool you book a time with.",
+      "spamAnswer": "Absolutely not. You only receive what the programme needs: confirmations and updates about your own sessions, plus in-app reminders 24 hours and 1 hour before a confirmed session (email reminders switch on once the programme's email service is connected). Your address is never shared with third parties.",
       "commitmentQuestion": "How much time do mentors commit?",
       "commitmentAnswer": "Mentors set their own pace and can pause new requests at any time — the card then says \"Not accepting requests\".",
       "matchingQuestion": "How are mentors and mentees matched?",
@@ -2112,7 +2114,9 @@
       "brandMentee": "Mentee Dashboard",
       "book": "Book a session",
       "showcaseAccount": "Showcase account — not signed in",
-      "editProfile": "Edit my profile"
+      "editProfile": "Edit my profile",
+      "sampleTitle": "Sample data — not programme outcomes.",
+      "sampleBody": "Fewer than five real bookings exist, so every number and chart here is illustrative. Do not quote these as results; real metrics replace them automatically as sessions accumulate."
     },
     "legal": {
       "terms": "Terms",
@@ -2266,7 +2270,9 @@
       "viewBookings": "View my bookings",
       "noCalendar": "{{name}} hasn't connected a calendar yet. Send a request and you'll get the invite once it's accepted.",
       "send": "Send request",
-      "sharedCalendar": "Times come from the programme's shared calendar until {{name}} connects a Cal.com account from the dashboard."
+      "sharedCalendar": "Times come from the programme's shared calendar until {{name}} connects a Cal.com account from the dashboard.",
+      "botCheck": "Confirm you are human to send the request.",
+      "botFailed": "The bot check did not pass. Please try again."
     },
     "profileSettings": {
       "saved": "Profile saved",
@@ -2278,6 +2284,98 @@
       "calHint": "Your booking page; it is embedded on your session page.",
       "organisation": "Organisation",
       "goals": "What you want from mentoring"
+    },
+    "activity": {
+      "title": "Activity",
+      "recent": "Recent activity",
+      "viewAll": "View all",
+      "lede": "Every change, in order, as it happened. Entries are never edited or removed.",
+      "empty": "Nothing has happened yet.",
+      "groups": {
+        "all": "All",
+        "bookings": "Sessions",
+        "accounts": "Accounts",
+        "favorites": "Favourites",
+        "settings": "Settings"
+      },
+      "types": {
+        "mentor_registered": "Mentor joined",
+        "mentee_registered": "Mentee joined",
+        "profile_updated": "Profile updated",
+        "calendar_updated": "Calendar settings saved",
+        "request_sent": "Request sent",
+        "request_accepted": "Request accepted",
+        "request_declined": "Request declined",
+        "booking_confirmed": "Session confirmed",
+        "booking_rescheduled": "Session rescheduled",
+        "booking_canceled": "Session cancelled",
+        "session_completed": "Session completed",
+        "feedback_left": "Feedback left",
+        "favorite_added": "Favourite added",
+        "favorite_removed": "Favourite removed",
+        "reminder_sent": "Reminder sent"
+      },
+      "summaries": {
+        "mentorRegistered": "{{name}} joined as a mentor",
+        "menteeRegistered": "{{name}} joined as a mentee",
+        "profileUpdated": "{{name}} updated their profile",
+        "calendarUpdated": "Calendar settings and office hours saved",
+        "requestSent": "Session request sent to {{mentor}} — {{session}}",
+        "requestAccepted": "Request from {{mentee}} accepted",
+        "requestDeclined": "Request from {{mentee}} declined",
+        "bookingConfirmed": "Session booked with {{mentor}} on Cal.com — {{session}}"
+      }
+    },
+    "favorites": {
+      "title": "Favourite mentors",
+      "add": "Save {{name}} as a favourite",
+      "remove": "Remove {{name}} from favourites",
+      "onlyMine": "My favourites ({{count}})"
+    },
+    "reminders": {
+      "title": "Coming up",
+      "none": "No sessions in the next 24 hours.",
+      "tomorrow": "Session tomorrow at {{when}}",
+      "inHour": "Session within the hour — {{when}}",
+      "bell": "Notifications ({{count}} due)"
+    },
+    "report": {
+      "title": "Impact report",
+      "open": "Impact report (PDF)",
+      "download": "Download PDF",
+      "generated": "generated {{when}}",
+      "lastDays": "last {{count}} days",
+      "allTime": "all time",
+      "daysShort": "{{count}}d",
+      "kpis": "Key figures",
+      "sampleBadge": "Sample data",
+      "sampleNote": "This report is built from sample data because fewer than five real bookings exist. It is a layout preview, not a programme result.",
+      "unknown": "Not specified",
+      "byMonth": "Sessions by month",
+      "byMentor": "Mentors by sessions",
+      "byExpertise": "Sessions by area of expertise",
+      "byCountry": "Sessions by mentee country",
+      "footer": "MentorConnect · Amazon UAE mentorship programme · confidential · counts cover completed sessions in the selected period.",
+      "kpi": {
+        "completed": "Sessions completed",
+        "hours": "Hours mentored",
+        "mentees": "Mentees served",
+        "mentors": "Active mentors",
+        "requests": "Requests received",
+        "completionRate": "Completion rate",
+        "rating": "Average rating",
+        "avgLength": "Average length"
+      },
+      "col": {
+        "month": "Month",
+        "requests": "Requests",
+        "completed": "Completed",
+        "hours": "Hours",
+        "mentor": "Mentor",
+        "sessions": "Sessions",
+        "area": "Area",
+        "country": "Country"
+      }
     }
   }
 }

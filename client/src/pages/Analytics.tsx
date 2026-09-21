@@ -1,7 +1,8 @@
 import * as React from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import { Clock3, Eye, Video, type LucideIcon } from "lucide-react";
+import { Clock3, Eye, FileText, Video, type LucideIcon } from "lucide-react";
+import { Link } from "wouter";
 import { Area, AreaChart, Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Badge } from "@/components/ui/badge";
@@ -231,12 +232,23 @@ export default function Analytics() {
           <h1 id="page-title" tabIndex={-1} className="text-[28px] font-bold text-[var(--sc-ink)] md:text-[34px]">
             {t("showcase.analytics.title")}
           </h1>
-          {demo && (
-            <Badge tone="warning" data-testid="badge-demo-data">
-              {t("analyticsV2.demoBadge")}
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {demo && (
+              <Badge tone="warning" data-testid="badge-demo-data">
+                {t("analyticsV2.demoBadge")}
+              </Badge>
+            )}
+            <Link href="/analytics/report" className="inline-flex h-10 items-center gap-2 rounded-full border border-[#d9d9d9] px-4 text-[14px] font-semibold text-[var(--sc-ink)] hover:border-[var(--sc-ink)]" data-testid="link-impact-report">
+              <FileText className="size-4" aria-hidden="true" />
+              {t("showcase.report.open")}
+            </Link>
+          </div>
         </div>
+        {demo && (
+          <p className="mt-4 rounded-[10px] border border-[#f5d98a] bg-[#fffaeb] px-4 py-3 text-[14px] text-[#7a4b00]" role="note" data-testid="note-sample-data">
+            <strong className="font-semibold">{t("showcase.analytics.sampleTitle")}</strong> {t("showcase.analytics.sampleBody")}
+          </p>
+        )}
 
         <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
           <Segmented items={PERIODS.map((p) => p.key)} value={period} onChange={setPeriod} label={t("showcase.analytics.period")} render={(k) => t(`showcase.analytics.periods.${k}`)} />

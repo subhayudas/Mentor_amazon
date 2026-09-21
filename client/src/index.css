@@ -475,8 +475,22 @@ html.guard-veiled .guard-veil * {
 }
 
 @media print {
-  html.guard-active body > * {
+  html.guard-active body:not([data-printable="true"]) > * {
     display: none !important;
   }
 
+  /* Printable report: app chrome off, the article alone, real page margins. */
+  body[data-printable="true"] header,
+  body[data-printable="true"] .print\:hidden {
+    display: none !important;
+  }
+
+  body[data-printable="true"] .print-root {
+    padding: 0;
+    max-width: none;
+  }
+
+  @page {
+    margin: 16mm;
+  }
 }
