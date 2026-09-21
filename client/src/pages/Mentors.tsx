@@ -14,6 +14,9 @@ import { SearchIntent } from "@/components/discovery/SearchIntent";
 import { ZeroResults } from "@/components/discovery/ZeroResults";
 import { useIsDesktop, useIsPhone } from "@/hooks/useMediaQuery";
 import { useMentors } from "@/components/discovery/useMentors";
+import { useAuth } from "@/context/AuthContext";
+import { useFavorites } from "@/lib/favorites";
+import { Heart } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -116,7 +119,14 @@ export default function Mentors() {
   const ctx = React.useMemo(() => ({ lang, viewerTz }), [lang, viewerTz]);
 
   const liveState = React.useMemo<DiscoveryState>(() => ({ ...urlState, q: query }), [urlState, query]);
-  const results = React.useMemo(() => (mentors ? applyDiscovery(mentors, liveState, ctx) : []), [mentors, liveState, ctx]);
+  const { user } = useAuth();
+  const menteeId = user?.user_type === "mentee" ? user.profile_id ?? null : null;
+  const { ids: favoriteIds } = useFavorites(menteeId, user?.name);
+  const [favoritesOnly, setFavoritesOnly] = React.useState(false);
+  const results = React.useMemo(() => {
+    const list = mentors ? applyDiscovery(mentors, liveState, ctx) : [];
+    return favoritesOnly ? list.filter((m) => favoriteIds.has(m.id)) : list;
+  }, [mentors, liveState, ctx, favoritesOnly, favoriteIds]);
   const announcedCount = React.useMemo(
     () => (mentors ? applyDiscovery(mentors, urlState, ctx).length : null),
     [mentors, urlState, ctx],
@@ -341,6 +351,21 @@ export default function Mentors() {
                   </Select>
                 </div>
               )}
+            </div>
+          )}
+
+          {menteeId && favoriteIds.size > 0 && (
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                aria-pressed={favoritesOnly}
+                onClick={() => setFavoritesOnly((v) => !v)}
+                data-testid="button-favorites-only"
+                className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[14px] font-medium transition-colors duration-fast ${favoritesOnly ? "border-[#d5534d] bg-[#fdecec] text-[#d5534d]" : "border-[#d9d9d9] text-[var(--sc-ink)] hover:border-[var(--sc-ink)]"}`}
+              >
+                <Heart className={`size-4 ${favoritesOnly ? "fill-current" : ""}`} aria-hidden="true" />
+                {t("showcase.favorites.onlyMine", { count: favoriteIds.size })}
+              </button>
             </div>
           )}
 

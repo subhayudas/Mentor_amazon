@@ -39,6 +39,8 @@ const DashboardHome = lazy(() => import("@/pages/dashboard/DashboardHome"));
 const DashboardBookings = lazy(() => import("@/pages/dashboard/DashboardBookings"));
 const DashboardCalendar = lazy(() => import("@/pages/dashboard/DashboardCalendar"));
 const DashboardProfile = lazy(() => import("@/pages/dashboard/DashboardProfile"));
+const DashboardActivity = lazy(() => import("@/pages/dashboard/DashboardActivity"));
+const AnalyticsReport = lazy(() => import("@/pages/AnalyticsReport"));
 const MentorOnboarding = lazy(() => import("@/pages/MentorOnboarding"));
 const MenteeRegistration = lazy(() => import("@/pages/MenteeRegistration"));
 const MentorPortal = lazy(() => import("@/pages/MentorPortal"));
@@ -176,6 +178,17 @@ function Router() {
         <Route path="/dashboard/profile">
           <RequireAuth>
             <DashboardProfile />
+          </RequireAuth>
+        </Route>
+        <Route path="/dashboard/activity">
+          <RequireAuth>
+            <DashboardActivity />
+          </RequireAuth>
+        </Route>
+        {/* Printable impact report (Download PDF = the browser's print-to-PDF; the content guard allows printing here). */}
+        <Route path="/analytics/report">
+          <RequireAuth>
+            <AnalyticsReport />
           </RequireAuth>
         </Route>
         <Route path="/analytics">

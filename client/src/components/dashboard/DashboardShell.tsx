@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { BarChart3, CalendarClock, CalendarDays, ChevronRight, Home as HomeIcon, LogOut, Plus, Search, Settings, UserRound, Users, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, CalendarClock, CalendarDays, ChevronRight, Home as HomeIcon, LogOut, Plus, Search, Settings, UserRound, Users, type LucideIcon } from "lucide-react";
 
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { useAuth } from "@/context/AuthContext";
@@ -10,13 +10,14 @@ import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 /** Which sidebar entry is lit. */
-export type DashboardSection = "home" | "bookings" | "calendar" | "profile" | "mentors" | "analytics-growth" | "analytics-profile" | "settings";
+export type DashboardSection = "home" | "bookings" | "calendar" | "profile" | "activity" | "mentors" | "analytics-growth" | "analytics-profile" | "settings";
 
 export const DASHBOARD_ROUTES = {
   home: "/dashboard",
   bookings: "/dashboard/bookings",
   calendar: "/dashboard/calendar",
   profile: "/dashboard/profile",
+  activity: "/dashboard/activity",
   analyticsProfile: ROUTES.analytics,
   analyticsGrowth: "/analytics/reports",
 } as const;
@@ -69,6 +70,7 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
         { key: "home", icon: HomeIcon, label: t("showcase.analytics.nav.home"), href: DASHBOARD_ROUTES.home },
         { key: "bookings", icon: CalendarClock, label: t("showcase.analytics.nav.mySessions"), href: DASHBOARD_ROUTES.bookings },
         { key: "mentors", icon: Search, label: t("discovery.title"), href: ROUTES.mentors },
+        { key: "activity", icon: Activity, label: t("showcase.activity.title"), href: DASHBOARD_ROUTES.activity },
         { key: "profile", icon: UserRound, label: t("showcase.analytics.nav.profileSettings"), href: DASHBOARD_ROUTES.profile },
       ]
     : [
@@ -76,6 +78,7 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
         { key: "bookings", icon: CalendarClock, label: t("showcase.analytics.nav.bookings"), href: DASHBOARD_ROUTES.bookings, chevron: true },
         { key: "calendar", icon: CalendarDays, label: t("showcase.analytics.nav.calendar"), href: DASHBOARD_ROUTES.calendar },
         { key: "profile", icon: UserRound, label: t("showcase.analytics.nav.profileSettings"), href: DASHBOARD_ROUTES.profile },
+        { key: "activity", icon: Activity, label: t("showcase.activity.title"), href: DASHBOARD_ROUTES.activity },
         { key: "mentors", icon: Users, label: t("showcase.analytics.nav.mentors"), href: ROUTES.mentors },
       ];
 

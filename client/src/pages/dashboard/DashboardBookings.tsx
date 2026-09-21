@@ -9,6 +9,8 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { FEATURED_MENTORS } from "@/data/featuredMentors";
 import type { Booking } from "@/lib/database";
 import { localStore } from "@/lib/localStore";
+import { logActivity } from "@/lib/activity";
+import { useDashboardIdentity } from "@/components/dashboard/DashboardShell";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { UPCOMING_STATUSES, useDashboardData } from "@/pages/dashboard/data";
@@ -23,8 +25,22 @@ type Tab = "requests" | "upcoming" | "completed";
 export default function DashboardBookings() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { bookings, mentees, mentors, demo, role } = useDashboardData();
+  const { bookings, mentees, mentors, demo, role, profileId } = useDashboardData();
+  const { displayName } = useDashboardIdentity();
   const isMentee = role === "mentee";
+  const decide = (b: Booking, status: "accepted" | "rejected") => {
+    localStore.update("bookings", b.id, { status, responded_at: new Date().toISOString() });
+    logActivity({
+      actor_type: "mentor",
+      actor_id: profileId ?? b.mentor_id,
+      actor_name: displayName,
+      type: status === "accepted" ? "request_accepted" : "request_declined",
+      subject_type: "booking",
+      subject_id: b.id,
+      visible_to: [b.mentor_id, b.mentee_id],
+      summary: t(status === "accepted" ? "showcase.activity.summaries.requestAccepted" : "showcase.activity.summaries.requestDeclined", { mentee: menteeById.get(b.mentee_id)?.name ?? t("showcase.bookings.mentee") }),
+    });
+  };
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
   const [tab, setTab] = React.useState<Tab>(() => (pendingCount > 0 ? "requests" : "upcoming"));
 
@@ -115,7 +131,7 @@ export default function DashboardBookings() {
                     <span className="flex gap-2">
                       <button
                         type="button"
-                        onClick={() => localStore.update("bookings", b.id, { status: "accepted", responded_at: new Date().toISOString() })}
+                        onClick={() => decide(b, "accepted")}
                         className="inline-flex h-9 items-center gap-1.5 rounded-[6px] bg-[var(--sc-ink)] px-3 text-[13px] font-bold text-white hover:bg-black"
                         data-testid={`button-accept-${b.id}`}
                       >
@@ -124,7 +140,7 @@ export default function DashboardBookings() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => localStore.update("bookings", b.id, { status: "rejected", responded_at: new Date().toISOString() })}
+                        onClick={() => decide(b, "rejected")}
                         className="inline-flex h-9 items-center gap-1.5 rounded-[6px] border border-[#d9d9d9] px-3 text-[13px] font-semibold text-[var(--sc-ink)] hover:bg-[var(--sc-sand)]"
                         data-testid={`button-decline-${b.id}`}
                       >

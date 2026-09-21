@@ -6,6 +6,7 @@ import { ArrowRight, ChevronDown, LogOut, Menu } from "lucide-react";
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { NotificationBell } from "@/components/NotificationBell";
+import { LocalNotificationBell } from "@/components/LocalNotificationBell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -168,6 +169,7 @@ export function Navigation() {
           <LanguageToggle />
 
           {bellEmail && !IS_LOCAL && <NotificationBell email={bellEmail} />}
+          {IS_LOCAL && user && <LocalNotificationBell />}
 
           {/* Visitor CTAs never top the access-error card: with a session whose users row failed to load (F-02), the header stays neutral. */}
           {!isLoading && !isLoggedIn && !error && (

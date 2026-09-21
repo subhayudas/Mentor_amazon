@@ -28,6 +28,7 @@ import { OnboardingShell, onboardingSectionClass } from "@/components/onboarding
 import { IS_LOCAL } from "@/lib/demo";
 import { localStore, newId } from "@/lib/localStore";
 import { sessionFromMentee, setLocalSession } from "@/lib/localAuth";
+import { logActivity } from "@/lib/activity";
 import { FilterChip } from "@/components/discovery/FilterChip";
 import { RequestRail, DEFAULT_STOPS } from "@/components/RequestRail";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
@@ -270,6 +271,7 @@ export default function MenteeRegistration() {
       localStorage.setItem("menteeEmail", row.email);
       localStorage.setItem("menteeName", row.name);
       window.dispatchEvent(new Event("userRegistered"));
+      logActivity({ actor_type: "mentee", actor_id: row.id, actor_name: row.name, type: completing ? "profile_updated" : "mentee_registered", subject_type: "mentee", subject_id: row.id, summary: t(completing ? "showcase.activity.summaries.profileUpdated" : "showcase.activity.summaries.menteeRegistered", { name: row.name }) });
       const newOrgReview = row.user_type === "organization" && row.verification_status === "pending" && !(existing?.user_type === "organization");
       toast.success(completing ? t("menteeRegistration.updatedMessage") : t("menteeRegistration.successTitle"), {
         description: newOrgReview ? t("verification.inReviewToast") : completing ? undefined : t("menteeRegistration.successMessage"),

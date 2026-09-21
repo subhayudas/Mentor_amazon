@@ -253,6 +253,51 @@ export interface MentorActivityLog {
   created_at: string;
 }
 
+/** A mentee's saved mentor (`mentee_favorites`). */
+export interface Favorite {
+  id: string;
+  mentee_id: string;
+  mentor_id: string;
+  created_at: string;
+}
+
+export type ActivityType =
+  | 'mentor_registered'
+  | 'mentee_registered'
+  | 'profile_updated'
+  | 'calendar_updated'
+  | 'request_sent'
+  | 'request_accepted'
+  | 'request_declined'
+  | 'booking_confirmed'
+  | 'booking_rescheduled'
+  | 'booking_canceled'
+  | 'session_completed'
+  | 'feedback_left'
+  | 'favorite_added'
+  | 'favorite_removed'
+  | 'reminder_sent';
+
+/**
+ * Append-only audit event (`activity_events`). Written by the app at every
+ * state change and by the Cal.com webhook / reminder cron server-side; never
+ * updated or deleted. `summary` is the human line shown in the feed.
+ */
+export interface ActivityEvent {
+  id: string;
+  actor_type: 'mentor' | 'mentee' | 'admin' | 'system';
+  actor_id?: string;
+  actor_name?: string;
+  type: ActivityType;
+  subject_type?: 'booking' | 'mentor' | 'mentee' | 'favorite' | 'settings';
+  subject_id?: string;
+  /** Every party who should see the event (mentor id, mentee id); admins see all. */
+  visible_to: string[];
+  summary: string;
+  meta?: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface MentorDashboardStats {
   totalSessions: number;
   completedSessions: number;

@@ -10,6 +10,12 @@ import { FEATURED_MENTORS } from "@/data/featuredMentors";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { UPCOMING_STATUSES, useDashboardData } from "@/pages/dashboard/data";
+import { useActivity } from "@/lib/activity";
+import { useFavorites } from "@/lib/favorites";
+import { dueReminders } from "@/lib/reminders";
+import { useAuth } from "@/context/AuthContext";
+import { ActivityList } from "@/pages/dashboard/DashboardActivity";
+import { Bell, Heart } from "lucide-react";
 
 /**
  * Dashboard home `/dashboard` (Figma "Dashboard Home", Topmate → Amazon /
@@ -26,6 +32,9 @@ export default function DashboardHome() {
   const lang = i18n.language;
   const { displayName, firstName, email, role, signedIn } = useDashboardIdentity();
   const { bookings, mentors, demo, profileId } = useDashboardData();
+  const { user } = useAuth();
+  const { events } = useActivity(signedIn ? profileId : null, { all: !signedIn, limit: 6 });
+  const reminders = React.useMemo(() => (signedIn ? dueReminders(bookings) : []), [bookings, signedIn]);
   const checklistKey = `checklist:${email || "showcase"}`;
   const [open, setOpen] = React.useState<(typeof CHECKLIST)[number] | null>("availability");
   const [done, setDoneState] = React.useState<Set<string>>(() => new Set(getLocalValue<string[]>(checklistKey) ?? []));
@@ -66,7 +75,7 @@ export default function DashboardHome() {
   const stat = "rounded-[12px] border border-[var(--sc-hairline)] bg-[#fcfbf9] p-5";
 
   if (signedIn && role === "mentee") {
-    return <MenteeHome firstName={firstName} bookings={bookings} mentors={mentors} lang={lang} />;
+    return <MenteeHome firstName={firstName} bookings={bookings} mentors={mentors} lang={lang} menteeId={user?.profile_id ?? null} menteeName={user?.name} events={events} reminders={reminders} />;
   }
 
   return (
@@ -91,6 +100,8 @@ export default function DashboardHome() {
             </button>
           </div>
         </div>
+
+        <RemindersBanner reminders={reminders} lang={lang} />
 
         {/* Greeting card */}
         <section className={cn(card, "mt-6 p-6")} aria-labelledby="greeting">
@@ -221,6 +232,20 @@ export default function DashboardHome() {
           </section>
         </div>
 
+        {signedIn && (
+          <section className={cn(card, "mt-6 p-6")} aria-labelledby="recent-activity">
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="recent-activity" className="text-[20px] font-bold text-[var(--sc-ink)]">
+                {t("showcase.activity.recent")}
+              </h2>
+              <Link href={DASHBOARD_ROUTES.activity} className="text-[14px] font-semibold text-[var(--sc-ink)] underline underline-offset-4">
+                {t("showcase.activity.viewAll")}
+              </Link>
+            </div>
+            <ActivityList events={events} lang={lang} compact />
+          </section>
+        )}
+
         {/* Upcoming strip */}
         <Link href={DASHBOARD_ROUTES.bookings} className={cn(card, "mt-6 flex items-center gap-4 p-4 hover:bg-[#fcfbf9]")}>
           <span className="inline-flex size-12 items-center justify-center rounded-[8px] bg-[var(--sc-sand)] text-[var(--sc-ink)]" aria-hidden="true">
@@ -281,8 +306,30 @@ export default function DashboardHome() {
 }
 
 /** Mentee view of the dashboard home: their sessions, then where to find the next mentor. */
-function MenteeHome({ firstName, bookings, mentors, lang }: { firstName: string; bookings: ReturnType<typeof useDashboardData>["bookings"]; mentors: ReturnType<typeof useDashboardData>["mentors"]; lang: string }) {
+function MenteeHome({
+  firstName,
+  bookings,
+  mentors,
+  lang,
+  menteeId,
+  menteeName,
+  events,
+  reminders,
+}: {
+  firstName: string;
+  bookings: ReturnType<typeof useDashboardData>["bookings"];
+  mentors: ReturnType<typeof useDashboardData>["mentors"];
+  lang: string;
+  menteeId: string | null;
+  menteeName?: string;
+  events: ReturnType<typeof useActivity>["events"];
+  reminders: ReturnType<typeof dueReminders>;
+}) {
   const { t } = useTranslation();
+  const { favorites } = useFavorites(menteeId, menteeName);
+  const favoriteMentors = favorites
+    .map((f) => mentors.find((m) => m.id === f.mentor_id) ?? FEATURED_MENTORS.find((m) => m.id === f.mentor_id))
+    .filter((m): m is NonNullable<typeof m> => Boolean(m));
   const mentorById = new Map(mentors.map((m) => [m.id, m]));
   const featuredById = new Map(FEATURED_MENTORS.map((m) => [m.id, m]));
   const nameOf = (id: string) => mentorById.get(id)?.name ?? featuredById.get(id)?.name ?? t("showcase.bookings.mentor");
@@ -297,6 +344,7 @@ function MenteeHome({ firstName, bookings, mentors, lang }: { firstName: string;
         <h1 id="page-title" tabIndex={-1} className="text-[28px] font-bold text-[var(--sc-ink)] md:text-[34px]">
           {t("showcase.dashboard.hi", { name: firstName })}
         </h1>
+        <RemindersBanner reminders={reminders} lang={lang} />
         <div className="mt-6 grid gap-6 lg:grid-cols-[1.7fr_1fr]">
           <section className={cn(card, "p-6")} aria-labelledby="my-sessions">
             <h2 id="my-sessions" className="text-[20px] font-bold text-[var(--sc-ink)]">
@@ -329,6 +377,28 @@ function MenteeHome({ firstName, bookings, mentors, lang }: { firstName: string;
             )}
           </section>
           <section className="rounded-[12px] bg-[#f7f6f2] p-6" aria-labelledby="suggested-title">
+            {favoriteMentors.length > 0 && (
+              <>
+                <h2 className="inline-flex items-center gap-2 text-[20px] font-bold text-[var(--sc-ink)]">
+                  <Heart className="size-5 fill-[#d5534d] text-[#d5534d]" aria-hidden="true" />
+                  {t("showcase.favorites.title")}
+                </h2>
+                <ul className="mt-4 space-y-3" data-testid="list-favorites">
+                  {favoriteMentors.map((m) => (
+                    <li key={m.id}>
+                      <Link href={`/mentor/${m.id}`} className="flex items-center gap-3 rounded-[8px] hover:bg-white/70">
+                        {m.photo_url ? <img src={m.photo_url} alt="" className="size-10 rounded-full object-cover" /> : <span className="inline-flex size-10 items-center justify-center rounded-full bg-white text-[14px] font-bold" aria-hidden="true">{m.name.slice(0, 1)}</span>}
+                        <span className="min-w-0">
+                          <span className="block truncate text-[15px] font-semibold text-[var(--sc-ink)]">{m.name}</span>
+                          <span className="block truncate text-[13px] text-[#6c6c84]">{[m.position, m.company].filter(Boolean).join(", ")}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <div className="my-5 border-t border-[var(--sc-hairline)]" />
+              </>
+            )}
             <h2 id="suggested-title" className="text-[20px] font-bold text-[var(--sc-ink)]">
               {t("showcase.dashboard.suggested")}
             </h2>
@@ -348,6 +418,17 @@ function MenteeHome({ firstName, bookings, mentors, lang }: { firstName: string;
             </ul>
           </section>
         </div>
+        <section className={cn(card, "mt-6 p-6")} aria-labelledby="mentee-activity">
+          <div className="flex items-center justify-between gap-4">
+            <h2 id="mentee-activity" className="text-[20px] font-bold text-[var(--sc-ink)]">
+              {t("showcase.activity.recent")}
+            </h2>
+            <Link href={DASHBOARD_ROUTES.activity} className="text-[14px] font-semibold text-[var(--sc-ink)] underline underline-offset-4">
+              {t("showcase.activity.viewAll")}
+            </Link>
+          </div>
+          <ActivityList events={events} lang={lang} compact />
+        </section>
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {[
             { label: t("showcase.dashboard.stat.requests"), value: String(bookings.length) },
@@ -362,5 +443,27 @@ function MenteeHome({ firstName, bookings, mentors, lang }: { firstName: string;
         </div>
       </div>
     </DashboardShell>
+  );
+}
+
+/** Sessions starting within 24 hours, for the signed-in person. */
+function RemindersBanner({ reminders, lang }: { reminders: ReturnType<typeof dueReminders>; lang: string }) {
+  const { t } = useTranslation();
+  const fmt = React.useMemo(() => new Intl.DateTimeFormat(lang, { weekday: "long", hour: "numeric", minute: "2-digit" }), [lang]);
+  if (reminders.length === 0) return null;
+  return (
+    <section className="mt-6 rounded-[12px] border border-[#f5d98a] bg-[#fffaeb] p-4" aria-labelledby="reminders-title" data-testid="reminders-banner">
+      <h2 id="reminders-title" className="inline-flex items-center gap-2 text-[15px] font-bold text-[#7a4b00]">
+        <Bell className="size-4" aria-hidden="true" />
+        {t("showcase.reminders.title")}
+      </h2>
+      <ul className="mt-2 space-y-1 text-[14px] text-[#7a4b00]">
+        {reminders.map((r) => (
+          <li key={r.booking.id}>
+            {t(r.kind === "1h" ? "showcase.reminders.inHour" : "showcase.reminders.tomorrow", { when: fmt.format(r.startsAt) })} — {r.booking.goal ?? t("showcase.bookings.session")}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

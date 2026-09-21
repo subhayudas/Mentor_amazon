@@ -4,6 +4,8 @@ import { CalendarCog, CalendarDays, ChevronDown, Clock3, MapPin, Settings2, Chec
 
 import { DashboardHeader, DashboardShell, Pill, useDashboardIdentity } from "@/components/dashboard/DashboardShell";
 import { getLocalValue, setLocalValue } from "@/lib/localStore";
+import { logActivity } from "@/lib/activity";
+import { useAuth } from "@/context/AuthContext";
 import { viewerTimeZone } from "@/lib/format";
 import { timeZoneChoices, utcOffsetLabel } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
@@ -56,7 +58,8 @@ const DEFAULT_DAYS: CalendarSettings["days"] = {
 
 export default function DashboardCalendar() {
   const { t } = useTranslation();
-  const { email } = useDashboardIdentity();
+  const { email, displayName } = useDashboardIdentity();
+  const { user } = useAuth();
   // Saved per account (local store now, the mentor's availability row once the DB is back).
   const storageKey = `calendar:${email || "showcase"}`;
   const stored = React.useMemo(() => getLocalValue<CalendarSettings>(storageKey), [storageKey]);
@@ -73,6 +76,9 @@ export default function DashboardCalendar() {
 
   const save = () => {
     setLocalValue<CalendarSettings>(storageKey, { tz, period, notice, noticeUnit, policy, days });
+    if (user?.profile_id) {
+      logActivity({ actor_type: "mentor", actor_id: user.profile_id, actor_name: displayName, type: "calendar_updated", subject_type: "settings", subject_id: user.profile_id, summary: t("showcase.activity.summaries.calendarUpdated") });
+    }
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1600);
   };

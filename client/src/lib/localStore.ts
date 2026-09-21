@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 
-import type { Booking, Mentee, Mentor } from "@/lib/database";
+import type { ActivityEvent, Booking, Favorite, Mentee, Mentor } from "@/lib/database";
 
 /**
  * Browser-side persistence used while no Supabase project is configured
@@ -10,7 +10,7 @@ import type { Booking, Mentee, Mentor } from "@/lib/database";
  * and survives reloads. `useLocalCollection` subscribes React to changes,
  * including from other tabs.
  */
-type Collections = { mentors: Mentor[]; mentees: Mentee[]; bookings: Booking[] };
+type Collections = { mentors: Mentor[]; mentees: Mentee[]; bookings: Booking[]; favorites: Favorite[]; events: ActivityEvent[] };
 type Name = keyof Collections;
 
 const PREFIX = "mentorconnect.local.";
@@ -71,6 +71,11 @@ export const localStore = {
   add<K extends Name>(name: K, row: Collections[K][number]): Collections[K][number] {
     write(name, [...read(name), row] as Collections[K]);
     return row;
+  },
+  remove<K extends Name>(name: K, id: string): void {
+    const rows = read(name);
+    if (!rows.some((r) => (r as { id: string }).id === id)) return;
+    write(name, rows.filter((r) => (r as { id: string }).id !== id) as Collections[K]);
   },
   update<K extends Name>(name: K, id: string, patch: Partial<Collections[K][number]>): Collections[K][number] | null {
     const rows = read(name);

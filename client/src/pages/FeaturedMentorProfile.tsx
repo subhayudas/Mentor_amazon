@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight, BadgeCheck, CalendarCheck, Clock, Globe, Languag
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { FEATURED_MENTORS, resolveShowcaseMentor, type FeaturedMentor } from "@/data/featuredMentors";
 import { lastDiscoveryHref } from "@/lib/urlState";
+import { FavoriteButton } from "@/components/FavoriteButton";
 import { utcOffsetLabel } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
@@ -136,6 +137,7 @@ export default function FeaturedMentorProfile() {
             <CalendarCheck className="size-4" aria-hidden="true" />
             {t("showcase.profile.book", { minutes: mentor.session.minutes })}
           </Link>
+          <FavoriteButton mentorId={mentor.id} mentorName={name} className="border-white/60 bg-transparent text-white hover:bg-white/10 aria-pressed:bg-white aria-pressed:text-[#d5534d]" />
           {mentor.linkedin && (
             <a
               href={mentor.linkedin}
