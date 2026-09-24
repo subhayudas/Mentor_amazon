@@ -17,9 +17,9 @@ const STATUS: Record<RequestStatus, { tone: BadgeTone; card: StatusTone; icon: L
 };
 
 /**
- * Landing page for an Amazon sign-in whose alias is not on the allow-list.
- * The SSO callback redirects here with `?alias=` (and optionally `?status=`)
- * after recording an access_requests row; no session exists at this point,
+ * Landing page for an Amazon sign-in that was refused. The SSO callback
+ * redirects here with `?alias=<alias>&status=rejected` when an admin has
+ * deactivated the alias; no session exists at this point,
  * so the page is anonymous by design. The card heading takes focus on mount.
  */
 export default function RequestAccess() {

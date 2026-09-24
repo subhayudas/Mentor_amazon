@@ -1,8 +1,10 @@
 # SSO helpers — manual self-check
 
-No test runner is wired into this repo, so the checks below are things a
-developer runs by hand. They need no Amazon credentials; the last section
-needs a deployed integ environment.
+Sections 2 and 3 are now automated: `npm test` runs them (and much more)
+against a local mock of Federate and an in-memory Supabase — see `tests/` and
+"Local development" in `api/README.md`. The manual steps below still work and
+need no Amazon credentials; the last section needs a deployed integ
+environment.
 
 ## 1. Type-check the functions
 

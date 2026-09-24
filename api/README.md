@@ -6,7 +6,7 @@ with secrets that must **never** be prefixed `VITE_` or imported from `client/`.
 | Route | File | Purpose |
 | --- | --- | --- |
 | `GET /api/auth/login/amazon` | `auth/login/amazon.ts` | Start Amazon Federate sign-in (OIDC code + PKCE) |
-| `GET /api/auth/callback/amazon` | `auth/callback/amazon.ts` | Registered redirect URI — token exchange, allow-list, Supabase bridge |
+| `GET /api/auth/callback/amazon` | `auth/callback/amazon.ts` | Registered redirect URI — token exchange, role lookup, Supabase bridge |
 | `POST /api/auth/logout` | `auth/logout.ts` | Clear `mc_oidc*` cookies, 302 to `/login` |
 | `GET /api/auth/debug-claims` | `auth/debug-claims.ts` | Integ-only: show the claims from the last sign-in (404 unless `AMAZON_OIDC_DEBUG=true`) |
 | `POST /api/webhooks/cal` | `webhooks/cal.ts` | Cal.com booking webhooks — HMAC-SHA256 verified, idempotent; confirms / reschedules / cancels the matching booking, creates it when booked directly on cal.com |
@@ -48,9 +48,11 @@ Browser                    Vercel function                       Amazon Federate
   |                              |  jose.jwtVerify(id_token, JWKS): iss, aud=client_id, exp (60 s tolerance), nonce
   |                              |  alias = claims.amazonAlias ?? claims.sub                   |
   |                              |  (userinfo_endpoint only if email/name missing)             |
-  |                              |-- approved_users where amazon_alias = alias and is_active --->|
-  |                              |   not found → upsert access_requests(pending) → 302 /request-access?alias=<alias>
-  |                              |   found     → users row by alias, else by email, else auth.admin.createUser + insert users
+  |                              |  email = token/userinfo email ?? approved_users.email ?? <alias>@amazon.com
+  |                              |-- approved_users where amazon_alias = alias ----------------->|
+  |                              |   is_active = false → 302 /request-access?alias=<alias>&status=rejected
+  |                              |   not found → insert approved_users(role mentor, approved_by 'amazon-sso')
+  |                              |   then      → users row by alias, else by email, else auth.admin.createUser + insert users
   |                              |               upsert user_identifiers (provider 'amazon', claims minus tokens)
   |                              |-- auth.admin.generateLink({ type: 'magiclink', email }) ---->|
   |                              |<-- properties.hashed_token                                   |
@@ -66,12 +68,12 @@ Redirect outcomes from the callback (always 302, never a stack trace):
 | --- | --- |
 | cookie missing / state mismatch / cookie older than 10 min | `/login?error=sso_state` |
 | token endpoint rejected the code | `/login?error=sso_token` |
-| alias not in `approved_users` (or inactive) | `/request-access?alias=<alias>` |
-| approved | `/auth/sso#token_hash=…&type=magiclink&next=<returnTo>` |
+| alias deactivated by an admin (`approved_users.is_active = false`) | `/request-access?alias=<alias>&status=rejected` |
+| any other Amazon employee | `/auth/sso#token_hash=…&type=magiclink&next=<returnTo>` |
 | anything else (discovery, ID-token, provider `error=`, DB) | `/login?error=sso_failed` |
 
 When `AMAZON_OIDC_DEBUG=true`, error redirects carry `&reason=<code>`
-(e.g. `token_invalid_grant`, `id_token_nonce`, `alias_conflict`, `no_email`).
+(e.g. `token_invalid_grant`, `id_token_nonce`, `alias_conflict`, `alias_invalid`).
 Never enable this in production.
 
 Any missing env var → `500 {"error":"server_misconfigured","missing":[...]}`.
@@ -89,7 +91,17 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 
 ### Account rules
 
+- **Open access:** every Amazon employee who completes Federate sign-in gets
+  in. `approved_users` is a role list, not a gate: an alias with no row is
+  written there on its first sign-in as an active `mentor`
+  (`approved_by = 'amazon-sso'`), which is also what the onboarding page and the
+  `mentors` INSERT policy (`is_approved_mentor()`) check. An admin makes someone
+  an admin by setting `role = 'admin'` (before their first sign-in, or together
+  with `users.user_type`), and revokes someone by setting `is_active = false`.
 - `approved_users.role` decides the account type on first login (`mentor` or `admin`).
+- The alias must look like an alias (`^[a-z0-9][a-z0-9._-]{0,63}$` after
+  lowercasing); anything else in `sub` is refused (`alias_invalid`) rather than
+  turned into an email.
 - `users` row is written with `id = auth user id`, `password = 'managed-by-amazon-sso'`,
   `is_verified = true`, `amazon_alias = alias`, `profile_id = approved.mentor_id`
   or the `mentors` row with the same email (else `null` → mentor completes onboarding).
@@ -109,8 +121,9 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 - The bridge URL carries a `bind` nonce that must match the `mc_sso_bind`
   cookie set by the callback, so the one-time token only works in the browser
   that completed the Amazon round trip.
-- If the ID token has no email, `approved_users.email` is used; with neither
-  the login fails (`no_email`).
+- Email: the ID token's (or userinfo's) email if present, else
+  `approved_users.email`, else `<alias>@amazon.com`. Federate's discovery
+  document lists no email claim, so the last fallback is the normal case.
 
 ---
 
@@ -122,7 +135,7 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 | `AMAZON_OIDC_CLIENT_ID` | yes | `mentor-amazon.vercel.app` (integ; prod TBC) |
 | `AMAZON_OIDC_CLIENT_SECRET` | yes | From Amazon's identity team. Also seeds the cookie-signing key. |
 | `AMAZON_OIDC_REDIRECT_URI` | yes | `https://mentor-amazon.vercel.app/api/auth/callback/amazon` — exact match, no trailing slash |
-| `AMAZON_OIDC_SCOPES` | no | default `openid profile email` |
+| `AMAZON_OIDC_SCOPES` | no | default `openid` (the only scope Federate advertises) |
 | `AMAZON_OIDC_DEBUG` | no | `true` enables `/api/auth/debug-claims` and `&reason=` on error redirects. Integ only. |
 | `SUPABASE_URL` | yes | `https://<project>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Service-role key (bypasses RLS). Server only. |
@@ -145,7 +158,7 @@ Checklist — copy into the ticket:
 3. **Redirect URI (exact match):** `https://mentor-amazon.vercel.app/api/auth/callback/amazon`
 4. **Client ID requested:** `mentor-amazon.vercel.app` (integ; production client id/issuer TBC).
 5. **Token endpoint auth:** `client_secret_basic` preferred; `client_secret_post` supported as fallback.
-6. **Scopes:** `openid profile email`.
+6. **Scopes:** `openid`.
 7. **Claims needed in the ID token:** `sub`, `amazonAlias`, `email`, `name` (or `given_name` + `family_name`). Please configure **`sub = amazonAlias`** (the app also reads an explicit `amazonAlias` claim and prefers it when present).
 8. **Signing:** RS256 (or any asymmetric alg published in `jwks_uri`); HS256 is not accepted.
 9. **Post-logout redirect:** not required (no RP-initiated logout is used).
@@ -156,9 +169,9 @@ Checklist — copy into the ticket:
 ## How to test on integ
 
 Prerequisites: env vars above set on Vercel, `AMAZON_OIDC_DEBUG=true` on the
-integ deployment, at least one row in `approved_users` (see the SQL slice), and
-the SQL migration for `approved_users`, `access_requests`, `user_identifiers`
-applied.
+integ deployment, and the SQL migration for `approved_users`,
+`access_requests`, `user_identifiers` applied. No `approved_users` rows are
+needed: the first sign-in creates one.
 
 ### 1. Configuration check (no Amazon involvement)
 
@@ -193,10 +206,10 @@ curl -si "https://mentor-amazon.vercel.app/api/auth/callback/amazon?code=x&state
 
 1. Open `https://mentor-amazon.vercel.app/login` → **Sign in with Amazon**.
 2. Authenticate with Midway.
-3. Approved alias → you land on `/auth/sso` (spinner) and then `/mentor-portal`,
-   `/mentor-onboarding` (mentor without a profile) or `/admin`.
-   Unapproved alias → `/request-access?alias=<alias>` and a pending row appears
-   in `access_requests`; approve it in `/admin` and sign in again.
+3. You land on `/auth/sso` (spinner) and then `/mentor-onboarding` (first
+   sign-in, no profile yet), `/mentor-portal` or `/admin`. A new
+   `approved_users` row (`approved_by = amazon-sso`) appears in `/admin/access`.
+   An alias an admin deactivated → `/request-access?alias=<alias>&status=rejected`.
 4. Confirm the claims Amazon sent:
 
    ```bash
@@ -241,6 +254,14 @@ no `reason`.
 
 `vite` alone serves only the SPA. To run the functions locally use
 `vercel dev` with a root `.env` (the discovery document must be reachable
-from your machine). Pure helper logic (cookies, PKCE, return-path guard,
-claim extraction) has no I/O and can be exercised with `npx tsx` against a
-throwaway script; see `_lib/__selftest.md`.
+from your machine).
+
+`npm test` runs the SSO suite (`tests/`, Vitest) with no network and no
+credentials: a local mock of Federate (same endpoint paths as the real
+discovery document; it enforces the exact redirect URI, S256 PKCE, client
+authentication and single-use codes, and signs RS256 ID tokens) and an
+in-memory Supabase that the real `supabaseAdmin.ts` queries run against. It
+drives the real handlers through login → authorize → callback → bridge and
+covers first sign-in, returning users, roles, revocation, the takeover guards,
+state/nonce/signature/audience/expiry failures, the basic→post fallback,
+debug-claims and logout.

@@ -52,67 +52,55 @@ function sameText(a: string | null | undefined, b: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Allow-list
+// approved_users (role list)
+//
+// Every Amazon employee may sign in. approved_users no longer gates entry; it
+// records each alias's role (mentor unless an admin set admin) and is what the
+// onboarding page and the mentors INSERT policy (`is_approved_mentor()`) read.
+// An admin revokes someone by setting is_active = false.
 
+/** The alias's row whatever its is_active; the caller decides what inactive means. */
 export async function findApprovedUser(sb: AdminClient, alias: string): Promise<ApprovedUserRow | null> {
   const { data, error } = await sb
     .from('approved_users')
     .select('id, amazon_alias, email, role, mentor_id, is_active')
     .ilike('amazon_alias', likeLiteral(alias))
-    .eq('is_active', true)
     .limit(5);
   if (error) throw new SsoDataError('approved_lookup', error.message);
   const rows = (data ?? []) as ApprovedUserRow[];
-  return rows.find((r) => sameText(r.amazon_alias, alias) && r.is_active) ?? null;
+  return rows.find((r) => sameText(r.amazon_alias, alias)) ?? null;
 }
 
-export interface AccessRequestInput {
-  alias: string;
-  email?: string;
-  name?: string;
-}
+export const AUTO_APPROVED_BY = 'amazon-sso';
 
 /**
- * Record that an unapproved alias tried to sign in. One pending row per alias:
- * a repeat attempt refreshes the email/name on the existing pending row rather
- * than creating a duplicate. A unique-violation from a concurrent insert is
- * treated as success.
+ * First sign-in of an alias nobody has listed: record it as an active mentor.
+ * A unique-violation means a concurrent first login (or an admin) wrote the
+ * row a moment ago, so that row wins.
  */
-export async function upsertAccessRequest(sb: AdminClient, input: AccessRequestInput): Promise<'created' | 'existing'> {
-  const { data, error } = await sb
-    .from('access_requests')
-    .select('id, amazon_alias, email, name')
-    .ilike('amazon_alias', likeLiteral(input.alias))
-    .eq('status', 'pending')
-    .limit(5);
-  if (error) throw new SsoDataError('access_request_lookup', error.message);
-
-  const existing = ((data ?? []) as Array<{ id: string; amazon_alias: string; email: string | null; name: string | null }>)
-    .find((r) => sameText(r.amazon_alias, input.alias));
-
-  if (existing) {
-    const patch: Record<string, string> = {};
-    if (input.email && !existing.email) patch.email = input.email;
-    if (input.name && !existing.name) patch.name = input.name;
-    if (Object.keys(patch).length > 0) {
-      await sb.from('access_requests').update(patch).eq('id', existing.id);
-    }
-    return 'existing';
-  }
-
-  const { error: insertError } = await sb.from('access_requests').insert({
+export async function autoApproveMentor(sb: AdminClient, input: { alias: string; email: string }): Promise<ApprovedUserRow> {
+  const row: ApprovedUserRow = {
     id: randomUUID(),
     amazon_alias: input.alias,
-    email: input.email ?? null,
-    name: input.name ?? null,
-    status: 'pending',
-    requested_at: new Date().toISOString(),
+    email: input.email,
+    role: 'mentor',
+    mentor_id: null,
+    is_active: true,
+  };
+  const { error } = await sb.from('approved_users').insert({
+    ...row,
+    approved_by: AUTO_APPROVED_BY,
+    approved_at: new Date().toISOString(),
+    note: 'first Amazon sign-in',
   });
-  if (insertError) {
-    if (insertError.code === '23505') return 'existing';
-    throw new SsoDataError('access_request_insert', insertError.message);
+  if (error) {
+    if (error.code === '23505') {
+      const existing = await findApprovedUser(sb, input.alias);
+      if (existing) return existing;
+    }
+    throw new SsoDataError('approved_insert', error.message);
   }
-  return 'created';
+  return row;
 }
 
 // ---------------------------------------------------------------------------
