@@ -10,7 +10,7 @@ import type postgres from 'postgres';
 import { e2eEnv, turnstile } from '../fixtures/env';
 import { tr } from '../fixtures/i18n';
 
-/** Skip the current test unless it runs in one of `projects` (design §6.4 project matrix). */
+/** Whether the current test runs in one of `projects` (design §6.4 project matrix); specs skip otherwise. */
 export function runsOn(testInfo: TestInfo, projects: readonly string[]): boolean {
   return projects.includes(testInfo.project.name);
 }
