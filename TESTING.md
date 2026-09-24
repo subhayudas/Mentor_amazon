@@ -49,7 +49,11 @@ mock-IdP, preview and demo ports, so two checkouts can run Playwright side by si
 headers, tests tagged `@prod-csp`) and `demo-local` / `demo-local-ar` (`VITE_LOCAL=1`, tests
 tagged `@demo-local`). Specs import `test` from `e2e/fixtures/test.ts`: `loginAs(persona)`,
 `healthy()` (the per-page checks), `cal` (Cal.com iframe stub), `db`, `mailpit`,
-`signedCalPost`. Personas are `e2e.<project>.<persona>@mentorconnect.test` (password in
+`signedCalPost`. Every `healthy()` visit also runs an axe scan (`@axe-core/playwright`): all
+violations are attached to the test as `<screenshot>-axe.json`; only a critical one fails the
+visit (pre-existing critical findings would be listed, with evidence, in
+`PREEXISTING_CRITICAL` in `e2e/fixtures/health.ts`; there are none). `E2E_AXE=off` skips the
+scan. Personas are `e2e.<project>.<persona>@mentorconnect.test` (password in
 `e2e/fixtures/personas.ts`); `E2E_NS=<x>` namespaces them so two people can run the same
 project against one stack. `e2e/specs/a-infra.spec.ts` checks the harness itself.
 

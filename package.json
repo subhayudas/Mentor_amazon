@@ -63,6 +63,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.63.0",
     "@replit/vite-plugin-cartographer": "^0.4.2",
     "@replit/vite-plugin-dev-banner": "^0.1.1",

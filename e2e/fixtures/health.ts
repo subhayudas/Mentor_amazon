@@ -1,3 +1,4 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type Response, type TestInfo } from '@playwright/test';
 
 /**
@@ -5,8 +6,35 @@ import { expect, type Page, type Response, type TestInfo } from '@playwright/tes
  * same-origin / Supabase responses from the moment the page is created; expectHealthyPage()
  * asserts on them together with the page's shape and attaches a full-page screenshot. The
  * checks are soft: one run reports every problem on the page (the test still fails).
- * The design's axe scan is not included: no axe package is installed (package.json is frozen).
+ *
+ * Accessibility: an axe scan of every visited page is attached as a report (every violation,
+ * any impact), because some violations predate this work. Only a CRITICAL violation fails the
+ * visit, unless it is a pre-existing one listed in PREEXISTING_CRITICAL with the evidence that
+ * it predates the change (seen on a4f3fbd). E2E_AXE=off skips the scan.
  */
+interface AxeFinding {
+  id: string;
+  impact: string | null | undefined;
+  help: string;
+  targets: string[];
+}
+
+/** Critical axe findings that predate this change (rule id + a target pattern), with evidence. */
+const PREEXISTING_CRITICAL: Array<{ id: string; target: RegExp; why: string }> = [];
+
+async function axeScan(page: Page, testInfo: TestInfo, name: string): Promise<AxeFinding[]> {
+  const results = await new AxeBuilder({ page }).analyze();
+  const findings: AxeFinding[] = results.violations.map((v) => ({
+    id: v.id,
+    impact: v.impact,
+    help: v.help,
+    targets: v.nodes.map((n) => n.target.join(' ')),
+  }));
+  await testInfo.attach(`${name}-axe.json`, { body: JSON.stringify(findings, null, 2), contentType: 'application/json' });
+  return findings.filter(
+    (f) => f.impact === 'critical' && !f.targets.every((t) => PREEXISTING_CRITICAL.some((k) => k.id === f.id && k.target.test(t))),
+  );
+}
 export interface HealthTracker {
   pageErrors: string[];
   badResponses: Array<{ url: string; status: number; method: string }>;
@@ -82,4 +110,9 @@ export async function expectHealthyPage(page: Page, tracker: HealthTracker, test
 
   const shot = await page.screenshot({ fullPage: true });
   await testInfo.attach(opts.screenshotName ?? 'page', { body: shot, contentType: 'image/png' });
+
+  if (process.env.E2E_AXE !== 'off') {
+    const critical = await axeScan(page, testInfo, opts.screenshotName ?? 'page');
+    expect.soft(critical, 'critical accessibility violations (axe; the full report is attached)').toEqual([]);
+  }
 }
