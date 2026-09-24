@@ -11,7 +11,7 @@ import {
   toRequestField,
 } from '../client/src/lib/requests.ts';
 import { classifyBookingError, invalidRequestFields, isSendBlocked, rateLimitCooldownMs } from '../client/src/components/booking/bookingErrors.ts';
-import { railStatesFor, railStopsFor, resolveRequestState, sentMemoryForViewer, type RequestState } from '../client/src/components/booking/requestState.ts';
+import { isSentMemoryStale, railStatesFor, railStopsFor, resolveRequestState, sentMemoryForViewer, type RequestState } from '../client/src/components/booking/requestState.ts';
 import { FEATURED_MENTORS } from '../client/src/data/featuredMentors.ts';
 import type { Booking } from '../client/src/lib/database.ts';
 
@@ -193,6 +193,38 @@ describe('sentMemoryForViewer (cards, profile and scheduler share it)', () => {
     expect(sentMemoryForViewer(memory, 'sara@example.com')).toBe(memory);
     expect(sentMemoryForViewer(memory, 'omar@example.com')).toBeNull();
     expect(sentMemoryForViewer(null, 'sara@example.com')).toBeNull();
+  });
+});
+
+describe('the browser memory yields to a signed-in viewer\'s bookings fetched after the send', () => {
+  const sentAt = '2026-09-20T10:00:00.000Z';
+  const memory = { email: 'sara@example.com', sentAt };
+  const before = Date.parse(sentAt) - 5_000;
+  const after = Date.parse(sentAt) + 5_000;
+  const row = (status: Booking['status']): Booking => ({ id: 'b1', mentor_id: 'm-db', mentee_id: 'me1', status, created_at: sentAt });
+  const state = (bookings: Booking[] | undefined, bookingsAsOf: number | undefined, viewerEmail: string | undefined = 'sara@example.com') =>
+    resolveRequestState({ mentorId: 'm-db', isAvailable: true, bookings, bookingsAsOf, viewerEmail, local: memory });
+
+  it('bridges the send until the refetch lands: bookings fetched before the send, or not loaded yet', () => {
+    expect(state([], before)).toMatchObject({ kind: 'sent', source: 'local' });
+    expect(state(undefined, undefined)).toMatchObject({ kind: 'sent', source: 'local' });
+    expect(isSentMemoryStale({ mentorId: 'm-db', bookings: [], bookingsAsOf: before, viewerEmail: 'sara@example.com', local: memory })).toBe(false);
+  });
+
+  it('a request declined, withdrawn or removed after the send gives the button back', () => {
+    for (const bookings of [[], [row('rejected')], [row('canceled')], [row('completed')]]) {
+      expect(state(bookings, after)).toEqual({ kind: 'cta' });
+      expect(isSentMemoryStale({ mentorId: 'm-db', bookings, bookingsAsOf: after, viewerEmail: 'sara@example.com', local: memory })).toBe(true);
+    }
+  });
+
+  it('a live row still reads as sent (from the row), and anonymous viewers keep the memory', () => {
+    expect(state([row('pending')], after)).toMatchObject({ kind: 'sent', source: 'row', status: 'pending' });
+    expect(isSentMemoryStale({ mentorId: 'm-db', bookings: [row('accepted')], bookingsAsOf: after, viewerEmail: 'sara@example.com', local: memory })).toBe(false);
+    expect(state(undefined, after, undefined)).toMatchObject({ kind: 'sent', source: 'local' });
+    expect(isSentMemoryStale({ mentorId: 'm-db', bookings: [], bookingsAsOf: after, viewerEmail: undefined, local: memory })).toBe(false);
+    // A live request to another mentor does not keep this one's memory.
+    expect(state([{ ...row('pending'), mentor_id: 'm-other' }], after)).toEqual({ kind: 'cta' });
   });
 });
 

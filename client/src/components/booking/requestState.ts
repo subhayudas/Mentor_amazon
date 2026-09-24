@@ -51,20 +51,48 @@ export function sentMemoryForViewer(memory: SentRequest | null, viewerEmail: str
   return !viewerEmail || sameEmail(memory.email, viewerEmail) ? memory : null;
 }
 
+type VisibleBookings = ReadonlyArray<Booking & { mentor?: Pick<Mentor, "cal_link"> | null }>;
+
+/**
+ * Whether the per-browser memory is out of date for a signed-in viewer: their
+ * bookings were fetched after the send (`bookingsAsOf`, epoch ms, react-query's
+ * `dataUpdatedAt`) and hold no live request to this mentor, because it was
+ * declined, withdrawn or removed. The memory only stands in for a row nobody can
+ * read back (anonymous requesters) and bridges a send until the refetch lands.
+ * Without this rule, a signed-in mentee saw "Request sent" and no request
+ * button for up to 7 days after a decline.
+ */
+export function isSentMemoryStale(params: {
+  mentorId: string;
+  bookings: VisibleBookings | undefined;
+  bookingsAsOf: number | undefined;
+  viewerEmail: string | undefined;
+  local: SentRequest | null;
+}): boolean {
+  const { mentorId, bookings, bookingsAsOf, viewerEmail, local } = params;
+  if (!local || !viewerEmail || bookings === undefined || !bookingsAsOf) return false;
+  const sentAt = Date.parse(local.sentAt);
+  if (Number.isNaN(sentAt) || bookingsAsOf < sentAt) return false;
+  return !bookings.some((b) => b.mentor_id === mentorId && ACTIVE_REQUEST_STATUSES.includes(b.status));
+}
+
 /**
  * Prefer the real row (newest live booking for this mentor) over the local
  * memory; fall back to the memory only when no row is visible yet. A signed-in
  * viewer never inherits a memory written under a different email (someone
- * else may have used this browser anonymously).
+ * else may have used this browser anonymously), and once their bookings were
+ * fetched after the send, those bookings decide (`isSentMemoryStale`).
  */
 export function resolveRequestState(params: {
   mentorId: string;
   isAvailable: boolean;
-  bookings: ReadonlyArray<Booking & { mentor?: Pick<Mentor, "cal_link"> | null }> | undefined;
+  bookings: VisibleBookings | undefined;
+  /** When `bookings` was fetched (epoch ms); lets a signed-in viewer's rows overrule the memory. */
+  bookingsAsOf?: number;
   viewerEmail: string | undefined;
   local: SentRequest | null;
 }): RequestState {
-  const { mentorId, isAvailable, bookings, viewerEmail, local } = params;
+  const { mentorId, isAvailable, bookings, bookingsAsOf, viewerEmail, local } = params;
   const row = (bookings ?? [])
     .filter((b) => b.mentor_id === mentorId && ACTIVE_REQUEST_STATUSES.includes(b.status))
     .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))[0];
@@ -81,7 +109,11 @@ export function resolveRequestState(params: {
       programmeManaged: isFeaturedDbId(row.mentor_id),
     };
   }
-  if (local && (!viewerEmail || sameEmail(local.email, viewerEmail))) {
+  if (
+    local &&
+    (!viewerEmail || sameEmail(local.email, viewerEmail)) &&
+    !isSentMemoryStale({ mentorId, bookings, bookingsAsOf, viewerEmail, local })
+  ) {
     return { kind: "sent", email: local.email, sentAt: local.sentAt, source: "local" };
   }
   return isAvailable ? { kind: "cta" } : { kind: "unavailable" };

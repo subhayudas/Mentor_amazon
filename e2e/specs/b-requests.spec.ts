@@ -245,7 +245,7 @@ test('S6b a server outage is not blamed on the connection; a 429 blocks Send onl
   await healthy({ screenshotName: 'S6b-rate-limit-cooled', allowStatus: [{ url: /\/api\/requests$/, status: 429 }, { url: /\/api\/requests$/, status: 503 }] });
 });
 
-test('S8 a signed-in mentee requests through the RPC: no captcha, a row, then "already waiting" with no new row', async ({ page, context, db, healthy, lang, loginAs, personaProject }, testInfo) => {
+test('S8 a signed-in mentee requests through the RPC: no captcha, a row, then "already waiting" with no new row; a declined request gives the button back', async ({ page, context, db, healthy, lang, loginAs, personaProject }, testInfo) => {
   test.skip(!['desktop-en', 'mobile-ar'].includes(testInfo.project.name), 'S8 runs on desktop-en and mobile-ar');
   const mentorId = ids(personaProject).mentor;
   const menteeId = ids(personaProject).menteeEmpty;
@@ -253,10 +253,14 @@ test('S8 a signed-in mentee requests through the RPC: no captcha, a row, then "a
   try {
     await loginAs('mentee-empty');
     await page.goto(`/mentor/${mentorId}`);
-    // A second tab on the same profile, opened before the first send (a double submit).
+    // A second tab on the same profile, opened before the first send (a double submit). Its data
+    // must have settled (no request yet) before the first tab sends: a tab whose bookings land
+    // after the send rightly shows "Request sent" instead of the button (the old S8 flake).
     const second = await context.newPage();
     await useLanguage(second, lang);
     await second.goto(`/mentor/${mentorId}`);
+    await second.waitForLoadState('networkidle');
+    await expect(second.getByTestId('button-request-session').first()).toBeVisible();
 
     let apiPosts = 0;
     page.on('request', (r) => {
@@ -289,6 +293,16 @@ test('S8 a signed-in mentee requests through the RPC: no captcha, a row, then "a
     const after = await db`select 1 from public.bookings where mentee_id = ${menteeId} and mentor_id = ${mentorId} and status = 'pending'`;
     expect(after).toHaveLength(1);
     await second.close();
+
+    // The mentor declines. This browser still remembers the send, but the mentee's bookings,
+    // fetched after it, decide: the profile offers a new request instead of "Request sent".
+    await db`update public.bookings set status = 'rejected', responded_at = timezone('utc', now()) where id = ${rows[0].id}`;
+    await page.reload();
+    await expect(page.getByTestId('button-request-session').first()).toBeVisible();
+    await expect
+      .poll(() => page.evaluate((id) => JSON.parse(window.localStorage.getItem('mc.sentRequests') ?? '{}')[id] ?? null, mentorId))
+      .toBeNull();
+    await healthy({ screenshotName: 'S8-declined-button-back' });
   } finally {
     const created = await db<{ id: string }[]>`select id from public.bookings where mentee_id = ${menteeId} and mentor_id = ${mentorId}`;
     for (const { id } of created) {

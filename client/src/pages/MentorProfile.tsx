@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { BookingRequestDialog, type BookingPrefill } from "@/components/booking/BookingRequestDialog";
 import { RequestStatusCard } from "@/components/booking/RequestStatusCard";
-import { railStopsFor, resolveRequestState } from "@/components/booking/requestState";
+import { isSentMemoryStale, railStopsFor, resolveRequestState } from "@/components/booking/requestState";
 import { AboutSection } from "@/components/profile/AboutSection";
 import { AvailabilityWindows } from "@/components/profile/AvailabilityWindows";
 import { HelpsWith } from "@/components/profile/HelpsWith";
@@ -29,7 +29,7 @@ import { usePublicAvailability, windowsForMentor } from "@/lib/availability";
 import type { Booking, Mentee, Mentor, PublicMentor } from "@/lib/database";
 import { bidi } from "@/lib/format";
 import { discoveryUrl } from "@/lib/routes";
-import { getSentRequest, markSent } from "@/lib/sentRequests";
+import { clearSentRequest, getSentRequest, markSent } from "@/lib/sentRequests";
 import { menteeService, mentorService } from "@/lib/services";
 import { lastDiscoveryHref } from "@/lib/urlState";
 import { useConfirmOnCalBooking } from "@/pages/mentee/useConfirmOnCalBooking";
@@ -166,6 +166,21 @@ export default function MentorProfile() {
   React.useEffect(() => {
     setLocalSent(getSentRequest(mentorId));
   }, [mentorId]);
+  // Bookings fetched after the send decide for a signed-in viewer: a declined, withdrawn or
+  // removed request no longer reads as "Request sent" here, nor on the directory cards.
+  const bookingsAsOf = bookingsQuery.dataUpdatedAt || undefined;
+  const staleMemory = isSentMemoryStale({
+    mentorId,
+    bookings: signedIn ? bookingsQuery.data : undefined,
+    bookingsAsOf,
+    viewerEmail: user?.email,
+    local: localSent,
+  });
+  React.useEffect(() => {
+    if (!staleMemory) return;
+    clearSentRequest(mentorId);
+    setLocalSent(null);
+  }, [staleMemory, mentorId]);
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
@@ -226,6 +241,7 @@ export default function MentorProfile() {
     mentorId,
     isAvailable: mentor.is_available,
     bookings: signedIn ? bookingsQuery.data : undefined,
+    bookingsAsOf,
     viewerEmail: user?.email,
     local: localSent,
   });
