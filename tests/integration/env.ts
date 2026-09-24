@@ -1,5 +1,9 @@
 import { describe } from 'vitest';
 
+// The database stores UTC wall-clock `timestamp` columns and postgres.js serialises those values
+// through JavaScript Dates, so the suites always run in UTC whatever the machine's zone is.
+process.env.TZ = 'UTC';
+
 /**
  * Integration suites run against a LOCAL Supabase stack when SUPABASE_TEST_URL is set and
  * report "skipped" otherwise (so `npm run test:integration` exits 0 on a machine without it).
