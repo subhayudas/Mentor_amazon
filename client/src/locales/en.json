@@ -2466,7 +2466,9 @@
       "saveError": "Your changes weren't saved. Check your connection and try again.",
       "photoType": "Choose a JPEG, PNG, WebP or GIF image.",
       "calHintLive": "Your Cal.com event, e.g. yourname/30min. Mentees pick a time on it after you accept. Leave it empty to remove it.",
-      "calSyncSection": "Cal.com booking sync"
+      "calSyncSection": "Cal.com booking sync",
+      "photoHintLive": "JPEG, PNG, WebP or GIF, up to 5 MB. A new photo is kept when you press Save.",
+      "photoPending": "New photo ready. Press Save to keep it."
     },
     "activity": {
       "title": "Activity",

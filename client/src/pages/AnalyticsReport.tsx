@@ -103,7 +103,8 @@ export default function AnalyticsReport() {
     const map = new Map<string, number>();
     const menteeById = new Map(mentees.map((m) => [m.id, m]));
     for (const b of completed) {
-      const c = b.country ?? menteeById.get(b.mentee_id)?.country ?? t("showcase.report.unknown");
+      // Blank or missing countries group under one "unknown" row, never an empty label.
+      const c = b.country?.trim() || menteeById.get(b.mentee_id)?.country?.trim() || t("showcase.report.unknown");
       map.set(c, (map.get(c) ?? 0) + 1);
     }
     return Array.from(map.entries())
@@ -166,127 +167,136 @@ export default function AnalyticsReport() {
             <DashboardError message={t("showcase.analytics.loadError")} onRetry={refetch} />
           </div>
         )}
-        {!demo && isLoading && <DashboardLoading rows={3} label={t("common.loading")} />}
+        {!demo && !isError && isLoading && (
+          <div className="mt-6">
+            <DashboardLoading rows={3} label={t("common.loading")} />
+          </div>
+        )}
 
-        <section className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4" aria-label={t("showcase.report.kpis")}>
-          {[
-            { label: t("showcase.report.kpi.completed"), value: nf.format(completed.length) },
-            { label: t("showcase.report.kpi.hours"), value: nf.format(Math.round((minutes / 60) * 10) / 10) },
-            { label: t("showcase.report.kpi.mentees"), value: nf.format(uniqueMentees) },
-            { label: t("showcase.report.kpi.mentors"), value: nf.format(uniqueMentors) },
-            { label: t("showcase.report.kpi.requests"), value: nf.format(rows.length) },
-            { label: t("showcase.report.kpi.completionRate"), value: rows.length ? `${Math.round((completed.length / rows.length) * 100)}%` : "—" },
-            { label: t("showcase.report.kpi.rating"), value: avgRating ? avgRating.toFixed(1) : "—" },
-            { label: t("showcase.report.kpi.avgLength"), value: recordedCount > 0 ? t("mentorPortal.durationMinutes", { count: Math.round(minutes / recordedCount) }) : "—" },
-          ].map((k) => (
-            <div key={k.label} className="rounded-[10px] border border-[var(--sc-hairline)] p-4">
-              <p className="text-[12px] text-[#6c6c84]">{k.label}</p>
-              <p className="mt-1 text-[26px] font-bold leading-none text-[var(--sc-ink)] tabular-nums">{k.value}</p>
-            </div>
-          ))}
-        </section>
-
-        <section className="mt-10" aria-labelledby="r-month">
-          <h2 id="r-month" className="text-[18px] font-bold text-[var(--sc-ink)]">
-            {t("showcase.report.byMonth")}
-          </h2>
-          <table className="mt-3 w-full border-collapse">
-            <thead className="border-b border-[var(--sc-hairline)]">
-              <tr>
-                <th className={th}>{t("showcase.report.col.month")}</th>
-                <th className={th}>{t("showcase.report.col.requests")}</th>
-                <th className={th}>{t("showcase.report.col.completed")}</th>
-                <th className={th}>{t("showcase.report.col.hours")}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--sc-hairline)]">
-              {byMonth.map((m) => (
-                <tr key={m.key}>
-                  <td className={td}>{m.label}</td>
-                  <td className={td}>{nf.format(m.requests)}</td>
-                  <td className={td}>{nf.format(m.completed)}</td>
-                  <td className={td}>{nf.format(Math.round(m.hours * 10) / 10)}</td>
-                </tr>
+        {/* The figures render only once the bookings are in: never zeros under a loading or error state. */}
+        {(demo || (!isLoading && !isError)) && (
+          <>
+            <section className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4" aria-label={t("showcase.report.kpis")}>
+              {[
+                { label: t("showcase.report.kpi.completed"), value: nf.format(completed.length) },
+                { label: t("showcase.report.kpi.hours"), value: nf.format(Math.round((minutes / 60) * 10) / 10) },
+                { label: t("showcase.report.kpi.mentees"), value: nf.format(uniqueMentees) },
+                { label: t("showcase.report.kpi.mentors"), value: nf.format(uniqueMentors) },
+                { label: t("showcase.report.kpi.requests"), value: nf.format(rows.length) },
+                { label: t("showcase.report.kpi.completionRate"), value: rows.length ? `${Math.round((completed.length / rows.length) * 100)}%` : "—" },
+                { label: t("showcase.report.kpi.rating"), value: avgRating ? avgRating.toFixed(1) : "—" },
+                { label: t("showcase.report.kpi.avgLength"), value: recordedCount > 0 ? t("mentorPortal.durationMinutes", { count: Math.round(minutes / recordedCount) }) : "—" },
+              ].map((k) => (
+                <div key={k.label} className="rounded-[10px] border border-[var(--sc-hairline)] p-4">
+                  <p className="text-[12px] text-[#6c6c84]">{k.label}</p>
+                  <p className="mt-1 text-[26px] font-bold leading-none text-[var(--sc-ink)] tabular-nums">{k.value}</p>
+                </div>
               ))}
-              {byMonth.length === 0 && (
-                <tr>
-                  <td className={td} colSpan={4}>
-                    {t("showcase.analytics.empty")}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </section>
+            </section>
 
-        <div className="mt-10 grid grid-cols-1 gap-10 md:grid-cols-2 print:grid-cols-2">
-          <section aria-labelledby="r-mentors">
-            <h2 id="r-mentors" className="text-[18px] font-bold text-[var(--sc-ink)]">
-              {t("showcase.report.byMentor")}
-            </h2>
-            <table className="mt-3 w-full border-collapse">
-              <thead className="border-b border-[var(--sc-hairline)]">
-                <tr>
-                  <th className={th}>{t("showcase.report.col.mentor")}</th>
-                  <th className={th}>{t("showcase.report.col.sessions")}</th>
-                  <th className={th}>{t("showcase.report.col.hours")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--sc-hairline)]">
-                {byMentor.map((m) => (
-                  <tr key={m.id}>
-                    <td className={td}>{m.name}</td>
-                    <td className={td}>{nf.format(m.sessions)}</td>
-                    <td className={td}>{nf.format(Math.round(m.hours * 10) / 10)}</td>
+            <section className="mt-10" aria-labelledby="r-month">
+              <h2 id="r-month" className="text-[18px] font-bold text-[var(--sc-ink)]">
+                {t("showcase.report.byMonth")}
+              </h2>
+              <table className="mt-3 w-full border-collapse">
+                <thead className="border-b border-[var(--sc-hairline)]">
+                  <tr>
+                    <th className={th}>{t("showcase.report.col.month")}</th>
+                    <th className={th}>{t("showcase.report.col.requests")}</th>
+                    <th className={th}>{t("showcase.report.col.completed")}</th>
+                    <th className={th}>{t("showcase.report.col.hours")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-          <section aria-labelledby="r-expertise">
-            <h2 id="r-expertise" className="text-[18px] font-bold text-[var(--sc-ink)]">
-              {t("showcase.report.byExpertise")}
-            </h2>
-            <table className="mt-3 w-full border-collapse">
-              <thead className="border-b border-[var(--sc-hairline)]">
-                <tr>
-                  <th className={th}>{t("showcase.report.col.area")}</th>
-                  <th className={th}>{t("showcase.report.col.sessions")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--sc-hairline)]">
-                {byExpertise.map(([tag, n]) => (
-                  <tr key={tag}>
-                    <td className={td}>{tag}</td>
-                    <td className={td}>{nf.format(n)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <h2 className="mt-8 text-[18px] font-bold text-[var(--sc-ink)]">{t("showcase.report.byCountry")}</h2>
-            <table className="mt-3 w-full border-collapse">
-              <thead className="border-b border-[var(--sc-hairline)]">
-                <tr>
-                  <th className={th}>{t("showcase.report.col.country")}</th>
-                  <th className={th}>{t("showcase.report.col.sessions")}</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--sc-hairline)]">
-                {byCountry.map(([c, n]) => (
-                  <tr key={c}>
-                    <td className={td}>{localizeCountry(c, lang)}</td>
-                    <td className={td}>{nf.format(n)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        </div>
+                </thead>
+                <tbody className="divide-y divide-[var(--sc-hairline)]">
+                  {byMonth.map((m) => (
+                    <tr key={m.key}>
+                      <td className={td}>{m.label}</td>
+                      <td className={td}>{nf.format(m.requests)}</td>
+                      <td className={td}>{nf.format(m.completed)}</td>
+                      <td className={td}>{nf.format(Math.round(m.hours * 10) / 10)}</td>
+                    </tr>
+                  ))}
+                  {byMonth.length === 0 && (
+                    <tr>
+                      <td className={td} colSpan={4}>
+                        {t("showcase.analytics.empty")}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </section>
 
-        {recorded.missing > 0 && (
-          <p className="mt-8 text-[12px] text-[#6c6c84]" data-testid="text-report-missing-durations">
-            {t("showcase.report.missingDurations", { count: recorded.missing })}
-          </p>
+            <div className="mt-10 grid grid-cols-1 gap-10 md:grid-cols-2 print:grid-cols-2">
+              <section aria-labelledby="r-mentors">
+                <h2 id="r-mentors" className="text-[18px] font-bold text-[var(--sc-ink)]">
+                  {t("showcase.report.byMentor")}
+                </h2>
+                <table className="mt-3 w-full border-collapse">
+                  <thead className="border-b border-[var(--sc-hairline)]">
+                    <tr>
+                      <th className={th}>{t("showcase.report.col.mentor")}</th>
+                      <th className={th}>{t("showcase.report.col.sessions")}</th>
+                      <th className={th}>{t("showcase.report.col.hours")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--sc-hairline)]">
+                    {byMentor.map((m) => (
+                      <tr key={m.id}>
+                        <td className={td}>{m.name}</td>
+                        <td className={td}>{nf.format(m.sessions)}</td>
+                        <td className={td}>{nf.format(Math.round(m.hours * 10) / 10)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+              <section aria-labelledby="r-expertise">
+                <h2 id="r-expertise" className="text-[18px] font-bold text-[var(--sc-ink)]">
+                  {t("showcase.report.byExpertise")}
+                </h2>
+                <table className="mt-3 w-full border-collapse">
+                  <thead className="border-b border-[var(--sc-hairline)]">
+                    <tr>
+                      <th className={th}>{t("showcase.report.col.area")}</th>
+                      <th className={th}>{t("showcase.report.col.sessions")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--sc-hairline)]">
+                    {byExpertise.map(([tag, n]) => (
+                      <tr key={tag}>
+                        <td className={td}>{tag}</td>
+                        <td className={td}>{nf.format(n)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <h2 className="mt-8 text-[18px] font-bold text-[var(--sc-ink)]">{t("showcase.report.byCountry")}</h2>
+                <table className="mt-3 w-full border-collapse">
+                  <thead className="border-b border-[var(--sc-hairline)]">
+                    <tr>
+                      <th className={th}>{t("showcase.report.col.country")}</th>
+                      <th className={th}>{t("showcase.report.col.sessions")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--sc-hairline)]">
+                    {byCountry.map(([c, n]) => (
+                      <tr key={c}>
+                        <td className={td}>{localizeCountry(c, lang)}</td>
+                        <td className={td}>{nf.format(n)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </section>
+            </div>
+
+            {recorded.missing > 0 && (
+              <p className="mt-8 text-[12px] text-[#6c6c84]" data-testid="text-report-missing-durations">
+                {t("showcase.report.missingDurations", { count: recorded.missing })}
+              </p>
+            )}
+          </>
         )}
         <footer className="mt-12 border-t border-[var(--sc-hairline)] pt-4 text-[12px] text-[#6c6c84]">{t("showcase.report.footer")}</footer>
       </article>

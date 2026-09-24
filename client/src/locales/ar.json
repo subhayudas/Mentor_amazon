@@ -2466,7 +2466,9 @@
       "saveError": "لم تُحفظ تغييراتك. تحقّق من اتصالك وحاول مرة أخرى.",
       "photoType": "اختر صورة بصيغة JPEG أو PNG أو WebP أو GIF.",
       "calHintLive": "حدث Cal.com الخاص بك، مثل yourname/30min. يختار المتدربون موعدًا عليه بعد قبولك. اتركه فارغًا لإزالته.",
-      "calSyncSection": "مزامنة حجوزات Cal.com"
+      "calSyncSection": "مزامنة حجوزات Cal.com",
+      "photoHintLive": "JPEG أو PNG أو WebP أو GIF بحجم أقصاه 5 ميغابايت. تُحفظ الصورة الجديدة عند الضغط على «حفظ».",
+      "photoPending": "الصورة الجديدة جاهزة. اضغط «حفظ» للاحتفاظ بها."
     },
     "activity": {
       "title": "النشاط",

@@ -223,6 +223,8 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
   const [errors, setErrors] = React.useState<Partial<Record<keyof MentorForm, string>>>({});
   const [uploading, setUploading] = React.useState(false);
   const [photoError, setPhotoError] = React.useState<string | null>(null);
+  // An uploaded photo lives only in the form until Save writes the profile row: say so.
+  const [photoPending, setPhotoPending] = React.useState(false);
   const [saveError, setSaveError] = React.useState<string | null>(null);
   // The form as it was submitted: a finished save only adopts the saved row (e.g. the
   // normalised Cal link) when nothing was edited meanwhile, so no typing is lost.
@@ -244,7 +246,10 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
     if (IS_LOCAL) {
       // Local demo: keep the image in this browser only.
       const reader = new FileReader();
-      reader.onload = () => setForm((f) => ({ ...f, photo_url: String(reader.result ?? "") }));
+      reader.onload = () => {
+        setForm((f) => ({ ...f, photo_url: String(reader.result ?? "") }));
+        setPhotoPending(true);
+      };
       reader.readAsDataURL(file);
       return;
     }
@@ -252,6 +257,7 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
     try {
       const url = await uploadService.uploadProfileImage(file, userId);
       setForm((f) => ({ ...f, photo_url: url }));
+      setPhotoPending(true);
     } catch {
       setPhotoError(t("mentorOnboarding.photoUploadFailed"));
     } finally {
@@ -299,6 +305,7 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
     },
     onSuccess: async (row) => {
       setSaveError(null);
+      if (row.photo_url === submitted.current?.photo_url) setPhotoPending(false);
       setForm((current) => (current === submitted.current ? mentorForm(row) : current));
       await invalidate();
       logActivity({ actor_type: "mentor", actor_id: mentor.id, actor_name: row.name, type: "profile_updated", subject_type: "mentor", subject_id: mentor.id, summary: t("showcase.activity.summaries.profileUpdated", { name: row.name }) });
@@ -355,7 +362,7 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
               </label>
             </div>
             <p className={cn("mt-1 text-[12px]", photoError ? "font-medium text-destructive" : "text-[#6c6c84]")} role={photoError ? "alert" : undefined} aria-live="polite" data-testid="text-photo-status">
-              {photoError ?? t("mentorOnboarding.photoHint")}
+              {photoError ?? (photoPending ? t("showcase.profileSettings.photoPending") : t("showcase.profileSettings.photoHintLive"))}
             </p>
           </div>
           <Field id={`${ids}-position`} title={t("mentorOnboarding.position")}>

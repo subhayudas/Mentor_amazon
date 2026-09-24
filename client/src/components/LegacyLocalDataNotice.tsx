@@ -30,6 +30,15 @@ export function LegacyLocalDataNotice() {
 
 export default LegacyLocalDataNotice;
 
+/**
+ * Wrap text the visitor typed (a goal, a name, an e-mail) in Unicode
+ * first-strong isolates, so a Latin goal inside an Arabic sentence keeps its
+ * own order and the sentence's quotes stay where the translation put them.
+ */
+function isolate(text: string): string {
+  return `\u2068${text}\u2069`;
+}
+
 function LegacyLocalDataNoticeInner() {
   const { t, i18n } = useTranslation();
   const [data, setData] = React.useState(() => detectLegacyLocalData(browserStorage()));
@@ -45,9 +54,9 @@ function LegacyLocalDataNoticeInner() {
   };
 
   const mentorLabel = (id: string, name?: string) => {
-    if (name) return name;
+    if (name) return isolate(name);
     const featured = featuredMentorByAnyId(id);
-    if (featured) return i18n.language === "ar" && featured.name_ar ? featured.name_ar : featured.name;
+    if (featured) return isolate(i18n.language === "ar" && featured.name_ar ? featured.name_ar : featured.name);
     return t("legacyData.unknownMentor");
   };
 
@@ -55,12 +64,12 @@ function LegacyLocalDataNoticeInner() {
     switch (item.kind) {
       case "request":
         return item.goal
-          ? t("legacyData.item.request", { mentor: mentorLabel(item.mentorId, item.mentorName), goal: item.goal })
+          ? t("legacyData.item.request", { mentor: mentorLabel(item.mentorId, item.mentorName), goal: isolate(item.goal) })
           : t("legacyData.item.requestNoGoal", { mentor: mentorLabel(item.mentorId, item.mentorName) });
       case "registration":
-        return t("legacyData.item.registration", { name: item.organization || item.name || item.email || "—" });
+        return t("legacyData.item.registration", { name: isolate(item.organization || item.name || item.email || "—") });
       case "mentorProfile":
-        return t("legacyData.item.mentorProfile", { name: item.name || item.email || "—" });
+        return t("legacyData.item.mentorProfile", { name: isolate(item.name || item.email || "—") });
       case "favorite":
         return t("legacyData.item.favorite", { mentor: mentorLabel(item.mentorId, item.mentorName) });
     }
@@ -103,7 +112,7 @@ function LegacyLocalDataNoticeInner() {
         <ul id={listId} hidden={!open} className="mt-3 space-y-1.5 border-t border-warning-border pt-3 text-body-sm" data-testid="list-legacy-items">
           {data.items.map((item) => (
             <li key={`${item.kind}-${item.id}`} className="flex flex-wrap gap-x-2">
-              <span className="min-w-0" dir="auto">
+              <span className="min-w-0">
                 {describe(item)}
               </span>
               {item.createdAt && <span className="text-caption opacity-80">· {formatDate(item.createdAt, i18n.language)}</span>}

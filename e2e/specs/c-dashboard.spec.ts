@@ -191,6 +191,71 @@ test('S9 mentor accepts, declines, cancels and completes on /dashboard/bookings;
   }
 });
 
+// ---------------------------------------------------------------- S9 mentee actions
+
+test('S9 a mentee withdraws a pending request and cancels an accepted session on /dashboard/bookings', async ({ page, loginAs, healthy, db, lang, personaProject }) => {
+  const p = personaProject;
+  const { mentor, mentee } = ids(p);
+  // Rows of this test only (the fixture bookings belong to the mentor test above).
+  const withdrawId = `${bookingId(p, 'pending-1')}-mentee-withdraw`;
+  const cancelId = `${bookingId(p, 'accepted')}-mentee-cancel`;
+  const mine = [withdrawId, cancelId];
+  const cleanup = async () => {
+    await db`delete from public.notifications where booking_id = any(${mine})`;
+    await db`delete from public.activity_events where subject_id = any(${mine})`;
+    await db`delete from public.bookings where id = any(${mine})`;
+  };
+  try {
+    await cleanup();
+    await db`
+      insert into public.bookings (id, mentor_id, mentee_id, status, goal, clicked_at, responded_at, created_at)
+      values (${withdrawId}, ${mentor}, ${mentee}, 'pending', 'E2E: a request the mentee withdraws again.',
+              timezone('utc', now()), null, timezone('utc', now())),
+             (${cancelId}, ${mentor}, ${mentee}, 'accepted', 'E2E: an accepted session the mentee cancels.',
+              timezone('utc', now()), timezone('utc', now()), timezone('utc', now()))`;
+    await db`delete from public.activity_events where subject_id = any(${mine})`;
+
+    await loginAs('mentee');
+    await tokenSettle(page);
+    await page.goto('/dashboard/bookings');
+    await page.getByTestId('tab-requests').click();
+    await expect(page.getByTestId(`booking-row-${withdrawId}`)).toBeVisible();
+    await expectNoDemo(page, lang);
+
+    // Withdraw, through the confirmation dialog.
+    await page.getByTestId(`button-withdraw-${withdrawId}`).click();
+    const dialog = page.getByTestId('dialog-booking-confirm');
+    await expect(dialog).toBeVisible();
+    await healthy({ screenshotName: 'S9-mentee-withdraw-dialog' });
+    await dialog.getByTestId('button-confirm-action').click();
+    await expect(toast(page, tr(lang, 'showcase.bookings.toast.withdrawn'))).toBeVisible();
+    await expect.poll(async () => (await bookingRow(db, withdrawId)).status).toBe('canceled');
+    expect((await bookingRow(db, withdrawId)).canceled_by).toBe('mentee');
+    expect((await activityFor(db, withdrawId)).map((e) => e.type)).toEqual(['booking_canceled']);
+    await expect(page.getByTestId(`booking-row-${withdrawId}`)).toHaveCount(0);
+
+    // Cancel the accepted session, with confirmation.
+    await page.getByTestId('tab-upcoming').click();
+    await page.getByTestId(`button-cancel-${cancelId}`).click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByTestId('button-confirm-action').click();
+    await expect(toast(page, tr(lang, 'showcase.bookings.toast.canceled'))).toBeVisible();
+    await expect.poll(async () => (await bookingRow(db, cancelId)).status).toBe('canceled');
+    expect((await bookingRow(db, cancelId)).canceled_by).toBe('mentee');
+    const canceled = await activityFor(db, cancelId);
+    expect(canceled.map((e) => e.type)).toEqual(['booking_canceled']);
+    expect(canceled[0].visible_to).toEqual(expect.arrayContaining([mentor, mentee]));
+
+    // Both rows are now under Canceled.
+    await page.getByTestId('tab-canceled').click();
+    await expect(page.getByTestId(`booking-row-${withdrawId}`)).toBeVisible();
+    await expect(page.getByTestId(`booking-row-${cancelId}`)).toBeVisible();
+    await healthy({ screenshotName: 'S9-mentee-after-actions' });
+  } finally {
+    await cleanup();
+  }
+});
+
 // ---------------------------------------------------------------- S17 feed error state
 
 test('S17 an aborted activity read shows the error state, and Retry loads the feed', async ({ page, loginAs, healthy, lang }, testInfo) => {
@@ -328,9 +393,13 @@ test('S14 a mentor edits the profile: validation, saved fields, photo in storage
     const img = page.getByTestId('img-profile-photo');
     await expect(img).toHaveAttribute('src', /\/storage\/v1\/object\/public\/uploads\//);
     const src = (await img.getAttribute('src'))!;
+    // Until Save, the page says the new photo is not kept yet (the row still has none).
+    await expect(page.getByTestId('text-photo-status')).toHaveText(tr(lang, 'showcase.profileSettings.photoPending'));
+    expect((await db<{ photo_url: string | null }[]>`select photo_url from public.mentors where id = ${mentorId}`)[0].photo_url).toBeNull();
     await expect(page.getByTestId('button-save-profile')).toBeEnabled();
     await page.getByTestId('button-save-profile').click();
     await expect.poll(async () => (await db<{ photo_url: string | null }[]>`select photo_url from public.mentors where id = ${mentorId}`)[0].photo_url).toBe(src);
+    await expect(page.getByTestId('text-photo-status')).toHaveText(tr(lang, 'showcase.profileSettings.photoHintLive'));
     expect((await page.request.get(src)).ok(), 'the public photo URL serves the file').toBe(true);
 
     // Clearing the Cal.com link stores an empty string.

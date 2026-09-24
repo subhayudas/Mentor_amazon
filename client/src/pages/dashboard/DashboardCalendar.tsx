@@ -154,7 +154,10 @@ function DatabaseCalendar() {
   }
 
   const loading = own.isLoading || availabilityQuery.isLoading || tz === null || windows === null;
-  const failed = own.isError || availabilityQuery.isError;
+  // A profile id whose mentors row does not come back (deleted, or unreadable) would
+  // otherwise leave the timezone unset and the skeleton up forever: show the error with Retry.
+  const mentorMissing = Boolean(mentorId) && !own.isLoading && !own.isError && !mentor;
+  const failed = own.isError || availabilityQuery.isError || mentorMissing;
   const serverWindows = availabilityQuery.data ? toWindows(availabilityQuery.data) : [];
   const inactiveRows = (availabilityQuery.data ?? []).filter((r) => r.is_active === false);
   const tzChanged = Boolean(mentor && tz && tz !== (mentor.timezone || viewerTimeZone()));

@@ -11,6 +11,8 @@ import { MOCK_BOOKINGS, MOCK_MENTEES } from "@/data/mockAnalytics";
 import { FEATURED_MENTORS, featuredMentorByAnyId } from "@/data/featuredMentors";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
 import { IS_LOCAL } from "@/lib/demo";
+import { localizeCountry } from "@/lib/format";
+import { NOT_SPECIFIED } from "@/lib/reporting";
 import { cn } from "@/lib/utils";
 import { useDashboardData } from "@/pages/dashboard/data";
 import { recordedMinutes } from "@/pages/dashboard/dataSource";
@@ -65,7 +67,8 @@ interface Stats {
   /** Completed sessions with no recorded duration (never counted as 30 min). */
   missingDurations: number;
   series: { label: string; requests: number }[];
-  countries: { name: string; value: number }[];
+  /** Top countries by requests; `key` is the stored country (or NOT_SPECIFIED), `name` its localized label. */
+  countries: { key: string; name: string; value: number }[];
   topMentors: { id: string; value: number }[];
 }
 
@@ -95,11 +98,12 @@ function computeStats(bookings: Booking[], mentees: Mentee[], days: number, grai
   const byCountry = new Map<string, number>();
   const menteeById = new Map(mentees.map((m) => [m.id, m]));
   for (const b of rows) {
-    const c = b.country ?? menteeById.get(b.mentee_id)?.country ?? "Other";
+    // Blank or missing countries group under one "Not specified" row, never an empty label.
+    const c = b.country?.trim() || menteeById.get(b.mentee_id)?.country?.trim() || NOT_SPECIFIED;
     byCountry.set(c, (byCountry.get(c) ?? 0) + 1);
   }
   const countries = Array.from(byCountry.entries())
-    .map(([name, value]) => ({ name, value }))
+    .map(([key, value]) => ({ key, name: key, value }))
     .sort((a, b) => b.value - a.value)
     .slice(0, 6);
 
@@ -245,7 +249,11 @@ export default function Analytics() {
   ];
   const funnelColors = traffic ? [NAVY, TEAL, RUST, "#5A6169"] : [TEAL, RUST, "#5A6169"];
   const refreshed = new Intl.DateTimeFormat(i18n.language, { hour: "numeric", minute: "2-digit" }).format(new Date());
-  const countryTotal = Math.max(1, stats.countries.reduce((s, c) => s + c.value, 0));
+  const countries = stats.countries.map((c) => ({
+    ...c,
+    name: c.key === NOT_SPECIFIED ? t("analytics.notSpecified") : localizeCountry(c.key, i18n.language),
+  }));
+  const countryTotal = Math.max(1, countries.reduce((s, c) => s + c.value, 0));
 
   const header = (
     <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--sc-hairline)] pb-5">
@@ -383,8 +391,8 @@ export default function Analytics() {
             <div className="chart-container h-[240px]" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie isAnimationActive={false} data={stats.countries} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2} stroke="#fcfbf9">
-                    {stats.countries.map((_, i) => (
+                  <Pie isAnimationActive={false} data={countries} dataKey="value" nameKey="name" innerRadius={60} outerRadius={100} paddingAngle={2} stroke="#fcfbf9">
+                    {countries.map((_, i) => (
                       <Cell key={i} fill={PIE[i % PIE.length]} />
                     ))}
                   </Pie>
@@ -393,10 +401,10 @@ export default function Analytics() {
               </ResponsiveContainer>
             </div>
             <ul className="divide-y divide-[var(--sc-hairline)]">
-              {stats.countries.map((c) => (
-                <Row key={c.name} label={c.name} value={`${Math.round((c.value / countryTotal) * 100)}%`} share={(c.value / countryTotal) * 100} />
+              {countries.map((c) => (
+                <Row key={c.key} label={c.name} value={`${Math.round((c.value / countryTotal) * 100)}%`} share={(c.value / countryTotal) * 100} />
               ))}
-              {stats.countries.length === 0 && <li className="py-6 text-center text-[13px] text-[#6c6c84]">{t("showcase.analytics.empty")}</li>}
+              {countries.length === 0 && <li className="py-6 text-center text-[13px] text-[#6c6c84]">{t("showcase.analytics.empty")}</li>}
             </ul>
           </div>
         </Card>
