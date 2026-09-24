@@ -124,6 +124,7 @@ export default function BookingsTab() {
           type="button"
           size={size}
           variant="secondary"
+          className="max-md:h-11"
           loading={busyId === booking.id && decide.variables?.action === "accept"}
           disabled={busyId === booking.id}
           onClick={(event) => {
@@ -139,6 +140,7 @@ export default function BookingsTab() {
           type="button"
           size={size}
           variant="outline"
+          className="max-md:h-11"
           loading={busyId === booking.id && decide.variables?.action === "decline"}
           disabled={busyId === booking.id}
           onClick={(event) => {
@@ -254,6 +256,8 @@ export default function BookingsTab() {
                           <bdi dir="ltr">{booking.mentor?.email}</bdi>
                         </p>
                       )}
+                      {/* Next to the mentor, not in the last column: visible without scrolling the table on any screen. */}
+                      {isProgrammeRequest(booking) && <div className="mt-2 flex flex-wrap gap-2">{actionButtons(booking)}</div>}
                     </TableCell>
                     <TableCell>
                       <p className="max-w-[12rem] truncate font-medium text-foreground">
@@ -269,7 +273,6 @@ export default function BookingsTab() {
                     <TableCell className="text-body-sm">{localizeCountry(booking.country || booking.mentor?.country || "", lang) || UNAVAILABLE}</TableCell>
                     <TableCell className="text-end">
                       <div className="flex items-center justify-end gap-2">
-                        {actionButtons(booking)}
                         {/* The real control: rows also open on click as a pointer convenience. */}
                         <Button
                           variant="ghost"

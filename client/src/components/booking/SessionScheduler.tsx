@@ -8,7 +8,7 @@ import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Check, CircleAlert, Clock, Hourglass, Send } from "lucide-react";
 
-import { loadCalApi } from "@/components/CalEmbed";
+import { CAL_NAMESPACE, loadCalApi } from "@/components/CalEmbed";
 import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
 import { GOAL_MAX, GOAL_MIN } from "@/components/booking/BookingRequestDialog";
 import { classifyBookingError, invalidRequestFields, isSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
@@ -737,6 +737,7 @@ function LocalCalInline({ calLink, mentor, sessionTitle, name, requestId }: { ca
     <div className="chart-container relative mt-5 min-h-[600px] overflow-hidden rounded-[16px] border border-[var(--sc-hairline)] bg-white" data-testid="cal-inline">
       <Suspense fallback={null}>
         <Cal
+          namespace={CAL_NAMESPACE}
           calLink={calLink}
           style={{ width: "100%", height: "100%", minHeight: "600px", overflow: "auto" }}
           config={{ theme: "light", layout: "month_view", notes: `${sessionTitle} — ${t("showcase.scheduler.title", { name })}` }}

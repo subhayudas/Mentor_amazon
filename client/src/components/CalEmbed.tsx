@@ -27,9 +27,17 @@ import { bidi } from "@/lib/format";
 // never ships in a route chunk.
 const Cal = lazy(() => import("@calcom/embed-react"));
 
-/** Resolves Cal.com's global API (e.g. to listen for `bookingSuccessfulV2`), loading the embed on first call. */
-export function loadCalApi(options?: { embedJsUrl?: string; namespace?: string }) {
-  return import("@calcom/embed-react").then((m) => m.getCalApi(options));
+/**
+ * The one Cal.com embed namespace the app uses. The inline embed and the event API must
+ * share it: `getCalApi()` without a namespace registers a second, empty-named instance next
+ * to the embed's global one, which then receives the iframe's `__iframeReady` without owning
+ * an iframe and throws ("createIframe must be called before doInIframe").
+ */
+export const CAL_NAMESPACE = "mentorconnect";
+
+/** Resolves the Cal.com API of `CAL_NAMESPACE` (e.g. to listen for `bookingSuccessfulV2`), loading the embed on first call. */
+export function loadCalApi(options?: { embedJsUrl?: string }) {
+  return import("@calcom/embed-react").then((m) => m.getCalApi({ ...options, namespace: CAL_NAMESPACE }));
 }
 
 /** What Cal.com hands back when a slot is booked (or moved) through the embed; see `lib/calEvents.ts`. */
@@ -172,6 +180,7 @@ export function CalEmbed({
             <>
               <Suspense fallback={null}>
                 <Cal
+                  namespace={CAL_NAMESPACE}
                   calLink={link}
                   style={{ width: "100%", height: "100%", minHeight: "600px", overflow: "auto" }}
                   config={config}
