@@ -1,3 +1,13 @@
+-- =============================================================================
+-- SUPERSEDED — DO NOT RUN.
+-- This is the original (v1) policy script. It leaves mentor contact data readable by
+-- anyone and lets any signed-in user write notifications and activity for others.
+-- Use, in order: drizzle push (shared/schema.ts) → supabase_setup_v2.sql →
+-- supabase_phase2.sql → migrations/0002_production_readiness.sql → (after the deploy)
+-- migrations/0003_restrict_legacy_writes.sql → (optional) migrations/0004_seed_featured_mentors.sql.
+-- Kept only as a record of what older projects ran.
+-- =============================================================================
+
 -- MentorConnect Supabase Setup Script
 -- Run this in your Supabase SQL Editor to set up Row Level Security policies
 
