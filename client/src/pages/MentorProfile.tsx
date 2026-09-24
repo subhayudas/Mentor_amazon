@@ -147,7 +147,9 @@ export default function MentorProfile() {
     enabled: Boolean(email),
     staleTime: 5 * 60_000,
   });
-  const menteeId = user?.profile_id ?? menteeQuery.data?.id;
+  // The viewer's mentees row: a mentee's users.profile_id, else the row with their email. A mentor's
+  // or admin's profile_id points at a mentors row, which never holds the requests they sent.
+  const menteeId = (user?.user_type === "mentee" ? user.profile_id : undefined) ?? menteeQuery.data?.id;
   // The live booking row (P1-21): signed-in viewers fetch their bookings
   // through the same key and queryFn the dashboard uses, so a direct load of
   // the profile shows a scheduled/pending request instead of inviting a
@@ -167,7 +169,8 @@ export default function MentorProfile() {
     setLocalSent(getSentRequest(mentorId));
   }, [mentorId]);
   // Bookings fetched after the send decide for a signed-in viewer: a declined, withdrawn or
-  // removed request no longer reads as "Request sent" here, nor on the directory cards.
+  // removed request no longer reads as "Request sent" here, and clearing the memory also stops this
+  // mentor's directory card from saying so.
   const bookingsAsOf = bookingsQuery.dataUpdatedAt || undefined;
   const staleMemory = isSentMemoryStale({
     mentorId,

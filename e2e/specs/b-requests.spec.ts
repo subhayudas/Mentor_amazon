@@ -314,6 +314,46 @@ test('S8 a signed-in mentee requests through the RPC: no captcha, a row, then "a
   }
 });
 
+test('S8c a signed-in mentor who requests another mentor still sees "Request sent" once their bookings are refetched', async ({ page, db, healthy, loginAs, personaProject }, testInfo) => {
+  test.skip(!['desktop-en', 'mobile-ar'].includes(testInfo.project.name), 'S8c runs on desktop-en and mobile-ar');
+  // mentor-linked's users.profile_id points at its own mentors row: the requests it sends live
+  // under the mentees row that has its email, which is what the profile must read.
+  const target = ids(personaProject).mentor;
+  const requesterEmail = personaEmail(personaProject, 'mentor-linked');
+  const cleanup = async () => {
+    const rows = await db<{ id: string }[]>`
+      select b.id from public.bookings b join public.mentees me on me.id = b.mentee_id
+      where b.mentor_id = ${target} and lower(me.email) = ${requesterEmail}`;
+    for (const { id } of rows) {
+      await db`delete from public.notifications where booking_id = ${id}`;
+      await db`delete from public.mentor_activity_log where booking_id = ${id}`;
+      await db`delete from public.activity_events where subject_id = ${id}`;
+      await db`delete from public.bookings where id = ${id}`;
+    }
+  };
+  try {
+    await loginAs('mentor-linked');
+    await page.goto(`/mentor/${target}`);
+    await page.getByTestId('button-request-session').first().click();
+    const dialog = page.getByTestId('dialog-booking-request');
+    await expect(dialog.getByTestId('input-booking-email')).toHaveValue(requesterEmail);
+    await dialog.getByTestId('textarea-booking-goal').fill(GOAL);
+    await dialog.getByTestId('button-submit-booking').click();
+    await expect(page.getByTestId('booking-success-title')).toHaveAttribute('data-outcome', 'sent');
+    const rows = await db`select 1 from public.bookings b join public.mentees me on me.id = b.mentee_id
+                          where b.mentor_id = ${target} and lower(me.email) = ${requesterEmail} and b.status = 'pending'`;
+    expect(rows).toHaveLength(1);
+
+    // A fresh load reads the row itself: still "Request sent", no second request button.
+    await page.reload();
+    await expect(page.locator('[data-testid="booking-section"][data-state="sent"]').first()).toBeVisible();
+    await expect(page.getByTestId('button-request-session')).toHaveCount(0);
+    await healthy({ screenshotName: 'S8c-mentor-request-sent' });
+  } finally {
+    await cleanup();
+  }
+});
+
 test('S21 demo mode: the curated /book page is the request form, never a Cal.com calendar; the request stays in this browser @demo-local', async ({ page, healthy }) => {
   await page.goto('/mentor/manav-gupta/book');
   await expect(page.getByTestId('form-session-request')).toBeVisible();
