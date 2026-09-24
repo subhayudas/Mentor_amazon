@@ -77,6 +77,33 @@ describeDb('I5 constraints and the booking guard', () => {
     });
   });
 
+  it('a self-booking (caller owns both sides) can be canceled but never completed or rated', async () => {
+    await withTx(sql, async (tx) => {
+      // A legacy row (or one made before 0002's self-request check) where the mentor's own
+      // address is also the mentee's.
+      const mentor = await mkMentor(tx, { country: 'Jordan' });
+      const selfMentee = await mkMentee(tx, { email: mentor.email });
+      const sub = randomUUID();
+      await mkUser(tx, { id: sub, email: mentor.email, user_type: 'mentor' });
+      const pending = await mkBooking(tx, mentor.id, selfMentee.id, { status: 'pending' });
+      const accepted = await mkBooking(tx, mentor.id, selfMentee.id, { status: 'accepted' });
+      const completed = await mkBooking(tx, mentor.id, selfMentee.id, { status: 'completed' });
+      const cancelMe = await mkBooking(tx, mentor.id, selfMentee.id, { status: 'accepted' });
+      await asRole(tx, 'authenticated', claims(sub, mentor.email));
+      await expectPgError(tx, (sp) => sp`update public.bookings set status = 'accepted' where id = ${pending}`, '42501', /forbidden_self_booking/);
+      await expectPgError(tx, (sp) => sp`update public.bookings set status = 'completed' where id = ${accepted}`, '42501', /forbidden_self_booking/);
+      await expectPgError(tx, (sp) => sp`update public.bookings set mentee_rating = 5 where id = ${completed}`, '42501', /forbidden_self_booking/);
+      await expectPgError(tx, (sp) => sp`update public.bookings set mentee_feedback = 'Great' where id = ${completed}`, '42501', /forbidden_self_booking/);
+      await expectPgError(tx, (sp) => sp`update public.bookings set mentor_rating = 5 where id = ${completed}`, '42501', /forbidden_self_booking/);
+      await tx`update public.bookings set status = 'canceled', canceled_at = now() where id = ${cancelMe}`;
+      await asService(tx);
+      const [row] = await tx`select status from public.bookings where id = ${cancelMe}`;
+      expect(row.status).toBe('canceled');
+      const [m] = await tx`select average_rating::text as avg, total_ratings from public.mentors where id = ${mentor.id}`;
+      expect(m).toEqual({ avg: '0.00', total_ratings: 0 });
+    });
+  });
+
   it('a client cancel is stamped with canceled_by (mentee, mentor, admin)', async () => {
     await withTx(sql, async (tx) => {
       const p = await parties(tx);

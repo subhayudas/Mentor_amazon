@@ -166,7 +166,20 @@ describe('RPC', () => {
     expect(res.body).not.toContain('already_pending');
   });
 
+  it('a request under the mentor\'s own address answers like a normal one (no e-mail oracle)', async () => {
+    rpc.mockImplementation(async () => ({
+      data: null,
+      error: { code: '42501', message: 'not_allowed', details: 'self_request' } as RpcResult['error'],
+    }));
+    const res = await send(VALID);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    const logged = JSON.stringify(vi.mocked(console.error).mock.calls);
+    expect(logged).not.toContain('sara@example.com');
+  });
+
   const mapping: Array<[string, { code: string; message: string }, number, unknown]> = [
+    ['42501 not_allowed (not a self request)', { code: '42501', message: 'not_allowed' }, 500, { error: 'server_error' }],
     ['22023 invalid_goal', { code: '22023', message: 'invalid_goal' }, 400, { error: 'invalid_request', fields: ['goal'] }],
     ['22023 invalid_email', { code: '22023', message: 'invalid_email' }, 400, { error: 'invalid_request', fields: ['email'] }],
     ['42501 mentor_unavailable', { code: '42501', message: 'mentor_unavailable' }, 422, { error: 'mentor_unavailable' }],

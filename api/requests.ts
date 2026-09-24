@@ -19,7 +19,10 @@ import { parseHostnames, verifyTurnstile } from './_lib/turnstile.js';
  * request, rate-limits per mentee and mentor, and notifies the mentor (or every admin for a
  * programme-managed mentor).
  * Success is 200 { ok: true } whether the request was created or was already pending, so the
- * endpoint never reveals whether someone has an open request. Responses never name env vars.
+ * endpoint never reveals whether someone has an open request. A request under the mentor's own
+ * address (42501 not_allowed, detail self_request) creates nothing but also answers 200: a
+ * distinct status would tell anyone which address belongs to which mentor, and mentor e-mails
+ * are never public. Responses never name env vars.
  * Signed-in visitors use the create_my_booking_request RPC instead.
  */
 export const MAX_BODY_BYTES = 16 * 1024;
@@ -116,10 +119,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
   const code = error.code ?? '';
   const message = error.message ?? '';
+  const details = (error as { details?: string | null }).details ?? '';
   if (code === '22023') {
     sendJson(res, 400, { error: 'invalid_request', fields: RPC_FIELD[message] ? [RPC_FIELD[message]] : [] });
   } else if (code === '42501' && message.includes('mentor_unavailable')) {
     sendJson(res, 422, { error: 'mentor_unavailable' });
+  } else if (code === '42501' && message.includes('not_allowed') && details.includes('self_request')) {
+    console.error('[requests] refused a request addressed to the mentor themselves');
+    sendJson(res, 200, { ok: true });
   } else if (code === 'P0001') {
     sendJson(res, 429, { error: 'rate_limited' });
   } else if (code === 'PGRST202') {

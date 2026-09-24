@@ -398,6 +398,15 @@ BEGIN
        OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
       RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'booking parties are immutable';
     END IF;
+    -- A self-booking (the caller owns both the mentor and the mentee profile) can only be
+    -- canceled: it never becomes a session and never carries a rating or feedback, so nobody
+    -- can rate themselves into the public average_rating.
+    IF v_mentor AND v_mentee
+       AND ((NEW.status IS DISTINCT FROM OLD.status AND NEW.status IS DISTINCT FROM 'canceled')
+            OR NEW.mentee_rating IS DISTINCT FROM OLD.mentee_rating OR NEW.mentee_feedback IS DISTINCT FROM OLD.mentee_feedback
+            OR NEW.mentor_rating IS DISTINCT FROM OLD.mentor_rating OR NEW.mentor_feedback IS DISTINCT FROM OLD.mentor_feedback) THEN
+      RAISE EXCEPTION 'forbidden_self_booking' USING ERRCODE = '42501', DETAIL = 'a booking with yourself can only be canceled';
+    END IF;
     IF NOT v_mentor
        AND (NEW.session_duration_minutes IS DISTINCT FROM OLD.session_duration_minutes
             OR NEW.country IS DISTINCT FROM OLD.country) THEN
@@ -608,6 +617,14 @@ BEGIN
   SELECT * INTO v_mentor FROM public.mentors WHERE id = p_mentor_id;
   IF NOT FOUND OR NOT v_mentor.is_available THEN
     RAISE EXCEPTION 'mentor_unavailable' USING ERRCODE = '42501';
+  END IF;
+  -- Nobody requests a session with themselves: not under the mentor's own address, not under
+  -- an identity an admin linked to this mentor profile, and not while signed in as the mentor.
+  -- (guard_booking_update also refuses to complete or rate a self-booking.)
+  IF lower(coalesce(v_mentor.email, '')) = v_email
+     OR public.owns_mentor(p_mentor_id)
+     OR EXISTS (SELECT 1 FROM public.users u WHERE u.profile_id = p_mentor_id AND lower(u.email) = v_email) THEN
+    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501', DETAIL = 'self_request';
   END IF;
 
   -- One request at a time per requester: serialises mentee creation, the pending dedupe and

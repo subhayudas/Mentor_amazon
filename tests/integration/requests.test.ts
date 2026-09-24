@@ -69,6 +69,39 @@ describeDb('I7 booking request RPCs', () => {
     });
   });
 
+  it('nobody can request a session with themselves (own address, linked profile, or signed in as the mentor)', async () => {
+    await withTx(sql, async (tx) => {
+      const mentor = await mkMentor(tx);
+      const [{ n: before }] = await tx`select count(*)::int as n from public.bookings where mentor_id = ${mentor.id}`;
+      // Anonymous path under the mentor's own address (any case).
+      await expectPgError(tx, (sp) => sp`select public.create_booking_request(${mentor.id}, ${mentor.email.toUpperCase()}, 'x', ${GOAL})`, '42501', /not_allowed/);
+      // Signed in with the mentor's own JWT e-mail.
+      const mentorSub = randomUUID();
+      await mkUser(tx, { id: mentorSub, email: mentor.email, user_type: 'mentor' });
+      await asRole(tx, 'authenticated', claims(mentorSub, mentor.email));
+      await expectPgError(tx, (sp) => sp`select public.create_my_booking_request(${mentor.id}, ${GOAL})`, '42501', /not_allowed/);
+      await asService(tx);
+      // An Amazon identity an admin linked to this mentor row (users.profile_id), both paths.
+      const linkedEmail = itEmail('linked');
+      const linkedSub = randomUUID();
+      await mkUser(tx, { id: linkedSub, email: linkedEmail, user_type: 'mentor', profile_id: mentor.id });
+      await expectPgError(tx, (sp) => sp`select public.create_booking_request(${mentor.id}, ${linkedEmail}, 'x', ${GOAL})`, '42501', /not_allowed/);
+      await asRole(tx, 'authenticated', claims(linkedSub, linkedEmail));
+      await expectPgError(tx, (sp) => sp`select public.create_my_booking_request(${mentor.id}, ${GOAL})`, '42501', /not_allowed/);
+      await asService(tx);
+      const [{ n: after }] = await tx`select count(*)::int as n from public.bookings where mentor_id = ${mentor.id}`;
+      expect(after).toBe(before);
+      const [{ n: mentees }] = await tx`select count(*)::int as n from public.mentees where lower(email) in (${mentor.email}, ${linkedEmail})`;
+      expect(mentees).toBe(0);
+      // The same signed-in mentor can still request another mentor.
+      const other = await mkMentor(tx);
+      await asRole(tx, 'authenticated', claims(mentorSub, mentor.email));
+      const [{ r }] = await tx`select public.create_my_booking_request(${other.id}, ${GOAL}) as r`;
+      expect(r).toMatchObject({ outcome: 'created' });
+      await asService(tx);
+    });
+  });
+
   it('a second request while one is pending returns already_pending and writes nothing', async () => {
     await withTx(sql, async (tx) => {
       const mentor = await mkMentor(tx);

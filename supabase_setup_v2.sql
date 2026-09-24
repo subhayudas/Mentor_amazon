@@ -487,6 +487,15 @@ BEGIN
        OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
       RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'booking parties are immutable';
     END IF;
+    -- A self-booking (the caller owns both the mentor and the mentee profile) can only be
+    -- canceled: it never becomes a session and never carries a rating or feedback, so nobody
+    -- can rate themselves into the public average_rating.
+    IF v_mentor AND v_mentee
+       AND ((NEW.status IS DISTINCT FROM OLD.status AND NEW.status IS DISTINCT FROM 'canceled')
+            OR NEW.mentee_rating IS DISTINCT FROM OLD.mentee_rating OR NEW.mentee_feedback IS DISTINCT FROM OLD.mentee_feedback
+            OR NEW.mentor_rating IS DISTINCT FROM OLD.mentor_rating OR NEW.mentor_feedback IS DISTINCT FROM OLD.mentor_feedback) THEN
+      RAISE EXCEPTION 'forbidden_self_booking' USING ERRCODE = '42501', DETAIL = 'a booking with yourself can only be canceled';
+    END IF;
     IF NOT v_mentor
        AND (NEW.session_duration_minutes IS DISTINCT FROM OLD.session_duration_minutes
             OR NEW.country IS DISTINCT FROM OLD.country) THEN
