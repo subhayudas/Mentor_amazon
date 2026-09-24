@@ -224,6 +224,9 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
   const [uploading, setUploading] = React.useState(false);
   const [photoError, setPhotoError] = React.useState<string | null>(null);
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  // The form as it was submitted: a finished save only adopts the saved row (e.g. the
+  // normalised Cal link) when nothing was edited meanwhile, so no typing is lost.
+  const submitted = React.useRef<MentorForm | null>(null);
 
   const onPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -296,7 +299,7 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
     },
     onSuccess: async (row) => {
       setSaveError(null);
-      setForm(mentorForm(row));
+      setForm((current) => (current === submitted.current ? mentorForm(row) : current));
       await invalidate();
       logActivity({ actor_type: "mentor", actor_id: mentor.id, actor_name: row.name, type: "profile_updated", subject_type: "mentor", subject_id: mentor.id, summary: t("showcase.activity.summaries.profileUpdated", { name: row.name }) });
       flash();
@@ -308,7 +311,9 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
     e.preventDefault();
     setSaveError(null);
     const patch = validate();
-    if (patch) save.mutate(patch);
+    if (!patch) return;
+    submitted.current = form;
+    save.mutate(patch);
   };
 
   const invalid = (key: keyof MentorForm) => (errors[key] ? { "aria-invalid": true, "aria-describedby": `${ids}-${key}-error` } : {});
@@ -365,13 +370,13 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
         </Field>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field id={`${ids}-expertise`} title={t("mentorOnboarding.expertise")} hint={t("showcase.profileSettings.commaHint")}>
-            <input id={`${ids}-expertise`} className={input} value={form.expertise} onChange={(e) => setForm({ ...form, expertise: e.target.value })} aria-describedby={`${ids}-expertise-hint`} />
+            <input id={`${ids}-expertise`} className={input} value={form.expertise} onChange={(e) => setForm({ ...form, expertise: e.target.value })} dir="auto" aria-describedby={`${ids}-expertise-hint`} />
           </Field>
           <Field id={`${ids}-industries`} title={t("mentorOnboarding.industriesExperience")} hint={t("showcase.profileSettings.commaHint")}>
-            <input id={`${ids}-industries`} className={input} value={form.industries} onChange={(e) => setForm({ ...form, industries: e.target.value })} aria-describedby={`${ids}-industries-hint`} />
+            <input id={`${ids}-industries`} className={input} value={form.industries} onChange={(e) => setForm({ ...form, industries: e.target.value })} dir="auto" aria-describedby={`${ids}-industries-hint`} />
           </Field>
           <Field id={`${ids}-languages`} title={t("mentorOnboarding.languagesSpoken")} hint={t("showcase.profileSettings.commaHint")}>
-            <input id={`${ids}-languages`} className={input} value={form.languages} onChange={(e) => setForm({ ...form, languages: e.target.value })} aria-describedby={`${ids}-languages-hint`} />
+            <input id={`${ids}-languages`} className={input} value={form.languages} onChange={(e) => setForm({ ...form, languages: e.target.value })} dir="auto" aria-describedby={`${ids}-languages-hint`} />
           </Field>
           <Field id={`${ids}-country`} title={t("mentorOnboarding.country")}>
             <input id={`${ids}-country`} className={input} value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} dir="auto" />
@@ -419,6 +424,7 @@ function MenteeProfileForm({ mentee }: { mentee: Mentee }) {
   const [form, setForm] = React.useState<MenteeForm>(() => menteeForm(mentee));
   const [nameError, setNameError] = React.useState<string | null>(null);
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const submitted = React.useRef<MenteeForm | null>(null);
 
   const save = useMutation({
     mutationFn: async (patch: Partial<Mentee>) => {
@@ -435,7 +441,7 @@ function MenteeProfileForm({ mentee }: { mentee: Mentee }) {
     },
     onSuccess: async (row) => {
       setSaveError(null);
-      setForm(menteeForm(row));
+      setForm((current) => (current === submitted.current ? menteeForm(row) : current));
       await invalidate();
       logActivity({ actor_type: "mentee", actor_id: mentee.id, actor_name: row.name, type: "profile_updated", subject_type: "mentee", subject_id: mentee.id, summary: t("showcase.activity.summaries.profileUpdated", { name: row.name }) });
       flash();
@@ -451,6 +457,7 @@ function MenteeProfileForm({ mentee }: { mentee: Mentee }) {
       return;
     }
     setNameError(null);
+    submitted.current = form;
     // Never verification_status, never user_type: those belong to the registration and the programme team.
     save.mutate({
       name: form.name.trim(),

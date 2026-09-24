@@ -10,6 +10,8 @@ import {
   toAuthFlowError,
   type AuthErrorKind,
 } from '../client/src/lib/authErrors.ts';
+import { asAuthFlowError, parseAuthRedirect } from '../client/src/lib/authFlow.ts';
+import { authConfirmUrl, confirmDestination, sameOriginPath } from '../client/src/lib/routes.ts';
 
 function lookup(dict: unknown, key: string): unknown {
   return key.split('.').reduce<unknown>((node, part) => (node && typeof node === 'object' ? (node as Record<string, unknown>)[part] : undefined), dict);
@@ -157,5 +159,77 @@ describe('cooldownRemaining', () => {
   });
   it('is zero before anything was sent', () => {
     expect(cooldownRemaining(null, 5)).toBe(0);
+  });
+});
+
+
+describe('parseAuthRedirect (read before supabase-js strips the fragment)', () => {
+  it('reads a recovery session fragment without keeping any token', () => {
+    const parsed = parseAuthRedirect('#access_token=secret&refresh_token=secret2&expires_in=3600&token_type=bearer&type=recovery', '');
+    expect(parsed).toEqual({ type: 'recovery', error: null, errorCode: null, errorDescription: null, hasSession: true });
+    expect(JSON.stringify(parsed)).not.toContain('secret');
+  });
+  it('reads GoTrue errors from the fragment', () => {
+    expect(parseAuthRedirect('#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired', '')).toEqual({
+      type: null,
+      error: 'access_denied',
+      errorCode: 'otp_expired',
+      errorDescription: 'Email link is invalid or has expired',
+      hasSession: false,
+    });
+  });
+  it('falls back to the query for PKCE-style errors', () => {
+    expect(parseAuthRedirect('', '?error=access_denied&error_code=otp_expired&error_description=x').errorCode).toBe('otp_expired');
+  });
+  it("ignores the app's own ?error=sso_* (no GoTrue error code)", () => {
+    expect(parseAuthRedirect('', '?error=sso_state&reason=expired')).toEqual({ type: null, error: null, errorCode: null, errorDescription: null, hasSession: false });
+  });
+  it('reads the SSO bridge fragment as a magic link without a session', () => {
+    const parsed = parseAuthRedirect('#token_hash=abc&type=magiclink&bind=xyz&next=%2F', '');
+    expect(parsed.type).toBe('magiclink');
+    expect(parsed.hasSession).toBe(false);
+  });
+  it('handles empty input', () => {
+    expect(parseAuthRedirect('', '')).toEqual({ type: null, error: null, errorCode: null, errorDescription: null, hasSession: false });
+  });
+});
+
+describe('asAuthFlowError (the always-loaded wrapper) and toAuthFlowError', () => {
+  it('keeps GoTrue codes, never interprets messages itself', () => {
+    expect(asAuthFlowError({ code: 'weak_password', status: 422, message: 'Password should be…' }).code).toBe('weak_password');
+    expect(asAuthFlowError({ status: 400, message: 'Invalid login credentials' }).code).toBe('unknown');
+    expect(asAuthFlowError({ name: 'AuthRetryableFetchError', status: 0 }).code).toBe('network');
+  });
+  it('toAuthFlowError derives the code from the message only when GoTrue sent none', () => {
+    const wrapped = asAuthFlowError({ status: 400, message: 'Invalid login credentials' });
+    expect(toAuthFlowError(wrapped).code).toBe('invalid_credentials');
+    expect(toAuthFlowError(wrapped).status).toBe(400);
+    expect(toAuthFlowError(asAuthFlowError({ status: 500 })).code).toBe('unknown');
+  });
+});
+
+describe('sameOriginPath / authConfirmUrl / confirmDestination', () => {
+  it('only accepts same-origin paths', () => {
+    expect(sameOriginPath('/mentee-dashboard/bookings')).toBe('/mentee-dashboard/bookings');
+    expect(sameOriginPath('/x#frag')).toBe('/x');
+    expect(sameOriginPath('//evil.example')).toBe('/');
+    expect(sameOriginPath('/\\evil.example')).toBe('/');
+    expect(sameOriginPath('https://evil.example')).toBe('/');
+    expect(sameOriginPath(null, '')).toBe('');
+  });
+  it('builds the confirmation redirect with an encoded, safe next', () => {
+    expect(authConfirmUrl('http://localhost:5173/', '/mentee-dashboard/bookings')).toBe('http://localhost:5173/auth/confirm?next=%2Fmentee-dashboard%2Fbookings');
+    expect(authConfirmUrl('https://mentor-amazon.vercel.app', '//evil.example')).toBe('https://mentor-amazon.vercel.app/auth/confirm?next=%2F');
+    expect(authConfirmUrl('https://mentor-amazon.vercel.app')).toBe('https://mentor-amazon.vercel.app/auth/confirm?next=%2F');
+  });
+  it('routes after confirmation: next, else registration, else dashboard', () => {
+    expect(confirmDestination({ role: 'mentee', hasProfile: false, next: '/mentee-dashboard/bookings' })).toBe('/mentee-dashboard/bookings');
+    expect(confirmDestination({ role: 'mentee', hasProfile: false, next: '/' })).toBe('/mentee-registration');
+    expect(confirmDestination({ role: 'mentee', hasProfile: true, next: null })).toBe('/mentee-dashboard');
+    expect(confirmDestination({ role: 'mentee', hasProfile: false, next: 'https://evil.example' })).toBe('/mentee-registration');
+    expect(confirmDestination({ role: 'mentee', hasProfile: true, next: '/auth/confirm?next=%2F' })).toBe('/mentee-dashboard');
+    expect(confirmDestination({ role: 'mentor', hasProfile: false })).toBe('/mentor-onboarding');
+    expect(confirmDestination({ role: 'mentor', hasProfile: true })).toBe('/mentor-portal');
+    expect(confirmDestination({ role: 'admin', hasProfile: false })).toBe('/admin');
   });
 });

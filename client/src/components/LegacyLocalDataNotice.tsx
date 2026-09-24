@@ -28,6 +28,8 @@ export function LegacyLocalDataNotice() {
   return <LegacyLocalDataNoticeInner />;
 }
 
+export default LegacyLocalDataNotice;
+
 function LegacyLocalDataNoticeInner() {
   const { t, i18n } = useTranslation();
   const [data, setData] = React.useState(() => detectLegacyLocalData(browserStorage()));
@@ -69,15 +71,16 @@ function LegacyLocalDataNoticeInner() {
       <div className="container-page py-3">
         <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
           <History className="mt-0.5 size-4 shrink-0 text-warning-icon" aria-hidden="true" />
-          <div className="min-w-0 flex-1" role="status">
+          <div className="min-w-0 flex-1 basis-[calc(100%-2rem)] md:basis-0" role="status">
             <p id={`${listId}-title`} className="text-body-sm font-semibold">
               {t("legacyData.title")}
             </p>
-            <p className="text-body-sm text-pretty" data-testid="text-legacy-count" data-count={data.total}>
-              {t("legacyData.body", { count: data.total })}
+            <p className="text-body-sm text-pretty">{t("legacyData.body")}</p>
+            <p className="text-caption font-semibold" data-testid="text-legacy-count" data-count={data.total}>
+              {t("legacyData.count", { count: data.total })}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 ps-8 md:ps-0">
             <Button
               type="button"
               variant="outline"

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Switch, Route, Redirect, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { DirectionProvider } from "@radix-ui/react-direction";
@@ -16,7 +16,6 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { ContentGuard } from "@/components/ContentGuard";
 import { SkipLink } from "@/components/SkipLink";
 import { BackendStatusBanner } from "@/components/BackendStatusBanner";
-import { LegacyLocalDataNotice } from "@/components/LegacyLocalDataNotice";
 import { RequireAuth, RequireRole } from "@/components/RouteGuard";
 import { useDirection } from "@/hooks/useDirection";
 import { pageTitleKey } from "@/lib/routes";
@@ -53,6 +52,25 @@ const SsoCallback = lazy(() => import("@/pages/SsoCallback"));
 const RequestAccess = lazy(() => import("@/pages/RequestAccess"));
 const Legal = lazy(() => import("@/pages/Legal"));
 const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
+// Only loaded when this browser still holds preview-period data (see hasPreviewPeriodData).
+const LegacyLocalDataNotice = lazy(() => import("@/components/LegacyLocalDataNotice"));
+
+/**
+ * Cheap boot-time probe (F19): does this browser still hold data from the
+ * preview period, when production ran in local mode? Database mode only; the
+ * notice itself (and its parser) is fetched only when the answer is yes.
+ */
+function hasPreviewPeriodData(): boolean {
+  if (IS_LOCAL) return false;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      if (localStorage.key(i)?.startsWith("mentorconnect.local.")) return true;
+    }
+  } catch {
+    // storage blocked: nothing to show
+  }
+  return false;
+}
 
 /** Shown while a lazy page chunk downloads. Announced once; the bars are decorative. */
 function PageSkeleton() {
@@ -306,6 +324,7 @@ function Router() {
 /** Everything that needs the active direction: Radix DirectionProvider, header, main, toaster. */
 function Shell() {
   const { dir } = useDirection();
+  const [previewData] = useState(hasPreviewPeriodData);
   return (
     <DirectionProvider dir={dir}>
       <SkipLink />
@@ -314,7 +333,11 @@ function Shell() {
       <div className="flex min-h-screen flex-col bg-background">
         <Navigation />
         <BackendStatusBanner />
-        <LegacyLocalDataNotice />
+        {previewData && (
+          <Suspense fallback={null}>
+            <LegacyLocalDataNotice />
+          </Suspense>
+        )}
         <main id="main" tabIndex={-1} className="flex-1 scroll-mt-14 lg:scroll-mt-[72px]">
           <Router />
         </main>

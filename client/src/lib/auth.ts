@@ -8,7 +8,7 @@ import type { AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { db } from './database';
 import type { User as DbUser } from './database';
-import { AuthFlowError, toAuthFlowError } from './authErrors';
+import { AuthFlowError, asAuthFlowError } from './authFlow';
 import { authConfirmUrl } from './routes';
 
 export type UserRole = 'mentor' | 'mentee' | 'admin';
@@ -127,7 +127,7 @@ class AuthService {
       if (result.error) throw result.error;
       authData = result.data;
     } catch (error) {
-      throw toAuthFlowError(error);
+      throw asAuthFlowError(error);
     }
 
     if (!authData.user) {
@@ -163,7 +163,7 @@ class AuthService {
       });
       if (error) throw error;
     } catch (error) {
-      throw toAuthFlowError(error);
+      throw asAuthFlowError(error);
     }
   }
 
@@ -182,7 +182,7 @@ class AuthService {
       if (result.error) throw result.error;
       authData = result.data;
     } catch (error) {
-      throw toAuthFlowError(error);
+      throw asAuthFlowError(error);
     }
 
     if (!authData.user) {
@@ -311,7 +311,7 @@ class AuthService {
       });
       if (error) throw error;
     } catch (error) {
-      throw toAuthFlowError(error);
+      throw asAuthFlowError(error);
     }
   }
 
@@ -321,7 +321,7 @@ class AuthService {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
     } catch (error) {
-      throw toAuthFlowError(error);
+      throw asAuthFlowError(error);
     }
   }
 

@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthCard, AuthPage, IconInput, passwordStrength, STRENGTH_CLASS, inlineLinkClass } from "@/components/auth/AuthCard";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { cn } from "@/lib/utils";
+import { bidi } from "@/lib/format";
 
 /**
  * Mentee sign-up (Amazon staff use SSO). After success: `?next` wins; a
@@ -39,6 +40,7 @@ export default function Signup() {
   const searchString = useSearch();
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmEmailFor, setConfirmEmailFor] = useState<string | null>(null);
+  const [confirmSentAt, setConfirmSentAt] = useState<number | null>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const needsCaptcha = turnstileEnabled();
@@ -95,6 +97,7 @@ export default function Signup() {
       queryClient.clear();
       if (!hasSession) {
         setConfirmEmailFor(user.email);
+        setConfirmSentAt(Date.now());
         return;
       }
       // The legacy `user` mirror only ever describes a real session (F50).
@@ -126,7 +129,7 @@ export default function Signup() {
           tone="success"
           icon={MailCheck}
           title={t("auth.confirmEmailTitle")}
-          description={t("auth.confirm.checkEmailBody", { email: confirmEmailFor })}
+          description={t("auth.confirm.checkEmailBody", { email: bidi(confirmEmailFor) })}
           data-testid="card-confirm-email"
           actions={
             <Button asChild variant="ghost">
@@ -135,7 +138,7 @@ export default function Signup() {
           }
         >
           <p className="text-body-sm text-muted-foreground">{t("auth.resend.prompt")}</p>
-          <ResendConfirmation email={confirmEmailFor} next={nextPath || null} className="mt-3" />
+          <ResendConfirmation email={confirmEmailFor} next={nextPath || null} sentAt={confirmSentAt} className="mt-3" />
         </StatusCard>
       </StatusPage>
     );

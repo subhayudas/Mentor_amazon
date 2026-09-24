@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { ENV_FORCES_LOCAL } from '@/lib/demo';
-import { parseAuthRedirect, type InitialAuthHash } from '@/lib/authErrors';
+import { parseAuthRedirect, type InitialAuthHash } from '@/lib/authFlow';
 
 /**
  * Thrown at startup when a required Supabase environment variable is absent.

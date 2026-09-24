@@ -58,12 +58,12 @@ export function BackendStatusBanner() {
     <div role="alert" className="border-b border-warning-border bg-warning text-warning-foreground" data-testid="banner-backend-degraded">
       <div className="container-page flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5">
         <CloudOff className="size-4 shrink-0 text-warning-icon" aria-hidden="true" />
-        <p className="min-w-0 flex-1 text-body-sm text-pretty">{t("backend.degraded.body")}</p>
+        <p className="min-w-0 flex-1 basis-[calc(100%-2rem)] text-body-sm text-pretty md:basis-0">{t("backend.degraded.body")}</p>
         <Button
           type="button"
           variant="outline"
           size="sm"
-          className="h-11 md:h-9"
+          className="ms-8 h-11 md:ms-0 md:h-9"
           onClick={() => void retry()}
           loading={retrying}
           data-testid="button-backend-retry"

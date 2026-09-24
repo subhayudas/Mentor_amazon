@@ -1,11 +1,14 @@
 /**
  * Supabase Auth failures mapped to what the person should do next (design
  * C11, fixes F33/F31). Pure: no Supabase import, so node vitest proves the
- * table. `lib/auth.ts` wraps every GoTrue error in `AuthFlowError` with the
- * error `code` (GoTrue's machine code, or one derived from the message on
- * older servers) and HTTP `status`; pages call `mapAuthError` and render
- * `authErrorKey(kind)`.
+ * table. `lib/auth.ts` throws `AuthFlowError` (lib/authFlow, always loaded)
+ * with GoTrue's machine `code` and HTTP `status`; the auth pages load this
+ * module, derive a code from the message for servers that send none
+ * (`toAuthFlowError`), then render `authErrorKey(mapAuthError(...))`.
  */
+import { AuthFlowError, asAuthFlowError } from "@/lib/authFlow";
+
+export { AuthFlowError } from "@/lib/authFlow";
 
 export type AuthErrorKind =
   | "invalid_credentials"
@@ -24,18 +27,6 @@ export type AuthErrorKind =
 
 /** Which auth call failed; a 5xx on a call that sends an email is almost always the mailer. */
 export type AuthFlow = "signup" | "login" | "recover" | "resend" | "update" | "verify";
-
-/** A GoTrue failure normalised to `{ code, status }`. Thrown by every function in `lib/auth.ts`. */
-export class AuthFlowError extends Error {
-  readonly code: string;
-  readonly status: number | null;
-  constructor(code: string, status: number | null = null, message?: string) {
-    super(message ?? code);
-    this.name = "AuthFlowError";
-    this.code = code;
-    this.status = status;
-  }
-}
 
 const EMAIL_FLOWS: ReadonlySet<AuthFlow> = new Set<AuthFlow>(["signup", "recover", "resend"]);
 
@@ -62,17 +53,16 @@ export function codeFromMessage(message: string | null | undefined): string | nu
   return null;
 }
 
-/** Normalise anything thrown by supabase-js (AuthApiError, AuthRetryableFetchError, TypeError) into an AuthFlowError. */
+/**
+ * Normalise anything thrown by supabase-js (or already wrapped by lib/auth)
+ * into an AuthFlowError whose code is known whenever GoTrue said enough:
+ * servers that send no `code` get one derived from the message.
+ */
 export function toAuthFlowError(err: unknown): AuthFlowError {
-  if (err instanceof AuthFlowError) return err;
-  const e = (err ?? {}) as { code?: unknown; status?: unknown; message?: unknown; name?: unknown };
-  const message = typeof e.message === "string" ? e.message : "";
-  const status = typeof e.status === "number" ? e.status : null;
-  const name = typeof e.name === "string" ? e.name : "";
-  let code = typeof e.code === "string" && e.code ? e.code : codeFromMessage(message);
-  // supabase-js reports fetch failures as AuthRetryableFetchError with status 0 (or a bare TypeError).
-  if (!code && (name === "AuthRetryableFetchError" || status === 0 || err instanceof TypeError)) code = "network";
-  return new AuthFlowError(code ?? "unknown", status, message || undefined);
+  const base = asAuthFlowError(err);
+  if (base.code !== "unknown") return base;
+  const derived = codeFromMessage(base.message === "unknown" ? "" : base.message);
+  return derived ? new AuthFlowError(derived, base.status, base.message) : base;
 }
 
 /**
@@ -141,37 +131,4 @@ export const RESEND_COOLDOWN_SECONDS = 60;
 export function cooldownRemaining(sentAt: number | null, now: number, seconds: number = RESEND_COOLDOWN_SECONDS): number {
   if (sentAt === null) return 0;
   return Math.max(0, Math.ceil((sentAt + seconds * 1000 - now) / 1000));
-}
-
-/**
- * What a Supabase Auth redirect put in the URL (design C11). Only the flow
- * type and error fields are kept — never a token.
- * - `type`: `recovery` (password reset link), `signup` (email confirmation),
- *   `magiclink`, `invite`, `email_change`.
- * - `errorCode` / `errorDescription`: e.g. `otp_expired` for a used or expired link
- *   (GoTrue sends these in the fragment; PKCE-style errors arrive in the query).
- */
-export interface InitialAuthHash {
-  type: string | null;
-  error: string | null;
-  errorCode: string | null;
-  errorDescription: string | null;
-  /** The fragment carried a session (implicit flow). */
-  hasSession: boolean;
-}
-
-export function parseAuthRedirect(hash: string, search: string): InitialAuthHash {
-  const fragment = new URLSearchParams(hash.startsWith("#") ? hash.slice(1) : hash);
-  const query = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
-  const fragmentCode = fragment.get("error_code");
-  // The query is consulted only for GoTrue's own error triple, never for the app's `?error=sso_*`.
-  const fromQuery = !fragmentCode && !!query.get("error_code");
-  const source = fromQuery ? query : fragment;
-  return {
-    type: fragment.get("type"),
-    error: source.get("error"),
-    errorCode: fragmentCode ?? query.get("error_code"),
-    errorDescription: source.get("error_description"),
-    hasSession: fragment.has("access_token"),
-  };
 }

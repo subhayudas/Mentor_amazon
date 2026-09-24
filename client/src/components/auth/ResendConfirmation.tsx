@@ -8,6 +8,7 @@ import { IconInput } from "@/components/auth/AuthCard";
 import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
 import { auth } from "@/lib/auth";
 import { authErrorKey, cooldownRemaining, mapAuthError, toAuthFlowError } from "@/lib/authErrors";
+import { bidi } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -25,19 +26,25 @@ export function ResendConfirmation({
   next,
   className,
   autoFocusInput = false,
+  sentAt: initialSentAt = null,
 }: {
   /** The address to resend to; when omitted the component asks for it. */
   email?: string;
   next?: string | null;
   className?: string;
   autoFocusInput?: boolean;
+  /**
+   * When an email was just sent (the sign-up itself), the cooldown starts
+   * there: Supabase refuses another send within its window anyway.
+   */
+  sentAt?: number | null;
 }) {
   const { t } = useTranslation();
   const inputId = React.useId();
   const [typedEmail, setTypedEmail] = React.useState("");
   const [token, setToken] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
-  const [sentAt, setSentAt] = React.useState<number | null>(null);
+  const [sentAt, setSentAt] = React.useState<number | null>(initialSentAt);
   const [now, setNow] = React.useState(() => Date.now());
   const [message, setMessage] = React.useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const turnstileRef = React.useRef<TurnstileHandle>(null);
@@ -67,7 +74,7 @@ export function ResendConfirmation({
       await auth.resendSignup(email, { captchaToken: token, next });
       setSentAt(Date.now());
       setNow(Date.now());
-      setMessage({ tone: "ok", text: t("auth.resend.sent", { email }) });
+      setMessage({ tone: "ok", text: t("auth.resend.sent", { email: bidi(email) }) });
     } catch (error) {
       const flowError = toAuthFlowError(error);
       const kind = mapAuthError(flowError.code, flowError.status, "resend");
@@ -118,6 +125,7 @@ export function ResendConfirmation({
         aria-live="polite"
         className={cn("min-h-5 text-body-sm", message?.tone === "error" ? "text-destructive" : "text-muted-foreground")}
         data-testid="text-resend-status"
+        data-state={message?.tone ?? "idle"}
       >
         {message?.text ?? ""}
       </p>

@@ -420,7 +420,7 @@ export default function Analytics() {
             <Card title={t("showcase.analytics.topMentors")} className="mt-4">
               <ul className="mt-2 divide-y divide-[var(--sc-hairline)]" data-testid="analytics-top-mentors">
                 {topMentors.map((m) => (
-                  <Row key={m.key} label={m.name} sub={t("showcase.analytics.requestsCount", { count: m.value })} value={nf.format(m.value)} />
+                  <Row key={m.key} label={m.name} value={nf.format(m.value)} />
                 ))}
                 {topMentors.length === 0 && <li className="py-6 text-center text-[13px] text-[#6c6c84]">{t("showcase.analytics.empty")}</li>}
               </ul>
