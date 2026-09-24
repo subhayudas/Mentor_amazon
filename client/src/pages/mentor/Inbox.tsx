@@ -22,7 +22,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { RequestRail } from "@/components/RequestRail";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { toast } from "sonner";
-import type { Booking, Mentee, Mentor, MentorDashboardStats } from "@/lib/database";
+import { isBookingNotPendingError, type Booking, type Mentee, type Mentor, type MentorDashboardStats } from "@/lib/database";
 import { bidi, formatHours, formatNumber, formatRelativeDay, UNAVAILABLE } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
 import { queryClient } from "@/lib/queryClient";
@@ -119,8 +119,14 @@ export default function Inbox({ mentorId, mentor }: { mentorId: string; mentor: 
         description: outcome === "accepted" ? t("dashboardV2.inbox.acceptedToastBody") : t("dashboardV2.inbox.declinedToastBody"),
       });
     },
-    onError: () => {
+    onError: (error) => {
       setInFlightId(null);
+      if (isBookingNotPendingError(error)) {
+        // Answered in another tab or withdrawn by the mentee: say so and show the list as it is now.
+        invalidateAll();
+        toast.error(t("dashboardV2.inbox.decisionStale"));
+        return;
+      }
       toast.error(t("dashboardV2.inbox.decisionError"));
     },
   });

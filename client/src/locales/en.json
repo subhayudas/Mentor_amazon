@@ -1734,6 +1734,7 @@
       "declinedToast": "Request declined",
       "declinedToastBody": "The mentee has been notified.",
       "decisionError": "Unable to update the request. Check your connection and try again.",
+      "decisionStale": "This request is no longer waiting for your answer: it was already answered or withdrawn. Your inbox has been refreshed.",
       "requestedAt": "Requested {{when}}",
       "goalLabel": "What they want help with",
       "noGoal": "No goal was written.",
