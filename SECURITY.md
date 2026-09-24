@@ -42,8 +42,10 @@ on Vercel's CDN.
   `id_token` with the issuer's JWKS, reads `amazonAlias` (`sub`), and only
   then bridges into a Supabase session (`generateLink` magic-link token sent
   in the URL fragment, never in a query string or log).
-* **Open access for Amazon employees**: anyone who completes Federate
-  sign-in gets a session. On an alias's first sign-in the callback writes an
+* **Open access for Amazon employees**: Amazon restricts who can complete
+  Federate sign-in for this app with an internal group on their side (their
+  identity team's recommendation); anyone who gets through gets a session.
+  Federate's `error=access_denied` is shown as `sso_denied`. On an alias's first sign-in the callback writes an
   active `approved_users` row with role `mentor`; that row is what mentor
   onboarding and the `mentors` INSERT policy check. An admin revokes an alias
   by setting `is_active = false` (the callback then refuses it and sends it to

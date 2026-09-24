@@ -165,6 +165,7 @@
         "sso_state": "Your sign-in session expired or the link was already used. Please start again.",
         "sso_token": "Amazon accepted your login but we could not complete the exchange. Please try again.",
         "sso_failed": "We could not sign you in with Amazon. Please try again or contact the MentorConnect team.",
+        "sso_denied": "Your Amazon account does not have access to MentorConnect yet. If you are part of the mentoring programme, contact the programme team.",
         "generic": "Something went wrong during sign-in. Please try again.",
         "unavailableLocal": "Amazon sign-in is only available on the deployed site. Sign in with your registered email below."
       },

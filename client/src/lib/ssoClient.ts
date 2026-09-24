@@ -81,6 +81,7 @@ export const SSO_ERROR_KEYS: Record<string, string> = {
   sso_state: "auth.sso.errors.sso_state",
   sso_token: "auth.sso.errors.sso_token",
   sso_failed: "auth.sso.errors.sso_failed",
+  sso_denied: "auth.sso.errors.sso_denied",
 };
 
 export function ssoErrorKey(code: string | null | undefined): string | null {
