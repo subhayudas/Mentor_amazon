@@ -19,8 +19,10 @@ const STATUS: Record<RequestStatus, { tone: BadgeTone; card: StatusTone; icon: L
 /**
  * Landing page for an Amazon sign-in that was refused. The SSO callback
  * redirects here with `?alias=<alias>&status=rejected` when an admin has
- * deactivated the alias; no session exists at this point,
- * so the page is anonymous by design. The card heading takes focus on mount.
+ * deactivated the alias; no session exists at this point, so the page is
+ * anonymous by design. Access is open to every Amazon employee (C12, F49):
+ * without a refusal the page says to sign in with Amazon again and promises
+ * no review. The card heading takes focus on mount.
  */
 export default function RequestAccess() {
   const { t } = useTranslation();
@@ -71,10 +73,13 @@ export default function RequestAccess() {
                 <p className="font-mono font-medium text-foreground" dir="ltr" data-testid="text-request-alias">
                   <bdi>{alias}</bdi>
                 </p>
-                <Badge tone={tone} data-testid="badge-request-status">
-                  {status === "pending" ? <Clock aria-hidden="true" /> : status === "approved" ? <CheckCircle2 aria-hidden="true" /> : <XCircle aria-hidden="true" />}
-                  {t(`access.status.${status}`)}
-                </Badge>
+                {/* No review queue exists any more, so there is no "pending review" state to show. */}
+                {status !== "pending" && (
+                  <Badge tone={tone} data-testid="badge-request-status">
+                    {status === "approved" ? <CheckCircle2 aria-hidden="true" /> : <XCircle aria-hidden="true" />}
+                    {t(`access.status.${status}`)}
+                  </Badge>
+                )}
               </div>
             </div>
           )}

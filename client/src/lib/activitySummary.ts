@@ -32,8 +32,9 @@ export interface TriggerSummary {
 const text = (value: unknown): string | undefined => (typeof value === "string" && value.trim() !== "" ? value.trim() : undefined);
 
 /**
- * The summary key and interpolation params for a trigger event, or `null`
- * when the event did not come from the trigger (render `event.summary`).
+ * The summary key and interpolation params for a trigger event (or a
+ * reminder written by the cron, `meta.source = 'cron'`), or `null` for
+ * anything else (render `event.summary`).
  * `formatWhen` formats `meta.scheduled_at` (ISO) in the viewer's zone;
  * `fallbacks` name a party whose row no longer has a name.
  */
@@ -42,6 +43,9 @@ export function triggerSummary(
   options: { formatWhen: (iso: string) => string; fallbacks: { mentor: string; mentee: string } },
 ): TriggerSummary | null {
   const meta = event.meta && typeof event.meta === "object" ? (event.meta as Record<string, unknown>) : null;
+  if (meta?.source === "cron" && event.type === "reminder_sent" && (meta.kind === "1h" || meta.kind === "24h")) {
+    return { key: meta.kind === "1h" ? "reminder_sent_1h" : "reminder_sent_24h", params: { mentor: options.fallbacks.mentor, mentee: options.fallbacks.mentee } };
+  }
   if (!meta || meta.source !== "db_trigger" || !TRIGGER_TYPES.has(event.type)) return null;
 
   const mentor = text(meta.mentor_name) ?? options.fallbacks.mentor;
@@ -106,4 +110,6 @@ export const TRIGGER_SUMMARY_KEYS: readonly string[] = [
   "booking_time_requested_untimed",
   "booking_time_declined",
   "feedback_left",
+  "reminder_sent_1h",
+  "reminder_sent_24h",
 ];

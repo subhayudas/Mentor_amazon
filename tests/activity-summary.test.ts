@@ -83,6 +83,14 @@ describe('triggerSummary', () => {
     expect(result).toEqual({ key: 'request_sent', params: { mentor: 'a mentor', mentee: 'a mentee' } });
   });
 
+  it('localises reminders written by the cron (meta.source = cron) and nothing else from it', () => {
+    const cron = { source: 'cron', kind: '24h', channels: ['in_app'], booking_id: 'b1' };
+    expect(triggerSummary(event('reminder_sent', cron, 'system'), options)?.key).toBe('reminder_sent_24h');
+    expect(triggerSummary(event('reminder_sent', { ...cron, kind: '1h' }, 'system'), options)?.key).toBe('reminder_sent_1h');
+    expect(triggerSummary(event('reminder_sent', { ...cron, kind: 'weekly' }, 'system'), options)).toBeNull();
+    expect(triggerSummary(event('request_sent', cron, 'system'), options)).toBeNull();
+  });
+
   it('covers every trigger type', () => {
     for (const type of TRIGGER_TYPES) {
       const result = triggerSummary(event(type, { ...META, scheduled_at: '2026-10-01T09:00:00Z', duration_minutes: 30 }), options);

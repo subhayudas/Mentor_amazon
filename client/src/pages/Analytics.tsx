@@ -304,7 +304,7 @@ export default function Analytics() {
           <Segmented items={GRAINS} value={grain} onChange={setGrain} label={t("showcase.analytics.grain")} render={(g) => t(`showcase.analytics.grains.${g}`)} />
         </div>
 
-        <div className="mt-5 grid gap-4 md:grid-cols-3" data-testid="analytics-kpis">
+        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3" data-testid="analytics-kpis">
           {traffic ? (
             <Kpi icon={Eye} tone="bg-[#e3f0fb] text-[#1d5fa0]" label={t("showcase.analytics.kpi.views")} sub={t("showcase.analytics.kpi.viewsSub")} value={nf.format(traffic.views)} />
           ) : (
@@ -342,7 +342,7 @@ export default function Analytics() {
           <p className="mt-2 text-end text-[11px] text-[#9aa3ab]">{t("showcase.analytics.refreshed", { time: refreshed })}</p>
         </Card>
 
-        <div className={cn("mt-4 grid gap-4", traffic && "lg:grid-cols-2")}>
+        <div className={cn("mt-4 grid grid-cols-1 gap-4", traffic && "lg:grid-cols-2")}>
           {traffic && (
             <Card title={t("showcase.analytics.sources")}>
               <ul className="mt-2 divide-y divide-[var(--sc-hairline)]">
@@ -379,7 +379,7 @@ export default function Analytics() {
         </div>
 
         <Card title={t("showcase.analytics.location")} className="mt-4">
-          <div className="mt-2 grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+          <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1.2fr]">
             <div className="chart-container h-[240px]" aria-hidden="true">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -403,7 +403,7 @@ export default function Analytics() {
 
         {traffic ? (
           <Card title={t("showcase.analytics.devices")} className="mt-4">
-            <div className="mt-2 grid gap-6 lg:grid-cols-[1fr_1fr_1fr]">
+            <div className="mt-2 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_1fr_1fr]">
               <DemoDevices views={traffic.views} devices={traffic.devices} nf={nf} />
               <div>
                 <h3 className="text-[13px] font-semibold text-[#6c6c84]">{t("showcase.analytics.topMentors")}</h3>

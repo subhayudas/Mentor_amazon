@@ -119,7 +119,7 @@ function LocalDashboardAdmin() {
         }
       />
       <div className="px-4 py-6 sm:px-8 lg:px-12">
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           {[
             { label: t("showcase.admin.kpi.mentors"), value: `${nf.format(mentors.filter((m) => m.is_available).length)} / ${nf.format(mentors.length)}` },
             { label: t("showcase.admin.kpi.mentees"), value: nf.format(mentees.length) },

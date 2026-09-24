@@ -314,14 +314,14 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
   const invalid = (key: keyof MentorForm) => (errors[key] ? { "aria-invalid": true, "aria-describedby": `${ids}-${key}-error` } : {});
 
   return (
-    <div className="grid max-w-[760px] gap-10">
-      <form onSubmit={submit} className="grid gap-5" noValidate data-testid="form-mentor-profile">
+    <div className="grid max-w-[760px] grid-cols-1 gap-10">
+      <form onSubmit={submit} className="grid grid-cols-1 gap-5" noValidate data-testid="form-mentor-profile">
         {saveError && (
           <p role="alert" className="rounded-[8px] border border-destructive/30 bg-destructive-soft px-4 py-3 text-[14px] font-medium text-destructive" data-testid="profile-save-error">
             {saveError}
           </p>
         )}
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field id={`${ids}-name`} title={t("mentorOnboarding.fullName")} error={errors.name}>
             <input id={`${ids}-name`} className={input} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} dir="auto" autoComplete="name" {...invalid("name")} data-testid="input-profile-name" />
           </Field>
@@ -363,7 +363,7 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
         <Field id={`${ids}-bio`} title={t("mentorOnboarding.bio")} error={errors.bio}>
           <textarea id={`${ids}-bio`} rows={5} className={area} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} dir="auto" {...invalid("bio")} data-testid="input-profile-bio" />
         </Field>
-        <div className="grid gap-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field id={`${ids}-expertise`} title={t("mentorOnboarding.expertise")} hint={t("showcase.profileSettings.commaHint")}>
             <input id={`${ids}-expertise`} className={input} value={form.expertise} onChange={(e) => setForm({ ...form, expertise: e.target.value })} aria-describedby={`${ids}-expertise-hint`} />
           </Field>
@@ -463,13 +463,13 @@ function MenteeProfileForm({ mentee }: { mentee: Mentee }) {
   };
 
   return (
-    <form onSubmit={submit} className="grid max-w-[760px] gap-5" noValidate data-testid="form-mentee-profile">
+    <form onSubmit={submit} className="grid max-w-[760px] grid-cols-1 gap-5" noValidate data-testid="form-mentee-profile">
       {saveError && (
         <p role="alert" className="rounded-[8px] border border-destructive/30 bg-destructive-soft px-4 py-3 text-[14px] font-medium text-destructive" data-testid="profile-save-error">
           {saveError}
         </p>
       )}
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <Field id={`${ids}-ename`} title={t("mentorOnboarding.fullName")} error={nameError}>
           <input
             id={`${ids}-ename`}

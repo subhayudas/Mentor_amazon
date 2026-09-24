@@ -45,7 +45,7 @@ const CAL_AVAILABILITY_URL = "https://app.cal.com/availability";
 
 function Row({ icon: Icon, title, sub, children }: { icon: typeof MapPin; title: string; sub: string; children?: React.ReactNode }) {
   return (
-    <div className="grid gap-4 border-b border-[var(--sc-hairline)] py-6 md:grid-cols-[minmax(0,1fr)_270px] md:items-center">
+    <div className="grid grid-cols-1 gap-4 border-b border-[var(--sc-hairline)] py-6 md:grid-cols-[minmax(0,1fr)_270px] md:items-center">
       <div className="flex gap-4">
         <Icon className="mt-0.5 size-5 shrink-0 text-[var(--sc-ink)]" strokeWidth={1.5} aria-hidden="true" />
         <div>
@@ -266,7 +266,7 @@ function DatabaseCalendar() {
                 const day = DAY_INDEX[d];
                 const dayWindows = (windows ?? []).filter((w) => w.day === day).sort((a, b) => a.from.localeCompare(b.from));
                 return (
-                  <li key={d} className="grid items-start gap-3 px-4 py-3 sm:grid-cols-[120px_1fr_auto]" data-testid={`office-day-${d}`}>
+                  <li key={d} className="grid grid-cols-1 items-start gap-3 px-4 py-3 sm:grid-cols-[120px_1fr_auto]" data-testid={`office-day-${d}`}>
                     <p className="pt-2 text-[15px] font-semibold text-[var(--sc-ink)]">{t(`showcase.calendar.days.${d}`)}</p>
                     <div className="space-y-2">
                       {dayWindows.length === 0 && <p className="pt-2 text-[13px] text-[#6c6c84]">{t("showcase.calendar.unavailable")}</p>}
@@ -476,7 +476,7 @@ function LocalCalendar() {
               {DAYS.map((d) => {
                 const row = days[d];
                 return (
-                  <li key={d} className="grid items-center gap-3 px-4 py-3 sm:grid-cols-[120px_1fr]">
+                  <li key={d} className="grid grid-cols-1 items-center gap-3 px-4 py-3 sm:grid-cols-[120px_1fr]">
                     <label className="inline-flex items-center gap-3 text-[15px] font-semibold text-[var(--sc-ink)]">
                       <input type="checkbox" checked={row.on} onChange={(e) => setDays({ ...days, [d]: { ...row, on: e.target.checked } })} className="size-4 accent-[var(--sc-ink)]" />
                       {t(`showcase.calendar.days.${d}`)}

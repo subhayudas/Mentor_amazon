@@ -18,7 +18,8 @@ import { dueReminders } from "@/lib/reminders";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { UPCOMING_STATUSES, useDashboardData, useOwnProfile, type DashboardBooking } from "@/pages/dashboard/data";
-import { CHECKLIST_KEYS, checklistDone, displayNameFor, firstNameOf, recordedMinutes, upcomingWithin, type ChecklistKey } from "@/pages/dashboard/dataSource";
+import { CHECKLIST_KEYS, checklistDone, firstNameOf, recordedMinutes, upcomingWithin, type ChecklistKey } from "@/pages/dashboard/dataSource";
+import { formatHours, formatRelativeDay, formatTime } from "@/lib/format";
 import { ActivityList } from "@/pages/dashboard/DashboardActivity";
 import { DashboardError, DashboardLoading, ProfileNeededCard } from "@/pages/dashboard/states";
 
@@ -65,8 +66,8 @@ function MentorHome() {
   const { events } = useActivity(signedIn ? profileId : null, { all: !signedIn, limit: 6 });
   const reminders = React.useMemo(() => (signedIn ? confirmedReminders(bookings) : []), [bookings, signedIn]);
 
-  // Greeting: the mentor row's name, else the account's (F41).
-  const displayName = IS_LOCAL ? identity.displayName : displayNameFor(own.mentor?.name ?? identity.displayName, identity.email);
+  // Greeting: the mentor row's name, else the account's, else the email's local part (F41).
+  const displayName = identity.displayName;
   const firstName = firstNameOf(displayName) || displayName;
 
   // "Share your link" is the one step only this browser can know about.
@@ -102,7 +103,7 @@ function MentorHome() {
   const completed = inPeriod.filter((b) => b.status === "completed");
   const upcoming = upcomingWithin(bookings, now, UPCOMING_DAYS);
   const recorded = recordedMinutes(completed);
-  const hours = Math.round((recorded.minutes / 60) * 10) / 10;
+  const hoursLabel = formatHours(recorded.minutes, lang);
   const nf = new Intl.NumberFormat(lang);
   const pending = bookings.filter((b) => b.status === "pending").length;
   const calendarLinked = IS_LOCAL ? null : isValidCalLink(own.mentor?.cal_link);
@@ -176,7 +177,7 @@ function MentorHome() {
             </h2>
             <p className="text-[13px] text-[#6c6c84]">{dateLabel}</p>
           </div>
-          <div className="mt-5 grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+          <div className="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6c6c84]">{t("showcase.dashboard.yourPage")}</p>
               <div className="mt-3 rounded-[10px] bg-[#f7f6f2] p-5">
@@ -202,7 +203,7 @@ function MentorHome() {
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6c6c84]">{t("showcase.dashboard.hoursThisMonth")}</p>
               <p className="mt-2 text-[24px] font-bold text-[var(--sc-ink)]" data-testid="text-hours">
-                {nf.format(hours)} h
+                {hoursLabel}
               </p>
               {recorded.missing > 0 && (
                 <p className="text-[12px] text-[#6c6c84]" data-testid="text-hours-missing">
@@ -226,7 +227,7 @@ function MentorHome() {
               </Link>
             </div>
           </div>
-          <div className="mt-5 grid gap-3 border-t border-[var(--sc-hairline)] pt-5 sm:grid-cols-3">
+          <div className="mt-5 grid grid-cols-1 gap-3 border-t border-[var(--sc-hairline)] pt-5 sm:grid-cols-3">
             {[
               { icon: Plus, label: t("showcase.dashboard.addSession"), href: DASHBOARD_ROUTES.calendar },
               ...(publicPath ? [{ icon: Share2, label: t("showcase.dashboard.shareProfile"), href: publicPath }] : []),
@@ -240,7 +241,7 @@ function MentorHome() {
           </div>
         </section>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.7fr_1fr]">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.7fr_1fr]">
           {/* Checklist: computed from the database in database mode; the share step is this browser's tick. */}
           <section className={cn(card, "overflow-hidden")} aria-labelledby="checklist-title" data-testid="checklist">
             <div className="flex items-start justify-between gap-4 p-6">
@@ -347,7 +348,7 @@ function MentorHome() {
             <Clock3 className="size-5" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold text-[var(--sc-ink)]">{t("showcase.dashboard.upcomingTitle", { count: upcoming.length })}</span>
+            <span className="block text-[15px] font-semibold text-[var(--sc-ink)]">{t("showcase.dashboard.upcomingCount", { count: upcoming.length })}</span>
             <span className="block text-[13px] text-[#6c6c84]">{t("showcase.dashboard.upcomingSub")}</span>
           </span>
           <span className="inline-flex h-10 items-center rounded-[8px] border border-[#d9d9d9] px-4 text-[14px] font-semibold text-[var(--sc-ink)]">{t("showcase.dashboard.seeDetails")}</span>
@@ -378,10 +379,10 @@ function MentorHome() {
           </div>
           {demo && <Badge tone="warning">{t("analyticsV2.demoBadge")}</Badge>}
         </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3" data-testid="period-stats">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3" data-testid="period-stats">
           {[
             { label: t("showcase.dashboard.stat.requests"), value: nf.format(inPeriod.length) },
-            { label: t("showcase.dashboard.stat.hours"), value: `${nf.format(hours)} h` },
+            { label: t("showcase.dashboard.stat.hours"), value: hoursLabel },
             { label: t("showcase.dashboard.stat.completed"), value: nf.format(completed.length) },
           ].map((s) => (
             <div key={s.label} className={stat}>
@@ -413,7 +414,7 @@ function MenteeHome() {
   const { events } = useActivity(profileId, { limit: 6 });
   const reminders = React.useMemo(() => confirmedReminders(bookings), [bookings]);
 
-  const displayName = IS_LOCAL ? identity.displayName : displayNameFor(me?.name ?? identity.displayName, identity.email);
+  const displayName = identity.displayName;
   const firstName = firstNameOf(displayName) || displayName;
   // Organisations are reviewed before they book; individuals need no verification (F17).
   const verification: VerificationStatus | null = me?.user_type === "organization" ? me.verification_status ?? "pending" : null;
@@ -476,7 +477,7 @@ function MenteeHome() {
             <p className="mt-1 text-[14px]">{t(`showcase.verification.${verification === "unverified" ? "pending" : verification}.body`)}</p>
           </section>
         )}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1.7fr_1fr]">
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.7fr_1fr]">
           <section className={cn(card, "p-6")} aria-labelledby="my-sessions">
             <div className="flex items-center justify-between gap-4">
               <h2 id="my-sessions" className="text-[20px] font-bold text-[var(--sc-ink)]">
@@ -497,8 +498,8 @@ function MenteeHome() {
             ) : (
               <ul className="mt-4 divide-y divide-[var(--sc-hairline)]" data-testid="mentee-sessions">
                 {active.map((b) => (
-                  <li key={b.id} className="flex flex-wrap items-center gap-4 py-4" data-testid={`mentee-session-${b.id}`}>
-                    <div className="min-w-0 flex-1">
+                  <li key={b.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4" data-testid={`mentee-session-${b.id}`}>
+                    <div className="min-w-0 flex-1 basis-full sm:basis-auto">
                       <p className="truncate text-[15px] font-semibold text-[var(--sc-ink)]">{t("showcase.bookings.with", { name: nameOf(b.mentor_id) })}</p>
                       <p className="truncate text-[13px] text-[#6c6c84]" dir="auto">
                         {b.goal || t("showcase.bookings.session")}
@@ -573,7 +574,7 @@ function MenteeHome() {
           </div>
           <ActivityList events={events} lang={lang} compact />
         </section>
-        <div className="mt-6 grid gap-4 sm:grid-cols-3" data-testid="mentee-stats">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3" data-testid="mentee-stats">
           {[
             { label: t("showcase.dashboard.stat.requests"), value: bookings.length },
             { label: t("showcase.dashboard.stat.upcoming"), value: upcomingCount },
@@ -590,11 +591,15 @@ function MenteeHome() {
   );
 }
 
-/** Confirmed sessions starting within 24 hours, for the signed-in person. */
+/** Confirmed sessions starting within 24 hours, for the signed-in person (times in the viewer's zone). */
 function RemindersBanner({ reminders, lang }: { reminders: ReturnType<typeof dueReminders>; lang: string }) {
   const { t } = useTranslation();
   const fmt = React.useMemo(() => new Intl.DateTimeFormat(lang, { weekday: "long", hour: "numeric", minute: "2-digit" }), [lang]);
   if (reminders.length === 0) return null;
+  const line = (r: ReturnType<typeof dueReminders>[number]) =>
+    r.kind === "1h"
+      ? t("showcase.reminders.inHour", { when: fmt.format(r.startsAt) })
+      : t("showcase.reminders.within24h", { day: formatRelativeDay(r.startsAt, lang), time: formatTime(r.startsAt, lang) });
   return (
     <section className="mt-6 rounded-[12px] border border-[#f5d98a] bg-[#fffaeb] p-4" aria-labelledby="reminders-title" data-testid="reminders-banner">
       <h2 id="reminders-title" className="inline-flex items-center gap-2 text-[15px] font-bold text-[#7a4b00]">
@@ -604,7 +609,7 @@ function RemindersBanner({ reminders, lang }: { reminders: ReturnType<typeof due
       <ul className="mt-2 space-y-1 text-[14px] text-[#7a4b00]">
         {reminders.map((r) => (
           <li key={r.booking.id} data-testid={`reminder-${r.booking.id}`}>
-            {t(r.kind === "1h" ? "showcase.reminders.inHour" : "showcase.reminders.tomorrow", { when: fmt.format(r.startsAt) })} — {r.booking.goal ?? t("showcase.bookings.session")}
+            {line(r)} — <span dir="auto">{r.booking.goal || t("showcase.bookings.session")}</span>
           </li>
         ))}
       </ul>

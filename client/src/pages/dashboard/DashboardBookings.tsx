@@ -30,7 +30,7 @@ import { bidi } from "@/lib/format";
 import { localStore } from "@/lib/localStore";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
-import { UPCOMING_STATUSES, useDashboardData, type DashboardBooking } from "@/pages/dashboard/data";
+import { UPCOMING_STATUSES, useDashboardData, useOwnProfile, type DashboardBooking } from "@/pages/dashboard/data";
 import { bookingsTabFor, rowActionsFor, type BookingsTab, type RowAction, type RowNote } from "@/pages/dashboard/dataSource";
 import { DashboardError, DashboardLoading, ProfileNeededCard } from "@/pages/dashboard/states";
 import { useDashboardBookingActions } from "@/pages/dashboard/useDashboardBookingActions";
@@ -87,6 +87,7 @@ export default function DashboardBookings() {
   const tabIds = React.useId();
 
   const actions = useDashboardBookingActions();
+  const own = useOwnProfile();
   const onCalBooked = useConfirmOnCalBooking(profileId ?? "");
 
   const when = React.useMemo(
@@ -273,7 +274,7 @@ export default function DashboardBookings() {
           <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--sc-peach)] text-[15px] font-bold text-[var(--sc-ink)]" aria-hidden="true">
             {name.slice(0, 1)}
           </span>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-[calc(100%-4rem)] md:basis-auto">
             <p className="truncate text-[15px] font-semibold text-[var(--sc-ink)]" dir="auto">
               {isMentee ? t("showcase.bookings.with", { name: bidi(name) }) : name}
             </p>
@@ -295,7 +296,7 @@ export default function DashboardBookings() {
           {rowActions.length > 0 && <span className="flex flex-wrap gap-2">{rowActions.map((a) => actionButton(a, b))}</span>}
         </div>
         {noteLine && (
-          <p className="mt-2 ps-16 text-[13px] text-[#6c6c84]" data-testid={`booking-note-${b.id}`}>
+          <p className="mt-2 text-[13px] text-[#6c6c84] md:ps-16" data-testid={`booking-note-${b.id}`}>
             {noteLine}
           </p>
         )}
@@ -313,7 +314,7 @@ export default function DashboardBookings() {
         <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--sc-peach)] text-[15px] font-bold text-[var(--sc-ink)]" aria-hidden="true">
           {name.slice(0, 1)}
         </span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-[calc(100%-4rem)] md:basis-auto">
           <p className="truncate text-[15px] font-semibold text-[var(--sc-ink)]">{isMentee ? t("showcase.bookings.with", { name }) : name}</p>
           <p className="truncate text-[13px] text-[#6c6c84]">
             {b.goal ?? t("showcase.bookings.session")}
@@ -496,7 +497,7 @@ export default function DashboardBookings() {
       <CompleteSessionDialog
         open={!!completing}
         onOpenChange={(open) => !open && setCompleting(null)}
-        defaultCountry={completing?.country ?? ""}
+        defaultCountry={completing?.country || own.mentor?.country || ""}
         pending={actions.complete.isPending}
         onConfirm={({ minutes, country }) => {
           if (!completing) return;

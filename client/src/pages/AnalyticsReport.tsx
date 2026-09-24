@@ -219,7 +219,7 @@ export default function AnalyticsReport() {
           </table>
         </section>
 
-        <div className="mt-10 grid gap-10 md:grid-cols-2 print:grid-cols-2">
+        <div className="mt-10 grid grid-cols-1 gap-10 md:grid-cols-2 print:grid-cols-2">
           <section aria-labelledby="r-mentors">
             <h2 id="r-mentors" className="text-[18px] font-bold text-[var(--sc-ink)]">
               {t("showcase.report.byMentor")}

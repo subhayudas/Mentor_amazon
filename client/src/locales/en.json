@@ -379,7 +379,11 @@
       "notApprovedTitle": "Your alias is not approved yet",
       "notApprovedBody": "{{alias}} is not on the approved mentor list yet. Request access and the programme team will review it; you can come back here once approved.",
       "checkFailedTitle": "We couldn't check your approval",
-      "checkFailedBody": "Unable to check your approval status. Refresh the page to try again."
+      "checkFailedBody": "Unable to check your approval status. Refresh the page to try again.",
+      "inactiveTitle": "Your Amazon access isn't active",
+      "inactiveBody": "Mentor access for {{alias}} isn't active. Contact the programme team.",
+      "linkedTitle": "Your mentor profile is already set up",
+      "linkedBody": "The programme team linked a mentor profile to your Amazon account. Sign in with Amazon again to open it; there is no need to create another one."
     },
     "eyebrow": "Mentor onboarding",
     "namePlaceholder": "Your full name",
@@ -784,11 +788,11 @@
       "approved": "Approved",
       "rejected": "Not approved"
     },
-    "recorded": "Your request has been recorded and the programme team will review it. You will be able to sign in once it is approved.",
+    "recorded": "Every Amazon employee can use MentorConnect: sign in with Amazon again and your mentor access is set up automatically.",
     "approvedBody": "Your access has been approved. Sign in with Amazon again to continue.",
     "rejectedBody": "This request was not approved. If you believe this is a mistake, contact the programme team.",
-    "noAliasBody": "To request access, sign in with Amazon. Your alias is recorded automatically and the programme team reviews it.",
-    "whatNext": "Approval usually happens within a few working days. There is nothing else you need to do right now.",
+    "noAliasBody": "Sign in with Amazon to use MentorConnect as a mentor. Your access is set up automatically the first time you sign in.",
+    "whatNext": "If Amazon sign-in still doesn't let you in, contact the programme team.",
     "backHome": "Back to home",
     "signInAgain": "Sign in with Amazon again"
   },
@@ -2433,7 +2437,13 @@
         "sessions": "Done once your first request arrives. Share your link to get one.",
         "calendar": "Add your Cal.com link so accepted mentees can pick a time.",
         "share": "Post your page on LinkedIn or in your team channel, then tick this off."
-      }
+      },
+      "upcomingCount_zero": "No upcoming sessions",
+      "upcomingCount_one": "{{count}} upcoming session",
+      "upcomingCount_two": "{{count}} upcoming sessions",
+      "upcomingCount_few": "{{count}} upcoming sessions",
+      "upcomingCount_many": "{{count}} upcoming sessions",
+      "upcomingCount_other": "{{count}} upcoming sessions"
     },
     "onboarding": {
       "stepsLabel": "Form sections",
@@ -2538,7 +2548,9 @@
         "booking_time_requested": "{{mentee}} picked {{when}} on Cal.com; waiting for {{mentor}} to confirm",
         "booking_time_requested_untimed": "{{mentee}} picked a time on Cal.com; waiting for {{mentor}} to confirm",
         "booking_time_declined": "{{mentor}} declined the proposed time; {{mentee}} can choose another",
-        "feedback_left": "{{mentee}} left feedback for {{mentor}}"
+        "feedback_left": "{{mentee}} left feedback for {{mentor}}",
+        "reminder_sent_1h": "1-hour reminder sent",
+        "reminder_sent_24h": "24-hour reminder sent"
       },
       "loadError": "We couldn't load the activity feed."
     },
@@ -2553,7 +2565,8 @@
       "none": "No sessions in the next 24 hours.",
       "tomorrow": "Session tomorrow at {{when}}",
       "inHour": "Session within the hour — {{when}}",
-      "bell": "Notifications ({{count}} due)"
+      "bell": "Notifications ({{count}} due)",
+      "within24h": "Session {{day}} at {{time}}"
     },
     "report": {
       "title": "Impact report",

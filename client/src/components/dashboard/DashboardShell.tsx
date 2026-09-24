@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { IS_LOCAL } from "@/lib/demo";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { useOwnProfile } from "@/pages/dashboard/data";
 import { displayNameFor, firstNameOf } from "@/pages/dashboard/dataSource";
 
 /** Which sidebar entry is lit. */
@@ -46,14 +47,16 @@ function SideLink({ icon: Icon, label, href, active, chevron, sub }: { icon?: Lu
 export const DEMO_IDENTITY_EMAIL = "demo@mentorconnect.local";
 
 /**
- * The signed-in identity the shell shows (F41, F43): the account's name, else
- * the local part of its email. With no account (local showcase only) a
- * neutral "Demo mentor".
+ * The signed-in identity the shell shows (F41, F43): the profile row's name,
+ * else the account's name, else the local part of its email. With no account
+ * (local showcase only) a neutral "Demo mentor".
  */
 export function useDashboardIdentity() {
   const { t } = useTranslation();
   const { user } = useAuth();
-  const displayName = user ? displayNameFor(user.name, user.email) : IS_LOCAL ? t("showcase.dashboard.demoName") : "";
+  const own = useOwnProfile();
+  const rowName = user?.user_type === "mentor" ? own.mentor?.name : user?.user_type === "mentee" ? own.mentee?.name : undefined;
+  const displayName = user ? displayNameFor(rowName || user.name, user.email) : IS_LOCAL ? t("showcase.dashboard.demoName") : "";
   const email = user?.email ?? (IS_LOCAL ? DEMO_IDENTITY_EMAIL : "");
   const firstName = firstNameOf(displayName) || displayName;
   const role: "mentor" | "mentee" | "admin" = user?.user_type === "mentee" ? "mentee" : user?.user_type === "admin" ? "admin" : "mentor";
