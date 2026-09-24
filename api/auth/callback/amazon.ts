@@ -70,6 +70,8 @@ import {
  * Outcomes (all 302, never a stack trace):
  *   missing/reused state         → /login?error=sso_state
  *   token endpoint rejected code → /login?error=sso_token
+ *   Federate refused the user    → /login?error=sso_denied (error=access_denied:
+ *                                  not in the Amazon group allowed on this profile)
  *   alias deactivated by an admin → /request-access?alias=<alias>&status=rejected
  *   any other Amazon employee    → /auth/sso#token_hash=...&type=magiclink&next=/path
  *                                  (first sign-in: approved_users row created as mentor)
@@ -170,7 +172,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (providerError) {
     // Attacker-controllable query value: keep only a short token-safe slug before it reaches logs/URLs.
-    fail('sso_failed', `provider_${providerError.replace(/[^a-z0-9_-]/gi, '_').slice(0, 40)}`);
+    const reason = `provider_${providerError.replace(/[^a-z0-9_-]/gi, '_').slice(0, 40)}`;
+    // Amazon restricts who may use this app with an internal group on the
+    // Federate profile; someone outside it comes back with access_denied.
+    // Retrying will not help them, so they get their own message.
+    fail(providerError === 'access_denied' ? 'sso_denied' : 'sso_failed', reason);
     return;
   }
   if (!code) {

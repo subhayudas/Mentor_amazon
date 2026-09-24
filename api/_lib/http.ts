@@ -61,7 +61,7 @@ export function safeReturnTo(value: string | undefined, fallback = '/'): string 
   return withoutFragment.length > 0 ? withoutFragment : fallback;
 }
 
-export type SsoErrorCode = 'sso_state' | 'sso_token' | 'sso_failed';
+export type SsoErrorCode = 'sso_state' | 'sso_token' | 'sso_failed' | 'sso_denied';
 
 /**
  * Build the login-page error URL. `reason` is a short machine code appended

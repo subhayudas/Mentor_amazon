@@ -68,9 +68,10 @@ Redirect outcomes from the callback (always 302, never a stack trace):
 | --- | --- |
 | cookie missing / state mismatch / cookie older than 10 min | `/login?error=sso_state` |
 | token endpoint rejected the code | `/login?error=sso_token` |
+| Federate refused the user (`error=access_denied`: not in the Amazon group allowed on the profile) | `/login?error=sso_denied` |
 | alias deactivated by an admin (`approved_users.is_active = false`) | `/request-access?alias=<alias>&status=rejected` |
 | any other Amazon employee | `/auth/sso#token_hash=…&type=magiclink&next=<returnTo>` |
-| anything else (discovery, ID-token, provider `error=`, DB) | `/login?error=sso_failed` |
+| anything else (discovery, ID-token, any other provider `error=`, DB) | `/login?error=sso_failed` |
 
 When `AMAZON_OIDC_DEBUG=true`, error redirects carry `&reason=<code>`
 (e.g. `token_invalid_grant`, `id_token_nonce`, `alias_conflict`, `alias_invalid`).
@@ -132,7 +133,7 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 | Name | Required | Value |
 | --- | --- | --- |
 | `AMAZON_OIDC_ISSUER` | yes | Issuer URL from Amazon's identity team (integ now, prod TBC). Discovery is fetched from `{issuer}/.well-known/openid-configuration`; the document's `issuer` must match exactly. |
-| `AMAZON_OIDC_CLIENT_ID` | yes | `mentor-amazon.vercel.app` (integ; prod TBC) |
+| `AMAZON_OIDC_CLIENT_ID` | yes | `mentor-amazon.vercel.app` (integ; Amazon expects the same for prod, to be confirmed) |
 | `AMAZON_OIDC_CLIENT_SECRET` | yes | From Amazon's identity team. Also seeds the cookie-signing key. |
 | `AMAZON_OIDC_REDIRECT_URI` | yes | `https://mentor-amazon.vercel.app/api/auth/callback/amazon` — exact match, no trailing slash |
 | `AMAZON_OIDC_SCOPES` | no | default `openid` (the only scope Federate advertises) |
@@ -143,26 +144,40 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 
 See the root `.env.example`. For `vercel dev` put them in a root `.env`.
 
-Preview deployments: Amazon only allows the registered redirect URI, so SSO
-can only be exercised on the production domain (or a preview domain that
-Amazon has also registered). Password login keeps working everywhere.
+Preview deployments and local dev: Amazon only allows the registered redirect
+URI, so SSO can only be exercised on the production domain. Amazon did **not**
+register `http://localhost:3000/api/auth/callback/amazon`, so a real Amazon
+sign-in cannot be done from a local machine; use `npm test` (mock Federate)
+instead. Password login keeps working everywhere.
 
 ---
 
-## What to send Amazon's identity team (Federate registration)
+## Federate registration (as configured by Amazon's identity team)
 
-Checklist — copy into the ticket:
+What Amazon set up on their side, per the onboarding thread (Jul–Aug 2026):
 
-1. **Application name:** MentorConnect (Amazon UAE mentorship programme).
-2. **Protocol:** OpenID Connect, authorization code flow with PKCE (S256), confidential client.
-3. **Redirect URI (exact match):** `https://mentor-amazon.vercel.app/api/auth/callback/amazon`
-4. **Client ID requested:** `mentor-amazon.vercel.app` (integ; production client id/issuer TBC).
-5. **Token endpoint auth:** `client_secret_basic` preferred; `client_secret_post` supported as fallback.
-6. **Scopes:** `openid`.
-7. **Claims needed in the ID token:** `sub`, `amazonAlias`, `email`, `name` (or `given_name` + `family_name`). Please configure **`sub = amazonAlias`** (the app also reads an explicit `amazonAlias` claim and prefers it when present).
-8. **Signing:** RS256 (or any asymmetric alg published in `jwks_uri`); HS256 is not accepted.
-9. **Post-logout redirect:** not required (no RP-initiated logout is used).
-10. **Ask back:** issuer URL, client secret (out-of-band), whether `userinfo_endpoint` is available, the Amazon group/POSIX group that gates access on their side, and the integ vs prod values of 1–4.
+| Item | Integ | Prod |
+| --- | --- | --- |
+| Discovery | `https://idp-integ.federate.amazon.com/.well-known/openid-configuration` | `https://idp.federate.amazon.com/.well-known/openid-configuration` |
+| Flow | Authorization code + PKCE (S256), confidential client (secret) | same |
+| Client ID | `mentor-amazon.vercel.app` | expected to be the same; Amazon to confirm |
+| Client secret | delivered out-of-band (encrypted zip) | to be issued |
+| Redirect URI | `https://mentor-amazon.vercel.app/api/auth/callback/amazon` (exact). Localhost was **not** added. | same path on the final production domain; to be sent to Amazon once confirmed |
+| Subject | `sub` = Amazon alias. No additional claims (no email or name); the app falls back to `<alias>@amazon.com`. | same |
+| Who may sign in | Restricted **on Amazon's side** by internal group. For integ testing only the identity team's own org is allowed; Amazon switches it to the programme's team/group when it is ready. | the programme's group |
+| Token endpoint auth | `client_secret_basic` and `client_secret_post` both accepted; a bad credential is answered `400 invalid_client` | same |
+
+Because Amazon decides who reaches the app, the app lets every Amazon
+sign-in in (see "Account rules"). Someone outside the allowed group is
+refused by Federate: if it sends them back with `error=access_denied` they get
+`/login?error=sso_denied` ("your Amazon account does not have access yet")
+instead of the generic retry message.
+
+Still open with Amazon: a test account (nobody on the build team has an
+Amazon login), the production client ID/secret, and the production domain.
+Amazon has asked for confirmation that the integration works "with the
+claims"; see "How to test on integ" step 4 — someone in the allowed group
+signs in once with `AMAZON_OIDC_DEBUG=true` and shares `/api/auth/debug-claims`.
 
 ---
 

@@ -400,11 +400,24 @@ describe('callback: state, code and token validation', () => {
     expect(db.issuedLinks).toHaveLength(1);
   });
 
-  it('surfaces an IdP error (e.g. user cancelled) as sso_failed', async () => {
+  it('tells someone outside the Amazon group allowed on the profile that they have no access', async () => {
     const { jar, back } = await startLogin();
     const url = `/api/auth/callback/amazon?error=access_denied&state=${back.searchParams.get('state')}`;
     const res = await invoke(callback, url, { jar });
-    expect(errorOf(res)).toMatchObject({ error: 'sso_failed', reason: 'provider_access_denied' });
+    expect(errorOf(res)).toMatchObject({ error: 'sso_denied', reason: 'provider_access_denied' });
+    expectNoSession();
+  });
+
+  it('surfaces any other IdP error as sso_failed', async () => {
+    const { jar, back } = await startLogin();
+    const url = `/api/auth/callback/amazon?error=server_error&state=${back.searchParams.get('state')}`;
+    const res = await invoke(callback, url, { jar });
+    expect(errorOf(res)).toMatchObject({ error: 'sso_failed', reason: 'provider_server_error' });
+  });
+
+  it('checks state before trusting an IdP error, so a forged access_denied does nothing', async () => {
+    const res = await invoke(callback, '/api/auth/callback/amazon?error=access_denied&state=forged');
+    expect(errorOf(res)).toMatchObject({ error: 'sso_state', reason: 'no_cookie' });
   });
 
   it('reports a rejected client secret as sso_token', async () => {
