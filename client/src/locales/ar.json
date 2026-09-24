@@ -870,7 +870,34 @@
       "mentorRating": "تقييم المرشد",
       "menteeFeedback": "ملاحظات المتدرب",
       "mentorFeedback": "ملاحظات المرشد",
-      "ratingOf": "{{value}}/5"
+      "ratingOf": "{{value}}/5",
+      "programmeFilter": "يديرها البرنامج",
+      "programmeBadge": "يديره البرنامج",
+      "programmeCallout_zero": "لا طلبات معلّقة للمرشدين الذين يديرهم البرنامج",
+      "programmeCallout_one": "طلب معلّق واحد لمرشد يديره البرنامج",
+      "programmeCallout_two": "طلبان معلّقان لمرشدين يديرهم البرنامج",
+      "programmeCallout_few": "{{count}} طلبات معلّقة لمرشدين يديرهم البرنامج",
+      "programmeCallout_many": "{{count}} طلبًا معلّقًا لمرشدين يديرهم البرنامج",
+      "programmeCallout_other": "{{count}} طلب معلّق لمرشدين يديرهم البرنامج",
+      "programmeCalloutBody": "يردّ فريق البرنامج على هذه الطلبات. اقبلها أو ارفضها، ثم راسل المتدرب عبر البريد الإلكتروني لتحديد موعد.",
+      "programmeShow": "عرض المعلّقة",
+      "programmeExplain": "يجيب فريق البرنامج عن الطلبات الموجهة إلى المرشدين الذين يديرهم البرنامج. بعد القبول، راسل المتدرب عبر البريد الإلكتروني لتحديد موعد.",
+      "menteeEmail": "بريد المتدرب",
+      "emailMentee": "مراسلة المتدرب",
+      "accept": "قبول",
+      "decline": "رفض",
+      "acceptA11y": "قبول طلب {{mentee}} إلى {{mentor}}",
+      "declineA11y": "رفض طلب {{mentee}} إلى {{mentor}}",
+      "acceptTitle": "هل تريد قبول هذا الطلب؟",
+      "acceptBody": "سيُبلَّغ {{mentee}} بقبول طلبه إلى {{mentor}}. بعد ذلك راسله على {{email}} لتحديد موعد.",
+      "acceptConfirm": "قبول الطلب",
+      "declineTitle": "هل تريد رفض هذا الطلب؟",
+      "declineBody": "سيُبلَّغ {{mentee}} برفض طلبه إلى {{mentor}}.",
+      "declineConfirm": "رفض الطلب",
+      "keepPending": "إبقاؤه معلّقًا",
+      "acceptedToast": "تم قبول الطلب. راسل المتدرب لتحديد موعد.",
+      "declinedToast": "تم رفض الطلب",
+      "decisionError": "تعذّر تحديث الطلب. تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
     },
     "access": {
       "pendingTitle": "الطلبات المعلقة",
@@ -1154,11 +1181,81 @@
     },
     "error": {
       "title": "تعذّر تحميل المرشدين",
-      "body": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
+      "body": "تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+      "fallback": "نعرض المرشدين المميزين في البرنامج في هذه الأثناء."
     },
     "empty": {
       "title": "لا مرشدين بعد",
       "body": "يظهر المرشدون هنا بعد أن يعتمدهم فريق البرنامج."
+    }
+  },
+  "calSync": {
+    "title": "مزامنة حجوزات Cal.com",
+    "intro": "اربط Cal.com لتُحدَّث هنا تلقائيًا الجلسات التي تُحجز أو تُنقل أو تُلغى هناك.",
+    "statusLabel": "حالة المزامنة",
+    "notConnected": "غير مربوط بعد",
+    "notConnectedHint": "لم يصل شيء من Cal.com بعد. اتبع الخطوات أدناه ثم أرسل اختبار Ping.",
+    "connected": "مربوط",
+    "needsAttention": "يحتاج إلى مراجعة",
+    "lastDelivery": "آخر إرسال: {{trigger}} · {{when}}",
+    "justNow": "الآن",
+    "loading": "جارٍ تحميل إعدادات المزامنة…",
+    "loadError": "تعذّر تحميل إعدادات المزامنة. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+    "unavailable": "المزامنة غير متاحة بعد. يستكمل فريق البرنامج الإعداد.",
+    "noCalLink": "أضف رابط Cal.com أولًا. تتابع المزامنة فقط الحدث الذي يشير إليه رابطك.",
+    "previewHost": "هذا موقع تجريبي لا يستطيع Cal.com الوصول إليه. انسخ الرابط من الموقع الرسمي بدلًا من ذلك.",
+    "urlLabel": "رابط المشترك (Subscriber URL)",
+    "secretLabel": "المفتاح السري (Secret)",
+    "copyUrl": "نسخ الرابط",
+    "copySecret": "نسخ المفتاح",
+    "copied": "تم النسخ",
+    "copyFailed": "تعذّر النسخ. حدّد النص وانسخه بنفسك.",
+    "showSecret": "إظهار المفتاح",
+    "hideSecret": "إخفاء المفتاح",
+    "stepsTitle": "الإعداد في Cal.com",
+    "step1": "في Cal.com، افتح Settings ← Developer ← Webhooks واختر New.",
+    "step2": "الصق رابط المشترك في حقل Subscriber URL.",
+    "step3": "الصق المفتاح السري في حقل Secret.",
+    "step4": "فعّل الأحداث Booking Created وBooking Rescheduled وBooking Cancelled وBooking Requested وBooking Rejected.",
+    "step5": "اترك حقل Custom payload template فارغًا.",
+    "step6": "احفظ، ثم اختر Ping test. تظهر نتيجة الاختبار في هذه اللوحة خلال ثوانٍ.",
+    "rotate": "تغيير المفتاح السري",
+    "rotateTitle": "هل تريد تغيير المفتاح السري؟",
+    "rotateBody": "يبقى المفتاح القديم صالحًا لمدة 24 ساعة. الصق المفتاح الجديد في Cal.com قبل انتهائها.",
+    "rotateConfirm": "تغيير المفتاح",
+    "rotateCancel": "الإبقاء على المفتاح الحالي",
+    "rotated": "تم إنشاء مفتاح جديد. الصقه في Cal.com الآن.",
+    "rotateError": "تعذّر تغيير المفتاح السري. حاول مرة أخرى.",
+    "newSecretNote": "هذا مفتاحك الجديد. يتوقف المفتاح السابق عن العمل {{when}}.",
+    "outcomes": {
+      "ping": "وصل اختبار Ping",
+      "confirmed": "تم تأكيد الجلسة",
+      "requested": "هناك موعد بانتظار تأكيدك في Cal.com",
+      "rejected": "رفضت الموعد المطلوب",
+      "canceled": "أُلغيت الجلسة",
+      "cal_booking_released": "أُلغي حجز Cal.com، ويبقى الطلب مقبولًا",
+      "rescheduled": "نُقلت الجلسة",
+      "reschedule_requested": "هناك موعد جديد بانتظار تأكيدك",
+      "rescheduled_revived": "نُقلت الجلسة إلى موعد جديد",
+      "no_change": "محدّث بالفعل",
+      "duplicate": "تم تجاهل إرسال مكرر",
+      "unmatched": "تعذّر ربط هذا الحجز بطلب في MentorConnect",
+      "unmatched_direct_booking": "حجز شخص ما صفحتك على Cal.com مباشرة. تتابع MentorConnect فقط الجلسات المطلوبة عبرها.",
+      "ambiguous": "طابق أكثر من طلب، لذلك لم يُغيَّر شيء",
+      "organizer_mismatch": "يعود الحجز إلى مستخدم Cal.com مختلف عن صاحب رابطك",
+      "stale_state": "لم يعد الطلب مفتوحًا، لذلك لم يُغيَّر شيء",
+      "ignored": "حدث لا تستخدمه MentorConnect. يمكنك إلغاء تفعيله في Cal.com.",
+      "unrecognised_payload": "أرسل Cal.com صيغة غير متوقعة. اترك حقل Custom payload template فارغًا.",
+      "invalid_payload": "كانت تفاصيل الحجز غير مكتملة",
+      "unknown": "تم استلام إرسال"
+    },
+    "triggers": {
+      "PING": "اختبار Ping",
+      "BOOKING_CREATED": "حجز جديد",
+      "BOOKING_RESCHEDULED": "تغيير موعد حجز",
+      "BOOKING_CANCELLED": "إلغاء حجز",
+      "BOOKING_REQUESTED": "طلب حجز",
+      "BOOKING_REJECTED": "رفض حجز"
     }
   },
   "mentorCard": {
@@ -1180,7 +1277,8 @@
     "ratingA11y_many": "التقييم {{rating}} من 5 بناءً على {{count}} تقييمًا",
     "ratingA11y_other": "التقييم {{rating}} من 5 بناءً على {{count}} تقييم",
     "listSeparator": "، ",
-    "requestSent": "تم إرسال الطلب"
+    "requestSent": "تم إرسال الطلب",
+    "openingSoon": "يُتاح قريبًا"
   },
   "mentorProfile": {
     "backToMentors": "العودة إلى المرشدين",
@@ -1262,7 +1360,11 @@
       "invalidEmail": "أدخل بريدًا إلكترونيًا مثل name@example.com",
       "generic": "تعذّر إرسال طلبك. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
       "tryAgain": "حاول مرة أخرى",
-      "findSimilar": "ابحث عن مرشدين مشابهين"
+      "findSimilar": "ابحث عن مرشدين مشابهين",
+      "captcha": "لم ينجح التحقق الأمني. أعد المحاولة ثم أرسل.",
+      "botCheck": "أكمل التحقق الأمني لإرسال طلبك.",
+      "invalid": "لم تُقبل بعض التفاصيل. راجع الحقول المحددة وحاول مرة أخرى.",
+      "rateLimitedSoon": "أرسلت عدة طلبات خلال وقت قصير. حاول مرة أخرى بعد بضع دقائق."
     },
     "discard": {
       "title": "هل تريد تجاهل الطلب؟",
@@ -1277,7 +1379,9 @@
       "viewBookings": "عرض الحجوزات",
       "signIn": "تسجيل الدخول",
       "backToMentors": "العودة إلى المرشدين",
-      "createAccountInline": "ليس لديك حساب بعد؟ <signup>أنشئ حسابًا</signup> بالبريد الإلكتروني نفسه."
+      "createAccountInline": "ليس لديك حساب بعد؟ <signup>أنشئ حسابًا</signup> بالبريد الإلكتروني نفسه.",
+      "pendingTitle": "طلبك إلى <name>{{name}}</name> بانتظار الرد بالفعل",
+      "pendingBody": "لم يردّ <name>{{name}}</name> على طلبك السابق بعد، لذلك لم نرسل طلبًا آخر. ستجد الرد ضمن الحجوزات."
     },
     "status": {
       "sent": "تم إرسال الطلب",
@@ -1287,7 +1391,8 @@
       "viewInBookings": "عرض في الحجوزات"
     },
     "allRequired": "جميع الحقول مطلوبة.",
-    "tzLine": "المنطقة الزمنية لـ<name>{{name}}</name>: {{zone}} · {{relative}}"
+    "tzLine": "المنطقة الزمنية لـ<name>{{name}}</name>: {{zone}} · {{relative}}",
+    "captchaLabel": "التحقق الأمني"
   },
   "dashboardV2": {
     "tabs": {
@@ -1344,7 +1449,10 @@
       "sent": "تم إرسال الطلب",
       "accepted": "قبل {{name}} طلبك",
       "acceptedNoLink": "قبل {{name}} طلبك — رابط التقويم غير مُعدّ بعد",
-      "pickTime": "اختر وقتًا عبر رابط تقويم المرشد"
+      "pickTime": "اختر وقتًا عبر رابط تقويم المرشد",
+      "waitingConfirm": "بانتظار أن يؤكد {{name}} الموعد على Cal.com",
+      "timeDeclined": "لم يتمكن {{name}} من حضور ذلك الموعد — اختر موعدًا آخر",
+      "programmeTeam": "سيراسلك فريق البرنامج عبر البريد الإلكتروني لتحديد موعد"
     },
     "row": {
       "sent": "أُرسل {{when}}",
@@ -1353,7 +1461,12 @@
       "notMarkedComplete": "لم يحدّدها المرشد كمكتملة بعد",
       "timeNotRecorded": "لم يُسجَّل الوقت",
       "rated": "التقييم {{value}}/5",
-      "unknownMentor": "المرشد"
+      "unknownMentor": "المرشد",
+      "waitingConfirm": "اخترت {{when}}. بانتظار أن يؤكده {{name}} على Cal.com.",
+      "waitingConfirmNoTime": "بانتظار أن يؤكد {{name}} موعدك على Cal.com.",
+      "timeDeclined": "لم يتمكن {{name}} من حضور الموعد الذي اخترته. اختر موعدًا آخر.",
+      "programmeTeam": "تم القبول. سيراسلك فريق البرنامج عبر البريد الإلكتروني لتحديد موعد.",
+      "waitingBadge": "بانتظار تأكيد الموعد"
     },
     "actions": {
       "viewRequest": "عرض الطلب",
@@ -1362,7 +1475,9 @@
       "cancelRequest": "إلغاء الطلب",
       "cancelSession": "إلغاء الجلسة",
       "rateSession": "قيّم الجلسة",
-      "requestAgain": "أرسل طلبًا جديدًا"
+      "requestAgain": "أرسل طلبًا جديدًا",
+      "chooseAnother": "اختر موعدًا آخر",
+      "reschedule": "تغيير الموعد"
     },
     "confirm": {
       "withdrawTitle": "هل تريد سحب هذا الطلب؟",
@@ -1378,7 +1493,9 @@
       "cancelSessionKeep": "الإبقاء على الجلسة",
       "requestWithdrawn": "تم سحب الطلب",
       "sessionCancelled": "تم إلغاء الجلسة",
-      "error": "تعذّر تحديث الطلب. تحقق من اتصالك بالإنترنت وحاول مرة أخرى."
+      "error": "تعذّر تحديث الطلب. تحقق من اتصالك بالإنترنت وحاول مرة أخرى.",
+      "cancelSessionCalBody": "يلغي هذا الجلسة في MentorConnect. ألغِ حجز Cal.com أيضًا حتى تُحذف دعوة التقويم.",
+      "cancelInCal": "ألغِه أيضًا في Cal.com"
     },
     "view": {
       "title": "طلبك إلى {{name}}",
@@ -1409,7 +1526,15 @@
       "loading": "جارٍ تحميل التقويم…",
       "unavailableTitle": "تعذّر تحميل التقويم.",
       "unavailableBody": "يبدو أن رابط تقويم المرشد غير صحيح. حاول مرة أخرى لاحقًا.",
-      "confirmError": "تم حجز الموعد في Cal.com لكن تعذّر حفظه هنا. أعد تحميل الصفحة للتحقق ثم حاول مرة أخرى."
+      "confirmError": "تم حجز الموعد في Cal.com لكن تعذّر حفظه هنا. أعد تحميل الصفحة للتحقق ثم حاول مرة أخرى.",
+      "rescheduleTitle": "اختر موعدًا جديدًا مع {{name}}",
+      "rescheduleDescription": "اختر موعدًا جديدًا في تقويم المرشد على Cal.com. تُنقل الجلسة فور تأكيد Cal.com.",
+      "toastConfirmed": "تم تأكيد الجلسة",
+      "toastConfirmedBody": "أُضيفت إلى التقويمين، وستجدها ضمن الحجوزات.",
+      "toastRequested": "بانتظار أن يؤكد {{name}} الموعد على Cal.com",
+      "toastRescheduled": "نُقلت الجلسة",
+      "toastRescheduleRequested": "بانتظار أن يؤكد {{name}} الموعد الجديد على Cal.com",
+      "recordIncomplete": "لم يرسل Cal.com تفاصيل الحجز. أعد تحميل الصفحة بعد قليل للتحقق من الحجز."
     },
     "feedback": {
       "rateLabel": "تقييمك",
@@ -1985,7 +2110,12 @@
       "sessions": "جلسة",
       "facts": "معلومات المرشد",
       "book": "احجز جلسة {{minutes}} دقيقة",
-      "newMentor": "مرشد جديد · أولى الجلسات متاحة"
+      "newMentor": "مرشد جديد · أولى الجلسات متاحة",
+      "openingSoonTitle": "يُفتح باب الطلبات قريبًا",
+      "openingSoonBody": "يُجهَّز الملف الشخصي لـ{{name}} على MentorConnect. عد قريبًا لإرسال طلب.",
+      "checking": "جارٍ التحقق من التوفر…",
+      "checkError": "تعذّر التحقق من التوفر حاليًا.",
+      "noRatings": "مرشد جديد · لا تقييمات بعد"
     },
     "session": {
       "free": "مجاناً",
@@ -2294,7 +2424,19 @@
       "send": "إرسال الطلب",
       "sharedCalendar": "تأتي المواعيد من تقويم البرنامج المشترك حتى يربط {{name}} حساب Cal.com من لوحة التحكم.",
       "botCheck": "أكّد أنك إنسان لإرسال الطلب.",
-      "botFailed": "لم ينجح التحقق. حاول مرة أخرى."
+      "botFailed": "لم ينجح التحقق. حاول مرة أخرى.",
+      "requestIntro": "أرسل إلى {{name}} طلبًا يتضمن هدفك. يردّ عبر MentorConnect، وبعد القبول تختار موعدًا.",
+      "requestIntroProgramme": "أرسل طلبًا يتضمن هدفك. يقرؤه فريق البرنامج ويردّ عبر MentorConnect ثم يتفق معك على موعد عبر البريد الإلكتروني.",
+      "sentBodyProgramme": "يردّ فريق البرنامج عبر MentorConnect.",
+      "sentBodyMentor": "يردّ {{name}} عبر MentorConnect.",
+      "followAnon": "أنشئ حسابًا أو سجّل الدخول بالبريد <email>{{email}}</email> لمتابعته.",
+      "followSignedIn": "يمكنك متابعته ضمن الحجوزات.",
+      "createAccount": "إنشاء حساب",
+      "signIn": "تسجيل الدخول",
+      "pendingTitle": "طلبك إلى {{name}} بانتظار الرد بالفعل",
+      "pendingBody": "أرسلت طلبًا مؤخرًا ولم يُرد عليه بعد، لذلك لم نرسل طلبًا ثانيًا.",
+      "sentBefore": "أرسلت طلبًا {{when}} من <email>{{email}}</email>.",
+      "sendAnother": "إرسال طلب آخر"
     },
     "profileSettings": {
       "saved": "تم حفظ الملف",
@@ -2359,7 +2501,8 @@
       "title": "المرشدون المفضلون",
       "add": "حفظ {{name}} في المفضلة",
       "remove": "إزالة {{name}} من المفضلة",
-      "onlyMine": "مفضلتي ({{count}})"
+      "onlyMine": "مفضلتي ({{count}})",
+      "error": "تعذّر تحديث قائمة المفضلة. حاول مرة أخرى."
     },
     "reminders": {
       "title": "قادم قريباً",

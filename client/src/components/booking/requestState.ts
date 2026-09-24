@@ -3,6 +3,7 @@ import type { TFunction } from "i18next";
 import type { Booking, Mentor } from "@/lib/database";
 import type { SentRequest } from "@/lib/sentRequests";
 import { DEFAULT_STOPS, type RailStop, type RailStopState } from "@/components/RequestRail";
+import { isFeaturedDbId } from "@/data/featuredMentors";
 
 /** Statuses that mean "a request to this mentor is live" (P1-21). */
 export const ACTIVE_REQUEST_STATUSES: ReadonlyArray<Booking["status"]> = ["pending", "accepted", "confirmed"];
@@ -27,6 +28,14 @@ export type RequestState =
       /** The mentor's Cal.com link, released to the mentee once the row is accepted. */
       calLink?: string;
       source: "row" | "local";
+      /**
+       * State of the time the mentee picked on Cal.com (F28): `requested` while a
+       * requires-confirmation event waits for the mentor, `rejected` when the
+       * mentor declined that time (the mentee chooses another).
+       */
+      calStatus?: Booking["cal_status"];
+      /** A curated, programme-managed mentor: the programme team arranges the time by email. */
+      programmeManaged?: boolean;
     };
 
 const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -57,6 +66,8 @@ export function resolveRequestState(params: {
       bookingId: row.id,
       calLink: row.mentor?.cal_link || undefined,
       source: "row",
+      calStatus: row.cal_status ?? null,
+      programmeManaged: isFeaturedDbId(row.mentor_id),
     };
   }
   if (local && (!viewerEmail || sameEmail(local.email, viewerEmail))) {
@@ -82,15 +93,32 @@ export interface RailProgress {
   waitingKey?: string;
   /** The mentee owes the next action — pick a time on the mentor's calendar link. */
   canChooseTime: boolean;
+  /**
+   * i18n key replacing the third stop's label ("Pick a time…") when the time
+   * step is in a special state: waiting for the mentor to confirm a requested
+   * time, a declined time to replace, or the programme team arranging it.
+   * Interpolates `{ name }` (pass it through `bidi()`).
+   */
+  stop3Key?: string;
+  /** The mentor declined the time picked on Cal.com: the action reads "Choose another time". */
+  chooseAnother?: boolean;
 }
 
 export const RAIL_WAITING_FOR_LINK_KEY = "dashboardV2.rail.acceptedNoLink";
+export const RAIL_WAITING_CONFIRM_KEY = "dashboardV2.rail.waitingConfirm";
+export const RAIL_TIME_DECLINED_KEY = "dashboardV2.rail.timeDeclined";
+export const RAIL_PROGRAMME_TEAM_KEY = "dashboardV2.rail.programmeTeam";
 
 /**
  * - `cta` / `unavailable` (nothing sent) → all `next`;
  * - sent with no visible row (localStorage memory) or `pending` → ['done', 'current', 'next'];
- * - `accepted` without a calendar link → ['done', 'current', 'next'] + the waiting sentence;
- * - `accepted` with a link → ['done', 'done', 'current'] and `canChooseTime`;
+ * - `accepted` with a Cal.com time awaiting the mentor (`cal_status` requested)
+ *   → ['done', 'done', 'current'], no action, "waiting for {name} to confirm";
+ * - `accepted` without a calendar link → ['done', 'current', 'next'] + the waiting
+ *   sentence; for a programme-managed mentor ['done', 'done', 'current'] + "the
+ *   programme team will email you";
+ * - `accepted` with a link → ['done', 'done', 'current'] and `canChooseTime`
+ *   (`chooseAnother` when the mentor declined the last time picked);
  * - `confirmed` (and later) → all `done`.
  *
  * `options.hasLink` overrides the link the state itself carries (`calLink`).
@@ -100,9 +128,17 @@ export function railStatesFor(request: RequestState, options: { hasLink?: boolea
   const hasLink = options.hasLink ?? Boolean(request.calLink);
   switch (request.status) {
     case "accepted":
-      return hasLink
-        ? { states: ["done", "done", "current"], canChooseTime: true }
-        : { states: ["done", "current", "next"], waitingKey: RAIL_WAITING_FOR_LINK_KEY, canChooseTime: false };
+      if (request.calStatus === "requested") {
+        return { states: ["done", "done", "current"], waitingKey: RAIL_WAITING_CONFIRM_KEY, stop3Key: RAIL_WAITING_CONFIRM_KEY, canChooseTime: false };
+      }
+      if (!hasLink) {
+        return request.programmeManaged
+          ? { states: ["done", "done", "current"], waitingKey: RAIL_PROGRAMME_TEAM_KEY, stop3Key: RAIL_PROGRAMME_TEAM_KEY, canChooseTime: false }
+          : { states: ["done", "current", "next"], waitingKey: RAIL_WAITING_FOR_LINK_KEY, canChooseTime: false };
+      }
+      return request.calStatus === "rejected"
+        ? { states: ["done", "done", "current"], stop3Key: RAIL_TIME_DECLINED_KEY, canChooseTime: true, chooseAnother: true }
+        : { states: ["done", "done", "current"], canChooseTime: true };
     case "confirmed":
     case "completed":
       return { states: ["done", "done", "done"], canChooseTime: false };
@@ -142,7 +178,7 @@ export function railStopsFor(
     stops: [
       { label: t("dashboardV2.rail.sent"), state: s1 },
       { label: replyLabel, state: s2 },
-      { label: t("common.rail.step3"), state: s3 },
+      { label: progress.stop3Key ? t(progress.stop3Key, { name: options.name }) : t("common.rail.step3"), state: s3 },
     ],
   };
 }

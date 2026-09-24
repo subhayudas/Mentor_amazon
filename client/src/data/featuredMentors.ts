@@ -1,13 +1,20 @@
 /**
- * Curated mentors shown on the landing (hero wall + "Meet the mentors" rail)
- * and served as the directory in demo mode. Each entry is a full
- * `PublicMentor` so every existing surface (cards, filters, profile) can read
- * it, plus the showcase extras the Figma profile / session pages display.
- * Photos live in client/public/mentors/. Bios are written from the mentors'
- * public LinkedIn / Crunchbase profiles.
+ * Curated mentors shown on the landing (hero wall + "Meet the mentors" rail).
+ * Each entry is a full `PublicMentor` so every existing surface (cards,
+ * filters, profile) can read it, plus the showcase extras the Figma profile /
+ * session pages display. Photos live in client/public/mentors/. Bios are
+ * written from the mentors' public LinkedIn / Crunchbase profiles.
+ *
+ * Against the database the five are real, programme-managed `mentors` rows
+ * (`dbId`, seeded by migrations/0004): the DB row wins on everything a mentor
+ * or admin can edit (`overlayFeatured`) and this file only adds the session
+ * copy, tint, headline and FAQ. The showcase numbers below (`rating`,
+ * `ratings`, `bookings`, `average_rating`, `total_ratings`, `testimonials`)
+ * are demo-mode content and are never shown against the database (D14).
  */
 
 import type { Mentor, PublicMentor } from "@/lib/database";
+import { IS_LOCAL } from "@/lib/demo";
 import { localStore } from "@/lib/localStore";
 
 export interface Testimonial {
@@ -461,11 +468,56 @@ export function toShowcaseMentor(m: Mentor): FeaturedMentor {
   };
 }
 
-/** Curated mentor, or a mentor saved locally through onboarding, by id. */
-export function resolveShowcaseMentor(id: string | undefined): FeaturedMentor | undefined {
+/**
+ * The fields the database row wins on when it overlays a curated entry
+ * (design B1): everything a mentor or admin can edit, plus the real ratings.
+ */
+export const DB_OVERLAY_FIELDS = [
+  "name",
+  "name_ar",
+  "bio",
+  "bio_ar",
+  "photo_url",
+  "is_available",
+  "expertise",
+  "expertise_ar",
+  "industries",
+  "industries_ar",
+  "languages_spoken",
+  "timezone",
+  "country",
+  "average_rating",
+  "total_ratings",
+] as const satisfies ReadonlyArray<keyof PublicMentor>;
+
+/**
+ * A curated entry with its database row laid over it. `id` stays the slug and
+ * `dbId` is the row id; a column the view returns empty keeps the curated
+ * value only for the display copy (name, bio, photo) — availability, ratings
+ * and the tag lists always come from the row.
+ */
+export function overlayFeatured(row: PublicMentor, featured: FeaturedMentor): FeaturedMentor {
+  const merged: FeaturedMentor = { ...featured, dbId: row.id };
+  const target = merged as unknown as Record<string, unknown>;
+  const source = row as unknown as Record<string, unknown>;
+  for (const field of DB_OVERLAY_FIELDS) {
+    const value = source[field];
+    const keepCurated = (field === "name" || field === "bio" || field === "photo_url" || field === "timezone") && (value == null || value === "");
+    if (value === undefined || keepCurated) continue;
+    target[field] = value;
+  }
+  return merged;
+}
+
+/**
+ * Curated mentor by slug or database id; in local (demo) mode also a mentor
+ * saved in this browser through onboarding. Against the database it never
+ * reads browser storage: a non-curated id is a DB mentor (or not found).
+ */
+export function resolveShowcaseMentor(id: string | undefined, isLocal: boolean = IS_LOCAL): FeaturedMentor | undefined {
   if (!id) return undefined;
-  const curated = featuredMentor(id);
-  if (curated) return curated;
+  const curated = featuredMentorByAnyId(id);
+  if (curated || !isLocal) return curated;
   const local = localStore.find("mentors", id);
   return local ? toShowcaseMentor(local) : undefined;
 }
