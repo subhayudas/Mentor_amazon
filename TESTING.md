@@ -224,6 +224,7 @@ curl -si -X POST https://mentor-amazon.vercel.app/api/auth/logout | grep -iE '^(
 | i5 | In Cal.com add the webhook (see `api/README.md`), click **Ping test** | The panel shows "Ping · just now" within 15 s. |
 | i6 | `curl -si -X POST '<origin>/api/webhooks/cal?mentor=<id>' -H 'x-cal-signature-256: no-secret-provided' -d '{}'` | `401 {"error":"invalid_signature"}`. |
 | i7 | Cron: `curl -si <origin>/api/cron/reminders -H "Authorization: Bearer $CRON_SECRET"` | `200 {"ok":true,"reminders":n,"emails":n,"failures":0}`; without the header `401`. |
+| i8 | Local only, with Cloudflare's failing test keys: start the dev server with `VITE_TURNSTILE_SITE_KEY=2x00000000000000000000AB` (the widget always fails), then separately with the passing site key and `TURNSTILE_SECRET_KEY=2x0000000000000000000000000000000AA` (the server always refuses), and submit a featured `/book` form each time | Always-failing widget: the widget shows "Verification failed" and Send says "Complete the security check to send your request." without any POST. Always-refusing secret: the POST answers `403 captcha_failed` and the form says "The security check didn't pass. Try it again, then send." No booking row either way. |
 
 ---
 
