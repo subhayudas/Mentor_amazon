@@ -79,7 +79,11 @@ on Vercel's CDN.
   the mentee's embed through `record_cal_booking_from_embed`), never by a
   direct client update. Each side writes only its own rating, and only once
   the session is completed; ratings on `mentors` are derived and cannot be
-  typed in.
+  typed in. Nobody can request a session with themselves, and a booking whose
+  caller owns both sides (a legacy row) can only be canceled, never completed
+  or rated. The embed's uid and start come from the browser: the RPC takes
+  them only from the booking's mentee, for a start between an hour ago and a
+  year ahead, and the signed webhook stays the authority for later changes.
 * Ownership everywhere is `lower(email) = lower(auth.jwt()->>'email')`;
   `localStorage` is never an identity source.
 
@@ -111,8 +115,12 @@ Notable mechanics:
 
 * `mentors_public` and `mentor_scheduling_links` are owner-privilege views
   (`security_invoker = false`, Postgres 15+). The first exposes directory
-  columns only; the second returns Cal.com links only for the caller's own
-  accepted/confirmed/completed bookings.
+  columns only (plus `managed_by_programme`, which the directory needs); the
+  second returns Cal.com links only for the caller's own
+  accepted/confirmed/completed bookings. Both are **SELECT-only** for every
+  API role: `mentors_public` is a single-table view, so it is auto-updatable
+  and would otherwise let anyone edit or delete any mentor past RLS through
+  the write privileges Supabase's default privileges grant (0002 revokes them).
 * Notifications are created by `notify_booking_event(booking_id, event)`
   (signed-in parties and the service role; not anon), the request RPCs, the
   Cal.com sync RPC and the reminder cron. Recipients and text are derived from

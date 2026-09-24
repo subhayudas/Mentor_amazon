@@ -158,7 +158,11 @@ Checks, in order:
 
 Success is always `200 {"ok":true}` — the same answer whether the request was
 created or one was already pending, so the endpoint cannot be used to learn
-whether someone has an open request. With neither Turnstile key set there is
+whether someone has an open request. A request under the mentor's own address
+(or an identity an admin linked to that mentor) is refused by the RPC
+(`42501 not_allowed`, detail `self_request`, nothing written) but also answers
+`200`: a distinct status would reveal which address belongs to which mentor.
+Signed-in callers of `create_my_booking_request` get the `not_allowed` error. With neither Turnstile key set there is
 no captcha check (local development); only the IP and database limits apply.
 
 ---
@@ -210,7 +214,10 @@ Outcomes (shown in the mentor's panel; the last one is kept per mentor):
 
 Cal.com does not retry a failed delivery, so a `5xx` (for example a database
 outage) loses that event; the mentee's embed confirmation
-(`record_cal_booking_from_embed`) is the second path for confirmations.
+(`record_cal_booking_from_embed`) is the second path for confirmations. Its uid
+and start come from the browser, so the RPC accepts only the booking's own
+mentee, a well-formed uid no other booking holds, and a start between one hour
+ago and 366 days ahead (`22023 invalid_state` otherwise).
 
 ---
 
