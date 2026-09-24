@@ -297,9 +297,9 @@ What Amazon set up on their side, per the onboarding thread (Jul–Aug 2026):
 | --- | --- | --- |
 | Discovery | `https://idp-integ.federate.amazon.com/.well-known/openid-configuration` | `https://idp.federate.amazon.com/.well-known/openid-configuration` |
 | Flow | Authorization code + PKCE (S256), confidential client (secret) | same |
-| Client ID | `mentor-amazon.vercel.app` | expected to be the same; Amazon to confirm |
-| Client secret | delivered out-of-band (encrypted zip) | to be issued |
-| Redirect URI | `https://mentor-amazon.vercel.app/api/auth/callback/amazon` (exact). Localhost was **not** added. | same path on the final production domain; to be sent to Amazon once confirmed |
+| Client ID | `mentor-amazon.vercel.app` | issued by Amazon (set in Vercel) |
+| Client secret | delivered out-of-band (encrypted zip) | issued out-of-band (set in Vercel; never in the repo) |
+| Redirect URI | `https://mentor-amazon.vercel.app/api/auth/callback/amazon` (exact). Localhost was **not** added. | same; Amazon accepted `mentor-amazon.vercel.app` as the production domain |
 | Subject | `sub` = Amazon alias. No additional claims (no email or name); the app falls back to `<alias>@amazon.com`. | same |
 | Who may sign in | Restricted **on Amazon's side** by internal group. For integ testing only the identity team's own org is allowed; Amazon switches it to the programme's team/group when it is ready. | the programme's group |
 | Token endpoint auth | `client_secret_basic` and `client_secret_post` both accepted; a bad credential is answered `400 invalid_client` | same |
@@ -311,7 +311,8 @@ refused by Federate: if it sends them back with `error=access_denied` they get
 instead of the generic retry message.
 
 Still open with Amazon: a test account (nobody on the build team has an
-Amazon login), the production client ID/secret, and the production domain.
+Amazon login). The production client ID/secret are issued and
+`mentor-amazon.vercel.app` is accepted as the production domain (Sept 2026).
 Amazon has asked for confirmation that the integration works "with the
 claims"; see "How to test on integ" step 4 — someone in the allowed group
 signs in once with `AMAZON_OIDC_DEBUG=true` and shares `/api/auth/debug-claims`.
