@@ -30,9 +30,17 @@ else
   unset VITE_TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY
 fi
 
+# Helper servers get ports derived from E2E_PORT, so two checkouts running Playwright at the
+# same time (e.g. 5173 and 5174) never share a mock IdP or a preview built from other code.
+# The defaults for E2E_PORT=5173 are the documented ones: IdP 54399, preview 4173, demo 5176.
+_e2e_offset=0
+if [ "$E2E_PORT" -ge 5173 ] 2>/dev/null && [ "$E2E_PORT" -le 5199 ]; then _e2e_offset=$((E2E_PORT - 5173)); fi
+export E2E_PREVIEW_PORT="${E2E_PREVIEW_PORT:-$((4173 + _e2e_offset))}"
+export E2E_DEMO_PORT="${E2E_DEMO_PORT:-$((5176 + 10 * _e2e_offset))}"
+
 # Amazon SSO against the local mock IdP (scripts/e2e/mock-idp.ts)
-export E2E_MOCK_IDP_PORT="${E2E_MOCK_IDP_PORT:-54399}"
-export E2E_MOCK_IDP_CONTROL_PORT="${E2E_MOCK_IDP_CONTROL_PORT:-54398}"
+export E2E_MOCK_IDP_PORT="${E2E_MOCK_IDP_PORT:-$((54399 + 2 * _e2e_offset))}"
+export E2E_MOCK_IDP_CONTROL_PORT="${E2E_MOCK_IDP_CONTROL_PORT:-$((E2E_MOCK_IDP_PORT + 1))}"
 export AMAZON_OIDC_ISSUER="${AMAZON_OIDC_ISSUER:-http://127.0.0.1:${E2E_MOCK_IDP_PORT}}"
 export AMAZON_OIDC_CLIENT_ID="${AMAZON_OIDC_CLIENT_ID:-mentorconnect-e2e}"
 export AMAZON_OIDC_CLIENT_SECRET="${AMAZON_OIDC_CLIENT_SECRET:-e2e-mock-idp-client-secret-not-a-real-one}"

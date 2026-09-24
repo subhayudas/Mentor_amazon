@@ -43,7 +43,8 @@ suite that calls Cloudflare; `SUPABASE_TEST_CAPTCHA=on` (with `[auth.captcha]` e
 `playwright.config.ts` loads `scripts/e2e/env.sh`, starts the dev server on `E2E_PORT`
 (default 5173 — the only port GoTrue accepts in e-mail links) with `MC_LOCAL_API=1`, starts the
 mock Amazon IdP (`scripts/e2e/mock-idp.ts`, port 54399), and reseeds the personas of the
-selected projects (`E2E_SKIP_SEED=1` skips that). Projects: `desktop-en`, `desktop-ar`,
+selected projects (`E2E_SKIP_SEED=1` skips that). Another `E2E_PORT` (e.g. 5174) gets its own
+mock-IdP, preview and demo ports, so two checkouts can run Playwright side by side. Projects: `desktop-en`, `desktop-ar`,
 `mobile-en`, `mobile-ar`, plus `prod-csp` (production build behind the `vercel.json`
 headers, tests tagged `@prod-csp`) and `demo-local` / `demo-local-ar` (`VITE_LOCAL=1`, tests
 tagged `@demo-local`). Specs import `test` from `e2e/fixtures/test.ts`: `loginAs(persona)`,

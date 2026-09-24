@@ -16,7 +16,7 @@ export const e2eEnv = {
   get mailpitUrl() { return process.env.MAILPIT_URL ?? 'http://127.0.0.1:54324'; },
   get cronSecret() { return required('CRON_SECRET'); },
   get port() { return Number(process.env.E2E_PORT ?? 5173); },
-  get mockIdpControl() { return `http://127.0.0.1:${process.env.E2E_MOCK_IDP_CONTROL_PORT ?? 54398}`; },
+  get mockIdpControl() { return `http://127.0.0.1:${process.env.E2E_MOCK_IDP_CONTROL_PORT ?? Number(process.env.E2E_MOCK_IDP_PORT ?? 54399) + 1}`; },
   /** Supabase-js' localStorage key for the session (sb-<first host label>-auth-token). */
   get authStorageKey() { return `sb-${new URL(required('VITE_SUPABASE_URL')).hostname.split('.')[0]}-auth-token`; },
 };

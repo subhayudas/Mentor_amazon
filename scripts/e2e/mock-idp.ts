@@ -6,7 +6,7 @@
  *   source scripts/e2e/env.sh && npx tsx scripts/e2e/mock-idp.ts
  *
  * IdP:     http://127.0.0.1:$E2E_MOCK_IDP_PORT   (issuer; default 54399)
- * Control: http://127.0.0.1:$E2E_MOCK_IDP_CONTROL_PORT (default 54398)
+ * Control: http://127.0.0.1:$E2E_MOCK_IDP_CONTROL_PORT (default: the IdP port + 1)
  *   GET  /subject                       current claims of the next ID token
  *   POST /subject {"sub", "email"?, "name"?, "amazonAlias"?}   who approves the next sign-in
  *   POST /reset                         back to E2E_MOCK_IDP_SUB (default "e2etester")
@@ -18,7 +18,7 @@ import http, { createServer, type IncomingMessage } from 'node:http';
 import { startMockIdp } from '../../tests/helpers/mockIdp';
 
 const PORT = Number(process.env.E2E_MOCK_IDP_PORT ?? 54399);
-const CONTROL_PORT = Number(process.env.E2E_MOCK_IDP_CONTROL_PORT ?? 54398);
+const CONTROL_PORT = Number(process.env.E2E_MOCK_IDP_CONTROL_PORT ?? PORT + 1);
 const clientId = process.env.AMAZON_OIDC_CLIENT_ID ?? 'mentorconnect-e2e';
 const clientSecret = process.env.AMAZON_OIDC_CLIENT_SECRET ?? 'e2e-mock-idp-client-secret-not-a-real-one';
 const redirectUri = process.env.AMAZON_OIDC_REDIRECT_URI ?? 'http://localhost:5173/api/auth/callback/amazon';

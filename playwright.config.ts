@@ -10,8 +10,10 @@ import type { E2eOptions } from './e2e/fixtures/test';
  * Environment: scripts/e2e/env.sh is loaded into this process (values already set win), so
  * the dev server, the mock IdP, the seed and the fixtures all see the same settings.
  * Web servers: the dev server (E2E_PORT, default 5173, MC_LOCAL_API=1) and the mock IdP always;
- * the production preview (4173, vercel.json headers) only when `prod-csp` runs; the demo-mode
- * dev server (5176, VITE_LOCAL=1) only when a `demo-local*` project runs.
+ * the production preview (vercel.json headers) only when `prod-csp` runs; the demo-mode dev
+ * server (VITE_LOCAL=1) only when a `demo-local*` project runs. For E2E_PORT=5173 their ports are
+ * 54399, 4173 and 5176; other E2E_PORTs get their own (scripts/e2e/env.sh), so parallel
+ * checkouts never reuse each other's servers.
  * Personas are (re)seeded for the selected projects before the run unless E2E_SKIP_SEED=1.
  * Tags: a test titled with @prod-csp runs only in prod-csp, @demo-local only in demo-local*.
  */
@@ -29,6 +31,8 @@ loadE2eEnv();
 
 const PORT = Number(process.env.E2E_PORT ?? 5173);
 const IDP_PORT = Number(process.env.E2E_MOCK_IDP_PORT ?? 54399);
+const PREVIEW_PORT = Number(process.env.E2E_PREVIEW_PORT ?? 4173);
+const DEMO_PORT = Number(process.env.E2E_DEMO_PORT ?? 5176);
 
 // Which projects this invocation runs (webServers are only started when needed).
 const selected = process.argv.flatMap((arg, i, all) =>
@@ -65,16 +69,16 @@ const webServer: NonNullable<PlaywrightTestConfig['webServer']> = [
 ];
 if (runs('prod-csp')) {
   webServer.push({
-    command: `bash -c 'source scripts/e2e/env.sh && npx vite build >/dev/null && MC_APPLY_VERCEL_HEADERS=1 exec npx vite preview --port 4173 --strictPort'`,
-    url: 'http://localhost:4173',
+    command: `bash -c 'source scripts/e2e/env.sh && npx vite build >/dev/null && MC_APPLY_VERCEL_HEADERS=1 exec npx vite preview --port ${PREVIEW_PORT} --strictPort'`,
+    url: `http://localhost:${PREVIEW_PORT}`,
     reuseExistingServer: true,
     timeout: 300_000,
   });
 }
 if (runs('demo-local') || runs('demo-local-ar')) {
   webServer.push({
-    command: `bash -c 'source scripts/e2e/env.sh && VITE_LOCAL=1 MC_LOCAL_API=0 exec npx vite --port 5176 --strictPort'`,
-    url: 'http://localhost:5176',
+    command: `bash -c 'source scripts/e2e/env.sh && VITE_LOCAL=1 MC_LOCAL_API=0 exec npx vite --port ${DEMO_PORT} --strictPort'`,
+    url: `http://localhost:${DEMO_PORT}`,
     reuseExistingServer: true,
     timeout: 120_000,
   });
@@ -102,9 +106,9 @@ export default defineConfig<E2eOptions>({
     { name: 'desktop-ar', grepInvert: TAGGED, use: { ...desktop, lang: 'ar', locale: 'ar' } },
     { name: 'mobile-en', grepInvert: TAGGED, use: { ...mobile, lang: 'en', locale: 'en-US' } },
     { name: 'mobile-ar', grepInvert: TAGGED, use: { ...mobile, lang: 'ar', locale: 'ar' } },
-    { name: 'prod-csp', grep: /@prod-csp/, use: { ...desktop, lang: 'en', locale: 'en-US', baseURL: 'http://localhost:4173' } },
-    { name: 'demo-local', grep: /@demo-local/, use: { ...desktop, lang: 'en', locale: 'en-US', backend: 'local', baseURL: 'http://localhost:5176' } },
-    { name: 'demo-local-ar', grep: /@demo-local/, use: { ...desktop, lang: 'ar', locale: 'ar', backend: 'local', baseURL: 'http://localhost:5176' } },
+    { name: 'prod-csp', grep: /@prod-csp/, use: { ...desktop, lang: 'en', locale: 'en-US', baseURL: `http://localhost:${PREVIEW_PORT}` } },
+    { name: 'demo-local', grep: /@demo-local/, use: { ...desktop, lang: 'en', locale: 'en-US', backend: 'local', baseURL: `http://localhost:${DEMO_PORT}` } },
+    { name: 'demo-local-ar', grep: /@demo-local/, use: { ...desktop, lang: 'ar', locale: 'ar', backend: 'local', baseURL: `http://localhost:${DEMO_PORT}` } },
   ],
   webServer,
 });
