@@ -18,16 +18,19 @@ import {
   type OidcCookiePayload,
 } from '../../_lib/cookies.js';
 import {
+  aliasEmail,
   exchangeCode,
   extractIdentity,
   fetchUserinfo,
   getDiscovery,
+  isValidAlias,
   randomUrlSafe,
   stripTokenMaterial,
   verifyIdToken,
   OidcError,
 } from '../../_lib/oidc.js';
 import {
+  autoApproveMentor,
   createAdminClient,
   createAuthUser,
   deleteAuthUser,
@@ -41,7 +44,6 @@ import {
   rotateAuthPassword,
   syncAuthMetadata,
   updateUsersRow,
-  upsertAccessRequest,
   upsertIdentifier,
   SsoDataError,
   type UsersRow,
@@ -68,8 +70,9 @@ import {
  * Outcomes (all 302, never a stack trace):
  *   missing/reused state         → /login?error=sso_state
  *   token endpoint rejected code → /login?error=sso_token
- *   alias not on the allow-list  → /request-access?alias=<alias>
- *   approved                     → /auth/sso#token_hash=...&type=magiclink&next=/path
+ *   alias deactivated by an admin → /request-access?alias=<alias>&status=rejected
+ *   any other Amazon employee    → /auth/sso#token_hash=...&type=magiclink&next=/path
+ *                                  (first sign-in: approved_users row created as mentor)
  *   anything else                → /login?error=sso_failed
  * With AMAZON_OIDC_DEBUG=true a `&reason=<code>` is appended to error redirects.
  */
@@ -221,6 +224,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     fail('sso_failed', 'no_alias');
     return;
   }
+  if (!isValidAlias(identity.alias)) {
+    // The alias becomes a DB key and an email local part; never guess at an odd subject.
+    fail('sso_failed', 'alias_invalid');
+    return;
+  }
   const alias = identity.alias;
 
   // --- Userinfo fallback (only when the ID token is missing email or name) --
@@ -254,29 +262,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     appendSetCookie(res, serializeCookie(DEBUG_COOKIE, signValue(key, payload), { maxAge: DEBUG_COOKIE_MAX_AGE }));
   }
 
-  // --- Allow-list + account bridge ----------------------------------------
+  // --- Role + account bridge ---------------------------------------------
   const sb = createAdminClient(env.supabaseUrl, env.supabaseServiceRoleKey);
 
   try {
-    const approved = await findApprovedUser(sb, alias);
-    if (!approved) {
-      try {
-        const outcome = await upsertAccessRequest(sb, { alias, email: identity.email, name: identity.name });
-        logSso('callback.not_approved', { alias, outcome: 'request_access', request: outcome });
-      } catch (err) {
-        // The user still gets the request-access screen; an admin can add them by hand.
-        logSso('callback.not_approved', { alias, outcome: 'request_access', request: 'write_failed', reason: err instanceof SsoDataError ? err.code : 'db' });
-      }
+    // Every Amazon employee gets in. approved_users only carries the role
+    // (and a way for an admin to revoke someone); a first sign-in writes the row.
+    let approved = await findApprovedUser(sb, alias);
+    if (approved && !approved.is_active) {
+      logSso('callback.revoked', { alias });
       const target = new URL('/request-access', env.appOrigin);
       target.searchParams.set('alias', alias);
+      target.searchParams.set('status', 'rejected');
       sendRedirect(res, target.toString());
       return;
     }
 
-    const email = identity.email ?? (approved.email ? approved.email.trim().toLowerCase() : undefined);
-    if (!email) {
-      fail('sso_failed', 'no_email', alias);
-      return;
+    // Federate's ID token may carry no email: fall back to the address an
+    // admin recorded, then to the corporate alias@amazon.com.
+    const email = identity.email ?? (approved?.email ? approved.email.trim().toLowerCase() : aliasEmail(alias));
+
+    if (!approved) {
+      approved = await autoApproveMentor(sb, { alias, email });
+      if (!approved.is_active) {
+        // Lost a race to an admin who deactivated the alias in the same instant.
+        fail('sso_failed', 'revoked', alias);
+        return;
+      }
+      logSso('callback.auto_approved', { alias, role: approved.role });
     }
 
     let user: UsersRow | null = (await findUserByAlias(sb, alias)) ?? (await findUserByEmail(sb, email));

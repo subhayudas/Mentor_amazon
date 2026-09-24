@@ -18,7 +18,8 @@ export const ENV_SCHEMA = {
   clientId: { name: 'AMAZON_OIDC_CLIENT_ID', schema: nonEmpty },
   clientSecret: { name: 'AMAZON_OIDC_CLIENT_SECRET', schema: nonEmpty },
   redirectUri: { name: 'AMAZON_OIDC_REDIRECT_URI', schema: url },
-  scopes: { name: 'AMAZON_OIDC_SCOPES', schema: nonEmpty, default: 'openid profile email' },
+  // Federate advertises `scopes_supported: ["openid"]` only; email/name are not scope-gated there.
+  scopes: { name: 'AMAZON_OIDC_SCOPES', schema: nonEmpty, default: 'openid' },
   debug: { name: 'AMAZON_OIDC_DEBUG', schema: z.string(), default: '' },
   supabaseUrl: { name: 'SUPABASE_URL', schema: url },
   supabaseServiceRoleKey: { name: 'SUPABASE_SERVICE_ROLE_KEY', schema: nonEmpty },

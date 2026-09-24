@@ -371,3 +371,19 @@ export function extractIdentity(claims: Record<string, unknown>, userinfo?: Reco
 
   return { alias, sub, email, name };
 }
+
+/**
+ * An Amazon alias as it will be stored and used as an email local part.
+ * Anything else in `sub` (an opaque id, a Kerberos principal with a realm)
+ * is refused rather than guessed at.
+ */
+const ALIAS_SHAPE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
+
+export function isValidAlias(alias: string): boolean {
+  return ALIAS_SHAPE.test(alias);
+}
+
+/** Corporate address used when neither the token nor userinfo carries an email. */
+export function aliasEmail(alias: string): string {
+  return `${alias}@amazon.com`;
+}

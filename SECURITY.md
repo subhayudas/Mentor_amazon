@@ -42,9 +42,12 @@ on Vercel's CDN.
   `id_token` with the issuer's JWKS, reads `amazonAlias` (`sub`), and only
   then bridges into a Supabase session (`generateLink` magic-link token sent
   in the URL fragment, never in a query string or log).
-* **Allow-list**: an alias must have an active `approved_users` row before a
-  session is issued. Unknown aliases get an `access_requests` row and the
-  `/request-access` page; an admin approves or rejects from `/admin`.
+* **Open access for Amazon employees**: anyone who completes Federate
+  sign-in gets a session. On an alias's first sign-in the callback writes an
+  active `approved_users` row with role `mentor`; that row is what mentor
+  onboarding and the `mentors` INSERT policy check. An admin revokes an alias
+  by setting `is_active = false` (the callback then refuses it and sends it to
+  `/request-access?status=rejected`) and grants admin by setting `role`.
 * **Roles**: `users.user_type` is `mentor`, `mentee` or `admin` and is the
   authoritative role (auth metadata is a fallback for legacy accounts). It can
   only be changed by an admin or the service role (database trigger).
