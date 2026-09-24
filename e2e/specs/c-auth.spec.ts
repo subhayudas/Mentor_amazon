@@ -234,3 +234,69 @@ test('S24 an Amazon account in a recovery session is refused and signed out', as
     await deleteAccounts(db, [email]);
   }
 });
+
+/**
+ * An account the Amazon SSO bridge would have made (a users row with `amazon_alias`), and a
+ * recovery link for it. `stamped` also puts the alias on the auth user's metadata, as the
+ * bridge does (api/_lib/supabaseAdmin.ts); without it only the users row knows.
+ */
+async function amazonRecoveryLink(db: Parameters<typeof deleteAccounts>[0], email: string, alias: string, origin: string, stamped: boolean) {
+  const admin = adminClient();
+  const { data, error } = await admin.auth.admin.createUser({
+    email,
+    password: E2E_PASSWORD,
+    email_confirm: true,
+    user_metadata: stamped ? { amazon_alias: alias } : {},
+  });
+  if (error || !data.user) throw error ?? new Error('no user');
+  await db`delete from public.users where amazon_alias = ${alias}`;
+  await db`
+    insert into public.users (id, email, password, user_type, amazon_alias, is_verified, created_at)
+    values (${data.user.id}, ${email}, 'managed-by-supabase-auth', 'mentor', ${alias}, true, timezone('utc', now()))`;
+  const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: `${origin}/reset-password` } });
+  if (linkError || !link.properties?.action_link) throw linkError ?? new Error('no recovery link');
+  return link.properties.action_link;
+}
+
+test('S24 fail closed: when the account lookup fails, an Amazon account gets an error with Retry, never the form (F11)', async ({ page, healthy, db, personaProject, baseURL }, testInfo) => {
+  test.skip(!runsOn(testInfo, PROJECTS), 'S24 runs on desktop-en and desktop-ar');
+  const email = freshEmail(personaProject, 'amazon-down');
+  const alias = `e2e-s24d-${(e2eNamespace() ? `${e2eNamespace()}-` : '') + personaProject}`;
+  try {
+    const link = await amazonRecoveryLink(db, email, alias, new URL(baseURL!).origin, false);
+    // The users table is unreachable while GoTrue still works.
+    await page.route('**/rest/v1/users?**', (route) => route.abort());
+    await page.goto(link);
+    await expect(page.getByTestId('card-reset-error')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('button-reset-password')).toHaveCount(0);
+    await healthy({ screenshotName: 'S24-lookup-failed' });
+
+    // Back online: Retry reads the users row, refuses the Amazon account and signs it out.
+    await page.unroute('**/rest/v1/users?**');
+    await page.getByTestId('button-reset-retry').click();
+    await expect(page.getByTestId('card-reset-amazon')).toBeVisible();
+    await expect(page.getByTestId('button-reset-password')).toHaveCount(0);
+    await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), e2eEnv.authStorageKey)).toBeNull();
+  } finally {
+    await deleteAccounts(db, [email]);
+  }
+});
+
+test('S24 an alias on the session itself is refused without any database read (F11)', async ({ page, healthy, db, personaProject, baseURL }, testInfo) => {
+  test.skip(!runsOn(testInfo, PROJECTS), 'S24 runs on desktop-en and desktop-ar');
+  const email = freshEmail(personaProject, 'amazon-stamped');
+  const alias = `e2e-s24s-${(e2eNamespace() ? `${e2eNamespace()}-` : '') + personaProject}`;
+  try {
+    const link = await amazonRecoveryLink(db, email, alias, new URL(baseURL!).origin, true);
+    await page.route('**/rest/v1/users?**', (route) => route.abort());
+    await page.goto(link);
+    await expect(page.getByTestId('card-reset-amazon')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('button-reset-password')).toHaveCount(0);
+    await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), e2eEnv.authStorageKey)).toBeNull();
+    // As above: a header read already in flight when the page signs out may answer 401; nothing is shown for it.
+    await healthy({ screenshotName: 'S24-amazon-stamped', allowStatus: [{ url: /\/rest\/v1\/notifications/, status: 401 }] });
+  } finally {
+    await page.unroute('**/rest/v1/users?**');
+    await deleteAccounts(db, [email]);
+  }
+});

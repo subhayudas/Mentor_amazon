@@ -207,7 +207,9 @@
     },
     "reset": {
       "amazonTitle": "Amazon accounts sign in with Amazon",
-      "amazonBody": "This account uses Amazon sign-in, so it has no MentorConnect password to reset. We signed you out of this link; use Sign in with Amazon instead."
+      "amazonBody": "This account uses Amazon sign-in, so it has no MentorConnect password to reset. We signed you out of this link; use Sign in with Amazon instead.",
+      "checkFailedTitle": "We couldn't check this reset link",
+      "checkFailedBody": "We could not confirm which account this link is for, so the password form stays closed. Check your connection and try again."
     }
   },
   "nav": {

@@ -66,3 +66,47 @@ export function parseAuthRedirect(hash: string, search: string): InitialAuthHash
     hasSession: fragment.has("access_token"),
   };
 }
+
+/**
+ * Which session, if any, is a password-recovery session (D13, F11). The
+ * recovery link's fragment (read at load) or a `PASSWORD_RECOVERY` event
+ * starts it; it belongs to the first session user seen after that and ends
+ * when that user signs out or another account signs in. Pure: the caller feeds
+ * it every Supabase auth event.
+ */
+export interface RecoveryState {
+  active: boolean;
+  /** The recovery session's user; null until the first session after the link is seen. */
+  userId: string | null;
+}
+
+export function initialRecoveryState(hash: InitialAuthHash): RecoveryState {
+  return { active: hash.type === "recovery" && hash.hasSession && !hash.errorCode, userId: null };
+}
+
+export function nextRecoveryState(state: RecoveryState, event: string, userId: string | null): RecoveryState {
+  if (event === "PASSWORD_RECOVERY") return { active: true, userId };
+  if (event === "SIGNED_OUT") return { active: false, userId: null };
+  if (!state.active || !userId) return state;
+  if (state.userId === null) return { active: true, userId };
+  return state.userId === userId ? state : { active: false, userId: null };
+}
+
+/** Whether the signed-in `userId` holds the recovery session. */
+export function recoveryAppliesTo(state: RecoveryState, userId: string | null | undefined): boolean {
+  if (!state.active || !userId) return false;
+  return state.userId === null || state.userId === userId;
+}
+
+/**
+ * An Amazon (SSO) account, judged from the auth session alone, without a
+ * database read: the SSO bridge stamps `user_metadata.amazon_alias`, and SSO
+ * accounts use the corporate `@amazon.com` address. Such an account never gets a
+ * password (D13).
+ */
+export function isAmazonSessionUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined): boolean {
+  if (!user) return false;
+  const alias = user.user_metadata?.amazon_alias;
+  if (typeof alias === "string" && alias.trim() !== "") return true;
+  return typeof user.email === "string" && /@amazon\.com$/i.test(user.email.trim());
+}

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, RefreshCw, ShieldCheck } from "lucide-react";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,6 +16,7 @@ import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { isRecoverySession } from "@/context/AuthContext";
 import { auth, syncRoleStorage } from "@/lib/auth";
 import { authErrorKey, mapAuthError, toAuthFlowError } from "@/lib/authErrors";
+import { isAmazonSessionUser } from "@/lib/authFlow";
 import { authService } from "@/lib/services";
 import { INITIAL_AUTH_HASH, supabase } from "@/lib/supabase";
 import { ROUTES } from "@/lib/routes";
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 /** How long to wait for the recovery fragment to become a session before calling the link invalid. */
 const RECOVERY_GRACE_MS = 4000;
 
-type Gate = "checking" | "ready" | "invalid" | "amazon";
+type Gate = "checking" | "ready" | "invalid" | "amazon" | "error";
 
 /**
  * Set a new password from a Supabase recovery link (D13, F11, F34). The form
@@ -43,40 +44,64 @@ export default function ResetPassword() {
   const [done, setDone] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Bumped by Retry after a failed account check: re-runs the decision below.
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
     if (INITIAL_AUTH_HASH.errorCode) return;
     let cancelled = false;
     let deciding = false;
-    const decide = async (hasSession: boolean) => {
-      if (cancelled || deciding || !hasSession) return;
+    const refuseAmazon = async () => {
+      // Amazon accounts sign in through Amazon only; the recovery session must not linger.
+      await supabase.auth.signOut().catch(() => undefined);
+      syncRoleStorage(null);
+      if (!cancelled) setGate("amazon");
+    };
+    /**
+     * Fail closed (F11): the form opens only when this is the recovery session
+     * AND the account is known not to be an Amazon one. The session's own
+     * metadata is checked first (no database read); then the users row. Any
+     * failure along the way is an error state with Retry, never the form.
+     */
+    const decide = async () => {
+      if (cancelled || deciding) return;
       deciding = true;
-      if (!isRecoverySession()) {
-        setGate("invalid");
-        return;
-      }
-      let amazonAlias: string | undefined;
       try {
-        amazonAlias = (await auth.getCurrentUser())?.amazon_alias;
-      } catch {
-        amazonAlias = undefined;
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        const sessionUser = data.session?.user;
+        if (!sessionUser) {
+          deciding = false; // no session yet: wait for the event, or the grace timeout
+          return;
+        }
+        if (cancelled) return;
+        if (!isRecoverySession(sessionUser.id)) {
+          setGate("invalid");
+          return;
+        }
+        if (isAmazonSessionUser(sessionUser)) {
+          await refuseAmazon();
+          return;
+        }
+        const current = await auth.getCurrentUser();
+        if (cancelled) return;
+        // getCurrentUser answers null when GoTrue could not confirm the user: unknown, so no form.
+        if (!current || current.id !== sessionUser.id) throw new Error("reset-account-unverified");
+        if (current.amazon_alias || isAmazonSessionUser({ email: current.email })) {
+          await refuseAmazon();
+          return;
+        }
+        setGate("ready");
+      } catch (error) {
+        console.error("Could not verify the account for this reset link:", error);
+        if (!cancelled) setGate("error");
       }
-      if (cancelled) return;
-      if (amazonAlias) {
-        // Amazon accounts sign in through Amazon only; the recovery session must not linger.
-        await supabase.auth.signOut().catch(() => undefined);
-        syncRoleStorage(null);
-        if (!cancelled) setGate("amazon");
-        return;
-      }
-      setGate("ready");
     };
     // Supabase holds its auth lock while it runs this callback: decide on the next tick.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) window.setTimeout(() => void decide(true), 0);
+      if (session) window.setTimeout(() => void decide(), 0);
     });
-    supabase.auth.getSession().then(({ data }) => {
-      if (data.session) void decide(true);
-    });
+    void decide();
     const giveUp = window.setTimeout(() => {
       if (!cancelled) setGate((current) => (current === "checking" ? "invalid" : current));
     }, RECOVERY_GRACE_MS);
@@ -85,7 +110,7 @@ export default function ResetPassword() {
       window.clearTimeout(giveUp);
       subscription.unsubscribe();
     };
-  }, []);
+  }, [attempt]);
 
   const schema = useMemo(
     () =>
@@ -173,6 +198,34 @@ export default function ResetPassword() {
                 <Link href={ROUTES.login}>{t("auth.backToLogin")}</Link>
               </Button>
             </>
+          }
+        />
+      </StatusPage>
+    );
+  }
+
+  if (gate === "error") {
+    return (
+      <StatusPage>
+        <StatusCard
+          titleAs="h1"
+          tone="danger"
+          icon={AlertCircle}
+          title={t("auth.reset.checkFailedTitle")}
+          description={t("auth.reset.checkFailedBody")}
+          data-testid="card-reset-error"
+          actions={
+            <Button
+              variant="primary"
+              onClick={() => {
+                setGate("checking");
+                setAttempt((n) => n + 1);
+              }}
+              data-testid="button-reset-retry"
+            >
+              <RefreshCw aria-hidden="true" />
+              {t("common.tryAgain")}
+            </Button>
           }
         />
       </StatusPage>

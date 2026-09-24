@@ -10,7 +10,14 @@ import {
   toAuthFlowError,
   type AuthErrorKind,
 } from '../client/src/lib/authErrors.ts';
-import { asAuthFlowError, parseAuthRedirect } from '../client/src/lib/authFlow.ts';
+import {
+  asAuthFlowError,
+  initialRecoveryState,
+  isAmazonSessionUser,
+  nextRecoveryState,
+  parseAuthRedirect,
+  recoveryAppliesTo,
+} from '../client/src/lib/authFlow.ts';
 import { authConfirmUrl, confirmDestination, sameOriginPath } from '../client/src/lib/routes.ts';
 
 function lookup(dict: unknown, key: string): unknown {
@@ -231,5 +238,61 @@ describe('sameOriginPath / authConfirmUrl / confirmDestination', () => {
     expect(confirmDestination({ role: 'mentor', hasProfile: false })).toBe('/mentor-onboarding');
     expect(confirmDestination({ role: 'mentor', hasProfile: true })).toBe('/mentor-portal');
     expect(confirmDestination({ role: 'admin', hasProfile: false })).toBe('/admin');
+  });
+});
+
+describe('recovery session binding (D13, F11)', () => {
+  const link = parseAuthRedirect('#access_token=x&type=recovery', '');
+  it('a recovery link starts a session that binds to the first user seen', () => {
+    let s = initialRecoveryState(link);
+    expect(s).toEqual({ active: true, userId: null });
+    s = nextRecoveryState(s, 'INITIAL_SESSION', 'u1');
+    expect(s).toEqual({ active: true, userId: 'u1' });
+    expect(recoveryAppliesTo(s, 'u1')).toBe(true);
+    expect(recoveryAppliesTo(s, 'u2')).toBe(false);
+    expect(recoveryAppliesTo(s, null)).toBe(false);
+  });
+  it('no link, an expired link or an ordinary session is not recovery', () => {
+    expect(initialRecoveryState(parseAuthRedirect('', '')).active).toBe(false);
+    expect(initialRecoveryState(parseAuthRedirect('#error_code=otp_expired&type=recovery', '')).active).toBe(false);
+    expect(initialRecoveryState(parseAuthRedirect('#access_token=x&type=signup', '')).active).toBe(false);
+    const s = nextRecoveryState(initialRecoveryState(parseAuthRedirect('', '')), 'SIGNED_IN', 'u1');
+    expect(recoveryAppliesTo(s, 'u1')).toBe(false);
+  });
+  it('PASSWORD_RECOVERY starts it for that user', () => {
+    const s = nextRecoveryState({ active: false, userId: null }, 'PASSWORD_RECOVERY', 'u9');
+    expect(recoveryAppliesTo(s, 'u9')).toBe(true);
+  });
+  it('signing out ends it; token refreshes for the same user keep it', () => {
+    let s = nextRecoveryState(initialRecoveryState(link), 'INITIAL_SESSION', 'u1');
+    s = nextRecoveryState(s, 'TOKEN_REFRESHED', 'u1');
+    s = nextRecoveryState(s, 'USER_UPDATED', 'u1');
+    expect(recoveryAppliesTo(s, 'u1')).toBe(true);
+    s = nextRecoveryState(s, 'SIGNED_OUT', null);
+    expect(s.active).toBe(false);
+    s = nextRecoveryState(s, 'SIGNED_IN', 'u1');
+    expect(recoveryAppliesTo(s, 'u1')).toBe(false);
+  });
+  it('another account signing in ends it', () => {
+    let s = nextRecoveryState(initialRecoveryState(link), 'INITIAL_SESSION', 'u1');
+    s = nextRecoveryState(s, 'SIGNED_IN', 'u2');
+    expect(s.active).toBe(false);
+    expect(recoveryAppliesTo(s, 'u2')).toBe(false);
+    expect(recoveryAppliesTo(s, 'u1')).toBe(false);
+  });
+});
+
+describe('isAmazonSessionUser (no database read)', () => {
+  it('an alias in the session metadata or an @amazon.com address is Amazon', () => {
+    expect(isAmazonSessionUser({ email: 'x@example.com', user_metadata: { amazon_alias: 'jdoe' } })).toBe(true);
+    expect(isAmazonSessionUser({ email: 'jdoe@amazon.com' })).toBe(true);
+    expect(isAmazonSessionUser({ email: ' JDoe@Amazon.COM ' })).toBe(true);
+  });
+  it('anything else is not', () => {
+    expect(isAmazonSessionUser(null)).toBe(false);
+    expect(isAmazonSessionUser({ email: 'jdoe@amazon.com.evil.test' })).toBe(false);
+    expect(isAmazonSessionUser({ email: 'jdoe@notamazon.com' })).toBe(false);
+    expect(isAmazonSessionUser({ email: 'a@example.com', user_metadata: { amazon_alias: '  ' } })).toBe(false);
+    expect(isAmazonSessionUser({ email: 'a@example.com', user_metadata: { full_name: 'A' } })).toBe(false);
   });
 });

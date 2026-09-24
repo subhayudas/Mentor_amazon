@@ -7,7 +7,8 @@ import { localStore } from "@/lib/localStore";
 import { auth, AuthUser, type CaptchaOptions } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES } from "@/lib/routes";
-import { INITIAL_AUTH_HASH } from "@/lib/supabase";
+import { INITIAL_AUTH_HASH, supabase } from "@/lib/supabase";
+import { initialRecoveryState, nextRecoveryState, recoveryAppliesTo, type RecoveryState } from "@/lib/authFlow";
 
 interface LoginData {
   email: string;
@@ -37,14 +38,23 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
- * Whether this page load carries a password-recovery session: the recovery
- * link's fragment (captured before supabase-js consumed it) or a
- * `PASSWORD_RECOVERY` event seen since load. /reset-password opens its form
- * only then (D13, F11).
+ * The password-recovery session, if any: started by the recovery link's
+ * fragment (captured before supabase-js consumed it) or a `PASSWORD_RECOVERY`
+ * event, bound to that session's user, and ended by a sign-out or another
+ * account signing in (lib/authFlow `nextRecoveryState`). /reset-password opens
+ * its form only for that user (D13, F11).
  */
-let recoverySeen = INITIAL_AUTH_HASH.type === "recovery" && INITIAL_AUTH_HASH.hasSession && !INITIAL_AUTH_HASH.errorCode;
-export function isRecoverySession(): boolean {
-  return recoverySeen;
+let recovery: RecoveryState = initialRecoveryState(INITIAL_AUTH_HASH);
+supabase.auth.onAuthStateChange((event, session) => {
+  // Synchronous and Supabase-free: safe inside auth-js's lock.
+  recovery = nextRecoveryState(recovery, event, session?.user?.id ?? null);
+});
+export function isRecoverySession(userId: string | null | undefined): boolean {
+  return recoveryAppliesTo(recovery, userId);
+}
+/** Whether a recovery link started a recovery session on this page load (the redirect below). */
+function recoveryPending(): boolean {
+  return recovery.active;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -96,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // A recovery link that Supabase sent to another page (e.g. the Site URL)
     // still ends on the reset form (F34).
-    if (recoverySeen && locationRef.current !== ROUTES.resetPassword) {
+    if (recoveryPending() && locationRef.current !== ROUTES.resetPassword) {
       setLocation(ROUTES.resetPassword, { replace: true });
     }
 
@@ -106,7 +116,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(authUser);
       setError(resolveError ?? null);
       if (event === "PASSWORD_RECOVERY") {
-        recoverySeen = true;
         if (locationRef.current !== ROUTES.resetPassword) setLocation(ROUTES.resetPassword, { replace: true });
       }
     });

@@ -148,14 +148,3 @@ export async function resolveBackend(): Promise<void> {
   applyDecision(decision);
   if (decision.probeInBackground) void probeBackend();
 }
-
-/**
- * @deprecated Transitional and inert: Cal.com's public sample account is never
- * used again (design D4) and `VITE_DEFAULT_CAL_LINK` is no longer read. The
- * constant stays empty only until Track B's SessionScheduler stops importing
- * it; delete it (and the re-export below) at the Phase 3 merge.
- */
-export const DEFAULT_CAL_LINK = "";
-
-/** @deprecated Transitional re-export; import from `@/lib/calLink`. Deleted with DEFAULT_CAL_LINK at the Phase 3 merge. */
-export { normalizeCalLink } from "@/lib/calLink";
