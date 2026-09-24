@@ -6,7 +6,7 @@
  * (aliases starting with "e2e"; with E2E_NS only e2e-<label>-<ns>-…, see ssoTestAlias).
  *
  *   source scripts/e2e/env.sh && npx tsx scripts/e2e/seed.ts [project ...]
- *   (also runs under vite-node; E2E_NS=b|c namespaces the personas, see e2e/fixtures/personas.ts)
+ *   (E2E_NS=b|c namespaces the personas, see e2e/fixtures/personas.ts)
  *
  * Per project:
  *   mentee         auth user + users + mentees row; party of the accepted/confirmed/completed fixtures

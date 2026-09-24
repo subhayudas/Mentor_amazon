@@ -66,5 +66,6 @@ legacy writes $(psql "$DB" -Atc "select value from public.mc_settings where key 
 
 if [[ $E2E_SEED == 1 ]]; then
   echo "  seeding E2E personas"
-  ( cd "$ROOT" && DATABASE_URL="$DB" npx vite-node scripts/e2e/seed.ts )
+  # env.sh supplies the service-role key the seed needs; values already set (DATABASE_URL) win.
+  ( cd "$ROOT" && export DATABASE_URL="$DB" && source scripts/e2e/env.sh && npx tsx scripts/e2e/seed.ts )
 fi
