@@ -1,5 +1,10 @@
 import { pgTable, text, varchar, timestamp, integer, decimal, boolean, jsonb } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
+
+// Server-side defaults added by migrations/0002_production_readiness.sql (F35): writers that
+// omit id / created_at get a text UUID and a UTC wall-clock timestamp.
+const uuidText = sql`gen_random_uuid()::text`;
+const utcNow = sql`timezone('utc', now())`;
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -34,12 +39,14 @@ export const mentors = pgTable("mentors", {
   is_available: boolean("is_available").default(true).notNull(),
   average_rating: decimal("average_rating", { precision: 3, scale: 2 }).default("0"),
   total_ratings: integer("total_ratings").default(0),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
-  updated_at: timestamp("updated_at", { mode: "string" }).notNull(),
+  /** The featured five (migrations/0004): answered by the programme admins, placeholder email. */
+  managed_by_programme: boolean("managed_by_programme").default(false).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
+  updated_at: timestamp("updated_at", { mode: "string" }).notNull().default(utcNow),
 });
 
 export const mentees = pgTable("mentees", {
-  id: varchar("id").primaryKey(),
+  id: varchar("id").primaryKey().default(uuidText),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   user_type: text("user_type", { enum: ["individual", "organization"] }).notNull(),
@@ -59,11 +66,11 @@ export const mentees = pgTable("mentees", {
   languages_spoken: text("languages_spoken").array().notNull(),
   areas_exploring: text("areas_exploring").array().notNull(),
   goals: text("goals"),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
 });
 
 export const bookings = pgTable("bookings", {
-  id: varchar("id").primaryKey(),
+  id: varchar("id").primaryKey().default(uuidText),
   mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
   mentee_id: varchar("mentee_id").notNull().references(() => mentees.id),
   cal_event_uri: text("cal_event_uri"),
@@ -82,11 +89,16 @@ export const bookings = pgTable("bookings", {
   mentor_feedback: text("mentor_feedback"),
   session_duration_minutes: integer("session_duration_minutes"),
   country: text("country"),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  /** Cal.com side of an accepted request (written only by Cal sync; CHECK in migrations/0002). */
+  cal_status: text("cal_status", { enum: ["requested", "accepted", "rejected", "cancelled"] }),
+  /** Start Cal.com proposed while the mentor has not confirmed yet (UTC wall-clock). */
+  cal_requested_start: timestamp("cal_requested_start", { mode: "string" }),
+  canceled_by: text("canceled_by", { enum: ["mentor", "mentee", "admin", "cal"] }),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
 });
 
 export const bookingNotes = pgTable("booking_notes", {
-  id: varchar("id").primaryKey(),
+  id: varchar("id").primaryKey().default(uuidText),
   booking_id: varchar("booking_id").notNull().references(() => bookings.id),
   author_type: text("author_type", { enum: ["mentor", "mentee"] }).notNull(),
   author_email: text("author_email").notNull(),
@@ -94,7 +106,7 @@ export const bookingNotes = pgTable("booking_notes", {
   content: text("content").notNull(),
   is_completed: boolean("is_completed").default(false),
   due_date: timestamp("due_date", { mode: "string" }),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
 });
 
 export const mentorsRelations = relations(mentors, ({ many }) => ({
@@ -125,7 +137,7 @@ export const bookingNotesRelations = relations(bookingNotes, ({ one }) => ({
 }));
 
 export const notifications = pgTable("notifications", {
-  id: varchar("id").primaryKey(),
+  id: varchar("id").primaryKey().default(uuidText),
   recipient_email: text("recipient_email").notNull(),
   recipient_type: text("recipient_type", { enum: ["mentor", "mentee"] }).notNull(),
   type: text("type", { enum: ["booking_request", "booking_accepted", "booking_rejected", "booking_completed", "booking_canceled", "booking_confirmed", "feedback_received", "reminder"] }).notNull(),
@@ -133,7 +145,7 @@ export const notifications = pgTable("notifications", {
   message: text("message").notNull(),
   booking_id: varchar("booking_id").references(() => bookings.id),
   is_read: boolean("is_read").default(false).notNull(),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
 });
 
 export const notificationsRelations = relations(notifications, ({ one }) => ({
@@ -216,17 +228,17 @@ export const userIdentifiers = pgTable("user_identifiers", {
 });
 
 export const mentorAvailability = pgTable("mentor_availability", {
-  id: varchar("id").primaryKey(),
+  id: varchar("id").primaryKey().default(uuidText),
   mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
   day_of_week: integer("day_of_week").notNull(),
   start_time: text("start_time").notNull(),
   end_time: text("end_time").notNull(),
   is_active: boolean("is_active").default(true).notNull(),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
 });
 
 export const mentorTasks = pgTable("mentor_tasks", {
-  id: varchar("id").primaryKey(),
+  id: varchar("id").primaryKey().default(uuidText),
   mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
   mentee_id: varchar("mentee_id").references(() => mentees.id),
   booking_id: varchar("booking_id").references(() => bookings.id),
@@ -235,7 +247,7 @@ export const mentorTasks = pgTable("mentor_tasks", {
   due_date: timestamp("due_date", { mode: "string" }),
   status: text("status", { enum: ["pending", "in_progress", "completed", "canceled"] }).notNull().default("pending"),
   priority: text("priority", { enum: ["low", "medium", "high"] }).notNull().default("medium"),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
   updated_at: timestamp("updated_at", { mode: "string" }).notNull(),
   completed_at: timestamp("completed_at", { mode: "string" }),
 });
@@ -252,7 +264,7 @@ export const mentorEarnings = pgTable("mentor_earnings", {
 });
 
 export const mentorActivityLog = pgTable("mentor_activity_log", {
-  id: varchar("id").primaryKey(),
+  id: varchar("id").primaryKey().default(uuidText),
   mentor_id: varchar("mentor_id").notNull().references(() => mentors.id),
   mentee_id: varchar("mentee_id").references(() => mentees.id),
   booking_id: varchar("booking_id").references(() => bookings.id),
@@ -261,7 +273,7 @@ export const mentorActivityLog = pgTable("mentor_activity_log", {
   }).notNull(),
   title: text("title").notNull(),
   description: text("description"),
-  created_at: timestamp("created_at", { mode: "string" }).notNull(),
+  created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
 });
 
 export const mentorAvailabilityRelations = relations(mentorAvailability, ({ one }) => ({

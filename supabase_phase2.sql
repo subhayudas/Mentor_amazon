@@ -1,19 +1,30 @@
--- MentorConnect — phase 2 tables. Run after supabase_setup_v2.sql.
+-- MentorConnect — phase 2 tables.
+--
+-- APPLY ORDER: supabase_setup_v2.sql → THIS FILE → migrations/0002_production_readiness.sql
+--              → migrations/0003_restrict_legacy_writes.sql (after the new client is deployed).
+-- Re-running this file is safe; re-run migrations/0002 (and 0003 if it was applied) afterwards.
+-- migrations/0002 also repairs a database where an older copy of this file was run (uuid id
+-- columns, missing FKs) and creates these tables if they are missing.
 --
 --   mentee_favorites    a mentee's saved mentors
---   activity_events     append-only audit feed (every state change, app + server)
+--   activity_events     append-only audit feed (booking lifecycle rows come from a DB trigger)
 --   booking_reminders   one row per reminder actually sent (cron idempotency)
 --   cal_webhook_events  one row per Cal.com webhook delivery processed (idempotency)
 --
--- RLS: mentees own their favourites; anyone signed in can append events that
--- name themselves as actor and read the events they are listed in; admins
--- read everything; reminder and webhook tables are service-role only.
+-- Ids of the base tables (mentors, mentees, bookings) are `character varying`, so every
+-- column that references them is varchar too (an older copy said uuid, which cannot
+-- reference a varchar key).
+--
+-- RLS: mentees own their favourites; a signed-in user can append an event only as
+-- themselves and only visible to themselves; users read the events they are listed in;
+-- admins read everything; reminder and webhook tables are service-role only.
+-- is_admin() is NOT defined here: the uid-based version in supabase_setup_v2.sql is canonical.
 
 -- ---------------------------------------------------------------- favourites
 create table if not exists public.mentee_favorites (
   id          uuid primary key default gen_random_uuid(),
-  mentee_id   uuid not null references public.mentees(id) on delete cascade,
-  mentor_id   uuid not null references public.mentors(id) on delete cascade,
+  mentee_id   varchar not null references public.mentees(id) on delete cascade,
+  mentor_id   varchar not null references public.mentors(id) on delete cascade,
   created_at  timestamptz not null default now(),
   unique (mentee_id, mentor_id)
 );
@@ -46,26 +57,31 @@ create index if not exists activity_events_visible_idx on public.activity_events
 
 alter table public.activity_events enable row level security;
 
--- The ids a signed-in user may act as: their mentor row and/or mentee row.
+-- The ids a signed-in user may act as: mentor and/or mentee rows under their email, plus the
+-- profile an admin linked to their account (users.profile_id). Same body as migrations/0002.
 create or replace function public.my_profile_ids()
-returns text[] language sql stable security definer set search_path = public as $$
-  select coalesce(array_agg(id::text), '{}')
+returns text[] language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(array_agg(distinct p.id), '{}'::text[])
   from (
-    select id from public.mentors where lower(email) = lower(auth.jwt() ->> 'email')
+    select m.id::text as id from public.mentors m
+      where public.current_email() is not null and lower(m.email) = public.current_email()
     union all
-    select id from public.mentees where lower(email) = lower(auth.jwt() ->> 'email')
+    select me.id::text from public.mentees me
+      where public.current_email() is not null and lower(me.email) = public.current_email()
+    union all
+    select u.profile_id::text from public.users u
+      where auth.uid() is not null and u.id = auth.uid()::text and u.profile_id is not null
   ) p;
 $$;
+revoke all on function public.my_profile_ids() from public;
+grant execute on function public.my_profile_ids() to authenticated, service_role;
 
-create or replace function public.is_admin()
-returns boolean language sql stable security definer set search_path = public as $$
-  select exists (select 1 from public.users where lower(email) = lower(auth.jwt() ->> 'email') and user_type = 'admin');
-$$;
-
+-- A user may only post into their own feed; booking lifecycle rows are written by the
+-- bookings_activity_events trigger (migrations/0002), which bypasses this policy.
 drop policy if exists "events: append as self" on public.activity_events;
 create policy "events: append as self" on public.activity_events
   for insert
-  with check (actor_id = any (public.my_profile_ids()) or public.is_admin());
+  with check (public.is_admin() or (actor_id = any (public.my_profile_ids()) and visible_to <@ public.my_profile_ids()));
 
 drop policy if exists "events: read mine" on public.activity_events;
 create policy "events: read mine" on public.activity_events
@@ -77,7 +93,7 @@ create policy "events: read mine" on public.activity_events
 -- ---------------------------------------------------------------- reminders (cron)
 create table if not exists public.booking_reminders (
   id          uuid primary key default gen_random_uuid(),
-  booking_id  uuid not null references public.bookings(id) on delete cascade,
+  booking_id  varchar not null references public.bookings(id) on delete cascade,
   kind        text not null check (kind in ('24h', '1h')),
   sent_at     timestamptz not null default now(),
   channels    text[] not null default '{}',
@@ -88,11 +104,11 @@ alter table public.booking_reminders enable row level security;
 
 -- ---------------------------------------------------------------- Cal.com webhook idempotency
 create table if not exists public.cal_webhook_events (
-  id           text primary key,             -- trigger + booking uid (+ updated_at) from the payload
+  id           text primary key,             -- delivery id built by api/webhooks/cal.ts
   trigger      text not null,
   booking_uid  text,
   received_at  timestamptz not null default now(),
   outcome      text
 );
 alter table public.cal_webhook_events enable row level security;
--- service role only (no policies).
+-- service role only (no policies). migrations/0002 adds mentor_id, payload_sha256, booking_id, processed_at.

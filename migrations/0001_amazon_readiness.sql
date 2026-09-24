@@ -1,6 +1,11 @@
 -- =============================================================================
 -- 0001_amazon_readiness — DDL delta for the Amazon-readiness release
 -- =============================================================================
+-- NOTE: this file duplicates section 1 of supabase_setup_v2.sql. A project that has
+-- run supabase_setup_v2.sql does not need it. It is kept for history; the current
+-- apply order is: drizzle push → supabase_setup_v2.sql → supabase_phase2.sql →
+-- migrations/0002 → (after the deploy) migrations/0003 → (optional) migrations/0004.
+-- Never run `drizzle-kit generate` into ./migrations: these files are hand-written.
 -- Mirrors shared/schema.ts (the drizzle schema is the source of truth) and is
 -- the exact section-1 DDL from supabase_setup_v2.sql, which also applies it.
 -- Apply ONE of the two, not both (both are idempotent, so a double run is
