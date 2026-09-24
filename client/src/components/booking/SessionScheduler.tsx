@@ -268,7 +268,9 @@ function RequestFlow({
       }),
     [t, name, maxText],
   );
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { ...prefill, goal: "" }, mode: "onSubmit", reValidateMode: "onBlur" });
+  // Errors clear while the person types (onChange), never on blur: a blur-time re-render would
+  // move the Send button between mousedown and mouseup and swallow the click.
+  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { ...prefill, goal: "" }, mode: "onSubmit", reValidateMode: "onChange" });
   // Late prefill (the mentees row arrives after mount) fills only untouched fields.
   React.useEffect(() => {
     if (!form.formState.dirtyFields.name && prefill.name) form.setValue("name", prefill.name);

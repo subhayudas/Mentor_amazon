@@ -161,7 +161,9 @@ export function BookingRequestDialog({
     resolver: zodResolver(schema),
     defaultValues: { name: prefill.name, email: prefill.email, goal: "" },
     mode: "onSubmit",
-    reValidateMode: "onBlur",
+    // Errors clear while typing, never on blur: a blur-time re-render resizes the dialog and
+    // moves the footer's Send button between mousedown and mouseup, swallowing the click.
+    reValidateMode: "onChange",
   });
 
   const goal = useWatch({ control: form.control, name: "goal" }) ?? "";
@@ -188,6 +190,13 @@ export function BookingRequestDialog({
     mutationFn: (data: { mentor_id: string; mentee_name: string; mentee_email: string; goal: string; turnstileToken?: string | null }) =>
       bookingService.createRequest(data),
     onSuccess: (result, variables) => {
+      try {
+        // Per-browser prefill for the next request (Login reads the same keys); only once it went out.
+        localStorage.setItem("menteeName", variables.mentee_name);
+        localStorage.setItem("menteeEmail", variables.mentee_email);
+      } catch {
+        /* storage unavailable */
+      }
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
@@ -249,13 +258,6 @@ export function BookingRequestDialog({
       // No token yet (still solving, blocked, or expired): no POST at all.
       setServerError("botCheck");
       return;
-    }
-    try {
-      // Per-browser prefill for the next anonymous request (Login reads the same keys).
-      localStorage.setItem("menteeName", values.name);
-      localStorage.setItem("menteeEmail", values.email);
-    } catch {
-      /* storage unavailable: the request still goes out */
     }
     setServerError(null);
     mutation.mutate({
