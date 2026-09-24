@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, ChevronDown, LogOut, Menu } from "lucide-react";
@@ -6,7 +6,6 @@ import { ArrowRight, ChevronDown, LogOut, Menu } from "lucide-react";
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { NotificationBell } from "@/components/NotificationBell";
-import { LocalNotificationBell } from "@/components/LocalNotificationBell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,6 +21,11 @@ import { syncRoleStorage } from "@/lib/auth";
 import { IS_LOCAL } from "@/lib/demo";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+
+// Demo (local) mode only: database-mode visitors never download the browser-store bell.
+const LocalNotificationBell = lazy(() =>
+  import("@/components/LocalNotificationBell").then((m) => ({ default: m.LocalNotificationBell })),
+);
 
 /**
  * Global header (spec §4 as amended by P0-6/C1, P1-23, P1-26, P2-9).
@@ -183,7 +187,11 @@ export function Navigation() {
           <LanguageToggle />
 
           {bellEmail && !IS_LOCAL && <NotificationBell email={bellEmail} />}
-          {IS_LOCAL && user && <LocalNotificationBell />}
+          {IS_LOCAL && user && (
+            <Suspense fallback={null}>
+              <LocalNotificationBell />
+            </Suspense>
+          )}
 
           {/* Visitor CTAs never top the access-error card: with a session whose users row failed to load (F-02), the header stays neutral. */}
           {!isLoading && !isLoggedIn && !error && (

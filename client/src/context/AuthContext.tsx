@@ -56,9 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const locationRef = useRef(location);
   locationRef.current = location;
 
-  const resolve = useCallback(async (): Promise<AuthUser | null> => {
+  const resolve = useCallback(async (fresh = false): Promise<AuthUser | null> => {
     try {
-      const currentUser = await auth.getCurrentUser();
+      const currentUser = await auth.getCurrentUser({ fresh });
       if (mountedRef.current) {
         setUser(currentUser);
         setError(null);
@@ -129,7 +129,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(local);
       return Promise.resolve(local);
     }
-    return resolve();
+    // After a profile or role change: never reuse a resolution that started before it.
+    return resolve(true);
   }, [resolve]);
 
   const login = async (data: LoginData, options?: CaptchaOptions): Promise<AuthUser> => {

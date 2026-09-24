@@ -204,7 +204,31 @@ class AuthService {
    * authenticated email (the same predicate RLS uses for ownership). Nothing
    * here reads localStorage.
    */
-  private async resolveAuthUser(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Promise<AuthUser> {
+  /** Identity resolutions in flight, by auth user id (see resolveAuthUser). */
+  private resolving = new Map<string, Promise<AuthUser>>();
+
+  /**
+   * The app identity of a Supabase user. Calls made while one is in flight
+   * for the same user share it: a page load resolves the same session from
+   * the initial check and from each auth event, and one set of reads is
+   * enough (it also leaves nothing half-way when a page signs out right after
+   * deciding, e.g. /reset-password for an Amazon account). `fresh` starts a
+   * new resolution, for callers that just changed the users/profile rows.
+   */
+  private resolveAuthUser(
+    user: { id: string; email?: string; user_metadata?: Record<string, unknown> },
+    options: { fresh?: boolean } = {},
+  ): Promise<AuthUser> {
+    const pending = options.fresh ? undefined : this.resolving.get(user.id);
+    if (pending) return pending;
+    const run = this.loadAuthUser(user).finally(() => {
+      if (this.resolving.get(user.id) === run) this.resolving.delete(user.id);
+    });
+    this.resolving.set(user.id, run);
+    return run;
+  }
+
+  private async loadAuthUser(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Promise<AuthUser> {
     const email = user.email!;
     const metadata = user.user_metadata || {};
 
@@ -308,14 +332,14 @@ class AuthService {
   /**
    * Get the current authenticated user
    */
-  async getCurrentUser(): Promise<AuthUser | null> {
+  async getCurrentUser(options: { fresh?: boolean } = {}): Promise<AuthUser | null> {
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error || !user) {
       return null;
     }
 
-    return this.resolveAuthUser(user);
+    return this.resolveAuthUser(user, options);
   }
 
   /**

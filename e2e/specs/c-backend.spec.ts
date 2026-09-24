@@ -77,7 +77,9 @@ test('S20 outage: banner, database mode kept, no local fallback, visible failure
   expect(await page.evaluate(() => (window as unknown as { __MC_BACKEND__?: { health: string } }).__MC_BACKEND__?.health)).toBe('degraded');
   await expect(page.getByText('admin@mentorconnect.local')).toHaveCount(0);
   await expect(page.getByTestId('link-amazon-sso')).toBeVisible();
-  if (turnstile.enabled) await captchaReady(page); // the widget renders under the production CSP
+  // The Turnstile widget of the (folded) password form renders under the production CSP.
+  await page.getByTestId('button-toggle-password-login').click();
+  if (turnstile.enabled) await captchaReady(page);
   await healthy({ screenshotName: 'S20-banner' });
 
   // A request sent while the project is unreachable fails visibly; nothing lands in the browser store.

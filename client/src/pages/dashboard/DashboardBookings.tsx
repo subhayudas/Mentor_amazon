@@ -317,7 +317,8 @@ export default function DashboardBookings() {
         <div className="min-w-0 flex-1 basis-[calc(100%-4rem)] md:basis-auto">
           <p className="truncate text-[15px] font-semibold text-[var(--sc-ink)]">{isMentee ? t("showcase.bookings.with", { name }) : name}</p>
           <p className="truncate text-[13px] text-[#6c6c84]">
-            {b.goal ?? t("showcase.bookings.session")}
+            {/* The goal is the requester's own words, in either script: isolate its direction. */}
+            <bdi>{b.goal ?? t("showcase.bookings.session")}</bdi>
             {!isMentee ? ` · ${t("showcase.bookings.with", { name: mentorNameOf(b) })}` : ""}
           </p>
         </div>
