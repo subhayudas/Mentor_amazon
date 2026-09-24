@@ -63,8 +63,12 @@ function BackLink() {
   );
 }
 
-/** Not found / load error share one frame: the page title h1, then a compact EmptyState. */
-function ProfileState({
+/**
+ * Not found / load error share one frame: the page title h1, then a compact
+ * EmptyState. Exported so `/mentor/:id/book` shows the same not-found state as
+ * `/mentor/:id` for an unknown id (never another mentor's page, F23).
+ */
+export function ProfileState({
   icon,
   title,
   description,
@@ -320,7 +324,7 @@ export default function MentorProfile() {
           bookingId={request.bookingId}
           open={calOpen}
           onOpenChange={setCalOpen}
-          onBookingSuccessful={onCalBooked(request.bookingId)}
+          onBookingSuccessful={onCalBooked(request.bookingId, display.name)}
         />
       )}
     </Container>

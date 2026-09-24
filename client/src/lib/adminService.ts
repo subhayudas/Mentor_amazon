@@ -11,11 +11,20 @@
 import { supabase } from '@/lib/supabase';
 import type { Mentor, Mentee, Booking, User, ApprovedUser, AccessRequest, VerificationStatus } from '@/lib/database';
 
-/** Booking row with the small mentor/mentee projections the admin tables need. */
+/**
+ * Booking row with the small mentor/mentee projections the admin tables need.
+ * `managed_by_programme` marks the curated mentors whose requests the
+ * programme team answers from /admin/bookings (design D3, B5).
+ */
 export type AdminBooking = Booking & {
-  mentor?: Pick<Mentor, 'id' | 'name' | 'email' | 'country'> | null;
+  mentor?: Pick<Mentor, 'id' | 'name' | 'email' | 'country' | 'managed_by_programme'> | null;
   mentee?: Pick<Mentee, 'id' | 'name' | 'email' | 'user_type' | 'organization_name'> | null;
 };
+
+/** A pending request to a programme-managed mentor: the admin answers it (Accept / Decline). */
+export function isProgrammeRequest(booking: Pick<AdminBooking, 'status' | 'mentor'>): boolean {
+  return booking.status === 'pending' && booking.mentor?.managed_by_programme === true;
+}
 
 /** `users` row without secrets (never select `password` or reset tokens). */
 export type AdminUser = Pick<User, 'id' | 'email' | 'user_type' | 'profile_id' | 'amazon_alias' | 'is_verified' | 'created_at'>;
@@ -80,7 +89,7 @@ export const adminService = {
   async getBookings(): Promise<AdminBooking[]> {
     const { data, error } = await supabase
       .from('bookings')
-      .select('*, mentor:mentors(id, name, email, country), mentee:mentees(id, name, email, user_type, organization_name)')
+      .select('*, mentor:mentors(id, name, email, country, managed_by_programme), mentee:mentees(id, name, email, user_type, organization_name)')
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data || []) as AdminBooking[];
