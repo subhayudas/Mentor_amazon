@@ -65,13 +65,16 @@ export const test = base.extend<E2eOptions & E2eFixtures, E2eWorkerFixtures>({
   },
 
   page: async ({ page, lang, clientIp, baseURL }, use) => {
-    // Language before the first load (i18next's detector reads localStorage 'i18nextLng');
-    // only when absent, so an in-test language toggle sticks.
+    // Language before the first load: LanguageProvider reads localStorage 'language' and
+    // drives i18next (whose own detector key is 'i18nextLng'), so both are set — only when
+    // absent, so an in-test language toggle sticks.
     await page.addInitScript((l) => {
       try {
-        if (!window.localStorage.getItem('i18nextLng')) window.localStorage.setItem('i18nextLng', l);
+        for (const key of ['language', 'i18nextLng']) {
+          if (!window.localStorage.getItem(key)) window.localStorage.setItem(key, l);
+        }
       } catch {
-        /* storage blocked: the detector falls back to the navigator language */
+        /* storage blocked: the app falls back to English */
       }
     }, lang);
     const origin = new URL(baseURL ?? `http://localhost:${e2eEnv.port}`).origin;

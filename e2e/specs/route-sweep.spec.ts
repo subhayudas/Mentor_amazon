@@ -106,7 +106,7 @@ for (const persona of PERSONAS) {
                 if (persona !== 'anon') await expect(page.locator('input[type="email"]').first()).not.toBeEditable();
                 break;
               case 'ok':
-                expect(pathOf(page), 'not sent to login').not.toBe('/login');
+                if (route !== '/login') expect(pathOf(page), 'not sent to login').not.toBe('/login');
                 await expect(page.getByText(tr(lang, 'errors.notFoundTitle'))).toHaveCount(0);
                 await expect(page.getByText(tr(lang, 'guard.noAccessTitle'))).toHaveCount(0);
                 break;

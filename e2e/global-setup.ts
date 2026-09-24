@@ -14,5 +14,5 @@ export default function globalSetup(): void {
     selected.length === 0 || selected.some((p) => p === name || (p.includes('*') && new RegExp(`^${p.replace(/\*/g, '.*')}$`).test(name)));
   const projects = E2E_PROJECTS.filter(matches);
   if (projects.length === 0) return;
-  execFileSync('npx', ['tsx', 'scripts/e2e/seed.ts', ...projects], { stdio: 'inherit', env: process.env });
+  execFileSync('npx', ['tsx', 'scripts/e2e/seed.ts', ...projects], { stdio: ['ignore', 2, 2], env: process.env });
 }
