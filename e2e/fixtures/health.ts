@@ -62,7 +62,11 @@ export async function expectHealthyPage(page: Page, tracker: HealthTracker, test
   const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
   expect.soft(overflow.scroll, `horizontal overflow (${overflow.scroll} > ${overflow.inner})`).toBeLessThanOrEqual(overflow.inner + 1);
 
-  const text = await page.evaluate(() => document.body?.innerText ?? '');
+  // E-mail addresses and E2E persona handles are data (admin lists show them as names), not
+  // i18n keys: 'e2e.c.mobile-ar.mentor@…' would otherwise match as 'e2e.c.mobile'.
+  const text = (await page.evaluate(() => document.body?.innerText ?? ''))
+    .replace(/[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g, ' ')
+    .replace(/\be2e\.[A-Za-z0-9._-]+/g, ' ');
   const rawKeys = [...text.matchAll(RAW_KEY)]
     .map((m) => ({ key: m[0], before: text[m.index! - 1] ?? '', after: text[m.index! + m[0].length] ?? '' }))
     .filter((m) => !DOMAIN_LIKE.test(m.key) && m.before !== '@' && m.before !== '/' && m.after !== '@' && m.after !== '/')
