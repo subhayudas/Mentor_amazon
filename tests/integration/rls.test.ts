@@ -48,6 +48,29 @@ async function visible(tx: Tx, ids: string[]): Promise<string[]> {
 }
 
 describeDb('I18 RLS matrix', () => {
+  it('the public views are read-only for every API role (no writes through the owner-run view)', async () => {
+    await withTx(sql, async (tx) => {
+      const c = await cast(tx);
+      for (const role of ['anon', 'mentee', 'mentor', 'service'] as const) {
+        await c.as[role]();
+        await expectPgError(tx, (sp) => sp`update public.mentors_public set bio = 'defaced' where id = ${c.mentor.id}`, '42501', /permission denied/);
+        await expectPgError(tx, (sp) => sp`delete from public.mentors_public where id = ${c.mentor.id}`, '42501', /permission denied/);
+        await expectPgError(tx, (sp) => sp`insert into public.mentors_public (id, name) values (${randomUUID()}, 'x')`, '42501', /permission denied/);
+        const [{ n }] = await tx`select count(*)::int as n from public.mentors_public where id = ${c.mentor.id}`;
+        expect(n).toBe(1);
+      }
+      await asService(tx);
+      const writes = await tx<{ view: string; role: string; priv: string }[]>`
+        select v.view, r.role, p.priv from (values ('public.mentors_public'), ('public.mentor_scheduling_links')) v (view)
+        cross join (values ('anon'), ('authenticated'), ('service_role')) r (role)
+        cross join (values ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE')) p (priv)
+        where has_table_privilege(r.role, v.view, p.priv)`;
+      expect(writes).toEqual([]);
+      const [row] = await tx`select bio from public.mentors where id = ${c.mentor.id}`;
+      expect(row.bio).toBe('Integration test mentor');
+    });
+  });
+
   it('bookings: each party sees their own, the linked mentor sees the profile\'s, admins and the service role see all, anon nothing', async () => {
     await withTx(sql, async (tx) => {
       const c = await cast(tx);

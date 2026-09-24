@@ -31,6 +31,16 @@ describe('mirrored SQL', () => {
     expect(def(v2)).toBe(def(m0002));
   });
 
+  it('0002 and supabase_setup_v2.sql define the same mentors_public columns (with managed_by_programme)', () => {
+    const cols = (sql: string) => {
+      const s = sql.search(/VIEW public\.mentors_public WITH/);
+      return sql.slice(s, sql.indexOf('FROM public.mentors;', s)).replace(/\s+/g, ' ');
+    };
+    expect(cols(m0002)).toBe(cols(v2));
+    expect(cols(v2)).toMatch(/created_at, managed_by_programme $/);
+    expect(cols(v2)).not.toMatch(/\b(email|cal_link|linkedin_url)\b/);
+  });
+
   it('supabase_phase2.sql and 0002 define the same my_profile_ids()', () => {
     expect(body(phase2, 'my_profile_ids')).toBe(body(m0002, 'my_profile_ids'));
   });

@@ -70,13 +70,15 @@ describeDb('I16 featured-mentor seed', () => {
     }
   });
 
-  it('anon reads them from mentors_public without email or Cal link', async () => {
+  it('anon reads them from mentors_public without email or Cal link, flagged programme-managed', async () => {
     const { data, error } = await anonClient().from('mentors_public').select('*').in('id', Object.keys(FEATURED));
     expect(error).toBeNull();
     expect(data).toHaveLength(5);
     for (const row of data ?? []) {
       expect(row).not.toHaveProperty('email');
       expect(row).not.toHaveProperty('cal_link');
+      // The client switches a handed-over profile (flag false) from the curated copy to the row.
+      expect(row).toHaveProperty('managed_by_programme', true);
     }
     const direct = await anonClient().from('mentors').select('id').limit(1);
     expect(direct.error?.code).toBe('42501');

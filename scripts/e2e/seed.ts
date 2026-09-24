@@ -3,7 +3,7 @@
  * a reset: re-running puts every persona of the selected projects back into its initial
  * state (passwords, rows, fixture bookings, favourites, availability, Cal webhook, bell),
  * removes rows specs created around those personas, and removes SSO test identities
- * (aliases starting with "e2e").
+ * (aliases starting with "e2e"; with E2E_NS only e2e-<label>-<ns>-…, see ssoTestAlias).
  *
  *   source scripts/e2e/env.sh && npx tsx scripts/e2e/seed.ts [project ...]
  *   (also runs under vite-node; E2E_NS=b|c namespaces the personas, see e2e/fixtures/personas.ts)
@@ -32,6 +32,7 @@ import {
   mentorCalLink,
   personaAlias,
   personaEmail,
+  ssoAliasPattern,
   type AccountPersona,
 } from '../../e2e/fixtures/personas';
 
@@ -108,10 +109,16 @@ async function purgeMentee(tx: postgres.TransactionSql, menteeId: string): Promi
   await tx`delete from public.mentees where id = ${menteeId}`;
 }
 
-/** SSO test identities (mock IdP aliases starting with "e2e"): gone, so a first sign-in is a first sign-in. */
+/**
+ * SSO test identities (mock IdP aliases, see ssoTestAlias): gone, so a first sign-in is a first
+ * sign-in. With E2E_NS only that namespace's aliases (e2e-<label>-<ns>-…) are touched, so a
+ * namespaced seed never removes another track's identities mid-run; without it, every "e2e…".
+ */
 async function purgeSsoTestIdentities(): Promise<number> {
+  const aliasRe = ssoAliasPattern();
+  const emailRe = `${aliasRe}.*@amazon\\.com$`;
   const users = await sql<{ id: string; email: string }[]>`
-    select id, email from public.users where amazon_alias like 'e2e%'`;
+    select id, email from public.users where amazon_alias ~ ${aliasRe}`;
   await sql.begin(async (tx) => {
     for (const u of users) {
       const mentors = await tx<{ id: string }[]>`select id from public.mentors where lower(email) = lower(${u.email})`;
@@ -120,11 +127,11 @@ async function purgeSsoTestIdentities(): Promise<number> {
       await tx`delete from public.notifications where lower(recipient_email) = lower(${u.email})`;
       await tx`delete from public.users where id = ${u.id}`;
     }
-    const orphanMentors = await tx<{ id: string }[]>`select id from public.mentors where lower(email) like 'e2e%@amazon.com'`;
+    const orphanMentors = await tx<{ id: string }[]>`select id from public.mentors where lower(email) ~ ${emailRe}`;
     for (const m of orphanMentors) await purgeMentor(tx, m.id);
-    await tx`delete from public.user_identifiers where provider = 'amazon' and subject like 'e2e%'`;
-    await tx`delete from public.approved_users where amazon_alias like 'e2e%' and approved_by = 'amazon-sso'`;
-    await tx`delete from public.access_requests where amazon_alias like 'e2e%'`;
+    await tx`delete from public.user_identifiers where provider = 'amazon' and subject ~ ${aliasRe}`;
+    await tx`delete from public.approved_users where amazon_alias ~ ${aliasRe} and approved_by = 'amazon-sso'`;
+    await tx`delete from public.access_requests where amazon_alias ~ ${aliasRe}`;
   });
   for (const u of users) {
     const { error } = await admin.auth.admin.deleteUser(u.id);

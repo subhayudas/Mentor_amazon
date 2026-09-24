@@ -367,6 +367,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS bookings_cal_event_uri_unique ON public.bookin
 -- §6 MENTORS: programme-managed rows (the featured five, migrations/0004)
 -- =============================================================================
 ALTER TABLE public.mentors ADD COLUMN IF NOT EXISTS managed_by_programme boolean NOT NULL DEFAULT false;
+-- The public directory needs the flag: handing a featured profile to the real person
+-- (managed_by_programme = false) must switch the client from the programme copy to the row.
+-- Same definition as supabase_setup_v2.sql §3, with the column appended (so REPLACE works).
+CREATE OR REPLACE VIEW public.mentors_public WITH (security_invoker = false) AS
+  SELECT id, name, name_ar, company, company_ar, position, position_ar, timezone, country,
+         photo_url, bio, bio_ar, expertise, expertise_ar, industries, industries_ar,
+         languages_spoken, mentorship_preference, is_available, average_rating, total_ratings,
+         created_at, managed_by_programme
+  FROM public.mentors;
+-- Read-only views. mentors_public is a single-table view, so it is auto-updatable and runs as
+-- its owner: the INSERT/UPDATE/DELETE that Supabase's default privileges grant on every new
+-- object let anon edit or delete any mentor through it, past RLS. Only SELECT stays.
+REVOKE ALL ON public.mentors_public FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.mentors_public TO anon, authenticated, service_role;
+REVOKE ALL ON public.mentor_scheduling_links FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.mentor_scheduling_links TO authenticated, service_role;
 
 
 -- =============================================================================

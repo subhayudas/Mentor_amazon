@@ -27,6 +27,8 @@ export type FixtureBooking = (typeof FIXTURE_BOOKINGS)[number];
 export function e2eNamespace(): string {
   const ns = (process.env.E2E_NS ?? '').trim().toLowerCase();
   if (ns && !/^[a-z0-9]{1,8}$/.test(ns)) throw new Error('E2E_NS must be 1-8 lowercase letters or digits');
+  // A project prefix would make ssoAliasPattern() match un-namespaced aliases (e2e-x-desktop-…).
+  if (['desktop', 'mobile', 'prod'].includes(ns)) throw new Error('E2E_NS must not be a project prefix');
   return ns;
 }
 
@@ -51,6 +53,25 @@ function e2eId(project: string, ...parts: string[]): string {
 
 export function personaEmail(project: string, persona: AccountPersona | `requester-${number}` | 'mentor-linked-profile'): string {
   return `e2e.${scope(project)}.${persona}@mentorconnect.test`;
+}
+
+/**
+ * Amazon alias for a mock-IdP sign-in made by a spec: e2e-<label>-[<ns>-]<project>. The
+ * namespace sits right after the label (Track C's e2e-s24-/e2e-s28- aliases follow the same
+ * shape), so the seed can purge exactly one namespace's SSO identities.
+ */
+export function ssoTestAlias(label: string, project: string): string {
+  const ns = e2eNamespace();
+  return `e2e-${label}-${ns ? `${ns}-` : ''}${project}`.replace(/[^a-z0-9-]/g, '');
+}
+
+/**
+ * POSIX regex (Postgres `~`) matching the SSO test aliases the seed may remove: every "e2e…"
+ * alias without a namespace (Phase 3, single run), only e2e-<label>-<ns>-… with one.
+ */
+export function ssoAliasPattern(): string {
+  const ns = e2eNamespace();
+  return ns ? `^e2e-[a-z0-9]+-${ns}-` : '^e2e';
 }
 
 /** Amazon alias recorded for the mentor personas' approved_users rows. */

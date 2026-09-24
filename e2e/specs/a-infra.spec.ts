@@ -1,5 +1,5 @@
 import { test, expect, e2eEnv, mailpit, signedCalPost } from '../fixtures/test';
-import { ids, personaEmail } from '../fixtures/personas';
+import { ids, personaEmail, ssoTestAlias } from '../fixtures/personas';
 import { pingEvent } from '../../tests/helpers/cal';
 
 /**
@@ -89,7 +89,7 @@ test('the mock IdP and Mailpit are reachable', async ({ request }) => {
 });
 
 test('Amazon sign-in through the dev server ends in a Supabase session (AM3)', async ({ page, request, db, personaProject }) => {
-  const alias = `e2e-infra-${personaProject}`.replace(/[^a-z0-9-]/g, '');
+  const alias = ssoTestAlias('infra', personaProject);
   const setSubject = await request.post(`${e2eEnv.mockIdpControl}/subject`, { data: { sub: alias } });
   expect(setSubject.ok()).toBe(true);
   try {

@@ -74,8 +74,12 @@ function when(row: ReminderRow): string {
   return parseDbTimestamp(row.scheduled_at).toUTCString();
 }
 
+/**
+ * The cron runs hourly and a '24h' reminder can go out anywhere from 24 down to 1 hour before the
+ * session, so the copy names the window, never "tomorrow" (the exact time is in the body).
+ */
 export function reminderTitle(kind: ReminderKind): string {
-  return kind === '1h' ? 'Your session starts in an hour' : 'Session tomorrow';
+  return kind === '1h' ? 'Your session starts within the hour' : 'Your session is within the next 24 hours';
 }
 
 /** In-app notification text (plain text; the bell renders it as text). */

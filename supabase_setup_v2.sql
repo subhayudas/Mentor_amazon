@@ -116,6 +116,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_identifiers_provider_subject_unique
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_status text;
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_requested_start timestamp;
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS canceled_by text;
+-- Programme-managed mentors (migrations/0002 §6); the public directory view exposes the flag.
+ALTER TABLE public.mentors ADD COLUMN IF NOT EXISTS managed_by_programme boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS public.mc_settings (
   key        text PRIMARY KEY,
   value      text NOT NULL,
@@ -250,8 +252,12 @@ CREATE VIEW public.mentors_public WITH (security_invoker = false) AS
   SELECT id, name, name_ar, company, company_ar, position, position_ar, timezone, country,
          photo_url, bio, bio_ar, expertise, expertise_ar, industries, industries_ar,
          languages_spoken, mentorship_preference, is_available, average_rating, total_ratings,
-         created_at
+         created_at, managed_by_programme
   FROM public.mentors;
+-- Read-only. A single-table view is auto-updatable and runs as its owner, so the write
+-- privileges Supabase's default privileges hand out would let anyone edit or delete any
+-- mentor through it, past RLS.
+REVOKE ALL ON public.mentors_public FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT ON public.mentors_public TO anon, authenticated, service_role;
 
 -- Mentees see a mentor's Cal.com links only for their own accepted/confirmed/
@@ -266,8 +272,8 @@ CREATE VIEW public.mentor_scheduling_links WITH (security_invoker = false) AS
   WHERE b.status IN ('accepted', 'confirmed', 'completed')
     AND public.current_email() IS NOT NULL
     AND lower(me.email) = public.current_email();
+REVOKE ALL ON public.mentor_scheduling_links FROM PUBLIC, anon, authenticated, service_role;  -- default privileges would otherwise grant writes
 GRANT SELECT ON public.mentor_scheduling_links TO authenticated, service_role;
-REVOKE ALL ON public.mentor_scheduling_links FROM anon;  -- default privileges would otherwise grant it
 
 -- NOTE for client code: an INSERT ... RETURNING (supabase-js `.insert().select()`)
 -- also has to pass the table's SELECT policy. Anonymous inserts into bookings /

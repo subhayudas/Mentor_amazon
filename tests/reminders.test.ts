@@ -6,6 +6,7 @@ import {
   recipientsFor,
   reminderEmail,
   reminderKind,
+  reminderTitle,
   type ReminderRow,
 } from '../api/_lib/reminders.ts';
 import { invoke } from './helpers/vercel.ts';
@@ -25,6 +26,12 @@ describe('reminderKind', () => {
     expect(reminderKind(NOW, at(0))).toBeNull();
     expect(reminderKind(NOW, at(-30))).toBeNull();
     expect(reminderKind(NOW, 'garbage')).toBeNull();
+  });
+
+  it('never says "tomorrow": a 24h reminder can go out only a couple of hours before the session', () => {
+    expect(reminderTitle('24h')).toBe('Your session is within the next 24 hours');
+    expect(reminderTitle('1h')).toBe('Your session starts within the hour');
+    expect(reminderTitle('24h')).not.toMatch(/tomorrow/i);
   });
 
   it('reads zone-less database timestamps as UTC whatever the server time zone', () => {
