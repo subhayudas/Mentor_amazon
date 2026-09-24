@@ -33,6 +33,35 @@ export function sendMethodNotAllowed(res: VercelResponse, allow: string[]): void
   sendJson(res, 405, { error: 'method_not_allowed' });
 }
 
+/**
+ * 503 for a route that cannot serve right now (missing server env, migration not applied).
+ * Deliberately names nothing: the caller logs the details with console.error.
+ */
+export function sendUnavailable(res: VercelResponse): void {
+  sendJson(res, 503, { error: 'unavailable' });
+}
+
+export type RawBody = { ok: true; body: Buffer } | { ok: false; reason: 'too_large' };
+
+/**
+ * Read the raw request body from the stream, refusing more than `limitBytes` (checked on the
+ * declared content-length first, then on the bytes actually received). `req.body` is never
+ * touched, so signature checks see exactly the bytes that were sent.
+ */
+export async function readRawBody(req: VercelRequest, limitBytes: number): Promise<RawBody> {
+  const declared = Number(req.headers['content-length'] ?? '');
+  if (Number.isFinite(declared) && declared > limitBytes) return { ok: false, reason: 'too_large' };
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    const buf = typeof chunk === 'string' ? Buffer.from(chunk) : (chunk as Buffer);
+    size += buf.length;
+    if (size > limitBytes) return { ok: false, reason: 'too_large' };
+    chunks.push(buf);
+  }
+  return { ok: true, body: Buffer.concat(chunks) };
+}
+
 /** Parse the request URL once; Vercel's `req.query` helper is not relied on. */
 export function requestUrl(req: VercelRequest): URL {
   return new URL(req.url ?? '/', 'http://localhost');
