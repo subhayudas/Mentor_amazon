@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -8,7 +8,10 @@ import { z } from "zod";
 import { AlertCircle, Lock, Mail, MailCheck, Users } from "lucide-react";
 
 import { auth, rememberedMenteeEmail } from "@/lib/auth";
+import { authErrorKey, mapAuthError, toAuthFlowError } from "@/lib/authErrors";
 import { authService, menteeService } from "@/lib/services";
+import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES, isMenteePath } from "@/lib/routes";
 import { safeNext } from "@/lib/ssoClient";
@@ -20,13 +23,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthCard, AuthPage, IconInput, passwordStrength, STRENGTH_CLASS, inlineLinkClass } from "@/components/auth/AuthCard";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
 import { cn } from "@/lib/utils";
+import { bidi } from "@/lib/format";
 
 /**
  * Mentee sign-up (Amazon staff use SSO). After success: `?next` wins; a
- * mentee whose row already exists (created by an anonymous request through
- * `get_or_create_mentee`) goes straight to the dashboard; everyone else
- * completes registration. When email confirmation is on there is no session
- * yet, so the page shows "check your email" instead of bouncing off a guard.
+ * mentee whose row already exists (created by an anonymous request) goes
+ * straight to the dashboard; everyone else completes registration. When email
+ * confirmation is on there is no session yet, so the page shows "check your
+ * email" with Resend (60 s cooldown); the link lands on `/auth/confirm?next=…`
+ * (F32). Turnstile guards the form when enabled (F31) and errors say what to
+ * do next (F33).
  */
 export default function Signup() {
   const { t } = useTranslation();
@@ -34,6 +40,10 @@ export default function Signup() {
   const searchString = useSearch();
   const [formError, setFormError] = useState<string | null>(null);
   const [confirmEmailFor, setConfirmEmailFor] = useState<string | null>(null);
+  const [confirmSentAt, setConfirmSentAt] = useState<number | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const needsCaptcha = turnstileEnabled();
   const nextPath = safeNext(new URLSearchParams(searchString).get("next"), "");
   // The booking success state's "Create one" arrives with ?next=<mentee path>
   // and the mirrored email; the dialog insisted on "exactly this email", so it
@@ -73,18 +83,28 @@ export default function Signup() {
     mutationFn: async (data: SignupFormData) => {
       // Self-service accounts are mentee-only. Amazon mentors sign in with
       // Amazon SSO and are matched to an approved mentor record.
-      const user = await authService.signup({ email: data.email, password: data.password, user_type: "mentee" });
+      const user = await authService.signup({ email: data.email, password: data.password, user_type: "mentee" }, { captchaToken, next: nextPath || null });
       const session = await auth.getSession();
       // With a session the mentee can read their own row (RLS by session email).
       const existing = session ? await menteeService.getByEmail(data.email).catch(() => null) : null;
       return { user, hasSession: !!session, hasMenteeRow: !!existing };
     },
+    onSettled: () => {
+      // A Turnstile token is single-use: every attempt needs a fresh one.
+      if (needsCaptcha) turnstileRef.current?.reset();
+    },
     onSuccess: ({ user, hasSession, hasMenteeRow }) => {
       queryClient.clear();
-      localStorage.setItem("user", JSON.stringify(user));
       if (!hasSession) {
         setConfirmEmailFor(user.email);
+        setConfirmSentAt(Date.now());
         return;
+      }
+      // The legacy `user` mirror only ever describes a real session (F50).
+      try {
+        localStorage.setItem("user", JSON.stringify(user));
+      } catch {
+        /* storage blocked: nothing depends on the mirror */
       }
       toast.success(t("auth.signupSuccess"), { description: t("auth.accountCreated") });
       if (nextPath) {
@@ -94,8 +114,10 @@ export default function Signup() {
       }
     },
     onError: (error: Error) => {
-      const message = /already (registered|exists)/i.test(error.message) ? t("auth.emailInUse") : t("auth.signupError");
-      setFormError(message);
+      const flowError = toAuthFlowError(error);
+      const kind = mapAuthError(flowError.code, flowError.status, "signup");
+      const key = authErrorKey(kind);
+      setFormError(key && kind !== "invalid_credentials" ? t(key) : t("auth.signupError"));
     },
   });
 
@@ -107,14 +129,17 @@ export default function Signup() {
           tone="success"
           icon={MailCheck}
           title={t("auth.confirmEmailTitle")}
-          description={t("auth.confirmEmailBody", { email: confirmEmailFor })}
+          description={t("auth.confirm.checkEmailBody", { email: bidi(confirmEmailFor) })}
           data-testid="card-confirm-email"
           actions={
-            <Button asChild variant="secondary">
+            <Button asChild variant="ghost">
               <Link href={nextPath ? `${ROUTES.login}?next=${encodeURIComponent(nextPath)}` : ROUTES.login}>{t("auth.goToLogin")}</Link>
             </Button>
           }
-        />
+        >
+          <p className="text-body-sm text-muted-foreground">{t("auth.resend.prompt")}</p>
+          <ResendConfirmation email={confirmEmailFor} next={nextPath || null} sentAt={confirmSentAt} className="mt-3" />
+        </StatusCard>
       </StatusPage>
     );
   }
@@ -126,6 +151,10 @@ export default function Signup() {
           <form
             onSubmit={form.handleSubmit((data) => {
               setFormError(null);
+              if (needsCaptcha && !captchaToken) {
+                setFormError(t("auth.errors.captchaRequired"));
+                return;
+              }
               signupMutation.mutate(data);
             })}
             className="space-y-4"
@@ -231,6 +260,8 @@ export default function Signup() {
                 </p>
               </div>
             </div>
+
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} action="signup" />}
 
             <Button type="submit" variant="primary" size="lg" className="w-full" loading={signupMutation.isPending} data-testid="button-signup">
               {signupMutation.isPending ? t("auth.signingUp") : t("auth.signupButton")}

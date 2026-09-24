@@ -10,6 +10,9 @@ import { AlertCircle, ChevronRight, Lock, Mail, ShieldCheck } from "lucide-react
 import { authService } from "@/lib/services";
 import { LOCAL_ADMIN_EMAIL, findLocalAccount, setLocalSession } from "@/lib/localAuth";
 import { clearRoleStorage, rememberedMenteeEmail } from "@/lib/auth";
+import { authErrorKey, mapAuthError, toAuthFlowError, type AuthErrorKind } from "@/lib/authErrors";
+import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES, isMenteePath } from "@/lib/routes";
 import { IS_LOCAL } from "@/lib/demo";
@@ -17,13 +20,11 @@ import { safeNext, ssoErrorKey, ssoLoginHref } from "@/lib/ssoClient";
 import { toast } from "sonner";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthCard, AuthPage, IconInput, inlineLinkClass } from "@/components/auth/AuthCard";
 import { cn } from "@/lib/utils";
 
-/** Paths only a mentee follows; landing here from one of them means the visitor is a mentee (F-01). */
 /**
  * Sign in. Two audiences share the page: Amazon employees (mentors, admins)
  * use SSO; mentees use email + password. Whichever audience the visitor is
@@ -33,6 +34,9 @@ import { cn } from "@/lib/utils";
  * else sees SSO first and the password form behind a disclosure. Errors are
  * inline (the toast is only secondary). Mentees without `?next` land on their
  * dashboard when a mentee row exists, otherwise on the directory (P1-1).
+ * The password form carries the Turnstile check when it is enabled (F31):
+ * submit waits for a token and the widget resets after every attempt. An
+ * unconfirmed email gets "Confirm your email first" with Resend (F33).
  */
 export default function Login() {
   const { t } = useTranslation();
@@ -53,14 +57,18 @@ export default function Login() {
 
   const [passwordOpen, setPasswordOpen] = useState(menteePath || IS_LOCAL);
   const [formError, setFormError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<AuthErrorKind | null>(null);
+  const [unconfirmedEmail, setUnconfirmedEmail] = useState<string | null>(null);
   const emailRef = useRef<HTMLInputElement | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const needsCaptcha = !IS_LOCAL && turnstileEnabled();
 
   const loginSchema = useMemo(
     () =>
       z.object({
         email: z.string().trim().min(1, t("auth.validation.emailRequired")).email(t("auth.validation.emailInvalid")),
         password: IS_LOCAL ? z.string().optional() : z.string().min(1, t("auth.validation.passwordRequired")),
-        rememberMe: z.boolean().optional(),
       }),
     [t],
   );
@@ -68,7 +76,7 @@ export default function Login() {
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: rememberedEmail, password: IS_LOCAL ? "local" : "", rememberMe: false },
+    defaultValues: { email: rememberedEmail, password: IS_LOCAL ? "local" : "" },
   });
 
   // Expanding the disclosure moves focus into the form (D7). On the mentee
@@ -89,7 +97,11 @@ export default function Login() {
         setLocalSession(account);
         return account;
       }
-      return authService.login({ email: data.email, password: data.password ?? "" });
+      return authService.login({ email: data.email, password: data.password ?? "" }, { captchaToken });
+    },
+    onSettled: () => {
+      // A Turnstile token is single-use: every attempt needs a fresh one.
+      if (needsCaptcha) turnstileRef.current?.reset();
     },
     onSuccess: (data) => {
       localStorage.setItem("user", JSON.stringify(data));
@@ -130,11 +142,24 @@ export default function Login() {
         setLocation(data.profile_id ? ROUTES.menteeDashboard : ROUTES.mentors);
       }
     },
-    onError: () => {
-      // lib/auth throws a fixed English message for every credential failure;
-      // the translated copy says what to do instead of echoing it.
-      setFormError(t(IS_LOCAL ? "showcase.auth.localNotFound" : "auth.invalidCredentials"));
-      form.setFocus("password");
+    onError: (error, variables) => {
+      if (IS_LOCAL) {
+        setFormError(t("showcase.auth.localNotFound"));
+        form.setFocus("password");
+        return;
+      }
+      // lib/auth throws AuthFlowError; the translated copy says what to do next (F33).
+      const flowError = toAuthFlowError(error);
+      const kind = mapAuthError(flowError.code, flowError.status, "login");
+      setErrorKind(kind);
+      if (kind === "email_not_confirmed") {
+        setUnconfirmedEmail(variables.email.trim());
+        setFormError(t("auth.errors.email_not_confirmed"));
+        return;
+      }
+      setUnconfirmedEmail(null);
+      setFormError(t(authErrorKey(kind) ?? "auth.invalidCredentials"));
+      if (kind === "invalid_credentials") form.setFocus("password");
     },
   });
 
@@ -189,16 +214,24 @@ export default function Login() {
           <form
             onSubmit={form.handleSubmit((data) => {
               setFormError(null);
+              setErrorKind(null);
+              if (needsCaptcha && !captchaToken) {
+                setFormError(t("auth.errors.captchaRequired"));
+                return;
+              }
               loginMutation.mutate(data);
             })}
             className="space-y-4"
             noValidate
           >
             {formError && (
-              <Alert variant="destructive" role="alert" data-testid="alert-login-error">
+              <Alert variant={errorKind === "email_not_confirmed" ? "warning" : "destructive"} role="alert" data-testid="alert-login-error" data-kind={errorKind ?? undefined}>
                 <AlertCircle aria-hidden="true" />
-                <AlertTitle className="leading-snug">{t("auth.loginFailed")}</AlertTitle>
-                <AlertDescription>{formError}</AlertDescription>
+                <AlertTitle className="leading-snug">{t(errorKind === "email_not_confirmed" ? "auth.errors.confirmFirstTitle" : "auth.loginFailed")}</AlertTitle>
+                <AlertDescription>
+                  <p>{formError}</p>
+                  {errorKind === "email_not_confirmed" && unconfirmedEmail && <ResendConfirmation email={unconfirmedEmail} next={nextPath || null} className="mt-3" />}
+                </AlertDescription>
               </Alert>
             )}
             <FormField
@@ -255,20 +288,7 @@ export default function Login() {
             />
             )}
 
-            {!IS_LOCAL && (
-            <FormField
-              control={form.control}
-              name="rememberMe"
-              render={({ field }) => (
-                <FormItem className="flex items-center gap-2 space-y-0">
-                  <FormControl>
-                    <Checkbox checked={field.value} onCheckedChange={field.onChange} data-testid="checkbox-remember-me" />
-                  </FormControl>
-                  <FormLabel className="cursor-pointer font-normal">{t("auth.rememberMe")}</FormLabel>
-                </FormItem>
-              )}
-            />
-            )}
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} action="login" />}
 
             <Button type="submit" variant={menteePath ? "primary" : "secondary"} size="lg" className="w-full" loading={loginMutation.isPending} data-testid="button-login">
               {loginMutation.isPending ? t("auth.loggingIn") : t("auth.loginButton")}

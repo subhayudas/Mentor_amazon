@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -12,14 +12,27 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthCard, AuthPage, IconInput } from "@/components/auth/AuthCard";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
+import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { authErrorKey, mapAuthError, toAuthFlowError, type AuthErrorKind } from "@/lib/authErrors";
 import { authService } from "@/lib/services";
 import { ROUTES } from "@/lib/routes";
 
-/** Request a password-reset email. The service never reveals whether the email exists. */
+/**
+ * What the person must hear about: they can act on these (wait, retry the
+ * check, reconnect, contact the team). Anything else shows the same "check
+ * your email" card as a success, so the page never reveals whether an account
+ * exists (F33).
+ */
+const SURFACED: ReadonlySet<AuthErrorKind> = new Set<AuthErrorKind>(["email_rate_limited", "request_rate_limited", "send_failed", "captcha_failed", "network"]);
+
+/** Request a password-reset email (Turnstile when enabled, F31). Never reveals whether the email exists. */
 export default function ForgotPassword() {
   const { t } = useTranslation();
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const turnstileRef = useRef<TurnstileHandle>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const needsCaptcha = turnstileEnabled();
 
   const schema = useMemo(
     () => z.object({ email: z.string().trim().min(1, t("auth.validation.emailRequired")).email(t("auth.validation.emailInvalid")) }),
@@ -31,11 +44,25 @@ export default function ForgotPassword() {
 
   const send = useMutation({
     mutationFn: async (data: Values) => {
-      await authService.forgotPassword(data.email);
+      try {
+        await authService.forgotPassword(data.email, { captchaToken });
+      } catch (error) {
+        const flowError = toAuthFlowError(error);
+        const kind = mapAuthError(flowError.code, flowError.status, "recover");
+        if (SURFACED.has(kind)) throw flowError;
+        // Anything else is answered like a success: no account enumeration.
+      }
       return data.email;
     },
+    onSettled: () => {
+      if (needsCaptcha) turnstileRef.current?.reset();
+    },
     onSuccess: (email) => setSubmittedEmail(email),
-    onError: () => setFormError(t("auth.forgotPasswordError")),
+    onError: (error) => {
+      const flowError = toAuthFlowError(error);
+      const key = authErrorKey(mapAuthError(flowError.code, flowError.status, "recover"));
+      setFormError(key ? t(key) : t("auth.forgotPasswordError"));
+    },
   });
 
   if (submittedEmail) {
@@ -85,6 +112,10 @@ export default function ForgotPassword() {
           <form
             onSubmit={form.handleSubmit((data) => {
               setFormError(null);
+              if (needsCaptcha && !captchaToken) {
+                setFormError(t("auth.errors.captchaRequired"));
+                return;
+              }
               send.mutate(data);
             })}
             className="space-y-5"
@@ -121,6 +152,8 @@ export default function ForgotPassword() {
                 </FormItem>
               )}
             />
+
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} action="recover" />}
 
             <Button type="submit" variant="primary" size="lg" className="w-full" loading={send.isPending} data-testid="button-send-reset-link">
               {send.isPending ? t("auth.sending") : t("auth.sendResetLink")}

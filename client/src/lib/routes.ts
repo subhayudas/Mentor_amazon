@@ -14,6 +14,7 @@ export const ROUTES = {
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
   authSso: "/auth/sso",
+  authConfirm: "/auth/confirm",
   requestAccess: "/request-access",
   menteeRegistration: "/mentee-registration",
   myBookings: "/my-bookings",
@@ -52,6 +53,7 @@ const TITLE_RULES: TitleRule[] = [
   { test: (p) => p === "/forgot-password", key: "nav.titles.forgotPassword" },
   { test: (p) => p === "/reset-password", key: "nav.titles.resetPassword" },
   { test: (p) => p === "/auth/sso", key: "nav.titles.sso" },
+  { test: (p) => p === "/auth/confirm", key: "nav.titles.authConfirm" },
   { test: (p) => p === "/request-access", key: "nav.titles.requestAccess" },
   { test: (p) => p === "/mentee-registration", key: "nav.titles.menteeRegistration" },
   { test: (p) => p === "/my-bookings", key: "nav.titles.myBookings" },
@@ -87,4 +89,38 @@ export function discoveryUrl(state: Partial<DiscoveryState>): string {
 /** `/login?next=<path>` — the guard/redirect contract used across the app. */
 export function loginHref(next?: string): string {
   return next ? `${ROUTES.login}?next=${encodeURIComponent(next)}` : ROUTES.login;
+}
+
+/**
+ * Same-origin path guard (mirrors `safeNext` in lib/ssoClient.ts, which is
+ * frozen SSO code): only `/path` values, never `//host` or `/\host`, fragment
+ * dropped; anything else gives `fallback`.
+ */
+export function sameOriginPath(value: string | null | undefined, fallback = "/"): string {
+  if (!value) return fallback;
+  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return fallback;
+  return value.split("#")[0] || fallback;
+}
+
+/**
+ * Where Supabase sends the sign-up confirmation link (F32): `/auth/confirm`
+ * with the same-origin `next` the person signed up from, so confirming lands
+ * back in the app instead of on the Site URL.
+ */
+export function authConfirmUrl(origin: string, next?: string | null): string {
+  return `${origin.replace(/\/+$/, "")}${ROUTES.authConfirm}?next=${encodeURIComponent(sameOriginPath(next))}`;
+}
+
+/**
+ * After an email confirmation: a real `next` wins; otherwise a mentee without
+ * a mentees row registers first and one with a row goes to their dashboard.
+ * Mentor and admin accounts (created through Amazon sign-in, so rarely here)
+ * go where Amazon sign-in would send them.
+ */
+export function confirmDestination(input: { role: "mentor" | "mentee" | "admin"; hasProfile: boolean; next?: string | null }): string {
+  const next = sameOriginPath(input.next, "");
+  if (next && next !== "/" && !next.startsWith(ROUTES.authConfirm)) return next;
+  if (input.role === "admin") return ROUTES.admin;
+  if (input.role === "mentor") return input.hasProfile ? ROUTES.mentorPortal : ROUTES.mentorOnboarding;
+  return input.hasProfile ? ROUTES.menteeDashboard : ROUTES.menteeRegistration;
 }
