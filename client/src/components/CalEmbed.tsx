@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 
@@ -12,6 +12,14 @@ import {
   dialogCloseClassName,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  calEmbedConfig,
+  calEmbedLink,
+  calSuccessEvent,
+  parseBookingSuccessV2,
+  parseRescheduleSuccessV2,
+  type CalBookingSuccess,
+} from "@/lib/calEvents";
 import { bidi } from "@/lib/format";
 
 // The Cal.com embed (and the embed.js snippet it injects from app.cal.com) is only
@@ -19,18 +27,13 @@ import { bidi } from "@/lib/format";
 // never ships in a route chunk.
 const Cal = lazy(() => import("@calcom/embed-react"));
 
-/** Resolves Cal.com's global API (e.g. to listen for `bookingSuccessful`), loading the embed on first call. */
+/** Resolves Cal.com's global API (e.g. to listen for `bookingSuccessfulV2`), loading the embed on first call. */
 export function loadCalApi(options?: { embedJsUrl?: string; namespace?: string }) {
   return import("@calcom/embed-react").then((m) => m.getCalApi(options));
 }
 
-/** What Cal.com hands back when a slot is booked through the embed. */
-export interface CalBookingSuccess {
-  /** ISO start time of the scheduled slot, when Cal.com provides it. */
-  startTime?: string;
-  /** Cal.com booking uid, when provided. */
-  uid?: string;
-}
+/** What Cal.com hands back when a slot is booked (or moved) through the embed; see `lib/calEvents.ts`. */
+export type { CalBookingSuccess };
 
 interface CalEmbedProps {
   calLink: string;
@@ -38,10 +41,13 @@ interface CalEmbedProps {
   /** Prefills the Cal.com form so the mentor sees who booked. */
   menteeName?: string;
   menteeEmail?: string;
+  /** Our booking id: sent to Cal.com as `metadata[mc_booking]` so the webhook can match exactly. */
   bookingId?: string;
+  /** Reschedule an existing Cal.com booking (its uid) instead of booking a new one. */
+  rescheduleUid?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Fired once when Cal.com reports `bookingSuccessful` while this dialog is open. */
+  /** Fired once per opening when Cal.com reports the booking (or the reschedule). */
   onBookingSuccessful?: (detail: CalBookingSuccess) => void;
 }
 
@@ -59,10 +65,14 @@ function CalDialogSkeleton({ label }: { label: string }) {
 }
 
 /**
- * Cal.com scheduling dialog (C16/B8): a stock `DialogContent` (no custom
- * positioning, no hidden Radix close), opened only from an explicit "Choose a
- * time" action — never on data arrival. The mentee confirms the slot inside
- * Cal.com; the `bookingSuccessful` event moves the booking to confirmed.
+ * Cal.com scheduling dialog (C16/B8, design B6): a stock `DialogContent`,
+ * opened only from an explicit "Choose a time" / "Reschedule" action — never
+ * on data arrival. The booking form is prefilled with the mentee's name and
+ * email and carries `metadata[mc_booking]`; the webhook cross-checks that hint
+ * against the mentor and an attendee email before trusting it. With
+ * `rescheduleUid` the dialog opens Cal.com's reschedule page for that booking
+ * and listens for `rescheduleBookingSuccessfulV2`; otherwise it listens for
+ * `bookingSuccessfulV2` (the V1 events are deprecated).
  */
 export function CalEmbed({
   calLink,
@@ -70,38 +80,43 @@ export function CalEmbed({
   menteeName,
   menteeEmail,
   bookingId,
+  rescheduleUid,
   open,
   onOpenChange,
   onBookingSuccessful,
 }: CalEmbedProps) {
   const { t } = useTranslation();
   const [ready, setReady] = useState(false);
-  const calUsername = extractCalUsername(calLink);
+  const link = calEmbedLink(calLink, rescheduleUid);
+  const config = useMemo(() => calEmbedConfig({ menteeName, menteeEmail, bookingId }), [menteeName, menteeEmail, bookingId]);
+  // Latest callback without re-subscribing when the parent re-renders.
+  const onSuccessRef = useRef(onBookingSuccessful);
+  onSuccessRef.current = onBookingSuccessful;
+  const hasListener = Boolean(onBookingSuccessful);
 
-  // Listen for the embed's bookingSuccessful event so the app can move the
-  // booking from accepted to confirmed without a server-side webhook.
   useEffect(() => {
-    if (!open || !onBookingSuccessful) return;
+    if (!open || !hasListener) return;
     let disposed = false;
     let fired = false;
-    const handler = (e: { detail?: { data?: Record<string, unknown> } }) => {
+    const action = calSuccessEvent(rescheduleUid);
+    const handler = (event: unknown) => {
       if (disposed || fired) return;
       fired = true;
-      const data = (e?.detail?.data ?? {}) as Record<string, unknown>;
-      const booking = (data.booking ?? {}) as Record<string, unknown>;
-      const startTime = [data.startTime, booking.startTime, data.date].find((v) => typeof v === "string") as string | undefined;
-      const uid = [booking.uid, data.uid, data.bookingId].find((v) => typeof v === "string") as string | undefined;
-      onBookingSuccessful({ startTime, uid });
+      const detail = rescheduleUid ? parseRescheduleSuccessV2(event, rescheduleUid) : parseBookingSuccessV2(event);
+      onSuccessRef.current?.(detail);
     };
-    loadCalApi().then((cal) => {
-      if (disposed) return;
-      cal("on", { action: "bookingSuccessful", callback: handler as never });
-    });
+    loadCalApi()
+      .then((cal) => {
+        if (!disposed) cal("on", { action, callback: handler as never });
+      })
+      .catch(() => undefined);
     return () => {
       disposed = true;
-      loadCalApi().then((cal) => cal("off", { action: "bookingSuccessful", callback: handler as never })).catch(() => undefined);
+      loadCalApi()
+        .then((cal) => cal("off", { action, callback: handler as never }))
+        .catch(() => undefined);
     };
-  }, [open, onBookingSuccessful, bookingId]);
+  }, [open, hasListener, bookingId, rescheduleUid]);
 
   // The skeleton lifts when Cal reports the link ready, or after a grace period.
   useEffect(() => {
@@ -113,19 +128,28 @@ export function CalEmbed({
     const onReady = () => {
       if (!disposed) setReady(true);
     };
-    loadCalApi().then((cal) => {
-      if (disposed) return;
-      cal("on", { action: "linkReady", callback: onReady as never });
-    });
+    loadCalApi()
+      .then((cal) => {
+        if (!disposed) cal("on", { action: "linkReady", callback: onReady as never });
+      })
+      .catch(() => undefined);
     const fallback = window.setTimeout(onReady, READY_FALLBACK_MS);
     return () => {
       disposed = true;
       window.clearTimeout(fallback);
-      loadCalApi().then((cal) => cal("off", { action: "linkReady", callback: onReady as never })).catch(() => undefined);
+      loadCalApi()
+        .then((cal) => cal("off", { action: "linkReady", callback: onReady as never }))
+        .catch(() => undefined);
     };
   }, [open]);
 
-  const title = t("dashboardV2.cal.title", { name: bidi(mentorName) });
+  const name = bidi(mentorName);
+  const title = rescheduleUid ? t("dashboardV2.cal.rescheduleTitle", { name }) : t("dashboardV2.cal.title", { name });
+  const description = !link
+    ? t("dashboardV2.cal.unavailableBody")
+    : rescheduleUid
+      ? t("dashboardV2.cal.rescheduleDescription")
+      : t("dashboardV2.cal.description");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -133,6 +157,7 @@ export function CalEmbed({
         hideClose
         className="flex h-[min(90dvh,860px)] max-w-4xl flex-col gap-0 overflow-hidden p-0"
         data-testid="dialog-cal-embed"
+        data-mode={rescheduleUid ? "reschedule" : "book"}
       >
         <DialogClose className={dialogCloseClassName} data-testid="cal-embed-close-button">
           <X className="size-4" aria-hidden="true" />
@@ -140,21 +165,16 @@ export function CalEmbed({
         </DialogClose>
         <DialogHeader className="shrink-0 border-b border-border px-6 pb-4 pt-6">
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            {calUsername ? t("dashboardV2.cal.description") : t("dashboardV2.cal.unavailableBody")}
-          </DialogDescription>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <div className="relative min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {calUsername ? (
+          {link ? (
             <>
               <Suspense fallback={null}>
                 <Cal
-                  calLink={calUsername}
+                  calLink={link}
                   style={{ width: "100%", height: "100%", minHeight: "600px", overflow: "auto" }}
-                  config={{
-                    ...(menteeName ? { name: menteeName } : {}),
-                    ...(menteeEmail ? { email: menteeEmail } : {}),
-                  }}
+                  config={config}
                 />
               </Suspense>
               {!ready && <CalDialogSkeleton label={t("dashboardV2.cal.loading")} />}
@@ -168,18 +188,4 @@ export function CalEmbed({
       </DialogContent>
     </Dialog>
   );
-}
-
-function extractCalUsername(calLink: string): string | null {
-  if (!calLink) return null;
-  try {
-    if (calLink.startsWith("http")) {
-      const url = new URL(calLink);
-      const pathname = url.pathname.replace(/^\//, "");
-      return pathname || null;
-    }
-    return calLink;
-  } catch {
-    return calLink.replace(/^\//, "") || null;
-  }
 }

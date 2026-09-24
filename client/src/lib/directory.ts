@@ -160,6 +160,11 @@ export interface FeaturedPageState {
   showShowcaseProof: boolean;
   /** Whether the mentor accepts requests: null while unknown (loading, error, not seeded). */
   accepting: boolean | null;
+  /**
+   * The programme team answers requests (a curated mentor whose row has not
+   * been handed to the real person). Drives the honest "who replies" copy.
+   */
+  programmeManaged: boolean;
 }
 
 export interface FeaturedPageQuery {
@@ -169,6 +174,7 @@ export interface FeaturedPageQuery {
 
 export function featuredPageState(input: { isLocal: boolean; featured: FeaturedMentor; query: FeaturedPageQuery }): FeaturedPageState {
   const { isLocal, featured, query } = input;
+  const curated = isFeaturedDbId(featured.dbId);
   if (isLocal) {
     return {
       kind: "local",
@@ -178,13 +184,16 @@ export function featuredPageState(input: { isLocal: boolean; featured: FeaturedM
       canFavorite: true,
       showShowcaseProof: true,
       accepting: featured.is_available,
+      programmeManaged: curated,
     };
   }
-  const closed = { requestId: featured.dbId, bookable: false, canFavorite: false, showShowcaseProof: false };
+  const closed = { requestId: featured.dbId, bookable: false, canFavorite: false, showShowcaseProof: false, programmeManaged: curated };
   if (query.status === "pending") return { ...closed, kind: "loading", mentor: featured, accepting: null };
   if (query.status === "error") return { ...closed, kind: "error", mentor: featured, accepting: null };
   if (!query.data) return { ...closed, kind: "static", mentor: featured, accepting: null };
   const row = query.data;
+  // `mentors_public` may not expose the flag; a curated row counts as programme-managed unless it says otherwise.
+  const managed = (row as PublicMentor & { managed_by_programme?: boolean | null }).managed_by_programme;
   return {
     kind: "db",
     mentor: overlayFeatured(row, featured),
@@ -193,5 +202,6 @@ export function featuredPageState(input: { isLocal: boolean; featured: FeaturedM
     canFavorite: row.is_available,
     showShowcaseProof: false,
     accepting: row.is_available,
+    programmeManaged: curated && managed !== false,
   };
 }

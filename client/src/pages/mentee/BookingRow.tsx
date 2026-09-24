@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { CalendarPlus, Star } from "lucide-react";
+import { CalendarClock, CalendarPlus, Clock, Star } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/StatusBadge";
+import { isFeaturedDbId } from "@/data/featuredMentors";
+import { isCalUid } from "@/lib/calEvents";
 import { bidi, formatDate, formatDateTime, formatNumber, formatRelativeDay, tzDisplayLabel, viewerTimeZone } from "@/lib/format";
 import { credentialLine, initialsOf, localizedField } from "@/lib/localized";
 import { isConfirmedPast, isConfirmedWithoutTime, type BookingWithMentor } from "@/lib/menteeBookings";
@@ -17,6 +20,13 @@ import { cn } from "@/lib/utils";
  * zone label, and exactly the actions the DB allows for that status.
  * The "Choose a time" fill is orange only when `primary` (one per viewport);
  * further accepted rows get the navy secondary fill.
+ *
+ * Cal.com states (design B7, F28): an accepted row whose picked time waits for
+ * the mentor's confirmation (`cal_status` requested) shows a waiting badge and
+ * no "Choose a time"; a declined time (`cal_status` rejected) offers "Choose
+ * another time"; an accepted request to a programme-managed (curated) mentor
+ * without a link says the programme team will email. A confirmed future
+ * session booked through Cal.com can be rescheduled.
  */
 export interface BookingRowActions {
   onChooseTime: (booking: BookingWithMentor) => void;
@@ -25,8 +35,18 @@ export interface BookingRowActions {
   onCancelSession: (booking: BookingWithMentor) => void;
   onView: (booking: BookingWithMentor) => void;
   onRate: (booking: BookingWithMentor) => void;
+  /** Move a confirmed Cal.com session (opens the reschedule page); omitted = no Reschedule action. */
+  onReschedule?: (booking: BookingWithMentor) => void;
   /** Rows with a mutation in flight (their buttons show a spinner) — one per row, not only the latest (F-37). */
   pendingIds?: ReadonlySet<string>;
+}
+
+/** What the accepted row owes / waits for, from the Cal.com state (pure; the rail uses the same rules). */
+export function acceptedRowState(booking: BookingWithMentor): "waitingConfirm" | "timeDeclined" | "chooseTime" | "programmeTeam" | "waitingLink" {
+  if (booking.cal_status === "requested") return "waitingConfirm";
+  const hasLink = Boolean(booking.mentor?.cal_link);
+  if (!hasLink) return isFeaturedDbId(booking.mentor_id) ? "programmeTeam" : "waitingLink";
+  return booking.cal_status === "rejected" ? "timeDeclined" : "chooseTime";
 }
 
 export interface BookingRowProps extends BookingRowActions {
@@ -130,6 +150,7 @@ export function BookingRow({
   onCancelSession,
   onView,
   onRate,
+  onReschedule,
   pendingIds,
 }: BookingRowProps) {
   const { t, i18n } = useTranslation();
@@ -138,9 +159,13 @@ export function BookingRow({
   const name = localizedField(mentor, "name", i18n.language) || t("dashboardV2.row.unknownMentor");
   const credential = credentialLine(mentor, i18n.language);
   const busy = pendingIds?.has(booking.id) ?? false;
-  const hasLink = !!mentor?.cal_link;
+  const accepted = booking.status === "accepted" ? acceptedRowState(booking) : null;
+  const canPickTime = accepted === "chooseTime" || accepted === "timeDeclined";
+  const canReschedule =
+    booking.status === "confirmed" && Boolean(onReschedule) && isCalUid(booking.cal_event_uri) && !isConfirmedPast(booking);
   const scheduled = format(booking.scheduled_at);
   const completed = format(booking.completed_at);
+  const requestedStart = format(booking.cal_requested_start);
 
   // Meta line by status: what the person needs to know before acting. Every
   // clock time carries the viewer's zone label; day-level facts stay dates.
@@ -158,9 +183,24 @@ export function BookingRow({
       meta = t("dashboardV2.row.sent", { when: formatRelativeDay(booking.created_at, i18n.language) });
       break;
     case "accepted":
-      meta = hasLink
-        ? t("dashboardV2.row.acceptedChoose")
-        : t("dashboardV2.row.acceptedNoLink", { name });
+      switch (accepted) {
+        case "waitingConfirm":
+          meta = requestedStart
+            ? t("dashboardV2.row.waitingConfirm", { when: `${requestedStart} · ${zoneLabel}`, name: bidi(name) })
+            : t("dashboardV2.row.waitingConfirmNoTime", { name: bidi(name) });
+          break;
+        case "timeDeclined":
+          meta = t("dashboardV2.row.timeDeclined", { name: bidi(name) });
+          break;
+        case "programmeTeam":
+          meta = t("dashboardV2.row.programmeTeam");
+          break;
+        case "waitingLink":
+          meta = t("dashboardV2.row.acceptedNoLink", { name });
+          break;
+        default:
+          meta = t("dashboardV2.row.acceptedChoose");
+      }
       break;
     case "confirmed":
       if (isConfirmedWithoutTime(booking)) {
@@ -198,6 +238,12 @@ export function BookingRow({
               <bdi>{name}</bdi>
             </h3>
             <StatusBadge status={booking.status} />
+            {accepted === "waitingConfirm" && (
+              <Badge tone="warning" data-testid={`badge-time-waiting-${booking.id}`}>
+                <Clock aria-hidden="true" strokeWidth={2} />
+                {t("dashboardV2.row.waitingBadge")}
+              </Badge>
+            )}
           </div>
           {credential && <p className="text-body-sm text-muted-foreground">{credential}</p>}
           {meta && <p className="mt-1 text-body-sm text-muted-foreground tabular-nums">{meta}</p>}
@@ -229,7 +275,7 @@ export function BookingRow({
         )}
         {booking.status === "accepted" && (
           <>
-            {hasLink && (
+            {canPickTime && (
               <Button
                 variant={primary ? "primary" : "secondary"}
                 size="sm"
@@ -238,7 +284,7 @@ export function BookingRow({
                 data-testid={`button-schedule-booking-${booking.id}`}
               >
                 <CalendarPlus aria-hidden="true" />
-                {t("dashboardV2.actions.chooseTime")}
+                {accepted === "timeDeclined" ? t("dashboardV2.actions.chooseAnother") : t("dashboardV2.actions.chooseTime")}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => onView(booking)} data-testid={`button-view-request-${booking.id}`}>
@@ -257,6 +303,18 @@ export function BookingRow({
         )}
         {booking.status === "confirmed" && (
           <>
+            {canReschedule && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="max-md:h-11 max-md:px-5"
+                onClick={() => onReschedule?.(booking)}
+                data-testid={`button-reschedule-booking-${booking.id}`}
+              >
+                <CalendarClock aria-hidden="true" />
+                {t("dashboardV2.actions.reschedule")}
+              </Button>
+            )}
             <Button variant="outline" size="sm" onClick={() => onView(booking)} data-testid={`button-view-request-${booking.id}`}>
               {t("dashboardV2.actions.viewRequest")}
             </Button>

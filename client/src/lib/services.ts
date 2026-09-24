@@ -21,6 +21,9 @@ import {
 } from './database';
 import { auth, AuthUser } from './auth';
 import { storage } from './storage';
+import { supabase } from './supabase';
+import { submitAnonymousRequest } from './requests';
+import type { CalBookingSuccess, EmbedRecordOutcome } from './calEvents';
 
 /**
  * Notifications are written by the database (`notify_booking_event`), never by
@@ -237,28 +240,6 @@ export const menteeService = {
   async getFeedback(menteeId: string): Promise<(Booking & { mentor?: Mentor })[]> {
     return db.getMenteeFeedback(menteeId);
   },
-
-  // Get or create mentee (useful for booking requests)
-  async getOrCreate(email: string, name: string): Promise<Mentee> {
-    const existing = await db.getMenteeByEmail(email);
-    if (existing) return existing;
-
-    // The caller may not be allowed to read the row (anonymous requester, or a
-    // mentor with no booking with this mentee yet), so resolve it server-side.
-    const id = await db.resolveMenteeIdForBooking(email, name);
-    const readable = await db.getMentee(id);
-    return readable ?? {
-      id,
-      name,
-      email,
-      user_type: 'individual',
-      verification_status: 'unverified',
-      timezone: 'UTC',
-      languages_spoken: ['English'],
-      areas_exploring: ['Career Development'],
-      created_at: new Date().toISOString(),
-    };
-  },
 };
 
 // ==================== BOOKING SERVICES ====================
@@ -274,53 +255,35 @@ export const bookingService = {
     return db.getBooking(id);
   },
 
-  // Create a booking request
+  /**
+   * Send a session request (design D5, §3.4, F03/F31). The one write path:
+   * - signed in → `create_my_booking_request` (the account's own email; the
+   *   typed email is ignored). `already_pending` means an open request from
+   *   the last 7 days exists and nothing was written;
+   * - anonymous → `POST /api/requests` (Turnstile verified server-side when
+   *   configured). The server does not reveal whether a row was created, so
+   *   the outcome is `sent`.
+   * The database notifies the mentor (or the admins, programme-managed).
+   * Throws a `BookingRequestError` (`lib/requests.ts`).
+   */
   async createRequest(params: {
     mentor_id: string;
     mentee_name: string;
     mentee_email: string;
     goal: string;
-  }): Promise<Booking> {
-    // Get or create mentee
-    const mentee = await menteeService.getOrCreate(params.mentee_email, params.mentee_name);
-    
-    // Create booking request; the database notifies the mentor
-    const booking = await db.createBookingRequest(params.mentor_id, mentee.id, params.goal);
-    await notify(booking.id, 'booking_request');
-    
-    return booking;
-  },
-
-  // Create a direct booking
-  async create(params: {
-    mentor_id: string;
-    mentee_id?: string;
-    mentee_name?: string;
-    mentee_email?: string;
-  }): Promise<Booking> {
-    let menteeId = params.mentee_id;
-    
-    // If mentee_id not provided, look up or create by email
-    if (!menteeId && params.mentee_email) {
-      const mentee = await menteeService.getOrCreate(
-        params.mentee_email,
-        params.mentee_name || 'Anonymous'
-      );
-      menteeId = mentee.id;
+    turnstileToken?: string | null;
+  }): Promise<{ outcome: 'created' | 'already_pending' | 'sent' }> {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      return db.createMyBookingRequest(params.mentor_id, params.goal, params.mentee_name);
     }
-    
-    if (!menteeId) {
-      throw new Error('Either mentee_id or mentee_email is required');
-    }
-    
-    const booking = await db.createBooking({
-      mentor_id: params.mentor_id,
-      mentee_id: menteeId,
-      status: 'pending',
+    return submitAnonymousRequest({
+      mentorId: params.mentor_id,
+      name: params.mentee_name,
+      email: params.mentee_email,
+      goal: params.goal,
+      turnstileToken: params.turnstileToken,
     });
-    await notify(booking.id, 'booking_request');
-    
-    return booking;
   },
 
   // Accept a booking
@@ -356,11 +319,13 @@ export const bookingService = {
     return updated;
   },
 
-  // Mentee booked a slot via Cal.com for an accepted request
-  async confirm(bookingId: string, details: { scheduledAt?: string; calEventUri?: string } = {}): Promise<Booking | null> {
-    const confirmed = await db.confirmBooking(bookingId, details);
-    if (confirmed) await notify(bookingId, 'booking_confirmed');
-    return confirmed;
+  /**
+   * The mentee booked or rescheduled through the Cal.com embed. The RPC writes
+   * the Cal columns (clients can no longer PATCH them) and sends the
+   * `booking_confirmed` notification itself, so nothing is notified here.
+   */
+  async recordCalBooking(bookingId: string, detail: CalBookingSuccess): Promise<EmbedRecordOutcome | null> {
+    return db.recordCalBookingFromEmbed(bookingId, detail);
   },
 
   // Mark a session completed with its real duration (feeds volunteer hours)

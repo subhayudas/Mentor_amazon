@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { Container } from "@/components/layout/Container";
 import { FEATURED_MENTORS, type FeaturedMentor } from "@/data/featuredMentors";
+import { IS_LOCAL } from "@/lib/demo";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,10 @@ import { cn } from "@/lib/utils";
  * six-tile bento on grey, the orange "meet the mentors" rail of dark cards,
  * then the app footer. Every person shown is a curated featured mentor
  * (`data/featuredMentors.ts`); the wall and the rail link to their profiles.
+ *
+ * Against the database the sample social proof is not shown (design D14):
+ * the hero's "4.9 average rating" / "1,000+ sessions booked" chips and the
+ * rail's per-mentor session counts are demo-mode content only.
  */
 
 function localizedHeadline(m: FeaturedMentor, lang: string) {
@@ -94,7 +99,8 @@ function Hero() {
                 <ArrowRight className="size-5 rtl:-scale-x-100" aria-hidden="true" />
               </span>
             </Link>
-            <div className="flex flex-col gap-3">
+            {IS_LOCAL && (
+            <div className="flex flex-col gap-3" data-testid="hero-demo-proof">
               <div className="inline-flex h-[46px] items-center gap-2 rounded-[8px] border border-[#d9d9d9] bg-white/40 px-4 text-[16px] font-medium text-[var(--sc-ink)]">
                 <span>{t("showcase.hero.rating")}</span>
                 <span className="inline-flex items-center gap-0.5 text-[#f5a623]" aria-hidden="true">
@@ -108,6 +114,7 @@ function Hero() {
                 {t("showcase.hero.sessions")}
               </div>
             </div>
+            )}
           </div>
         </div>
 
@@ -263,9 +270,11 @@ function RailCard({ mentor, lang }: { mentor: FeaturedMentor; lang: string }) {
       <p className="mt-3 text-[15.5px] leading-[23px] text-white/70">{subtitle}</p>
       <div className="mt-auto flex items-end justify-between gap-4 pt-10">
         <div className="flex flex-col items-start gap-2.5">
-          <span className="rounded-[4px] bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold">
-            {t("showcase.rail.mentored", { total: mentor.bookings })}
-          </span>
+          {IS_LOCAL && (
+            <span className="rounded-[4px] bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold">
+              {t("showcase.rail.mentored", { total: mentor.bookings })}
+            </span>
+          )}
           <span className="rounded-[4px] border border-white/25 px-3 py-1.5 text-[12.5px] font-semibold">
             {t("showcase.rail.minutes", { minutes: mentor.session.minutes })}
           </span>

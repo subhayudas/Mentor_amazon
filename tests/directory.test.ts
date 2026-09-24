@@ -249,4 +249,11 @@ describe('featuredPageState', () => {
     const state = featuredPageState({ isLocal: false, featured: manav, query: { status: 'error' } });
     expect(state).toMatchObject({ kind: 'error', bookable: false, canFavorite: false });
   });
+
+  it('curated mentors are programme-managed unless their row was handed over', () => {
+    expect(featuredPageState({ isLocal: false, featured: manav, query: { status: 'success', data: seededRow(manav) } }).programmeManaged).toBe(true);
+    const handedOver = { ...seededRow(manav), managed_by_programme: false } as PublicMentor;
+    expect(featuredPageState({ isLocal: false, featured: manav, query: { status: 'success', data: handedOver } }).programmeManaged).toBe(false);
+    expect(featuredPageState({ isLocal: true, featured: manav, query: { status: 'pending' } }).programmeManaged).toBe(true);
+  });
 });
