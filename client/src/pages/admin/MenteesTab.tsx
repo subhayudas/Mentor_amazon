@@ -182,9 +182,14 @@ export default function MenteesTab() {
                     onClick={() => setDetail(mentee)}
                     data-testid={`row-mentee-${mentee.id}`}
                   >
-                    <TableCell className="max-w-[18rem]">{identity(mentee)}</TableCell>
+                    <TableCell>
+                      {/* Browsers ignore max-width on table cells; the inner block carries it. */}
+                      <div className="max-w-[18rem]">{identity(mentee)}</div>
+                    </TableCell>
                     <TableCell>{typeLabel(mentee)}</TableCell>
-                    <TableCell className="max-w-[14rem] truncate text-body-sm">{mentee.organization_name ? <bdi>{mentee.organization_name}</bdi> : UNAVAILABLE}</TableCell>
+                    <TableCell className="text-body-sm">
+                      <p className="max-w-[14rem] truncate">{mentee.organization_name ? <bdi>{mentee.organization_name}</bdi> : UNAVAILABLE}</p>
+                    </TableCell>
                     <TableCell className="hidden text-body-sm xl:table-cell">{mentee.country ? localizeCountry(mentee.country, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell><VerificationBadge status={mentee.verification_status} /></TableCell>
                     <TableCell className="hidden whitespace-nowrap text-body-sm text-muted-foreground tabular-nums xl:table-cell">{formatDate(mentee.created_at)}</TableCell>

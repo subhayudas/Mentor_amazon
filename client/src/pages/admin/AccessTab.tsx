@@ -241,8 +241,12 @@ export default function AccessTab() {
               ) : (
                 pending.map((request) => (
                   <TableRow key={request.id} {...rowProps(request.id)} data-testid={`row-request-${request.id}`}>
-                    <TableCell className="font-mono text-body-sm font-medium text-foreground" dir="ltr">{request.amazon_alias}</TableCell>
-                    <TableCell className="text-body-sm text-muted-foreground">{request.email ? <bdi dir="ltr">{request.email}</bdi> : UNAVAILABLE}</TableCell>
+                    <TableCell className="font-mono text-body-sm font-medium text-foreground" dir="ltr">
+                      <p className="max-w-[13rem] truncate">{request.amazon_alias}</p>
+                    </TableCell>
+                    <TableCell className="text-body-sm text-muted-foreground">
+                      <p className="max-w-[13rem] truncate">{request.email ? <bdi dir="ltr">{request.email}</bdi> : UNAVAILABLE}</p>
+                    </TableCell>
                     <TableCell className="text-body-sm">{request.name ? <bdi>{request.name}</bdi> : UNAVAILABLE}</TableCell>
                     <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDateTime(request.requested_at)}</TableCell>
                     <TableCell>{roleSelect(request, "h-8 w-32")}</TableCell>
@@ -354,8 +358,12 @@ export default function AccessTab() {
                 ) : (
                   approved.map((row) => (
                     <TableRow key={row.id} {...rowProps(row.id)} data-testid={`row-approved-${row.id}`}>
-                      <TableCell className="max-w-[13rem] truncate font-mono text-body-sm font-medium text-foreground" dir="ltr">{row.amazon_alias}</TableCell>
-                      <TableCell className="max-w-[13rem] truncate text-body-sm text-muted-foreground">{row.email ? <bdi dir="ltr">{row.email}</bdi> : UNAVAILABLE}</TableCell>
+                      <TableCell className="font-mono text-body-sm font-medium text-foreground" dir="ltr">
+                        <p className="max-w-[13rem] truncate">{row.amazon_alias}</p>
+                      </TableCell>
+                      <TableCell className="text-body-sm text-muted-foreground">
+                        <p className="max-w-[13rem] truncate">{row.email ? <bdi dir="ltr">{row.email}</bdi> : UNAVAILABLE}</p>
+                      </TableCell>
                       <TableCell><RoleBadge role={row.role} /></TableCell>
                       <TableCell>{approvedStatus(row)}</TableCell>
                       <TableCell className="text-body-sm text-muted-foreground">

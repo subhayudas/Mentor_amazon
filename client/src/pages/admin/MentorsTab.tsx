@@ -250,7 +250,10 @@ export default function MentorsTab() {
                     onClick={() => setDetail(mentor)}
                     data-testid={`row-mentor-${mentor.id}`}
                   >
-                    <TableCell className="max-w-[20rem]">{identity(mentor)}</TableCell>
+                    <TableCell>
+                      {/* Browsers ignore max-width on table cells; the inner block carries it. */}
+                      <div className="max-w-[20rem]">{identity(mentor)}</div>
+                    </TableCell>
                     <TableCell className="text-body-sm">{mentor.country ? localizeCountry(mentor.country, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell>{availability(mentor, approval)}</TableCell>
                     <TableCell className="text-body-sm">{ratingValue(mentor)}</TableCell>
@@ -280,7 +283,14 @@ export default function MentorsTab() {
                   <CardField label={t("admin.mentors.colRating")}>{ratingValue(mentor)}</CardField>
                   <CardField label={t("admin.mentors.colJoined")}>{formatDate(mentor.created_at)}</CardField>
                 </CardFields>
-                <Button type="button" variant="outline" className="mt-4 h-11" onClick={() => setDetail(mentor)} data-testid={`button-view-mentor-${mentor.id}`}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4 h-11"
+                  onClick={() => setDetail(mentor)}
+                  aria-label={t("admin.mentors.viewA11y", { name: displayName(mentor) })}
+                  data-testid={`button-view-mentor-${mentor.id}`}
+                >
                   <Eye aria-hidden="true" />
                   {t("admin.viewDetails")}
                 </Button>

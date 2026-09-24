@@ -56,12 +56,14 @@ function Rating({ value, lang }: { value?: number | null; lang: string }) {
   );
 }
 
+/** "1 minute" / "30 minutes", "دقيقتان" / "30 دقيقة": the locale's own plural forms (Intl unit style, like the analytics table). */
+const formatMinutes = (minutes: number, lang: string) => formatNumber(minutes, lang, { style: "unit", unit: "minute", unitDisplay: "long" });
+
 /** Recorded duration and the session's country, under its time; nothing when neither is known. */
 function SessionMeta({ booking, lang }: { booking: AdminBooking; lang: string }) {
-  const { t } = useTranslation();
   const country = localizeCountry(booking.country || booking.mentor?.country || "", lang);
   const parts = [
-    booking.session_duration_minutes != null ? t("admin.bookings.minutes", { count: booking.session_duration_minutes }) : null,
+    booking.session_duration_minutes != null ? formatMinutes(booking.session_duration_minutes, lang) : null,
     country || null,
   ].filter(Boolean);
   if (parts.length === 0) return null;
@@ -429,7 +431,7 @@ export default function BookingsTab() {
                 <DetailField label={t("admin.bookings.responded")}>{formatDateTime(detail.responded_at)}</DetailField>
                 <DetailField label={t("admin.bookings.completed")}>{formatDateTime(detail.completed_at)}</DetailField>
                 <DetailField label={t("admin.bookings.colDuration")}>
-                  {detail.session_duration_minutes ? t("admin.bookings.minutes", { count: detail.session_duration_minutes }) : undefined}
+                  {detail.session_duration_minutes ? formatMinutes(detail.session_duration_minutes, lang) : undefined}
                 </DetailField>
                 <DetailField label={t("admin.colCountry")}>{localizeCountry(detail.country || detail.mentor?.country || "", lang) || undefined}</DetailField>
                 <div className="sm:col-span-2">

@@ -884,7 +884,8 @@
       "industries": "القطاعات",
       "bio": "نبذة",
       "whyJoined": "سبب الانضمام",
-      "assistantWithEmail": "المساعد: {{email}}"
+      "assistantWithEmail": "المساعد: {{email}}",
+      "viewA11y": "عرض تفاصيل {{name}}"
     },
     "mentees": {
       "viewA11y": "عرض تفاصيل {{name}}",

@@ -884,7 +884,8 @@
       "industries": "Industries",
       "bio": "Bio",
       "whyJoined": "Why they joined",
-      "assistantWithEmail": "Assistant: {{email}}"
+      "assistantWithEmail": "Assistant: {{email}}",
+      "viewA11y": "View details for {{name}}"
     },
     "mentees": {
       "viewA11y": "View details for {{name}}",
