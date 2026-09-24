@@ -295,6 +295,10 @@ ALTER TABLE public.mentors
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_status text;
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_requested_start timestamp;  -- UTC wall-clock, like the other columns
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS canceled_by text;
+-- Provenance of the Cal.com uid: the uid the signed webhook last delivered for this booking.
+-- cal_event_uri = cal_verified_uid means Cal.com itself vouched for the booking; anything else
+-- (NULL, or another uid) was only reported by the mentee's browser (§11).
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_verified_uid text;
 
 -- Pre-checks: stop with the offending values rather than half-apply.
 DO $$
@@ -391,7 +395,8 @@ GRANT SELECT ON public.mentor_scheduling_links TO authenticated, service_role;
 -- Non-privileged callers (the booking's mentor or mentee through PostgREST):
 --   * keep every v2 rule (immutable parties, role-bound status transitions, who writes which
 --     rating, only the mentor records duration and country);
---   * may never write cal_status, cal_requested_start or canceled_by (the scheduler's columns);
+--   * may never write cal_status, cal_requested_start, canceled_by or cal_verified_uid (the
+--     scheduler's columns);
 --   * once mc_settings.legacy_booking_writes = 'blocked' (migrations/0003): may not write
 --     scheduled_at or cal_event_uri, a mentee may not move accepted → confirmed (scheduling
 --     goes through record_cal_booking_from_embed / the Cal.com webhook), and ratings and
@@ -464,6 +469,7 @@ BEGIN
     IF NEW.cal_status IS DISTINCT FROM OLD.cal_status
        OR NEW.cal_requested_start IS DISTINCT FROM OLD.cal_requested_start
        OR NEW.canceled_by IS DISTINCT FROM OLD.canceled_by
+       OR NEW.cal_verified_uid IS DISTINCT FROM OLD.cal_verified_uid
        OR (NOT v_legacy AND (NEW.scheduled_at IS DISTINCT FROM OLD.scheduled_at
                              OR NEW.cal_event_uri IS DISTINCT FROM OLD.cal_event_uri)) THEN
       RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'scheduling columns are written by Cal.com sync only';
@@ -906,6 +912,9 @@ GRANT EXECUTE ON FUNCTION public.cal_record_delivery(text, text, text, text, tex
 -- (replays answer 'duplicate'), mentor resolution, organizer check, exact matching under a row
 -- lock, the transition table, reminders reset, notifications, last-delivery fields. Bookings
 -- are never inserted here. Activity rows come from the bookings_activity_events trigger.
+-- The signed delivery is authoritative: it records the uid it vouched for (cal_verified_uid),
+-- and it corrects a uid, start or status that only the mentee's browser reported through
+-- record_cal_booking_from_embed (found through metadata.mc_booking, cross-checked as usual).
 CREATE OR REPLACE FUNCTION public.cal_apply_event(
   p_delivery_id text, p_mentor_id text, p_trigger text, p_uid text, p_reschedule_uid text,
   p_start timestamptz, p_end timestamptz, p_status text, p_attendee_emails text[], p_mc_booking text,
@@ -925,6 +934,7 @@ DECLARE
   v_cal_user  text;
   v_n         int;
   v_resched   boolean;
+  v_unverified boolean;  -- the booking's Cal.com uid came only from the browser (or is missing)
   v_outcome   text;
   v_changed   boolean := false;
   v_notify    text;   -- 'cancelled' | 'moved' | 'time_declined'
@@ -1005,16 +1015,21 @@ BEGIN
       SELECT * INTO v_b FROM public.bookings b
       WHERE b.mentor_id = v_mentor.id AND b.cal_event_uri = p_uid FOR UPDATE;
     END IF;
-    IF v_b.id IS NULL AND v_trigger IN ('BOOKING_CREATED', 'BOOKING_REQUESTED') THEN
-      IF p_mc_booking IS NOT NULL THEN                                     -- M (a hint from the booker)
-        SELECT b.* INTO v_b FROM public.bookings b
-        JOIN public.mentees me ON me.id = b.mentee_id
-        WHERE b.id = p_mc_booking AND b.mentor_id = v_mentor.id AND lower(me.email) = ANY (v_emails)
-        FOR UPDATE OF b;
-        IF v_b.id IS NOT NULL AND v_b.cal_event_uri IS NOT NULL AND v_b.cal_event_uri <> p_uid THEN
-          v_b := NULL;
-        END IF;
+    -- M (a hint from the booker): our booking id, only for this mentor and an attendee who is the
+    -- booking's mentee. It never moves a booking whose uid Cal.com already verified onto another
+    -- uid; a uid only the browser reported is corrected here, by a reschedule too.
+    IF v_b.id IS NULL AND p_mc_booking IS NOT NULL
+       AND v_trigger IN ('BOOKING_CREATED', 'BOOKING_REQUESTED', 'BOOKING_RESCHEDULED') THEN
+      SELECT b.* INTO v_b FROM public.bookings b
+      JOIN public.mentees me ON me.id = b.mentee_id
+      WHERE b.id = p_mc_booking AND b.mentor_id = v_mentor.id AND lower(me.email) = ANY (v_emails)
+      FOR UPDATE OF b;
+      IF v_b.id IS NOT NULL AND v_b.cal_event_uri IS NOT NULL AND v_b.cal_event_uri <> p_uid
+         AND v_b.cal_verified_uid IS NOT DISTINCT FROM v_b.cal_event_uri THEN
+        v_b := NULL;
       END IF;
+    END IF;
+    IF v_b.id IS NULL AND v_trigger IN ('BOOKING_CREATED', 'BOOKING_REQUESTED') THEN
       IF v_b.id IS NULL THEN                                               -- E (unique email match)
         SELECT count(*) INTO v_n FROM public.bookings b
         JOIN public.mentees me ON me.id = b.mentee_id
@@ -1053,6 +1068,7 @@ BEGIN
       v_outcome := 'invalid_payload';
       EXIT apply;
     END IF;
+    v_unverified := v_b.cal_event_uri IS NULL OR v_b.cal_verified_uid IS DISTINCT FROM v_b.cal_event_uri;
 
     -- Transition table.
     IF v_trigger = 'BOOKING_CANCELLED' THEN
@@ -1150,8 +1166,17 @@ BEGIN
             WHERE id = v_b.id;
             v_outcome := 'requested'; v_changed := true;
           END IF;
-        ELSIF v_b.status = 'confirmed' AND v_b.cal_event_uri = p_uid THEN
+        ELSIF v_b.status = 'confirmed' AND v_b.cal_event_uri = p_uid AND NOT v_unverified THEN
           v_outcome := 'no_change';   -- the request arrived after its confirmation
+        ELSIF v_b.status = 'confirmed' AND v_unverified THEN
+          -- Only the browser said this time was confirmed; Cal.com says it still waits for the
+          -- mentor: back to a requested time.
+          UPDATE public.bookings
+          SET status = 'accepted', cal_status = 'requested', cal_requested_start = v_start, scheduled_at = NULL,
+              cal_event_uri = p_uid
+          WHERE id = v_b.id;
+          DELETE FROM public.booking_reminders WHERE booking_id = v_b.id;
+          v_outcome := 'requested'; v_changed := true;
         ELSE
           v_outcome := 'stale_state';
         END IF;
@@ -1171,12 +1196,33 @@ BEGIN
           ELSE
             v_outcome := 'no_change';
           END IF;
+        ELSIF v_b.status = 'confirmed' AND v_unverified THEN
+          -- The browser reported another uid (or none) for this session: Cal.com's uid and start win.
+          UPDATE public.bookings
+          SET cal_event_uri = p_uid, scheduled_at = v_start, cal_status = 'accepted', cal_requested_start = NULL
+          WHERE id = v_b.id;
+          IF v_b.scheduled_at IS DISTINCT FROM v_start THEN
+            DELETE FROM public.booking_reminders WHERE booking_id = v_b.id;
+            v_outcome := 'rescheduled'; v_notify := 'moved';
+          ELSE
+            v_outcome := 'confirmed';
+          END IF;
+          v_changed := true;
         ELSE
           v_outcome := 'stale_state';
         END IF;
       END IF;
     END IF;
   END apply;
+
+  -- Provenance: this signed delivery vouches for the booking's Cal.com uid, or for its having none
+  -- (a rejected or released time). record_cal_booking_from_embed never overwrites a verified uid.
+  IF v_b.id IS NOT NULL AND v_outcome IN ('confirmed', 'requested', 'rejected', 'canceled', 'cal_booking_released',
+                                          'rescheduled', 'reschedule_requested', 'rescheduled_revived', 'no_change') THEN
+    UPDATE public.bookings
+    SET cal_verified_uid = CASE WHEN cal_event_uri = p_uid THEN p_uid END
+    WHERE id = v_b.id AND cal_verified_uid IS DISTINCT FROM (CASE WHEN cal_event_uri = p_uid THEN p_uid END);
+  END IF;
 
   -- Neutral notifications to both parties (programme-managed placeholder addresses skipped).
   IF v_notify IS NOT NULL THEN
@@ -1227,6 +1273,9 @@ GRANT EXECUTE ON FUNCTION public.cal_apply_event(text, text, text, text, text, t
 -- The mentee's embed reports a Cal.com booking for their accepted request. Respects
 -- requires-confirmation (PENDING) and reschedules through the embed. Races with the webhook
 -- resolve on the row lock: whichever runs second finds the state already recorded.
+-- What the browser reports is provisional: once the signed webhook has verified the booking's
+-- uid (cal_verified_uid), this function never changes it, and a later delivery corrects any
+-- uid, start or status recorded here (cal_apply_event).
 CREATE OR REPLACE FUNCTION public.record_cal_booking_from_embed(p_booking_id text, p_uid text, p_start timestamptz,
                                                                 p_status text, p_reschedule_uid text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -1264,6 +1313,13 @@ BEGIN
   END IF;
   IF EXISTS (SELECT 1 FROM public.bookings b WHERE b.cal_event_uri = p_uid AND b.id <> v_b.id) THEN
     RAISE EXCEPTION 'uid_in_use' USING ERRCODE = '23505';
+  END IF;
+  -- Cal.com's signed webhook already delivered this booking (or the one being rescheduled): its
+  -- record stands, and a reschedule reaches it through the webhook too.
+  IF v_b.status IN ('accepted', 'confirmed') AND v_b.cal_event_uri IS NOT NULL
+     AND v_b.cal_verified_uid = v_b.cal_event_uri
+     AND (p_uid = v_b.cal_event_uri OR p_reschedule_uid = v_b.cal_event_uri) THEN
+    RETURN jsonb_build_object('outcome', 'already_recorded', 'booking_id', v_b.id);
   END IF;
 
   PERFORM set_config('mc.internal_write', 'on', true);

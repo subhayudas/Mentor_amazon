@@ -94,6 +94,8 @@ export const bookings = pgTable("bookings", {
   /** Start Cal.com proposed while the mentor has not confirmed yet (UTC wall-clock). */
   cal_requested_start: timestamp("cal_requested_start", { mode: "string" }),
   canceled_by: text("canceled_by", { enum: ["mentor", "mentee", "admin", "cal"] }),
+  /** Cal.com uid the signed webhook last delivered; equal to cal_event_uri = verified by Cal.com (migrations/0002 §11). */
+  cal_verified_uid: text("cal_verified_uid"),
   created_at: timestamp("created_at", { mode: "string" }).notNull().default(utcNow),
 });
 

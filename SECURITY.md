@@ -83,7 +83,10 @@ on Vercel's CDN.
   caller owns both sides (a legacy row) can only be canceled, never completed
   or rated. The embed's uid and start come from the browser: the RPC takes
   them only from the booking's mentee, for a start between an hour ago and a
-  year ahead, and the signed webhook stays the authority for later changes.
+  year ahead, and only provisionally. The signed webhook is the authority: it
+  corrects a uid, start or status the browser recorded for the same booking,
+  records the uid it verified (`bookings.cal_verified_uid`, never writable by
+  a client), and the embed can no longer change a verified booking.
 * Ownership everywhere is `lower(email) = lower(auth.jwt()->>'email')`;
   `localStorage` is never an identity source.
 

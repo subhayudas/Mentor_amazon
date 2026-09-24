@@ -219,6 +219,24 @@ and start come from the browser, so the RPC accepts only the booking's own
 mentee, a well-formed uid no other booking holds, and a start between one hour
 ago and 366 days ahead (`22023 invalid_state` otherwise).
 
+The signed webhook is the authority, whichever arrives first. Each applied
+delivery stores the uid it vouched for in `bookings.cal_verified_uid`:
+
+- **Embed first:** what the browser recorded is provisional. A delivery for the
+  same booking (the uid, or `metadata.mc_booking` with the mentee among the
+  attendees, which our embed always sends) replaces a wrong uid or start with
+  Cal.com's (`rescheduled` with a "Session moved" notice when the time differs),
+  and turns a browser-claimed confirmation back into a requested time when
+  Cal.com says the event awaits the mentor (`requested`).
+- **Webhook first:** once `cal_verified_uid = cal_event_uri`, the embed changes
+  nothing. A report of the same booking, or a reschedule of it, answers
+  `already_recorded` (the reschedule arrives as `BOOKING_RESCHEDULED`); any other
+  uid is `22023 invalid_state`.
+
+Clients can never write `cal_verified_uid` (booking guard). One consequence:
+if a mentor removes the webhook after a verified delivery, later reschedules of
+that booking through the embed are not recorded until Cal.com delivers them.
+
 ---
 
 ## Reminder cron — `GET /api/cron/reminders`

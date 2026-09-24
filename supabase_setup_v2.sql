@@ -116,6 +116,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS user_identifiers_provider_subject_unique
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_status text;
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_requested_start timestamp;
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS canceled_by text;
+ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_verified_uid text;
 -- Programme-managed mentors (migrations/0002 §6); the public directory view exposes the flag.
 ALTER TABLE public.mentors ADD COLUMN IF NOT EXISTS managed_by_programme boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS public.mc_settings (
@@ -543,6 +544,7 @@ BEGIN
     IF NEW.cal_status IS DISTINCT FROM OLD.cal_status
        OR NEW.cal_requested_start IS DISTINCT FROM OLD.cal_requested_start
        OR NEW.canceled_by IS DISTINCT FROM OLD.canceled_by
+       OR NEW.cal_verified_uid IS DISTINCT FROM OLD.cal_verified_uid
        OR (NOT v_legacy AND (NEW.scheduled_at IS DISTINCT FROM OLD.scheduled_at
                              OR NEW.cal_event_uri IS DISTINCT FROM OLD.cal_event_uri)) THEN
       RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'scheduling columns are written by Cal.com sync only';
