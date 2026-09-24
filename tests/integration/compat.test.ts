@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { describeDb, TEST_DB_URL } from './env.ts';
-import { Accounts, GOAL, anonClient, itEmail, mkBooking, mkMentee, mkMentor, serviceClient, type Account } from './fixtures.ts';
+import { Accounts, GOAL, anonClient, itEmail, mkBooking, mkMentee, mkMentor, lazyClient, serviceClient, type Account } from './fixtures.ts';
 import { readSql, SQL } from './scratchDb.ts';
 import { connect } from './sql.ts';
 
@@ -19,7 +19,7 @@ import { connect } from './sql.ts';
 const sql = connect();
 const script = connect(TEST_DB_URL, 1);
 const accounts = new Accounts();
-const admin = serviceClient();
+const admin = lazyClient(serviceClient);
 
 /** The commented ROLLBACK block of migrations/0003, uncommented. */
 export function rollbackBlock(): string {

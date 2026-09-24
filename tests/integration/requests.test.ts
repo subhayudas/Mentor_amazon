@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { describeDb, describeOnline } from './env.ts';
-import { Accounts, GOAL, anonClient, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, serviceClient } from './fixtures.ts';
+import { Accounts, GOAL, anonClient, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, lazyClient, serviceClient } from './fixtures.ts';
 import { useStackEnv } from './http.ts';
 import { asRole, asService, connect, expectPgError, withTx } from './sql.ts';
 import { invoke, nextIp } from '../helpers/vercel.ts';
@@ -127,7 +127,7 @@ describeDb('I7 booking request RPCs', () => {
   });
 
   it('direct PostgREST inserts into bookings fail as anon and as a signed-in user; the RPCs work', async () => {
-    const admin = serviceClient();
+    const admin = lazyClient(serviceClient);
     const mentorEmail = itEmail('pgrst-mentor');
     accounts.track(mentorEmail);
     const mentorId = randomUUID();
@@ -157,7 +157,7 @@ describeDb('I7 booking request RPCs', () => {
 });
 
 describeOnline('I12 /api/requests end to end (Cloudflare Turnstile test keys)', () => {
-  const admin = serviceClient();
+  const admin = lazyClient(serviceClient);
   let mentorId = '';
   let restore = () => {};
   let handler: (req: never, res: never) => Promise<void>;

@@ -87,6 +87,21 @@ export function anonClient(): SupabaseClient {
   return createClient(TEST_URL, TEST_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
+/**
+ * A client built on first use. Vitest still runs skipped describe bodies to collect them, and
+ * createClient() throws without a URL, so suites hold lazy clients at module/describe level.
+ */
+export function lazyClient(make: () => SupabaseClient): SupabaseClient {
+  let client: SupabaseClient | undefined;
+  return new Proxy({} as SupabaseClient, {
+    get(_target, prop) {
+      client ??= make();
+      const value = (client as unknown as Record<PropertyKey, unknown>)[prop];
+      return typeof value === 'function' ? (value as (...a: unknown[]) => unknown).bind(client) : value;
+    },
+  });
+}
+
 export interface Account {
   id: string;
   email: string;
@@ -96,7 +111,7 @@ export interface Account {
 export class Accounts {
   readonly emails: string[] = [];
   readonly authIds: string[] = [];
-  readonly admin = serviceClient();
+  readonly admin = lazyClient(serviceClient);
 
   /** A confirmed GoTrue user signed in with a password; optional public.users row. */
   async create(label: string, opts: { userType?: 'mentor' | 'mentee' | 'admin'; profileId?: string | null; email?: string } = {}): Promise<Account> {

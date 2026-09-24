@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { describeDb } from './env.ts';
-import { anonClient, serviceClient } from './fixtures.ts';
+import { anonClient, lazyClient, serviceClient } from './fixtures.ts';
 import { useStackEnv } from './http.ts';
 import { connect } from './sql.ts';
 import { startMockIdp, type MockIdp } from '../helpers/mockIdp.ts';
@@ -14,7 +14,7 @@ import { CookieJar, invoke, nextIp } from '../helpers/vercel.ts';
  * contract state (0003 applied), so this also proves SSO works after the contract.
  */
 const sql = connect();
-const admin = serviceClient();
+const admin = lazyClient(serviceClient);
 const CLIENT_ID = 'mentor-amazon.vercel.app';
 const CLIENT_SECRET = 'integration-client-secret-not-real';
 const APP_ORIGIN = 'https://mentor-amazon.vercel.app';

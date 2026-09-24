@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { describeDb } from './env.ts';
-import { Accounts, anonClient, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, serviceClient } from './fixtures.ts';
+import { Accounts, anonClient, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, lazyClient, serviceClient } from './fixtures.ts';
 import { useStackEnv } from './http.ts';
 import { asRole, asService, connect, expectPgError, withTx, type Tx } from './sql.ts';
 import { calEvent, calHeaders, pingEvent } from '../helpers/cal.ts';
@@ -108,7 +108,7 @@ describeDb('I10 mentor_cal_webhooks', () => {
 });
 
 describeDb('I11 webhook handler end to end', () => {
-  const admin = serviceClient();
+  const admin = lazyClient(serviceClient);
   let restore = () => {};
   let handler: (req: never, res: never) => Promise<void>;
   const mentorEmail = itEmail('hook-mentor');
