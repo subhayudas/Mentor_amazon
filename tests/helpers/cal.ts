@@ -50,7 +50,8 @@ function tomorrowAt(hour: number): string {
 
 export function calEvent(trigger: CalTrigger, o: CalPayloadOptions): Record<string, unknown> {
   const start = o.start ?? tomorrowAt(10);
-  const end = o.end ?? new Date(new Date(start).getTime() + 30 * 60_000).toISOString();
+  const startMs = new Date(start).getTime();
+  const end = o.end ?? (Number.isFinite(startMs) ? new Date(startMs + 30 * 60_000).toISOString() : start);
   const attendees = (o.attendees ?? ['mentee@example.com']).map((email, i) => ({
     email,
     name: `Attendee ${i + 1}`,
