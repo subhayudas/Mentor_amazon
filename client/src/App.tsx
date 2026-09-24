@@ -15,6 +15,8 @@ import { Navigation } from "@/components/Navigation";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ContentGuard } from "@/components/ContentGuard";
 import { SkipLink } from "@/components/SkipLink";
+import { BackendStatusBanner } from "@/components/BackendStatusBanner";
+import { LegacyLocalDataNotice } from "@/components/LegacyLocalDataNotice";
 import { RequireAuth, RequireRole } from "@/components/RouteGuard";
 import { useDirection } from "@/hooks/useDirection";
 import { pageTitleKey } from "@/lib/routes";
@@ -29,6 +31,7 @@ const Login = lazy(() => import("@/pages/Login"));
 const Signup = lazy(() => import("@/pages/Signup"));
 const ForgotPassword = lazy(() => import("@/pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("@/pages/ResetPassword"));
+const AuthConfirm = lazy(() => import("@/pages/AuthConfirm"));
 const Mentors = lazy(() => import("@/pages/Mentors"));
 const MentorProfile = lazy(() => import("@/pages/MentorProfile"));
 const FeaturedMentorProfile = lazy(() => import("@/pages/FeaturedMentorProfile"));
@@ -122,6 +125,8 @@ function Router() {
         <Route path="/forgot-password" component={ForgotPassword} />
         <Route path="/reset-password" component={ResetPassword} />
         <Route path="/auth/sso" component={SsoCallback} />
+        {/* Sign-up confirmation links land here (?next=…); the page waits for the session and routes on. */}
+        <Route path="/auth/confirm" component={AuthConfirm} />
         <Route path="/request-access" component={RequestAccess} />
         <Route path="/legal" component={Legal} />
         {/* Curated (featured) mentors get the showcase profile + session pages; DB mentors keep the standard profile. */}
@@ -212,10 +217,17 @@ function Router() {
             <DashboardBookings />
           </RequireAuth>
         </Route>
+        {/* Office hours belong to a mentor row: mentees see the forbidden card; admins pass and the shell sends them to /admin. */}
         <Route path="/dashboard/calendar">
-          <RequireAuth>
-            <DashboardCalendar />
-          </RequireAuth>
+          {IS_LOCAL ? (
+            <RequireAuth>
+              <DashboardCalendar />
+            </RequireAuth>
+          ) : (
+            <RequireRole role={["mentor", "admin"]}>
+              <DashboardCalendar />
+            </RequireRole>
+          )}
         </Route>
         <Route path="/dashboard/profile">
           <RequireAuth>
@@ -232,16 +244,17 @@ function Router() {
             <DashboardAdmin />
           </RequireAuth>
         </Route>
-        {/* Printable impact report (Download PDF = the browser's print-to-PDF; the content guard allows printing here). */}
+        {/* Printable impact report (Download PDF = the browser's print-to-PDF; the content guard allows printing here). Programme-wide, so admins only. */}
         <Route path="/analytics/report">
-          <RequireAuth>
+          <RequireRole role="admin">
             <AnalyticsReport />
-          </RequireAuth>
+          </RequireRole>
         </Route>
+        {/* Profile analytics: a mentor's own sessions, or the programme for admins. Mentees have no analytics. */}
         <Route path="/analytics">
-          <RequireAuth>
+          <RequireRole role={["admin", "mentor"]}>
             <Analytics />
-          </RequireAuth>
+          </RequireRole>
         </Route>
         {/* Growth analytics: the full reporting page (filters, drill-downs, CSV export) inside the same shell. */}
         <Route path="/analytics/reports">
@@ -300,6 +313,8 @@ function Shell() {
       <ContentGuard />
       <div className="flex min-h-screen flex-col bg-background">
         <Navigation />
+        <BackendStatusBanner />
+        <LegacyLocalDataNotice />
         <main id="main" tabIndex={-1} className="flex-1 scroll-mt-14 lg:scroll-mt-[72px]">
           <Router />
         </main>

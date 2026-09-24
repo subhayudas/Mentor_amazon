@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link } from "wouter";
+import { Link, Redirect } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Ban, BadgeCheck, Building2, Download, ExternalLink, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
@@ -11,18 +11,25 @@ import { FEATURED_MENTORS } from "@/data/featuredMentors";
 import { logActivity } from "@/lib/activity";
 import { csvFilename, downloadCsv, toCsv, type CsvValue } from "@/lib/csv";
 import type { Booking, Mentee, Mentor, VerificationStatus } from "@/lib/database";
+import { IS_LOCAL } from "@/lib/demo";
 import { localStore, useLocalCollection } from "@/lib/localStore";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 /**
- * Programme admin `/dashboard/admin` (local mode; against a live project the
- * database-backed /admin dashboard is used). Three queues on the rows people
- * actually created in this browser: mentors (list / unlist), mentees
- * (approve / reject organisation verification), bookings (cancel, CSV
- * export). Every decision is appended to the activity feed.
+ * Programme admin `/dashboard/admin`. Database mode: everyone is sent to the
+ * database-backed `/admin` dashboard (admins see it, other roles see its
+ * forbidden card) — this page never reads browser storage there (C3, F14).
+ * Local (demo) mode: three queues on the rows people created in this browser:
+ * mentors (list / unlist), mentees (approve / reject organisation
+ * verification), bookings (cancel, CSV export), each logged to the local feed.
  */
 type Tab = "mentors" | "mentees" | "bookings";
+
+export default function DashboardAdmin() {
+  if (!IS_LOCAL) return <Redirect to={ROUTES.admin} replace />;
+  return <LocalDashboardAdmin />;
+}
 
 const td = "px-3 py-3 text-[14px] text-[var(--sc-ink)] align-middle";
 const th = "px-3 py-2 text-start text-[12px] font-semibold uppercase tracking-[0.06em] text-[#6c6c84]";
@@ -37,7 +44,7 @@ function verificationTone(status: VerificationStatus | undefined): "success" | "
   return "neutral";
 }
 
-export default function DashboardAdmin() {
+function LocalDashboardAdmin() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { role, signedIn, displayName } = useDashboardIdentity();

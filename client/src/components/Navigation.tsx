@@ -37,8 +37,10 @@ import { cn } from "@/lib/utils";
  * the inline-end with 44px rows; "Become a mentor" lives there (and in the
  * footer), never in the desktop bar.
  *
- * Identity logic is unchanged: roles come from the session only; the mentee
- * localStorage mirror keeps the legacy anonymous mentee path alive.
+ * Identity comes from the session only (F19). Database mode never reads the
+ * legacy localStorage mirrors: signed in means a Supabase session and the
+ * bell follows the session email. Local (demo) mode keeps the
+ * browser-registered mentee path (`menteeId` / `menteeEmail`) alive.
  */
 type NavItem = { href: string; label: string; testId?: string };
 
@@ -66,11 +68,19 @@ export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
+    // Database mode: stale mirrors from the preview period must not make a
+    // visitor look signed in (LegacyLocalDataNotice offers to clear them).
+    if (!IS_LOCAL) return;
     const updateUserInfo = () => {
-      const menteeEmail = localStorage.getItem("menteeEmail");
-      const mentorEmail = localStorage.getItem("mentorEmail");
-      setUserEmail(menteeEmail || mentorEmail || null);
-      setMenteeId(localStorage.getItem("menteeId"));
+      try {
+        const menteeEmail = localStorage.getItem("menteeEmail");
+        const mentorEmail = localStorage.getItem("mentorEmail");
+        setUserEmail(menteeEmail || mentorEmail || null);
+        setMenteeId(localStorage.getItem("menteeId"));
+      } catch {
+        setUserEmail(null);
+        setMenteeId(null);
+      }
     };
 
     updateUserInfo();
@@ -102,13 +112,14 @@ export function Navigation() {
     setLocationPath(ROUTES.home);
   };
 
-  const isLoggedIn = Boolean(user || menteeId);
+  // menteeId is only ever set in local mode (the effect above returns early otherwise).
+  const isLoggedIn = Boolean(user || (IS_LOCAL && menteeId));
 
   // Roles that unlock protected surfaces come from the authenticated session
   // only. A stored mentorId is never enough: mentor ids are world-readable.
-  // The mentee mirror is kept for the legacy anonymous mentee-dashboard path.
+  // The mentee mirror keeps the local-mode (demo) mentee path alive.
   const isMentor = user?.user_type === "mentor";
-  const isMentee = user?.user_type === "mentee" || (!user && !!menteeId);
+  const isMentee = user?.user_type === "mentee" || (IS_LOCAL && !user && !!menteeId);
   const isAdmin = user?.user_type === "admin";
 
   const isActive = (href: string) =>
@@ -117,7 +128,10 @@ export function Navigation() {
   const primaryItems: NavItem[] = [
     { href: ROUTES.mentors, label: t("nav.mentors"), testId: "nav-mentors" },
     // The showcase dashboard (demo, or any signed-in account) and the mentor sign-up live in the bar itself.
-    ...(IS_LOCAL || user ? [{ href: "/dashboard", label: user ? t(user.user_type === "mentee" ? "showcase.nav.myDashboard" : "showcase.nav.dashboard") : t("showcase.nav.dashboard"), testId: "nav-dashboard" }] : []),
+    // Database-mode admins work in /admin (the dashboard only redirects there); they get the role items instead.
+    ...(IS_LOCAL || (user && user.user_type !== "admin")
+      ? [{ href: "/dashboard", label: user ? t(user.user_type === "mentee" ? "showcase.nav.myDashboard" : "showcase.nav.dashboard") : t("showcase.nav.dashboard"), testId: "nav-dashboard" }]
+      : []),
     ...(!isLoggedIn
       ? [
           { href: ROUTES.menteeRegistration, label: t("showcase.footer.joinAsMentee"), testId: "nav-join-mentee" },
@@ -136,9 +150,9 @@ export function Navigation() {
 
   const desktopItems = [...primaryItems, ...roleItems];
   const showBrowse = !isLoading && !isLoggedIn && !isActive(ROUTES.mentors);
-  const bellEmail = user?.email || userEmail;
-  const accountName = user?.name || user?.email || userEmail || "";
-  const initial = (user?.name || user?.email || userEmail || "?").charAt(0).toUpperCase();
+  const bellEmail = IS_LOCAL ? user?.email || userEmail : user?.email ?? null;
+  const accountName = user?.name || user?.email || (IS_LOCAL ? userEmail : null) || "";
+  const initial = (accountName || "?").charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 h-14 border-b border-[var(--sc-hairline)] bg-white lg:h-[72px]">
@@ -243,7 +257,7 @@ export function Navigation() {
             </DropdownMenu>
           )}
 
-          {!user && menteeId && (
+          {IS_LOCAL && !user && menteeId && (
             <Button
               variant="ghost"
               size="sm"

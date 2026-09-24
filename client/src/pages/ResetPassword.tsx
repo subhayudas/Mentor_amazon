@@ -5,46 +5,77 @@ import { z } from "zod";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { useMutation } from "@tanstack/react-query";
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock } from "lucide-react";
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Lock, ShieldCheck } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthCard, AuthPage, IconInput, passwordStrength, STRENGTH_CLASS } from "@/components/auth/AuthCard";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
+import { isRecoverySession } from "@/context/AuthContext";
+import { auth, syncRoleStorage } from "@/lib/auth";
+import { authErrorKey, mapAuthError, toAuthFlowError } from "@/lib/authErrors";
 import { authService } from "@/lib/services";
-import { supabase } from "@/lib/supabase";
+import { INITIAL_AUTH_HASH, supabase } from "@/lib/supabase";
 import { ROUTES } from "@/lib/routes";
+import { ssoLoginHref } from "@/lib/ssoClient";
 import { cn } from "@/lib/utils";
 
 /** How long to wait for the recovery fragment to become a session before calling the link invalid. */
 const RECOVERY_GRACE_MS = 4000;
 
-type Gate = "checking" | "ready" | "invalid";
+type Gate = "checking" | "ready" | "invalid" | "amazon";
 
 /**
- * Set a new password from a Supabase recovery link. The link carries the
- * recovery token in the URL fragment and becomes a session (`PASSWORD_RECOVERY`
- * event or an already-present session) — there is no `?token=` query
- * parameter, so the form is gated on the session, never on the query string.
+ * Set a new password from a Supabase recovery link (D13, F11, F34). The form
+ * opens ONLY for a password-recovery session: the recovery link's fragment
+ * (captured before supabase-js consumed it) or a `PASSWORD_RECOVERY` event.
+ * An ordinary signed-in session, an expired or used link, or no session at
+ * all gets the invalid-link state. An Amazon (SSO) account never gets a
+ * password: the page refuses and signs that recovery session out.
  */
 export default function ResetPassword() {
   const { t } = useTranslation();
-  const [gate, setGate] = useState<Gate>("checking");
+  const [gate, setGate] = useState<Gate>(() => (INITIAL_AUTH_HASH.errorCode ? "invalid" : "checking"));
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [done, setDone] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (INITIAL_AUTH_HASH.errorCode) return;
     let cancelled = false;
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    let deciding = false;
+    const decide = async (hasSession: boolean) => {
+      if (cancelled || deciding || !hasSession) return;
+      deciding = true;
+      if (!isRecoverySession()) {
+        setGate("invalid");
+        return;
+      }
+      let amazonAlias: string | undefined;
+      try {
+        amazonAlias = (await auth.getCurrentUser())?.amazon_alias;
+      } catch {
+        amazonAlias = undefined;
+      }
       if (cancelled) return;
-      if (event === "PASSWORD_RECOVERY" || session) setGate("ready");
+      if (amazonAlias) {
+        // Amazon accounts sign in through Amazon only; the recovery session must not linger.
+        await supabase.auth.signOut().catch(() => undefined);
+        syncRoleStorage(null);
+        if (!cancelled) setGate("amazon");
+        return;
+      }
+      setGate("ready");
+    };
+    // Supabase holds its auth lock while it runs this callback: decide on the next tick.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) window.setTimeout(() => void decide(true), 0);
     });
     supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled && data.session) setGate("ready");
+      if (data.session) void decide(true);
     });
     const giveUp = window.setTimeout(() => {
       if (!cancelled) setGate((current) => (current === "checking" ? "invalid" : current));
@@ -82,8 +113,17 @@ export default function ResetPassword() {
 
   const reset = useMutation({
     mutationFn: (data: Values) => authService.resetPassword(data.password),
-    onSuccess: () => setDone(true),
-    onError: () => setFormError(t("auth.resetPasswordError")),
+    onSuccess: async () => {
+      // The recovery session has done its job: sign in again with the new password.
+      await supabase.auth.signOut().catch(() => undefined);
+      syncRoleStorage(null);
+      setDone(true);
+    },
+    onError: (error) => {
+      const kind = mapAuthError(toAuthFlowError(error).code, toAuthFlowError(error).status, "update");
+      const key = authErrorKey(kind);
+      setFormError(key && kind !== "invalid_credentials" ? t(key) : t("auth.resetPasswordError"));
+    },
   });
 
   if (done) {
@@ -110,6 +150,31 @@ export default function ResetPassword() {
     return (
       <StatusPage>
         <StatusCard titleAs="h1" tone="busy" title={t("auth.resetPasswordTitle")} description={t("auth.checkingResetLink")} aria-busy="true" data-testid="card-reset-checking" />
+      </StatusPage>
+    );
+  }
+
+  if (gate === "amazon") {
+    return (
+      <StatusPage>
+        <StatusCard
+          titleAs="h1"
+          tone="warning"
+          icon={ShieldCheck}
+          title={t("auth.reset.amazonTitle")}
+          description={t("auth.reset.amazonBody")}
+          data-testid="card-reset-amazon"
+          actions={
+            <>
+              <a href={ssoLoginHref()} className={buttonVariants({ variant: "primary" })} data-testid="link-reset-amazon-sso">
+                {t("auth.sso.signInWithAmazon")}
+              </a>
+              <Button asChild variant="outline">
+                <Link href={ROUTES.login}>{t("auth.backToLogin")}</Link>
+              </Button>
+            </>
+          }
+        />
       </StatusPage>
     );
   }

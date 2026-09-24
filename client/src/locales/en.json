@@ -176,7 +176,39 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "confirmEmailTitle": "Check your email",
-    "confirmEmailBody": "We sent a confirmation link to {{email}}. Open it, then sign in to continue."
+    "confirmEmailBody": "We sent a confirmation link to {{email}}. Open it, then sign in to continue.",
+    "errors": {
+      "email_not_confirmed": "Open the confirmation link we emailed you, then sign in. Didn't get it? Send it again below.",
+      "confirmFirstTitle": "Confirm your email first",
+      "email_rate_limited": "Too many emails were sent to this address. Wait a few minutes, then try again.",
+      "request_rate_limited": "Too many attempts. Wait a minute, then try again.",
+      "send_failed": "We couldn't send the email. Contact the programme team.",
+      "weak_password": "Choose a stronger password: at least 8 characters with upper- and lower-case letters and a number.",
+      "same_password": "Choose a password you haven't used on this account before.",
+      "captcha_failed": "The bot check didn't pass. Complete it again, then retry.",
+      "link_expired": "This link has expired or was already used.",
+      "network": "We couldn't reach MentorConnect. Check your connection and try again.",
+      "captchaRequired": "Complete the bot check first."
+    },
+    "resend": {
+      "button": "Resend email",
+      "wait": "Resend in {{seconds}} s",
+      "sent": "Sent. Check {{email}} for a new link.",
+      "failed": "We couldn't resend the email. Try again in a moment.",
+      "prompt": "Didn't get it? Check your spam folder, or send it again."
+    },
+    "confirm": {
+      "checkingTitle": "Confirming your email",
+      "checkingBody": "One moment while we sign you in…",
+      "expiredTitle": "This link has expired or was already used",
+      "expiredBody": "Confirmation links work once and expire. Enter your email and we'll send you a new one.",
+      "alreadyConfirmed": "Already confirmed? Sign in",
+      "checkEmailBody": "We sent a confirmation link to {{email}}. Open it on this device to finish creating your account."
+    },
+    "reset": {
+      "amazonTitle": "Amazon accounts sign in with Amazon",
+      "amazonBody": "This account uses Amazon sign-in, so it has no MentorConnect password to reset. We signed you out of this link; use Sign in with Amazon instead."
+    }
   },
   "nav": {
     "home": "Home",
@@ -234,7 +266,8 @@
       "dashboardProfile": "Profile settings",
       "dashboardActivity": "Activity",
       "analyticsReport": "Impact report",
-      "dashboardAdmin": "Programme admin"
+      "dashboardAdmin": "Programme admin",
+      "authConfirm": "Confirming your email"
     }
   },
   "hero": {
@@ -694,6 +727,35 @@
       },
       "tryAgain": "Try again with Amazon",
       "usePassword": "Use email and password"
+    }
+  },
+  "backend": {
+    "demo": {
+      "body": "Demo mode: nothing you enter here is saved to MentorConnect."
+    },
+    "degraded": {
+      "body": "We can't reach MentorConnect right now. You can keep browsing; anything you submit may fail.",
+      "retry": "Retry"
+    }
+  },
+  "legacyData": {
+    "title": "Saved in this browser only",
+    "body_zero": "This browser has no items saved during the preview period.",
+    "body_one": "This browser has {{count}} item (a request or registration) saved during the preview period. It never reached MentorConnect; please send it again.",
+    "body_two": "This browser has {{count}} items (requests, registrations) saved during the preview period. They never reached MentorConnect; please send them again.",
+    "body_few": "This browser has {{count}} items (requests, registrations) saved during the preview period. They never reached MentorConnect; please send them again.",
+    "body_many": "This browser has {{count}} items (requests, registrations) saved during the preview period. They never reached MentorConnect; please send them again.",
+    "body_other": "This browser has {{count}} items (requests, registrations) saved during the preview period. They never reached MentorConnect; please send them again.",
+    "show": "Show what they were",
+    "hide": "Hide the list",
+    "clear": "Clear and dismiss",
+    "unknownMentor": "a mentor",
+    "item": {
+      "request": "Request to {{mentor}}: “{{goal}}”",
+      "requestNoGoal": "Request to {{mentor}}",
+      "registration": "Mentee registration: {{name}}",
+      "mentorProfile": "Mentor profile: {{name}}",
+      "favorite": "Saved mentor: {{mentor}}"
     }
   },
   "guard": {
@@ -2274,7 +2336,8 @@
       "menteeEmptyBody": "Pick a mentor, choose a time, and it shows up here.",
       "suggested": "Mentors for you",
       "suggestedSub": "Start with a 30-minute session",
-      "awaitingMentor": "Awaiting the mentor's reply"
+      "awaitingMentor": "Awaiting the mentor's reply",
+      "demoName": "Demo mentor"
     },
     "onboarding": {
       "stepsLabel": "Form sections",
@@ -2339,7 +2402,9 @@
         "mentor_listed": "Mentor listed",
         "mentor_unlisted": "Mentor unlisted",
         "mentee_verified": "Organisation verified",
-        "mentee_rejected": "Organisation declined"
+        "mentee_rejected": "Organisation declined",
+        "booking_time_requested": "Time proposed on Cal.com",
+        "booking_time_declined": "Proposed time declined"
       },
       "summaries": {
         "mentorRegistered": "{{name}} joined as a mentor",
@@ -2352,8 +2417,29 @@
         "bookingConfirmed": "Session booked with {{mentor}} on Cal.com — {{session}}",
         "canceled": "Session with {{mentor}} cancelled ({{mentee}})",
         "completed": "Session with {{mentee}} marked completed",
-        "rescheduled": "Session with {{mentor}} rescheduled on Cal.com"
-      }
+        "rescheduled": "Session with {{mentor}} rescheduled on Cal.com",
+        "request_sent": "{{mentee}} asked {{mentor}} for a session",
+        "request_accepted": "{{mentor}} accepted {{mentee}}'s request",
+        "request_accepted_admin": "The programme team accepted {{mentee}}'s request to {{mentor}}",
+        "request_declined": "{{mentor}} declined {{mentee}}'s request",
+        "request_declined_admin": "The programme team declined {{mentee}}'s request to {{mentor}}",
+        "booking_confirmed": "Session between {{mentor}} and {{mentee}} booked for {{when}}",
+        "booking_confirmed_untimed": "Session between {{mentor}} and {{mentee}} booked",
+        "booking_rescheduled": "Session between {{mentor}} and {{mentee}} moved to {{when}}",
+        "booking_rescheduled_untimed": "Session between {{mentor}} and {{mentee}} rescheduled",
+        "session_completed": "Session between {{mentor}} and {{mentee}} completed ({{minutes}} min)",
+        "session_completed_untimed": "Session between {{mentor}} and {{mentee}} completed",
+        "booking_canceled": "Session between {{mentor}} and {{mentee}} cancelled",
+        "booking_canceled_cal": "Session between {{mentor}} and {{mentee}} cancelled on Cal.com",
+        "booking_canceled_admin": "The programme team cancelled the session between {{mentor}} and {{mentee}}",
+        "booking_canceled_mentor": "{{mentor}} cancelled the session with {{mentee}}",
+        "booking_canceled_mentee": "{{mentee}} cancelled the session with {{mentor}}",
+        "booking_time_requested": "{{mentee}} picked {{when}} on Cal.com; waiting for {{mentor}} to confirm",
+        "booking_time_requested_untimed": "{{mentee}} picked a time on Cal.com; waiting for {{mentor}} to confirm",
+        "booking_time_declined": "{{mentor}} declined the proposed time; {{mentee}} can choose another",
+        "feedback_left": "{{mentee}} left feedback for {{mentor}}"
+      },
+      "loadError": "We couldn't load the activity feed."
     },
     "favorites": {
       "title": "Favourite mentors",

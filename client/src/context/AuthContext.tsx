@@ -3,8 +3,10 @@ import { useLocation } from "wouter";
 import { IS_LOCAL } from "@/lib/demo";
 import { findLocalAccount, getLocalSession, setLocalSession } from "@/lib/localAuth";
 import { localStore } from "@/lib/localStore";
-import { auth, AuthUser } from "@/lib/auth";
+import { auth, AuthUser, type CaptchaOptions } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
+import { ROUTES } from "@/lib/routes";
+import { INITIAL_AUTH_HASH } from "@/lib/supabase";
 
 interface LoginData {
   email: string;
@@ -21,20 +23,39 @@ interface AuthContextType {
    */
   error: unknown | null;
   retry: () => void;
-  login: (data: LoginData) => Promise<AuthUser>;
+  /**
+   * Re-read the identity without flipping `isLoading` (no skeleton flash):
+   * used right after a write that changes it, e.g. onboarding creating the
+   * mentor row, so the next page sees the new `profile_id`.
+   */
+  refresh: () => Promise<AuthUser | null>;
+  login: (data: LoginData, options?: CaptchaOptions) => Promise<AuthUser>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * Whether this page load carries a password-recovery session: the recovery
+ * link's fragment (captured before supabase-js consumed it) or a
+ * `PASSWORD_RECOVERY` event seen since load. /reset-password opens its form
+ * only then (D13, F11).
+ */
+let recoverySeen = INITIAL_AUTH_HASH.type === "recovery" && INITIAL_AUTH_HASH.hasSession && !INITIAL_AUTH_HASH.errorCode;
+export function isRecoverySession(): boolean {
+  return recoverySeen;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [user, setUser] = useState<AuthUser | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<unknown | null>(null);
   const mountedRef = useRef(true);
+  const locationRef = useRef(location);
+  locationRef.current = location;
 
-  const resolve = useCallback(async () => {
+  const resolve = useCallback(async (): Promise<AuthUser | null> => {
     try {
       const currentUser = await auth.getCurrentUser();
       if (mountedRef.current) {
@@ -42,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(null);
         setIsLoading(false);
       }
+      return currentUser;
     } catch (err) {
       console.error("Auth init error:", err);
       if (mountedRef.current) {
@@ -49,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(err ?? new Error("auth-resolve-failed"));
         setIsLoading(false);
       }
+      return null;
     }
   }, []);
 
@@ -70,18 +93,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     resolve();
 
+    // A recovery link that Supabase sent to another page (e.g. the Site URL)
+    // still ends on the reset form (F34).
+    if (recoverySeen && locationRef.current !== ROUTES.resetPassword) {
+      setLocation(ROUTES.resetPassword, { replace: true });
+    }
+
     // Listen for auth state changes
-    const unsubscribe = auth.onAuthStateChange((authUser, resolveError) => {
+    const unsubscribe = auth.onAuthStateChange((authUser, resolveError, event) => {
       if (!mountedRef.current) return;
       setUser(authUser);
       setError(resolveError ?? null);
+      if (event === "PASSWORD_RECOVERY") {
+        recoverySeen = true;
+        if (locationRef.current !== ROUTES.resetPassword) setLocation(ROUTES.resetPassword, { replace: true });
+      }
     });
 
     return () => {
       mountedRef.current = false;
       unsubscribe();
     };
-  }, [resolve]);
+  }, [resolve, setLocation]);
 
   const retry = useCallback(() => {
     setError(null);
@@ -89,7 +122,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resolve();
   }, [resolve]);
 
-  const login = async (data: LoginData): Promise<AuthUser> => {
+  const refresh = useCallback(() => {
+    if (IS_LOCAL) {
+      const local = getLocalSession();
+      setUser(local);
+      return Promise.resolve(local);
+    }
+    return resolve();
+  }, [resolve]);
+
+  const login = async (data: LoginData, options?: CaptchaOptions): Promise<AuthUser> => {
     if (IS_LOCAL) {
       const account = findLocalAccount(data.email);
       if (!account) throw new Error("local-account-not-found");
@@ -99,7 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.clear();
       return account;
     }
-    const authUser = await auth.login(data);
+    const authUser = await auth.login(data, options);
     setUser(authUser);
     setError(null);
 
@@ -122,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, error, retry, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, error, retry, refresh, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

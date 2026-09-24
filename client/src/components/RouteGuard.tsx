@@ -6,7 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { auth, type AuthUser, type UserRole } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 import { IS_LOCAL } from "@/lib/demo";
-import { bidi } from "@/lib/format";
+import { bidi, intlLocale } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
@@ -22,8 +22,14 @@ function currentPath(location: string): string {
   return `${location}${search}`;
 }
 
+/** Whether a session role satisfies a route's requirement (one role or any of several). */
+export function roleAllows(required: UserRole | readonly UserRole[] | undefined, actual: UserRole): boolean {
+  if (!required) return true;
+  return typeof required === "string" ? required === actual : required.includes(actual);
+}
+
 /**
- * Resolves the session against an optional required role. Anonymous visitors
+ * Resolves the session against an optional required role (or any of several). Anonymous visitors
  * are redirected to `redirectTo` with `?next=` set to the current page; the
  * wrong role is reported as `forbidden` (never silently redirected, so a
  * mentor landing on /admin understands why); a session whose users-row lookup
@@ -31,7 +37,7 @@ function currentPath(location: string): string {
  * again would only re-run the same failing read. Identity comes from
  * useAuth() only — never from localStorage.
  */
-export function useRequireRole(role?: UserRole, redirectTo = "/login"): { status: GuardStatus; user: AuthUser | null } {
+export function useRequireRole(role?: UserRole | readonly UserRole[], redirectTo = "/login"): { status: GuardStatus; user: AuthUser | null } {
   const { user, isLoading, error } = useAuth();
   const [location, setLocation] = useLocation();
 
@@ -74,7 +80,7 @@ export function useRequireRole(role?: UserRole, redirectTo = "/login"): { status
         : sessionPresent === true && error
           ? "error"
           : "loading"
-      : role && user.user_type !== role
+      : !roleAllows(role, user.user_type)
         ? "forbidden"
         : "ok";
 
@@ -150,9 +156,10 @@ export function AccessErrorCard() {
 }
 
 /** Wrong role for this route: explains instead of redirecting; the heading takes focus on mount (D7). */
-export function AccessDeniedCard({ role, user }: { role: UserRole; user: AuthUser | null }) {
-  const { t } = useTranslation();
-  const roleLabel = t(`guard.role.${role}`);
+export function AccessDeniedCard({ role, user }: { role: UserRole | readonly UserRole[]; user: AuthUser | null }) {
+  const { t, i18n } = useTranslation();
+  const roles: readonly UserRole[] = typeof role === "string" ? [role] : role;
+  const roleLabel = new Intl.ListFormat(intlLocale(i18n.language), { style: "long", type: "disjunction" }).format(roles.map((r) => t(`guard.role.${r}`)));
   const homeFor: Record<UserRole, string> = {
     admin: ROUTES.admin,
     mentor: ROUTES.mentorPortal,
@@ -195,14 +202,14 @@ export function RequireAuth({ children, redirectTo = "/login" }: { children: Rea
   return <GuardSkeleton />;
 }
 
-/** Renders children only for a session with exactly this role; other roles see an explanation instead. */
+/** Renders children only for a session with this role (or any of these roles); other roles see an explanation instead. */
 export function RequireRole({
   role,
   children,
   fallback,
   redirectTo = "/login",
 }: {
-  role: UserRole;
+  role: UserRole | readonly UserRole[];
   children: ReactNode;
   fallback?: ReactNode;
   redirectTo?: string;
