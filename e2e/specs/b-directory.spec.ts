@@ -39,8 +39,7 @@ test('S1 directory: one card per curated mentor with its db id, linked by slug, 
   await healthy({ screenshotName: 'S1-directory' });
 });
 
-test('S2 unseeded: five static cards, "opening soon", no form and no heart, nothing in localStorage', async ({ page, healthy, lang }, testInfo) => {
-  test.skip(!['desktop-en', 'mobile-ar'].includes(testInfo.project.name), 'S2 runs on desktop-en and mobile-ar');
+test('S2 unseeded: five static cards, "opening soon", no form and no heart, nothing in localStorage', async ({ page, healthy, lang }) => {
   await page.route('**/rest/v1/mentors_public*', async (route) => {
     const url = decodeURIComponent(route.request().url());
     const single = [...FEATURED_IDS].find((id) => url.includes(`id=eq.${id}`));
@@ -71,6 +70,10 @@ test('S2 unseeded: five static cards, "opening soon", no form and no heart, noth
   await expect(page.getByTestId('featured-opening-soon')).toBeVisible();
   await expect(page.getByTestId('link-book-session-rail')).toHaveCount(0);
   await expect(page.getByTestId(`button-favorite-${target.dbId}`)).toHaveCount(0);
+  // No invented social proof without a row (D14): no rating line, no demo numbers anywhere on the rail.
+  await expect(page.getByTestId('featured-rating-line')).toHaveCount(0);
+  await expect(page.locator('aside')).not.toContainText('412');
+  await expect(page.locator('aside')).not.toContainText(/4[.,٫]9|٤[.,٫]٩/);
   await healthy({ screenshotName: 'S2-profile-unseeded' });
 
   await page.goto(`/mentor/${target.slug}/book`);
@@ -107,4 +110,28 @@ test('S25 a curated mentor resolves by slug and by database id; a DB mentor /boo
   await expect(page).toHaveURL(new RegExp(`/mentor/${mentorId}$`));
   await expect(page.getByTestId('mentor-not-found')).toHaveCount(0);
   await healthy({ screenshotName: 'S25-db-mentor-book-redirect' });
+});
+
+test('D14 DB mode: the seeded profile shows real ratings only, and the landing has no invented figures', async ({ page, healthy, lang }) => {
+  const target = FEATURED[0];
+  await page.goto(`/mentor/${target.slug}`);
+  await expect(page.locator('[data-page-state="db"]')).toBeVisible();
+  const rating = page.getByTestId('featured-rating-line');
+  await expect(rating).toBeVisible();
+  await expect(rating).not.toContainText('412');
+  // The FAQ reads in the page language.
+  const firstQuestion = page.locator('section[aria-labelledby="faq-title"]').getByRole('button').first();
+  await firstQuestion.scrollIntoViewIfNeeded();
+  if (lang === 'ar') await expect(firstQuestion).toHaveText(/؟$/);
+  else await expect(firstQuestion).toHaveText(/\?$/);
+
+  await page.goto('/');
+  const bento = page.locator('section[aria-labelledby="bento-title"]');
+  await bento.scrollIntoViewIfNeeded();
+  await expect(bento).not.toContainText('96%');
+  await expect(bento).not.toContainText('2X');
+  await expect(bento).not.toContainText('5/5');
+  await expect(page.getByTestId('bento-scheduling')).toContainText(tr(lang, 'showcase.bento.t4requestBig'));
+  await expect(page.getByTestId('hero-demo-proof')).toHaveCount(0);
+  await healthy({ screenshotName: 'D14-landing-bento' });
 });

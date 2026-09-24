@@ -213,6 +213,38 @@ test('S6 the sixth request from one email within an hour is rate limited', async
   }
 });
 
+test('S6b a server outage is not blamed on the connection; a 429 blocks Send only until its Retry-After', async ({ page, healthy, lang }, testInfo) => {
+  test.skip(!['desktop-en', 'mobile-ar'].includes(testInfo.project.name), 'S6b runs on desktop-en and mobile-ar');
+  const f = featuredFor(testInfo.project.name, 3);
+  const email = devEmail('s6b');
+  // Both answers are simulated: nothing reaches the database.
+  let answer: { status: number; body: unknown; headers?: Record<string, string> } = { status: 503, body: { error: 'unavailable' } };
+  await page.route('**/api/requests', (route) =>
+    route.fulfill({ status: answer.status, contentType: 'application/json', headers: answer.headers, body: JSON.stringify(answer.body) }),
+  );
+  await page.goto(`/mentor/${f.slug}/book`);
+  await fillSessionForm(page, 'Dev B Outage', email);
+  if (turnstile.enabled) await expect(tokenInput(page)).toHaveValue(/.+/, { timeout: 20_000 });
+  const send = page.getByTestId('button-send-request');
+  await send.click();
+  const error = page.getByTestId('booking-error');
+  await expect(error).toHaveAttribute('data-kind', 'service');
+  await expect(error).toHaveText(tr(lang, 'bookingRequest.error.service'));
+  await expect(error).not.toContainText(tr(lang, 'bookingRequest.error.generic'));
+  await expect(send).not.toHaveAttribute('aria-disabled', 'true');
+  await healthy({ screenshotName: 'S6b-service', allowStatus: [{ url: /\/api\/requests$/, status: 503 }] });
+
+  answer = { status: 429, body: { error: 'rate_limited', retry_after_seconds: 6 }, headers: { 'Retry-After': '6' } };
+  if (turnstile.enabled) await expect(tokenInput(page)).toHaveValue(/.+/, { timeout: 20_000 });
+  await send.click();
+  await expect(error).toHaveAttribute('data-kind', 'rateLimited');
+  await expect(error).toHaveText(tr(lang, 'bookingRequest.error.rateLimitedSoon'));
+  await expect(send).toHaveAttribute('aria-disabled', 'true');
+  // After the Retry-After the person can try again without reloading.
+  await expect(send).not.toHaveAttribute('aria-disabled', 'true', { timeout: 12_000 });
+  await healthy({ screenshotName: 'S6b-rate-limit-cooled', allowStatus: [{ url: /\/api\/requests$/, status: 429 }, { url: /\/api\/requests$/, status: 503 }] });
+});
+
 test('S8 a signed-in mentee requests through the RPC: no captcha, a row, then "already waiting" with no new row', async ({ page, context, db, healthy, lang, loginAs, personaProject }, testInfo) => {
   test.skip(!['desktop-en', 'mobile-ar'].includes(testInfo.project.name), 'S8 runs on desktop-en and mobile-ar');
   const mentorId = ids(personaProject).mentor;

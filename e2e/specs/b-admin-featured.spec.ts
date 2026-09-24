@@ -92,3 +92,28 @@ test('S7 an admin accepts and declines programme-managed requests; other mentors
     await purgeRequester(db, declineEmail);
   }
 });
+
+test('S7b an admin answering a request someone already answered is told so, and nothing is overwritten', async ({ page, db, loginAs, healthy, lang }, testInfo) => {
+  test.skip(!['desktop-en', 'mobile-ar'].includes(testInfo.project.name), 'S7b runs on desktop-en and mobile-ar');
+  const f = featuredFor(testInfo.project.name, 4);
+  const email = devEmail('s7s');
+  try {
+    const stale = await insertPendingRequest(db, { mentorId: f.dbId, email, name: 'Dev B Stale' });
+    await loginAs('admin');
+    await page.goto('/admin/bookings');
+    await page.getByTestId('button-show-programme-pending').click();
+    await page.getByTestId(`button-accept-booking-${stale.bookingId}`).click();
+    await expect(page.getByTestId('dialog-confirm-decision')).toBeVisible();
+    // Another admin declines it while this confirmation is open.
+    await db`update public.bookings set status = 'rejected', responded_at = now() where id = ${stale.bookingId}`;
+    await page.getByTestId('button-decision-confirm').click();
+    await expect(page.getByText(tr(lang, 'admin.bookings.decisionStale'))).toBeVisible();
+    await expect(page.getByText(tr(lang, 'admin.bookings.acceptedToast'))).toHaveCount(0);
+    expect((await db`select status from public.bookings where id = ${stale.bookingId}`)[0]?.status).toBe('rejected');
+    const note = await db`select 1 from public.notifications where booking_id = ${stale.bookingId} and type = 'booking_accepted'`;
+    expect(note, 'no acceptance email for a request that was declined').toHaveLength(0);
+    await healthy({ screenshotName: 'S7b-stale-decision' });
+  } finally {
+    await purgeRequester(db, email);
+  }
+});
