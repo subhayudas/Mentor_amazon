@@ -62,7 +62,7 @@ function NonFeaturedSession({ id }: { id: string }) {
     );
   }
   if (!isLocal && id && query.isPending) return <ProfileSkeleton reserveAvailability={false} />;
-  return <ProfileState icon={UserX} title={t("mentorProfile.notFound.title")} description={t("mentorProfile.notFound.body")} testId="mentor-not-found" />;
+  return <ProfileState icon={UserX} title={t("mentorProfile.notFound.title")} description={t("mentorProfile.notFound.body")} testId="mentor-not-found" notFound />;
 }
 
 function SessionPage({ state, retry, retrying }: { state: NonNullable<ReturnType<typeof useFeaturedPageMentor>["state"]>; retry: () => void; retrying: boolean }) {

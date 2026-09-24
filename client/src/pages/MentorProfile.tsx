@@ -67,6 +67,10 @@ function BackLink() {
  * Not found / load error share one frame: the page title h1, then a compact
  * EmptyState. Exported so `/mentor/:id/book` shows the same not-found state as
  * `/mentor/:id` for an unknown id (never another mentor's page, F23).
+ * `notFound` gives the h1 of every other missing page ("Page not found", the
+ * heading the route-change effect focuses and screen readers announce); the
+ * card keeps the mentor-specific explanation. A load error keeps the profile
+ * title, because the mentor may well exist.
  */
 export function ProfileState({
   icon,
@@ -74,17 +78,23 @@ export function ProfileState({
   description,
   testId,
   action,
+  notFound = false,
 }: {
   icon: typeof UserX;
   title: string;
   description: string;
   testId: string;
   action?: React.ReactNode;
+  notFound?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Container className="pb-16">
-      <PageHeader title={t("nav.titles.mentor")} />
+      {notFound ? (
+        <PageHeader eyebrow="404" title={t("errors.notFoundTitle")} />
+      ) : (
+        <PageHeader title={t("nav.titles.mentor")} />
+      )}
       <EmptyState
         icon={icon}
         title={title}
@@ -183,6 +193,7 @@ export default function MentorProfile() {
         title={t("mentorProfile.notFound.title")}
         description={t("mentorProfile.notFound.body")}
         testId="mentor-not-found"
+        notFound
       />
     );
   }
