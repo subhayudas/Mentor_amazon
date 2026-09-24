@@ -4,10 +4,12 @@ import { useTranslation } from "react-i18next";
 import { Clock, MailCheck, Star } from "lucide-react";
 
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { sentMemoryForViewer } from "@/components/booking/requestState";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/AuthContext";
 import type { PublicMentor } from "@/lib/database";
 import { directoryFields, type DirectoryMentor } from "@/lib/directory";
 import {
@@ -105,7 +107,12 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
   const lang = i18n.language;
   const nameId = React.useId();
   const f = useCardFields(mentor);
-  const sent = React.useMemo(() => (f.bookable || f.source === "db" ? getSentRequest(mentor.id) : null), [mentor.id, f.bookable, f.source]);
+  const { user } = useAuth();
+  // Same rule as the profile and the scheduler: a signed-in viewer only sees a memory sent from their own address.
+  const sent = React.useMemo(
+    () => (f.bookable || f.source === "db" ? sentMemoryForViewer(getSentRequest(mentor.id), user?.email) : null),
+    [mentor.id, f.bookable, f.source, user?.email],
+  );
   const hasRating = f.ratingCount > 0 && Number.isFinite(f.rating);
   const status: { tone: "success" | "neutral" | "info"; label: string; key: string } | null = f.availabilityUnknown
     ? null

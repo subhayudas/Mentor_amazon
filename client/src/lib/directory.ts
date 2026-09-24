@@ -110,7 +110,7 @@ export function mergeDirectory({ isLocal, dbRows, featured, localRows = [], dbFa
     seen.add(row.id);
     const curated = isFeaturedDbId(row.id) ? featuredByDbId.get(row.id) : undefined;
     if (curated) {
-      const overlaid = overlayFeatured(row, curated);
+      const overlaid = overlayFeatured(row, withoutShowcaseProof(curated));
       out.push({ ...publicColumns(overlaid), id: row.id, created_at: row.created_at ?? overlaid.created_at, slug: curated.id, source: "db", bookable: row.is_available });
     } else {
       out.push({ ...row, source: "db", bookable: row.is_available });
@@ -167,6 +167,16 @@ export interface FeaturedPageState {
   programmeManaged: boolean;
 }
 
+/**
+ * A curated entry with the demo social proof removed (sample rating, rating
+ * count, "1.8k sessions", testimonials). What a DB-mode page renders while no
+ * database row backs the entry (loading, not seeded, read failed), so no
+ * surface can show invented numbers against the database (D14).
+ */
+export function withoutShowcaseProof(m: FeaturedMentor): FeaturedMentor {
+  return { ...m, average_rating: "0", total_ratings: 0, rating: "", ratings: 0, bookings: "", testimonials: [] };
+}
+
 export interface FeaturedPageQuery {
   status: "pending" | "success" | "error";
   data?: PublicMentor | null;
@@ -188,15 +198,17 @@ export function featuredPageState(input: { isLocal: boolean; featured: FeaturedM
     };
   }
   const closed = { requestId: featured.dbId, bookable: false, canFavorite: false, showShowcaseProof: false, programmeManaged: curated };
-  if (query.status === "pending") return { ...closed, kind: "loading", mentor: featured, accepting: null };
-  if (query.status === "error") return { ...closed, kind: "error", mentor: featured, accepting: null };
-  if (!query.data) return { ...closed, kind: "static", mentor: featured, accepting: null };
+  // Without a row there are no real ratings: the page never sees the demo numbers (D14).
+  const bare = withoutShowcaseProof(featured);
+  if (query.status === "pending") return { ...closed, kind: "loading", mentor: bare, accepting: null };
+  if (query.status === "error") return { ...closed, kind: "error", mentor: bare, accepting: null };
+  if (!query.data) return { ...closed, kind: "static", mentor: bare, accepting: null };
   const row = query.data;
   // `mentors_public` may not expose the flag; a curated row counts as programme-managed unless it says otherwise.
   const managed = (row as PublicMentor & { managed_by_programme?: boolean | null }).managed_by_programme;
   return {
     kind: "db",
-    mentor: overlayFeatured(row, featured),
+    mentor: overlayFeatured(row, withoutShowcaseProof(featured)),
     requestId: row.id,
     bookable: row.is_available,
     canFavorite: row.is_available,

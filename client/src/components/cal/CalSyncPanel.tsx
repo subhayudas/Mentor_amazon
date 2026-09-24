@@ -59,6 +59,27 @@ const swallowEnter = (event: React.KeyboardEvent) => {
  * renders in demo mode or without a mentor id. Every control is
  * `type="button"`, so the panel can sit inside a profile form.
  */
+/**
+ * Screen-reader announcement for a new delivery only: the text changes when
+ * `last_delivery_at` changes after the panel mounted, never on a poll that
+ * brings nothing new (a changing region would re-announce every 15 s).
+ */
+function DeliveryAnnouncer({ status, message }: { status: ReturnType<typeof calSyncStatus>; message: string }) {
+  const at = status.kind === "not_connected" ? "" : status.at;
+  const seen = React.useRef(at);
+  const [announcement, setAnnouncement] = React.useState("");
+  React.useEffect(() => {
+    if (at === seen.current) return;
+    seen.current = at;
+    if (at) setAnnouncement(message);
+  }, [at, message]);
+  return (
+    <p className="sr-only" role="status" aria-live="polite" data-testid="cal-sync-announcer">
+      {announcement}
+    </p>
+  );
+}
+
 export function CalSyncPanel({ mentorId, calLink }: { mentorId: string; calLink?: string | null }): JSX.Element | null {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
@@ -156,7 +177,10 @@ export function CalSyncPanel({ mentorId, calLink }: { mentorId: string; calLink?
     content = (
       <div className="space-y-5">
         {/* Status: what Cal.com last sent and what it did here. */}
-        <div role="status" aria-live="polite" className="space-y-1.5" data-testid="cal-sync-status" data-kind={status.kind} data-outcome={status.kind === "not_connected" ? undefined : status.outcome ?? undefined}>
+        {/* Not a live region: the relative time re-renders on every 15 s poll. A
+            new delivery is announced once by <DeliveryAnnouncer>. */}
+        <DeliveryAnnouncer status={status} message={status.kind === "not_connected" ? "" : `${t(status.kind === "working" ? "calSync.connected" : "calSync.needsAttention")}. ${t(outcomeCopyKey(status.outcome))}`} />
+        <div className="space-y-1.5" data-testid="cal-sync-status" data-kind={status.kind} data-outcome={status.kind === "not_connected" ? undefined : status.outcome ?? undefined}>
           <p className="flex flex-wrap items-center gap-2 text-body-sm text-muted-foreground">
             <span>{t("calSync.statusLabel")}</span>
             {status.kind === "not_connected" ? (

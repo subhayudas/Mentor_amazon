@@ -8,7 +8,7 @@ import { formatNumber, UNAVAILABLE } from "@/lib/format";
 import { localizeCountry } from "@/lib/format";
 import { ChipRadio, ChipRadioGroup, FilterChip } from "@/components/discovery/FilterChip";
 import { adminQueryKeys, adminService, isProgrammeRequest, type AdminBooking } from "@/lib/adminService";
-import type { Booking } from "@/lib/database";
+import { isBookingNotPendingError, type Booking } from "@/lib/database";
 import { bookingService } from "@/lib/services";
 import {
   AlertDialog,
@@ -108,7 +108,8 @@ export default function BookingsTab() {
     onSuccess: (_row, { action }) => {
       toast.success(action === "accept" ? t("admin.bookings.acceptedToast") : t("admin.bookings.declinedToast"));
     },
-    onError: () => toast.error(t("admin.bookings.decisionError")),
+    // Someone else answered it first: say so (the refetch below shows its status), not "check your connection".
+    onError: (error) => toast.error(isBookingNotPendingError(error) ? t("admin.bookings.decisionStale") : t("admin.bookings.decisionError")),
     onSettled: () => {
       for (const key of [adminQueryKeys.bookings, ["notifications"], ["dashboard"], ["analytics"]]) void queryClient.invalidateQueries({ queryKey: key });
     },

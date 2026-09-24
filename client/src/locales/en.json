@@ -897,7 +897,8 @@
       "keepPending": "Keep it pending",
       "acceptedToast": "Request accepted. Email the mentee to arrange a time.",
       "declinedToast": "Request declined",
-      "decisionError": "Unable to update the request. Check your connection and try again."
+      "decisionError": "Unable to update the request. Check your connection and try again.",
+      "decisionStale": "This request was already answered. The list now shows its current status."
     },
     "access": {
       "pendingTitle": "Pending requests",
@@ -1364,7 +1365,8 @@
       "captcha": "The security check didn't pass. Try it again, then send.",
       "botCheck": "Complete the security check to send your request.",
       "invalid": "Some details weren't accepted. Check the highlighted fields and try again.",
-      "rateLimitedSoon": "You've sent several requests in a short time. Try again in a few minutes."
+      "rateLimitedSoon": "You've sent several requests in a short time. Try again in a few minutes.",
+      "service": "Requests can't be sent right now. Try again in a few minutes."
     },
     "discard": {
       "title": "Discard request?",
@@ -2090,7 +2092,16 @@
       "yourSession": "Your session",
       "t6big": "Get matched",
       "t6a": "Smart matching",
-      "t6b": "that pairs you with the right mentor for what you're working on."
+      "t6b": "that pairs you with the right mentor for what you're working on.",
+      "t1dbA": "Personal guidance",
+      "t1dbB": "from people who have done it",
+      "goal1": "Review my pitch deck",
+      "goal2": "Plan my first hire",
+      "t2dbBig": "Goal first",
+      "t2dbA": "Every request starts with",
+      "t2dbB": "what you want to work on",
+      "t4requestBig": "Request, then schedule",
+      "t4requestA": "Send a request. Once it's accepted, pick a time on their calendar and the invite with the video link lands in both calendars."
     },
     "rail": {
       "title": "See what the best mentors bring to Amazon",

@@ -56,7 +56,8 @@ export interface FeaturedMentor extends PublicMentor {
     learn_ar: string[];
   };
   testimonials: Testimonial[];
-  faq: { q: string; a: string }[];
+  /** Questions and answers; the Arabic pair shows on the Arabic page (falls back to English when absent). */
+  faq: { q: string; a: string; q_ar?: string; a_ar?: string }[];
   linkedin: string;
   /** Cal.com username or username/event; embedded on the session page when present. */
   cal_link?: string;
@@ -126,9 +127,9 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
       { name: "Priya N.", role: "Hardware founder", date: "21 May 2026", quote: "He has seen every mistake a hardware startup can make and told us which ones we were about to make." },
     ],
     faq: [
-      { q: "What stage of company do you mentor?", a: "Idea to Series A. Most of my calls are with pre-seed and seed founders, but operators inside larger companies are welcome too." },
-      { q: "Should I send a deck before the call?", a: "Yes. Add the link to the booking notes and I will read it beforehand so we can spend the whole call on decisions." },
-      { q: "Do you invest in the companies you mentor?", a: "Sometimes, through Brinc, but mentoring here is independent of any investment conversation." },
+      { q: "What stage of company do you mentor?", a: "Idea to Series A. Most of my calls are with pre-seed and seed founders, but operators inside larger companies are welcome too.", q_ar: "ما مرحلة الشركات التي ترشدها؟", a_ar: "من الفكرة حتى جولة السلسلة A. معظم مكالماتي مع مؤسسين في مرحلتي ما قبل البذرة والبذرة، لكن المشغّلين داخل الشركات الكبيرة مرحّب بهم أيضًا." },
+      { q: "Should I send a deck before the call?", a: "Yes. Add the link to the booking notes and I will read it beforehand so we can spend the whole call on decisions.", q_ar: "هل أرسل عرضًا تقديميًا قبل المكالمة؟", a_ar: "نعم. أضف الرابط إلى طلبك وسأقرؤه مسبقًا، لنخصّص المكالمة كلها للقرارات." },
+      { q: "Do you invest in the companies you mentor?", a: "Sometimes, through Brinc, but mentoring here is independent of any investment conversation.", q_ar: "هل تستثمر في الشركات التي ترشدها؟", a_ar: "أحيانًا، عبر برينك، لكن الإرشاد هنا مستقل عن أي نقاش استثماري." },
     ],
     linkedin: "https://www.linkedin.com/in/manavg",
   },
@@ -193,9 +194,9 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
       { name: "Maya T.", role: "COO", date: "2 Apr 2026", quote: "The most useful thirty minutes of our raise." },
     ],
     faq: [
-      { q: "Can you review my term sheet on the call?", a: "Yes, if you share it with the booking. I will flag the terms worth negotiating and explain what is standard for the region." },
-      { q: "Do you advise on debt as well as equity?", a: "Yes. Many companies should not raise equity at all, and we can work out which instruments fit your cash flows." },
-      { q: "Is this an investment pitch?", a: "No. This is mentoring. If an investment conversation makes sense later, it happens separately." },
+      { q: "Can you review my term sheet on the call?", a: "Yes, if you share it with the booking. I will flag the terms worth negotiating and explain what is standard for the region.", q_ar: "هل يمكنك مراجعة ورقة الشروط الخاصة بي خلال المكالمة؟", a_ar: "نعم، إذا أرفقتها بطلبك. سأشير إلى البنود التي تستحق التفاوض، وأوضّح ما هو معتاد في المنطقة." },
+      { q: "Do you advise on debt as well as equity?", a: "Yes. Many companies should not raise equity at all, and we can work out which instruments fit your cash flows.", q_ar: "هل تقدّم المشورة في التمويل بالدين إلى جانب التمويل بالملكية؟", a_ar: "نعم. كثير من الشركات لا ينبغي أن تجمع تمويلًا بالملكية أصلًا، ويمكننا معًا تحديد الأدوات التي تناسب تدفقاتك النقدية." },
+      { q: "Is this an investment pitch?", a: "No. This is mentoring. If an investment conversation makes sense later, it happens separately.", q_ar: "هل هذا عرض استثماري؟", a_ar: "لا. هذا إرشاد. وإذا أصبح لنقاش استثماري معنى لاحقًا، فسيجري بشكل منفصل." },
     ],
     linkedin: "https://ae.linkedin.com/in/bashar-aboudaoud",
   },
@@ -260,9 +261,9 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
       { name: "Daniel W.", role: "Hardware founder", date: "8 May 2026", quote: "He has launched more physical products than anyone I know. Every tip was specific." },
     ],
     faq: [
-      { q: "Do I need a marketing budget to benefit from this?", a: "No. Most of what we cover is positioning and founder-led distribution, which costs time rather than money." },
-      { q: "Can we review my landing page live?", a: "Yes. Send the link with the booking and we will go through it together." },
-      { q: "Do you mentor B2B as well as consumer companies?", a: "Both. The channels differ but the story work is the same." },
+      { q: "Do I need a marketing budget to benefit from this?", a: "No. Most of what we cover is positioning and founder-led distribution, which costs time rather than money.", q_ar: "هل أحتاج إلى ميزانية تسويق للاستفادة من الجلسة؟", a_ar: "لا. معظم ما نتناوله هو التموضع والتوزيع الذي يقوده المؤسس، وهذا يكلّف وقتًا لا مالًا." },
+      { q: "Can we review my landing page live?", a: "Yes. Send the link with the booking and we will go through it together.", q_ar: "هل يمكننا مراجعة صفحتي المقصودة مباشرةً؟", a_ar: "نعم. أرسل الرابط مع طلبك وسنراجعها معًا." },
+      { q: "Do you mentor B2B as well as consumer companies?", a: "Both. The channels differ but the story work is the same.", q_ar: "هل ترشد الشركات التي تبيع للشركات إلى جانب الشركات الاستهلاكية؟", a_ar: "كلاهما. تختلف القنوات، لكن العمل على القصة واحد." },
     ],
     linkedin: "https://www.linkedin.com/in/nramil",
   },
@@ -327,9 +328,9 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
       { name: "Jonas E.", role: "Founder", date: "5 Mar 2026", quote: "Clear, kind and unbelievably well connected." },
     ],
     faq: [
-      { q: "Can you introduce me to a government partner?", a: "The call is about preparing you for those conversations. Introductions happen when there is a real fit, never as the goal of a session." },
-      { q: "Do you help companies that are not in the UAE yet?", a: "Yes. Many calls are with teams deciding whether and how to enter the market." },
-      { q: "What should I prepare?", a: "A one-paragraph description of what you sell and who you think the buyer is. We will refine both." },
+      { q: "Can you introduce me to a government partner?", a: "The call is about preparing you for those conversations. Introductions happen when there is a real fit, never as the goal of a session.", q_ar: "هل يمكنك تعريفي بشريك حكومي؟", a_ar: "تركّز المكالمة على إعدادك لتلك المحادثات. تأتي التعريفات عندما يكون هناك توافق حقيقي، ولا تكون أبدًا هدف الجلسة." },
+      { q: "Do you help companies that are not in the UAE yet?", a: "Yes. Many calls are with teams deciding whether and how to enter the market.", q_ar: "هل تساعد الشركات غير الموجودة في الإمارات بعد؟", a_ar: "نعم. كثير من المكالمات مع فرق تقرّر ما إذا كانت ستدخل السوق وكيف." },
+      { q: "What should I prepare?", a: "A one-paragraph description of what you sell and who you think the buyer is. We will refine both.", q_ar: "ماذا عليّ أن أحضّر؟", a_ar: "وصفًا في فقرة واحدة لما تبيعه ولمن تظن أنه المشتري. وسنحسّن الاثنين معًا." },
     ],
     linkedin: "https://ae.linkedin.com/in/levilewandowski",
   },
@@ -394,9 +395,9 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
       { name: "Elena V.", role: "Angel", date: "19 Apr 2026", quote: "She explained syndicates better than any deck I have read." },
     ],
     faq: [
-      { q: "Will you review my investor update?", a: "Yes. Share the draft with the booking and we will rewrite it together on the call." },
-      { q: "Do you cover funds outside the Gulf?", a: "The focus is MENA, but many of the funds active here are regional or global, so the map extends naturally." },
-      { q: "I want to work in venture. Is this call for me?", a: "Yes. Around a third of my sessions are with people moving into the industry." },
+      { q: "Will you review my investor update?", a: "Yes. Share the draft with the booking and we will rewrite it together on the call.", q_ar: "هل ستراجعين تحديثي للمستثمرين؟", a_ar: "نعم. شارك المسودة مع طلبك وسنعيد كتابتها معًا خلال المكالمة." },
+      { q: "Do you cover funds outside the Gulf?", a: "The focus is MENA, but many of the funds active here are regional or global, so the map extends naturally.", q_ar: "هل تغطّين الصناديق خارج الخليج؟", a_ar: "التركيز على منطقة الشرق الأوسط وشمال أفريقيا، لكن كثيرًا من الصناديق النشطة هنا إقليمية أو عالمية، لذا تمتد الخريطة بشكل طبيعي." },
+      { q: "I want to work in venture. Is this call for me?", a: "Yes. Around a third of my sessions are with people moving into the industry.", q_ar: "أريد العمل في رأس المال الجريء. هل هذه المكالمة مناسبة لي؟", a_ar: "نعم. نحو ثلث جلساتي مع أشخاص ينتقلون إلى هذا المجال." },
     ],
     linkedin: "https://www.linkedin.com/in/ghitaelidrissi",
   },
@@ -505,6 +506,15 @@ export function overlayFeatured(row: PublicMentor, featured: FeaturedMentor): Fe
     const keepCurated = (field === "name" || field === "bio" || field === "photo_url" || field === "timezone") && (value == null || value === "");
     if (value === undefined || keepCurated) continue;
     target[field] = value;
+  }
+  // An empty Arabic name or bio keeps the curated translation while the English
+  // text is still the curated one; once the row's English differs, the curated
+  // Arabic would describe someone else, so it stays empty and the page falls
+  // back to the row's English (`pickLang`).
+  for (const [ar, en] of [["name_ar", "name"], ["bio_ar", "bio"]] as const) {
+    const value = row[ar];
+    if (value != null && value.trim() !== "") continue;
+    merged[ar] = merged[en] === featured[en] ? featured[ar] : "";
   }
   return merged;
 }

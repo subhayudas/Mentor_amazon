@@ -41,6 +41,17 @@ export type RequestState =
 const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**
+ * The per-browser "request sent" memory as one viewer may see it: anyone
+ * signed out sees it; a signed-in viewer only when it was sent from their own
+ * address (someone else may have used this browser anonymously). One rule for
+ * the cards, the profile and the scheduler.
+ */
+export function sentMemoryForViewer(memory: SentRequest | null, viewerEmail: string | null | undefined): SentRequest | null {
+  if (!memory) return null;
+  return !viewerEmail || sameEmail(memory.email, viewerEmail) ? memory : null;
+}
+
+/**
  * Prefer the real row (newest live booking for this mentor) over the local
  * memory; fall back to the memory only when no row is visible yet. A signed-in
  * viewer never inherits a memory written under a different email (someone

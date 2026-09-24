@@ -18,8 +18,10 @@ import { cn } from "@/lib/utils";
  * (`data/featuredMentors.ts`); the wall and the rail link to their profiles.
  *
  * Against the database the sample social proof is not shown (design D14):
- * the hero's "4.9 average rating" / "1,000+ sessions booked" chips and the
- * rail's per-mentor session counts are demo-mode content only.
+ * the hero's "4.9 average rating" / "1,000+ sessions booked" chips, the
+ * bento's "2X" and "96%" figures with their 5/5 review pills, and the rail's
+ * per-mentor session counts are demo-mode content only. The scheduling tile
+ * says a request comes first and the time is picked once it is accepted (D4).
  */
 
 function localizedHeadline(m: FeaturedMentor, lang: string) {
@@ -154,36 +156,53 @@ function Bento() {
         </h2>
 
         <div className="mt-12 grid gap-5 md:mt-[64px] md:grid-cols-12">
-          {/* 1 — dedicated mentor */}
-          <div className={cn(tile, "bg-[var(--sc-tile-peach)] md:col-span-3")}>
+          {/* 1 — dedicated mentor ("2X" is sample showcase copy: demo mode only, D14) */}
+          <div className={cn(tile, "bg-[var(--sc-tile-peach)] md:col-span-3")} data-testid="bento-dedicated">
             <ShoppingBag className="size-14 text-[var(--sc-ink)]" strokeWidth={1.5} aria-hidden="true" />
             <div className="mt-auto text-end">
-              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">2X</p>
+              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]" dir="ltr">{IS_LOCAL ? "2X" : "1:1"}</p>
               <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
-                {t("showcase.bento.t1a")}
+                {t(IS_LOCAL ? "showcase.bento.t1a" : "showcase.bento.t1dbA")}
                 <br />
-                <strong className="font-bold">{t("showcase.bento.t1b")}</strong>
+                <strong className="font-bold">{t(IS_LOCAL ? "showcase.bento.t1b" : "showcase.bento.t1dbB")}</strong>
               </p>
             </div>
           </div>
 
-          {/* 2 — rated sessions */}
-          <div className={cn(tile, "bg-[var(--sc-tile-lavender)] md:col-span-5")}>
+          {/* 2 — rated sessions in demo mode; against the database there are no
+              invented ratings or reviews (D14), so the tile says every request
+              starts with the mentee's goal, with sample goals as decoration. */}
+          <div className={cn(tile, "bg-[var(--sc-tile-lavender)] md:col-span-5")} data-testid="bento-proof">
             <div className="pointer-events-none absolute inset-x-6 top-8 space-y-4" aria-hidden="true">
               <div className="w-fit -rotate-6 rounded-full bg-white/60 py-2 pe-6 ps-3 text-[13px] text-[var(--sc-ink-soft)]">
-                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-peach)] align-middle" /> 5/5 “{t("showcase.bento.review1")}”
+                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-peach)] align-middle" />{" "}
+                {IS_LOCAL ? <>5/5 “{t("showcase.bento.review1")}”</> : t("showcase.bento.goal1")}
               </div>
               <div className="ms-10 w-fit -rotate-6 rounded-full bg-white/60 py-2 pe-6 ps-3 text-[13px] text-[var(--sc-ink-soft)]">
-                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-green)] align-middle" /> 5/5 “{t("showcase.bento.review2")}”
+                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-green)] align-middle" />{" "}
+                {IS_LOCAL ? <>5/5 “{t("showcase.bento.review2")}”</> : t("showcase.bento.goal2")}
               </div>
             </div>
             <div className="mt-auto text-end">
-              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">96%</p>
-              <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
-                {t("showcase.bento.t2a")}
-                <br />
-                <strong className="font-bold">{t("showcase.bento.t2b")}</strong>
-              </p>
+              {IS_LOCAL ? (
+                <>
+                  <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">96%</p>
+                  <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                    {t("showcase.bento.t2a")}
+                    <br />
+                    <strong className="font-bold">{t("showcase.bento.t2b")}</strong>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[44px] font-black leading-none text-[var(--sc-ink)] md:text-[52px]">{t("showcase.bento.t2dbBig")}</p>
+                  <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                    {t("showcase.bento.t2dbA")}
+                    <br />
+                    <strong className="font-bold">{t("showcase.bento.t2dbB")}</strong>
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -203,8 +222,8 @@ function Bento() {
             </div>
           </div>
 
-          {/* 4 — instant scheduling */}
-          <div className={cn(tile, "bg-[var(--sc-tile-blue)] md:col-span-5")}>
+          {/* 4 — scheduling: a request comes first, the time after it is accepted (D4) */}
+          <div className={cn(tile, "bg-[var(--sc-tile-blue)] md:col-span-5")} data-testid="bento-scheduling">
             <div className="flex flex-col items-start gap-3">
               <Pill>
                 <Video className="size-4" aria-hidden="true" /> {t("showcase.bento.meet")}
@@ -214,8 +233,8 @@ function Bento() {
               </Pill>
             </div>
             <div className="mt-auto">
-              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t4big")}</p>
-              <p className="mt-3 max-w-[360px] text-[18px] leading-[26px] text-[var(--sc-ink)]">{t("showcase.bento.t4a")}</p>
+              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t4requestBig")}</p>
+              <p className="mt-3 max-w-[360px] text-[18px] leading-[26px] text-[var(--sc-ink)]">{t("showcase.bento.t4requestA")}</p>
             </div>
           </div>
 

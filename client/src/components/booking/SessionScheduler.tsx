@@ -11,7 +11,8 @@ import { CalendarDays, Check, CircleAlert, Clock, Hourglass, Send } from "lucide
 import { CAL_NAMESPACE, loadCalApi } from "@/components/CalEmbed";
 import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
 import { GOAL_MAX, GOAL_MIN } from "@/components/booking/BookingRequestDialog";
-import { classifyBookingError, invalidRequestFields, isSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
+import { SHORT_RETRY_SECONDS, classifyBookingError, invalidRequestFields, useSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
+import { sentMemoryForViewer } from "@/components/booking/requestState";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import type { FeaturedMentor } from "@/data/featuredMentors";
@@ -374,7 +375,7 @@ function RequestFlow({
     if (sent) successRef.current?.focus();
   }, [sent]);
 
-  const sendBlocked = isSendBlocked(serverError);
+  const sendBlocked = useSendBlocked(serverError, retryAfter);
   const onSubmit = form.handleSubmit((values) => {
     if (mutation.isPending || sendBlocked) return;
     if (needsCaptcha && !captchaToken) {
@@ -443,7 +444,7 @@ function RequestFlow({
   }
 
   // A signed-in viewer never inherits a memory written under another address on this browser.
-  const memory = remembered && (!signedIn || !user?.email || remembered.email.trim().toLowerCase() === user.email.trim().toLowerCase()) ? remembered : null;
+  const memory = sentMemoryForViewer(remembered, signedIn ? user?.email : undefined);
   if (memory) {
     return (
       <div className="mt-6 rounded-[12px] bg-[var(--sc-sand)] p-4" data-testid="scheduler-sent-before" role="status">
@@ -477,7 +478,7 @@ function RequestFlow({
   const goalLength = form.watch("goal")?.length ?? 0;
   const errorText =
     serverError === "rateLimited"
-      ? retryAfter !== undefined && retryAfter <= 15 * 60
+      ? retryAfter !== undefined && retryAfter <= SHORT_RETRY_SECONDS
         ? t("bookingRequest.error.rateLimitedSoon")
         : t("bookingRequest.error.rateLimited")
       : serverError === "captcha"
@@ -488,7 +489,9 @@ function RequestFlow({
             ? t("bookingRequest.error.invalid")
             : serverError === "generic"
               ? t("bookingRequest.error.generic")
-              : null;
+              : serverError === "service"
+                ? t("bookingRequest.error.service")
+                : null;
 
   return (
     <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate data-testid="form-session-request">

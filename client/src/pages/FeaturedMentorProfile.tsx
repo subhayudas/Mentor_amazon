@@ -11,6 +11,7 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import { useAuth } from "@/context/AuthContext";
 import type { PublicMentor } from "@/lib/database";
 import { IS_LOCAL } from "@/lib/demo";
+import { sentMemoryForViewer } from "@/components/booking/requestState";
 import { featuredPageState, type FeaturedPageState } from "@/lib/directory";
 import { bidi, formatNumber, formatRelativeDay, languageName, localizeCountry } from "@/lib/format";
 import { discoveryUrl } from "@/lib/routes";
@@ -36,8 +37,11 @@ import { cn } from "@/lib/utils";
  * Sample ratings, "1.8k sessions" and testimonials are demo-mode only (D14).
  */
 
+/** The Arabic value in Arabic when there is one; an empty string or list falls back to English. */
 export function pickLang<T>(lang: string, en: T, ar: T | undefined): T {
-  return lang === "ar" && ar !== undefined ? ar : en;
+  if (lang !== "ar" || ar === undefined || ar === null) return en;
+  if ((typeof ar === "string" || Array.isArray(ar)) && ar.length === 0) return en;
+  return ar;
 }
 
 /**
@@ -156,8 +160,7 @@ export default function FeaturedMentorProfile() {
   const sessionTitle = pickLang(lang, mentor.session.title, mentor.session.title_ar);
   const bookHref = `/mentor/${mentor.id}/book`;
   // The per-browser "request sent" memory; a signed-in viewer only sees one sent from their own address.
-  const memory = getSentRequest(state.requestId);
-  const sent = memory && (!user?.email || memory.email.trim().toLowerCase() === user.email.trim().toLowerCase()) ? memory : null;
+  const sent = sentMemoryForViewer(getSentRequest(state.requestId), user?.email);
   const similarHref = discoveryUrl({ expertise: mentor.expertise?.[0] ? [mentor.expertise[0]] : [] });
 
   const ratingCount = Number(mentor.total_ratings ?? 0);
@@ -171,7 +174,8 @@ export default function FeaturedMentorProfile() {
     ) : (
       t("showcase.profile.newMentor")
     )
-  ) : state.kind === "db" || state.kind === "static" ? (
+  ) : state.kind === "db" ? (
+    // Only a real row has ratings; loading, not-seeded and error states show none (D14).
     ratingCount > 0 && Number.isFinite(ratingValue) ? (
       <>
         <strong className="font-bold" dir="ltr">
@@ -363,8 +367,8 @@ export default function FeaturedMentorProfile() {
             <Accordion type="single" collapsible className="mt-6 flex flex-col gap-3">
               {mentor.faq.map((f, i) => (
                 <AccordionItem key={i} value={`q${i}`} className="rounded-[12px] border border-[var(--sc-hairline)] bg-white px-4 last:border-b">
-                  <AccordionTrigger className="py-4 text-[15px] font-bold text-[var(--sc-ink)]">{f.q}</AccordionTrigger>
-                  <AccordionContent className="text-[14px] leading-[22px] text-[var(--sc-ink-soft)]">{f.a}</AccordionContent>
+                  <AccordionTrigger className="py-4 text-[15px] font-bold text-[var(--sc-ink)]">{pickLang(lang, f.q, f.q_ar)}</AccordionTrigger>
+                  <AccordionContent className="text-[14px] leading-[22px] text-[var(--sc-ink-soft)]">{pickLang(lang, f.a, f.a_ar)}</AccordionContent>
                 </AccordionItem>
               ))}
             </Accordion>

@@ -12,7 +12,12 @@
  * Both paths end in one `BookingRequestError` vocabulary the forms render.
  */
 
-export type BookingRequestErrorKind = "invalid" | "captcha" | "unavailable" | "rateLimited" | "network" | "generic";
+/**
+ * `service`: the server answered but cannot take requests right now (5xx,
+ * including 503 `unavailable` / `captcha_unavailable`, or the RPC missing):
+ * not the visitor's connection, so it is not reported as one.
+ */
+export type BookingRequestErrorKind = "invalid" | "captcha" | "unavailable" | "rateLimited" | "network" | "service" | "generic";
 
 /** Form fields a server-side validation error can point at. */
 export type RequestField = "name" | "email" | "goal" | "mentor" | "captcha";
@@ -83,8 +88,9 @@ export function parseRetryAfter(header: string | null | undefined): number | und
 /**
  * Non-2xx `/api/requests` response → error (design §3.4 "Responses"):
  * 400 invalid_request (+fields), 403 captcha_failed, 422 mentor_unavailable,
- * 429 rate_limited (DB or IP limiter), 503 unavailable / captcha_unavailable,
- * anything else generic. The body is never trusted to carry more than that.
+ * 429 rate_limited (DB or IP limiter), 5xx (503 unavailable /
+ * captcha_unavailable, 500) service, anything else generic. The body is never
+ * trusted to carry more than that.
  */
 export function mapRequestsResponse(status: number, body: unknown, retryAfter?: string | null): BookingRequestError {
   const payload = (body && typeof body === "object" ? body : {}) as { error?: unknown; fields?: unknown; retry_after_seconds?: unknown };
@@ -100,8 +106,11 @@ export function mapRequestsResponse(status: number, body: unknown, retryAfter?: 
     const fromBody = typeof payload.retry_after_seconds === "number" ? String(payload.retry_after_seconds) : null;
     return new BookingRequestError("rateLimited", { ...base, retryAfterSeconds: parseRetryAfter(retryAfter ?? fromBody) });
   }
-  // 503 (service or bot check temporarily unavailable), 500, 405/413/415 (client
-  // bugs), a 403 that is not ours (e.g. deployment protection): retryable.
+  // 503 (service or bot check temporarily unavailable), 500, 502, 504: the
+  // server's side, retryable later.
+  if (status >= 500) return new BookingRequestError("service", base);
+  // 405/413/415 (client bugs), a 403 that is not ours (e.g. deployment
+  // protection), a 200 that is not `{ ok: true }`: retryable.
   return new BookingRequestError("generic", base);
 }
 
@@ -109,7 +118,7 @@ export function mapRequestsResponse(status: number, body: unknown, retryAfter?: 
  * Supabase RPC error → error (design §3.2 "Error vocabulary"): 22023 carries
  * `invalid_email|invalid_name|invalid_goal` in the message, 42501
  * `mentor_unavailable` (other 42501s are generic), P0001 `rate_limited`,
- * PGRST202 = the function is missing (migration not applied). A fetch failure
+ * PGRST202 = the function is missing (migration not applied: `service`). A fetch failure
  * inside supabase-js arrives without a code and with a network message.
  */
 export function mapRpcError(error: unknown): BookingRequestError {
@@ -130,6 +139,7 @@ export function mapRpcError(error: unknown): BookingRequestError {
   if (code === "P0001" || text.includes("rate_limited") || text.includes("rate limit")) {
     return new BookingRequestError("rateLimited", base);
   }
+  if (code === "PGRST202") return new BookingRequestError("service", base);
   if (!code && (error instanceof TypeError || /failed to fetch|networkerror|network request failed|load failed/.test(text))) {
     return new BookingRequestError("network", base);
   }

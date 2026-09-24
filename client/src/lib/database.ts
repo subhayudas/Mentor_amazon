@@ -354,6 +354,20 @@ function escapeLikePattern(value: string): string {
 }
 
 // Database Service Class
+/** Accept / Decline on a request someone already answered (the status is no longer `pending`). */
+export class BookingNotPendingError extends Error {
+  readonly status: Booking['status'];
+  constructor(status: Booking['status']) {
+    super('booking_not_pending');
+    this.name = 'BookingNotPendingError';
+    this.status = status;
+  }
+}
+
+export function isBookingNotPendingError(value: unknown): value is BookingNotPendingError {
+  return value instanceof BookingNotPendingError || (value as { name?: unknown } | null)?.name === 'BookingNotPendingError';
+}
+
 class DatabaseService {
   // ==================== MENTORS ====================
   
@@ -832,36 +846,35 @@ class DatabaseService {
     return data;
   }
 
-  async acceptBooking(bookingId: string): Promise<Booking | null> {
-    const now = new Date().toISOString();
+  /**
+   * Answer a pending request. The write is guarded by `status = 'pending'`, so
+   * two people answering at once cannot both win: the second update matches
+   * no row. A write that changed nothing is never reported as success — it
+   * throws `BookingNotPendingError` when the request was already answered,
+   * or a plain error when the row could not be written (RLS, missing row).
+   */
+  async respondToBooking(bookingId: string, status: 'accepted' | 'rejected'): Promise<Booking> {
     const { data, error } = await supabase
       .from('bookings')
-      .update({
-        status: 'accepted',
-        responded_at: now,
-      })
+      .update({ status, responded_at: new Date().toISOString() })
       .eq('id', bookingId)
+      .eq('status', 'pending')
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    if (error) throw error;
+    if (data) return data as Booking;
+    const current = await this.getBooking(bookingId);
+    if (current && current.status !== 'pending') throw new BookingNotPendingError(current.status);
+    throw new Error('booking_update_not_applied');
   }
 
-  async declineBooking(bookingId: string): Promise<Booking | null> {
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('bookings')
-      .update({
-        status: 'rejected',
-        responded_at: now,
-      })
-      .eq('id', bookingId)
-      .select()
-      .single();
+  async acceptBooking(bookingId: string): Promise<Booking> {
+    return this.respondToBooking(bookingId, 'accepted');
+  }
 
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+  async declineBooking(bookingId: string): Promise<Booking> {
+    return this.respondToBooking(bookingId, 'rejected');
   }
 
   async submitMenteeFeedback(bookingId: string, rating: number, feedback: string): Promise<Booking | null> {

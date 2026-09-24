@@ -178,6 +178,20 @@ describe('overlayFeatured / staticFeaturedEntry', () => {
     expect(merged.name).toBe(manav.name);
   });
 
+  it('an empty Arabic name or bio keeps the curated translation while the English is unchanged', () => {
+    const merged = overlayFeatured(seededRow(manav, { name_ar: '', bio_ar: undefined }), manav);
+    expect(merged.name_ar).toBe(manav.name_ar);
+    expect(merged.bio_ar).toBe(manav.bio_ar);
+  });
+
+  it('an empty Arabic name or bio is left empty once the English was edited (the page falls back to it)', () => {
+    const merged = overlayFeatured(seededRow(manav, { name: 'Manav G.', name_ar: '', bio: 'A new bio.', bio_ar: '  ' }), manav);
+    expect(merged.name_ar).toBe('');
+    expect(merged.bio_ar).toBe('');
+    const kept = overlayFeatured(seededRow(manav, { name_ar: 'مناف' }), manav);
+    expect(kept.name_ar).toBe('مناف');
+  });
+
   it('static entries never carry fabricated ratings', () => {
     const entry = staticFeaturedEntry(manav);
     expect(entry.total_ratings).toBe(0);
@@ -243,6 +257,33 @@ describe('featuredPageState', () => {
   it('static (not seeded yet): opening soon, no Book, no heart', () => {
     const state = featuredPageState({ isLocal: false, featured: manav, query: { status: 'success', data: null } });
     expect(state).toMatchObject({ kind: 'static', bookable: false, canFavorite: false, accepting: null });
+  });
+
+  it('without a DB row (loading, not seeded, error) the page never sees the demo ratings (D14)', () => {
+    expect(Number(manav.total_ratings)).toBeGreaterThan(0);
+    for (const query of [{ status: 'pending' }, { status: 'success', data: null }, { status: 'error' }] as const) {
+      const { mentor } = featuredPageState({ isLocal: false, featured: manav, query });
+      expect(mentor).toMatchObject({ total_ratings: 0, average_rating: '0', ratings: 0, rating: '', bookings: '', testimonials: [] });
+      expect(JSON.stringify(mentor)).not.toContain('412');
+    }
+  });
+
+  it('db: a row without rating columns does not inherit the demo numbers', () => {
+    const { average_rating: _a, total_ratings: _t, ...bare } = seededRow(manav);
+    const { mentor } = featuredPageState({ isLocal: false, featured: manav, query: { status: 'success', data: bare as PublicMentor } });
+    expect(mentor).toMatchObject({ total_ratings: 0, average_rating: '0', ratings: 0, testimonials: [] });
+    const [card] = mergeDirectory({ isLocal: false, dbRows: [bare as PublicMentor], featured: [manav] });
+    expect(card).toMatchObject({ total_ratings: 0, average_rating: '0' });
+  });
+
+  it('the curated FAQ has an Arabic pair for every question', () => {
+    for (const m of FEATURED_MENTORS) {
+      for (const f of m.faq) {
+        expect(f.q_ar?.trim(), f.q).toBeTruthy();
+        expect(f.a_ar?.trim(), f.q).toBeTruthy();
+        expect(f.q_ar).toMatch(/؟$/);
+      }
+    }
   });
 
   it('error: static page, Book disabled', () => {

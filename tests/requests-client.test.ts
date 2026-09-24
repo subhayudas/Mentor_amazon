@@ -10,8 +10,8 @@ import {
   submitAnonymousRequest,
   toRequestField,
 } from '../client/src/lib/requests.ts';
-import { classifyBookingError, invalidRequestFields, isSendBlocked } from '../client/src/components/booking/bookingErrors.ts';
-import { railStatesFor, railStopsFor, resolveRequestState, type RequestState } from '../client/src/components/booking/requestState.ts';
+import { classifyBookingError, invalidRequestFields, isSendBlocked, rateLimitCooldownMs } from '../client/src/components/booking/bookingErrors.ts';
+import { railStatesFor, railStopsFor, resolveRequestState, sentMemoryForViewer, type RequestState } from '../client/src/components/booking/requestState.ts';
 import { FEATURED_MENTORS } from '../client/src/data/featuredMentors.ts';
 import type { Booking } from '../client/src/lib/database.ts';
 
@@ -72,9 +72,10 @@ describe('submitAnonymousRequest (POST /api/requests)', () => {
     [403, { error: 'captcha_failed' }, {}, { kind: 'captcha', fields: ['captcha'] }],
     [422, { error: 'mentor_unavailable' }, {}, { kind: 'unavailable' }],
     [429, { error: 'rate_limited' }, { 'Retry-After': '540' }, { kind: 'rateLimited', retryAfterSeconds: 540 }],
-    [503, { error: 'unavailable' }, {}, { kind: 'generic', status: 503 }],
-    [503, { error: 'captcha_unavailable' }, {}, { kind: 'generic', code: 'captcha_unavailable' }],
-    [500, { error: 'server_error' }, {}, { kind: 'generic', status: 500 }],
+    [503, { error: 'unavailable' }, {}, { kind: 'service', status: 503 }],
+    [503, { error: 'captcha_unavailable' }, {}, { kind: 'service', code: 'captcha_unavailable' }],
+    [500, { error: 'server_error' }, {}, { kind: 'service', status: 500 }],
+    [502, null, {}, { kind: 'service', status: 502 }],
     [413, { error: 'payload_too_large' }, {}, { kind: 'generic' }],
     [415, { error: 'unsupported_media_type' }, {}, { kind: 'generic' }],
   ])('HTTP %i %j maps to %j', async (status, body, headers, expected) => {
@@ -102,7 +103,7 @@ describe('mapRequestsResponse', () => {
 
   it('never surfaces server wording, only the vocabulary', () => {
     const error = mapRequestsResponse(500, { error: 'server_error', detail: 'SUPABASE_SERVICE_ROLE_KEY missing' });
-    expect(error.message).toBe('booking_request_generic');
+    expect(error.message).toBe('booking_request_service');
   });
 });
 
@@ -115,7 +116,7 @@ describe('mapRpcError (create_my_booking_request)', () => {
     [{ code: '42501', message: 'not_allowed' }, { kind: 'generic' }],
     [{ code: '42501', message: 'permission denied for function create_my_booking_request' }, { kind: 'generic' }],
     [{ code: 'P0001', message: 'rate_limited' }, { kind: 'rateLimited' }],
-    [{ code: 'PGRST202', message: 'Could not find the function public.create_my_booking_request' }, { kind: 'generic', code: 'PGRST202' }],
+    [{ code: 'PGRST202', message: 'Could not find the function public.create_my_booking_request' }, { kind: 'service', code: 'PGRST202' }],
     [{ code: '', message: 'TypeError: Failed to fetch' }, { kind: 'network' }],
     [new TypeError('Load failed'), { kind: 'network' }],
     [{ code: 'XX000', message: 'boom' }, { kind: 'generic' }],
@@ -155,6 +156,8 @@ describe('classifyBookingError (the copy cases the forms render)', () => {
     [new BookingRequestError('invalid', { fields: ['goal'] }), 'invalid'],
     [new BookingRequestError('network'), 'generic'],
     [new BookingRequestError('generic'), 'generic'],
+    [new BookingRequestError('service'), 'service'],
+    [mapRequestsResponse(503, { error: 'unavailable' }), 'service'],
     [{ code: 'P0001', message: 'rate_limited' }, 'rateLimited'],
     [{ code: '42501', message: 'mentor_unavailable' }, 'unavailable'],
     [new Error('anything'), 'generic'],
@@ -169,6 +172,27 @@ describe('classifyBookingError (the copy cases the forms render)', () => {
     expect(isSendBlocked('unavailable')).toBe(true);
     expect(isSendBlocked('captcha')).toBe(false);
     expect(isSendBlocked(null)).toBe(false);
+    expect(isSendBlocked('service')).toBe(false);
+  });
+
+  it('a 429 blocks Send only for its Retry-After (an hour without one), never past an hour', () => {
+    expect(rateLimitCooldownMs(120)).toBe(120_000);
+    expect(rateLimitCooldownMs(0)).toBe(5_000);
+    expect(rateLimitCooldownMs(undefined)).toBe(3_600_000);
+    expect(rateLimitCooldownMs(86_400)).toBe(3_600_000);
+  });
+});
+
+describe('sentMemoryForViewer (cards, profile and scheduler share it)', () => {
+  const memory = { email: 'Sara@Example.com ', sentAt: '2026-09-20T10:00:00Z' };
+  it('signed out: the browser memory shows', () => {
+    expect(sentMemoryForViewer(memory, undefined)).toBe(memory);
+    expect(sentMemoryForViewer(memory, null)).toBe(memory);
+  });
+  it('signed in: only a memory sent from the same address (case and spaces ignored)', () => {
+    expect(sentMemoryForViewer(memory, 'sara@example.com')).toBe(memory);
+    expect(sentMemoryForViewer(memory, 'omar@example.com')).toBeNull();
+    expect(sentMemoryForViewer(null, 'sara@example.com')).toBeNull();
   });
 });
 

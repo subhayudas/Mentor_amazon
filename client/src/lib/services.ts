@@ -286,28 +286,22 @@ export const bookingService = {
     });
   },
 
-  // Accept a booking
-  async accept(bookingId: string): Promise<Booking | null> {
-    const booking = await db.getBooking(bookingId);
-    if (!booking) throw new Error('Booking not found');
-    if (booking.status !== 'pending') throw new Error('Booking is not in pending status');
-    
+  /**
+   * Accept a pending request. The update itself only matches a pending row
+   * (no check-then-write race); an already-answered request throws
+   * `BookingNotPendingError` and nobody is notified twice.
+   */
+  async accept(bookingId: string): Promise<Booking> {
     const acceptedBooking = await db.acceptBooking(bookingId);
     // The database builds the message (including the mentor's Cal.com link)
-    if (acceptedBooking) await notify(bookingId, 'booking_accepted');
-    
+    await notify(bookingId, 'booking_accepted');
     return acceptedBooking;
   },
 
-  // Decline a booking
-  async decline(bookingId: string): Promise<Booking | null> {
-    const booking = await db.getBooking(bookingId);
-    if (!booking) throw new Error('Booking not found');
-    if (booking.status !== 'pending') throw new Error('Booking is not in pending status');
-    
+  /** Decline a pending request (same guard as `accept`). */
+  async decline(bookingId: string): Promise<Booking> {
     const declinedBooking = await db.declineBooking(bookingId);
-    if (declinedBooking) await notify(bookingId, 'booking_rejected');
-    
+    await notify(bookingId, 'booking_rejected');
     return declinedBooking;
   },
 

@@ -23,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
-import { classifyBookingError, invalidRequestFields, isSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
+import { SHORT_RETRY_SECONDS, classifyBookingError, invalidRequestFields, useSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
 import { DiscardRequestDialog } from "@/components/booking/DiscardRequestDialog";
 import { railStopsFor } from "@/components/booking/requestState";
 import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
@@ -79,7 +79,6 @@ interface Values {
 }
 
 /** The IP limiter's window is minutes, the DB limit an hour: say which. */
-const SHORT_RETRY_SECONDS = 15 * 60;
 
 /**
  * The booking request dialog (§7 as amended: P0-3/C4, P1-20/C5, P1-22,
@@ -235,10 +234,11 @@ export function BookingRequestDialog({
     },
   });
   const isPending = mutation.isPending;
-  // After the rate limit or a "stopped accepting" refusal another send cannot
-  // succeed, so the primary is aria-disabled (still focusable) and described
-  // by the alert that says why; a fresh open clears it.
-  const sendBlocked = isSendBlocked(serverError);
+  // After the rate limit (until its cooldown ends) or a "stopped accepting"
+  // refusal another send cannot succeed, so the primary is aria-disabled
+  // (still focusable) and described by the alert that says why; a fresh open
+  // clears it.
+  const sendBlocked = useSendBlocked(serverError, retryAfter);
 
   React.useEffect(() => {
     if (serverError) alertRef.current?.focus();
@@ -489,6 +489,7 @@ export function BookingRequestDialog({
                         {serverError === "invalid" && t("bookingRequest.error.invalid")}
                         {serverError === "invalidEmail" && t("bookingRequest.error.invalidEmail")}
                         {serverError === "generic" && t("bookingRequest.error.generic")}
+                        {serverError === "service" && t("bookingRequest.error.service")}
                       </span>
                       {serverError === "unavailable" && (
                         <span>
@@ -497,7 +498,7 @@ export function BookingRequestDialog({
                           </Link>
                         </span>
                       )}
-                      {serverError === "generic" && (
+                      {(serverError === "generic" || serverError === "service") && (
                         <span>
                           <Button type="submit" form={formId} variant="outline" size="sm" data-testid="button-retry-booking">
                             {t("bookingRequest.error.tryAgain")}
