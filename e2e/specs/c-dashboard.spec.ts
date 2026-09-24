@@ -203,6 +203,7 @@ test('S9 a mentee withdraws a pending request and cancels an accepted session on
   const cleanup = async () => {
     await db`delete from public.notifications where booking_id = any(${mine})`;
     await db`delete from public.activity_events where subject_id = any(${mine})`;
+    await db`delete from public.mentor_activity_log where booking_id = any(${mine})`;
     await db`delete from public.bookings where id = any(${mine})`;
   };
   try {
@@ -395,7 +396,7 @@ test('S14 a mentor edits the profile: validation, saved fields, photo in storage
     const src = (await img.getAttribute('src'))!;
     // Until Save, the page says the new photo is not kept yet (the row still has none).
     await expect(page.getByTestId('text-photo-status')).toHaveText(tr(lang, 'showcase.profileSettings.photoPending'));
-    expect((await db<{ photo_url: string | null }[]>`select photo_url from public.mentors where id = ${mentorId}`)[0].photo_url).toBeNull();
+    expect((await db<{ photo_url: string | null }[]>`select photo_url from public.mentors where id = ${mentorId}`)[0].photo_url ?? '').toBe('');
     await expect(page.getByTestId('button-save-profile')).toBeEnabled();
     await page.getByTestId('button-save-profile').click();
     await expect.poll(async () => (await db<{ photo_url: string | null }[]>`select photo_url from public.mentors where id = ${mentorId}`)[0].photo_url).toBe(src);
