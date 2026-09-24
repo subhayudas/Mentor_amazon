@@ -233,7 +233,9 @@ test('S9 a mentee withdraws a pending request and cancels an accepted session on
     await expect.poll(async () => (await bookingRow(db, withdrawId)).status).toBe('canceled');
     expect((await bookingRow(db, withdrawId)).canceled_by).toBe('mentee');
     expect((await activityFor(db, withdrawId)).map((e) => e.type)).toEqual(['booking_canceled']);
-    await expect(page.getByTestId(`booking-row-${withdrawId}`)).toHaveCount(0);
+    // The page moves to the Cancelled tab, where the row now shows its new status.
+    await expect(page.getByTestId('tab-canceled')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId(`booking-row-${withdrawId}`)).toHaveAttribute('data-status', 'canceled');
 
     // Cancel the accepted session, with confirmation.
     await page.getByTestId('tab-upcoming').click();
@@ -247,8 +249,8 @@ test('S9 a mentee withdraws a pending request and cancels an accepted session on
     expect(canceled.map((e) => e.type)).toEqual(['booking_canceled']);
     expect(canceled[0].visible_to).toEqual(expect.arrayContaining([mentor, mentee]));
 
-    // Both rows are now under Canceled.
-    await page.getByTestId('tab-canceled').click();
+    // Both rows are now under Cancelled.
+    await expect(page.getByTestId('tab-canceled')).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId(`booking-row-${withdrawId}`)).toBeVisible();
     await expect(page.getByTestId(`booking-row-${cancelId}`)).toBeVisible();
     await healthy({ screenshotName: 'S9-mentee-after-actions' });
