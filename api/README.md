@@ -237,9 +237,11 @@ A uid the booking moved away from (a reschedule, a correction, a rejected or rel
 time) is kept in `booking_cal_superseded_uids`. A late delivery about it answers
 `stale_state` and changes nothing, and the embed cannot record it again.
 
-Clients can never write `cal_verified_uid` (booking guard) or the superseded list (no grants). One consequence:
-if a mentor removes the webhook after a verified delivery, later reschedules of
-that booking through the embed are not recorded until Cal.com delivers them.
+Clients can never write `cal_verified_uid` (booking guard) or the superseded list (no grants).
+The cost of this rule: once Cal.com has verified a booking, a reschedule made through the
+embed is recorded only when its `BOOKING_RESCHEDULED` delivery arrives. If that delivery is
+lost (Cal.com does not retry a `5xx`) or the mentor has removed the webhook, the app keeps the
+old time, while Cal.com's own e-mails and calendar invites carry the new one.
 
 ---
 
