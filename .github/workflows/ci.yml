@@ -47,6 +47,9 @@ jobs:
       - name: Build (vite)
         run: npm run build
 
+      - name: Entry chunk bundles every locale namespace its modules use
+        run: npm run check:entry-i18n
+
       - name: Upload dist
         uses: actions/upload-artifact@v4
         with:

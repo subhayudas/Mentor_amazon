@@ -17,8 +17,11 @@
 | Migration idempotency | `bash scripts/db/verify-idempotency.sh` | the local Postgres | every SQL file re-runs as a no-op; `v2` alone and the whole chain run twice leave the catalog identical |
 | Browser E2E | `npx playwright test` (or `--project=desktop-en e2e/specs/…`) | the local stack; Chromium (`npx playwright install chromium`) | every route × persona × EN/AR × desktop/mobile, flows through the UI to the database |
 
-CI (`.github/workflows/ci.yml`) runs type-check, unit tests, i18n parity and the build on
-every push, and the integration suites plus the idempotency check on a fresh
+CI (`.github/workflows/ci.yml`) runs type-check, unit tests, i18n parity, the build and
+`npm run check:entry-i18n` (the entry chunk bundles only the English namespaces its own
+modules use, see `client/src/lib/i18n.ts`; the check fails naming any namespace an
+entry-chunk module uses but the eager import leaves out) on every push, and the
+integration suites plus the idempotency check on a fresh
 `supabase start` (job `db-integration`). The E2E suite runs locally (it needs a browser and
 internet for Turnstile); attach its report to the PR.
 

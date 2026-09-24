@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "check": "tsc",
     "check:i18n": "node scripts/check-i18n.mjs",
+    "check:entry-i18n": "node scripts/check-entry-i18n.mjs",
     "db:push": "drizzle-kit push",
     "test": "vitest run",
     "test:integration": "vitest run -c vitest.integration.config.ts",
