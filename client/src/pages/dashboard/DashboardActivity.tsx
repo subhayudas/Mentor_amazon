@@ -66,7 +66,11 @@ export function ActivityList({ events, lang, compact }: { events: ActivityEvent[
   const fmt = React.useMemo(() => new Intl.DateTimeFormat(lang, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }), [lang]);
   const whenFmt = React.useMemo(() => new Intl.DateTimeFormat(lang, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }), [lang]);
   if (events.length === 0) {
-    return <p className="py-8 text-center text-[14px] text-[#6c6c84]">{t("showcase.activity.empty")}</p>;
+    return (
+      <p className="py-8 text-center text-[14px] text-[#6c6c84]" data-testid="activity-empty">
+        {t("showcase.activity.empty")}
+      </p>
+    );
   }
   const fallbacks = { mentor: t("showcase.bookings.mentor"), mentee: t("showcase.bookings.mentee") };
   const line = (e: ActivityEvent) => {

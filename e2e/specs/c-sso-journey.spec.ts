@@ -24,7 +24,8 @@ test('S28 Amazon sign-in → onboarding → database-backed portal → accept a 
   const ns = e2eNamespace();
   const alias = `e2e-s28-${ns ? `${ns}-` : ''}${personaProject}-${testInfo.retry}`;
   const amazonEmail = `${alias}@amazon.com`;
-  const requesterEmail = `e2e.${ns ? `${ns}.` : ''}${personaProject}.s28-requester@mentorconnect.test`;
+  // Hyphens, not dots: the page shows this address, and dotted words read as raw i18n keys to the health check.
+  const requesterEmail = `e2e-${ns ? `${ns}-` : ''}${personaProject}-s28-requester@mentorconnect.test`;
   const name = lang === 'ar' ? 'سلمى العتيبي' : 'Salma Otaibi';
   const paths = recordPaths(page);
   await purgeSsoIdentity(db, alias);
@@ -93,7 +94,9 @@ test('S28 Amazon sign-in → onboarding → database-backed portal → accept a 
 
     // 4. Sign out, sign in with Amazon again: straight to the portal, no onboarding, no duplicates.
     await signOut(page, lang, isMobile);
+    await healthy({ screenshotName: 'S28-6-signed-out' });
     paths.length = 0;
+    await page.goto('/login');
     await expect(page.getByTestId('link-amazon-sso')).toBeVisible();
     await page.getByTestId('link-amazon-sso').click();
     await expect(page).toHaveURL((u) => u.pathname === '/mentor-portal', { timeout: 30_000 });
@@ -103,7 +106,7 @@ test('S28 Amazon sign-in → onboarding → database-backed portal → accept a 
     await expect(page.getByTestId(`booking-row-${requestId}`)).toHaveCount(0); // answered: no longer waiting
     expect(await counts()).toEqual({ users: 1, approved: 1, mentors: 1, auth: 1 });
     await expectNoDemo(page, lang);
-    await healthy({ screenshotName: 'S28-6-signed-in-again' });
+    await healthy({ screenshotName: 'S28-7-signed-in-again' });
   } finally {
     await request.post(`${e2eEnv.mockIdpControl}/reset`).catch(() => undefined);
     await purgeSsoIdentity(db, alias);

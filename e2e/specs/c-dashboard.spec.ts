@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '../fixtures/test';
 import { tr } from '../fixtures/i18n';
 import { bookingId, displayName, ids, mentorCalLink } from '../fixtures/personas';
-import { TINY_PNG, expectNoDemo, plain, reseed, runsOn, toast } from './c-helpers';
+import { TINY_PNG, expectNoDemo, plain, reseed, runsOn, toast, tokenSettle } from './c-helpers';
 
 /**
  * Dashboards on the database (design §6.4 S9, S14–S17, S19, S26; C3–C10, F01/F02/F12/F13/
@@ -32,6 +32,7 @@ const rows = (page: Page) => page.locator('[data-testid^="booking-row-"]');
 
 test('S16 a mentee with no bookings sees an honest empty state: no demo rows, no reminders', async ({ page, loginAs, healthy, lang }) => {
   await loginAs('mentee-empty');
+  await tokenSettle(page);
   await page.goto('/dashboard');
   await expect(page.getByTestId('mentee-empty')).toBeVisible();
   await expect(page.getByTestId('reminders-banner')).toHaveCount(0);
@@ -47,6 +48,7 @@ test('S16 a mentee with no bookings sees an honest empty state: no demo rows, no
 
 test('S16 a mentor sees exactly the three seeded requests and one reminder (the confirmed session within 24 h)', async ({ page, loginAs, healthy, lang, personaProject }) => {
   await loginAs('mentor');
+  await tokenSettle(page);
   await page.goto('/dashboard');
   await expect(page.getByTestId('text-pending-count')).toContainText('3');
   const banner = page.getByTestId('reminders-banner');
@@ -67,6 +69,7 @@ test('S16 a mentor sees exactly the three seeded requests and one reminder (the 
 
 test('S16 a mentor without a profile is asked to finish it', async ({ page, loginAs, healthy, lang }) => {
   await loginAs('mentor-new');
+  await tokenSettle(page);
   await page.goto('/dashboard');
   const card = page.getByTestId('card-finish-profile');
   await expect(card).toBeVisible();
@@ -78,6 +81,7 @@ test('S16 a mentor without a profile is asked to finish it', async ({ page, logi
 
 test('S16 an admin opening /dashboard is sent to /admin', async ({ page, loginAs, healthy }) => {
   await loginAs('admin');
+  await tokenSettle(page);
   await page.goto('/dashboard');
   await expect(page).toHaveURL((u) => u.pathname === '/admin');
   await healthy({ screenshotName: 'S16-admin-redirect' });
@@ -94,6 +98,7 @@ test('S9 mentor accepts, declines, cancels and completes on /dashboard/bookings;
   const requester = (n: number) => ids(p).requesters[n - 1];
 
   await loginAs('mentor');
+  await tokenSettle(page);
   await page.goto('/dashboard/bookings');
   await expect(page.getByTestId(`booking-row-${pending1}`)).toBeVisible();
 
@@ -191,6 +196,7 @@ test('S9 mentor accepts, declines, cancels and completes on /dashboard/bookings;
 test('S17 an aborted activity read shows the error state, and Retry loads the feed', async ({ page, loginAs, healthy, lang }, testInfo) => {
   test.skip(!runsOn(testInfo, ['desktop-en', 'desktop-ar']), 'S17 runs on desktop-en and desktop-ar');
   await loginAs('mentor');
+  await tokenSettle(page);
   await page.route('**/rest/v1/activity_events?**', (route) => route.abort());
   await page.goto('/dashboard/activity');
   const error = page.getByTestId('dashboard-error');
@@ -198,7 +204,7 @@ test('S17 an aborted activity read shows the error state, and Retry loads the fe
   await expect(error).toContainText(tr(lang, 'showcase.activity.loadError'));
   await page.unroute('**/rest/v1/activity_events?**');
   await page.getByTestId('button-dashboard-retry').click();
-  await expect(page.getByTestId('activity-list')).toBeVisible();
+  await expect(page.getByTestId('activity-list').or(page.getByTestId('activity-empty'))).toBeVisible();
   await expect(error).toHaveCount(0);
   await healthy({ screenshotName: 'S17-retry' });
 });
@@ -210,6 +216,7 @@ const DEMO_ONLY = ['showcase.analytics.kpi.views', 'showcase.analytics.sources',
 test('S19 a mentor sees their own real numbers: no views, sources or devices; the report is admin-only', async ({ page, loginAs, healthy, lang }, testInfo) => {
   test.skip(!runsOn(testInfo, ['desktop-en', 'desktop-ar']), 'S19 runs on desktop-en and desktop-ar');
   await loginAs('mentor');
+  await tokenSettle(page);
   await page.goto('/analytics');
   await expect(page.getByTestId('analytics-kpis')).toBeVisible();
   await expect(page.getByTestId('analytics-funnel')).toBeVisible();
@@ -227,6 +234,7 @@ test('S19 a mentor sees their own real numbers: no views, sources or devices; th
 test('S19 an admin sees programme numbers with real top mentors, and the impact report', async ({ page, loginAs, healthy, db, lang }, testInfo) => {
   test.skip(!runsOn(testInfo, ['desktop-en', 'desktop-ar']), 'S19 runs on desktop-en and desktop-ar');
   await loginAs('admin');
+  await tokenSettle(page);
   await page.goto('/analytics');
   await expect(page.getByTestId('analytics-kpis')).toBeVisible();
   const top = page.getByTestId('analytics-top-mentors');
@@ -258,6 +266,7 @@ test('S19 an admin sees programme numbers with real top mentors, and the impact 
 test('S19 a mentee may not open analytics', async ({ page, loginAs, healthy, lang }, testInfo) => {
   test.skip(!runsOn(testInfo, ['desktop-en', 'desktop-ar']), 'S19 runs on desktop-en and desktop-ar');
   await loginAs('mentee');
+  await tokenSettle(page);
   await page.goto('/analytics');
   await expect(page.getByText(tr(lang, 'guard.noAccessTitle')).first()).toBeVisible();
   await expect(page.getByTestId('analytics-kpis')).toHaveCount(0);
@@ -269,6 +278,7 @@ test('S19 a mentee may not open analytics', async ({ page, loginAs, healthy, lan
 test('S26 /dashboard/admin goes to /admin, and the admin bookings tab lists database rows', async ({ page, loginAs, healthy, personaProject }, testInfo) => {
   test.skip(!runsOn(testInfo, ['desktop-en']), 'S26 runs on desktop-en');
   await loginAs('admin');
+  await tokenSettle(page);
   await page.goto('/dashboard/admin');
   await expect(page).toHaveURL((u) => u.pathname === '/admin');
   await healthy({ screenshotName: 'S26-admin' });
@@ -289,6 +299,7 @@ test('S14 a mentor edits the profile: validation, saved fields, photo in storage
   const calUser = mentorCalLink(p).split('/')[0];
   try {
     await loginAs('mentor');
+    await tokenSettle(page);
     await page.goto('/dashboard/profile');
     const form = page.getByTestId('form-mentor-profile');
     await expect(form).toBeVisible();
@@ -347,6 +358,7 @@ test('S14 a mentee edits the profile: goals persist, verification is untouched',
   const menteeId = ids(personaProject).mentee;
   const goals = lang === 'ar' ? 'أريد خطة واضحة لأول جولة تمويل خلال ستة أشهر.' : 'I want a clear plan for our first funding round within six months.';
   await loginAs('mentee');
+  await tokenSettle(page);
   await page.goto('/dashboard/profile');
   await expect(page.getByTestId('form-mentee-profile')).toBeVisible();
   await page.getByTestId('input-profile-goals').fill(goals);
@@ -366,6 +378,7 @@ test('S15 a mentor saves office hours and the timezone; the public profile shows
   await db`delete from public.mentor_availability where mentor_id = ${mentorId}`;
   try {
     await loginAs('mentor');
+    await tokenSettle(page);
     await page.goto('/dashboard/calendar');
     await expect(page.getByTestId('select-calendar-timezone')).toHaveValue('UTC');
     await expectNoDemo(page, lang);

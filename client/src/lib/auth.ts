@@ -249,10 +249,30 @@ class AuthService {
   }
 
   /**
+   * Rows created (or being created) by this page, by auth user id. A first
+   * sign-in resolves the identity several times at once (initial load plus
+   * the auth events); they share one insert instead of racing into
+   * duplicate-key errors.
+   */
+  private usersRows = new Map<string, Promise<DbUser | null>>();
+
+  /**
    * Create the app-level users row for a signed-in account if it is missing.
    * Never throws: without a row the account is treated as a mentee.
    */
-  private async ensureUsersRow(id: string, email: string, userType: 'mentee'): Promise<DbUser | null> {
+  private ensureUsersRow(id: string, email: string, userType: 'mentee'): Promise<DbUser | null> {
+    const pending = this.usersRows.get(id);
+    if (pending) return pending;
+    const run = this.createUsersRow(id, email, userType).then((row) => {
+      // Only a row that exists is remembered; a failure may be retried later.
+      if (!row) this.usersRows.delete(id);
+      return row;
+    });
+    this.usersRows.set(id, run);
+    return run;
+  }
+
+  private async createUsersRow(id: string, email: string, userType: 'mentee'): Promise<DbUser | null> {
     try {
       return await db.createUser({
         id,
@@ -261,7 +281,7 @@ class AuthService {
         user_type: userType,
       });
     } catch (dbError) {
-      // Duplicate (concurrent first sign-in) or RLS-denied: re-read, else fall back.
+      // Duplicate (another tab's first sign-in) or RLS-denied: re-read, else fall back.
       try {
         return await db.getUserByEmail(email);
       } catch {
@@ -366,12 +386,19 @@ class AuthService {
         }
         const sessionUser = session.user;
         setTimeout(() => {
-          this.resolveAuthUser(sessionUser)
-            .then((user) => callback(user, undefined, event))
-            .catch((error) => {
+          void (async () => {
+            // The session may be gone by now (the reset page signs out right after
+            // updateUser emits USER_UPDATED): resolving would then query as the
+            // anonymous role. SIGNED_OUT reports the change itself.
+            const { data: current } = await supabase.auth.getSession();
+            if (current.session?.user?.id !== sessionUser.id) return;
+            try {
+              callback(await this.resolveAuthUser(sessionUser), undefined, event);
+            } catch (error) {
               console.error('Auth state resolution error:', error);
               callback(null, error, event);
-            });
+            }
+          })();
         }, 0);
       }
     );

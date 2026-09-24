@@ -1,7 +1,7 @@
 import { test, expect, mailpit, turnstile, e2eEnv, type Page } from '../fixtures/test';
 import { tr } from '../fixtures/i18n';
 import { E2E_PASSWORD, e2eNamespace, personaEmail } from '../fixtures/personas';
-import { adminClient, anonClient, captchaReady, deleteAccounts, runsOn } from './c-helpers';
+import { adminClient, anonClient, captchaReady, deleteAccounts, runsOn, tokenSettle } from './c-helpers';
 
 /**
  * Password accounts end to end against the local GoTrue and Mailpit (design §6.4 S23, S24;
@@ -122,7 +122,8 @@ test('S23 signing up with an existing email says the email is in use', async ({ 
   await expect(alert).toBeVisible();
   await expect(alert).toContainText(tr(lang, 'auth.emailInUse'));
   await expect(page.getByTestId('card-confirm-email')).toHaveCount(0);
-  await healthy({ screenshotName: 'S23-duplicate' });
+  // GoTrue answers the duplicate with 422 user_already_exists: that refusal is the expected outcome.
+  await healthy({ screenshotName: 'S23-duplicate', allowStatus: [{ url: /\/auth\/v1\/signup/, status: 422 }] });
 });
 
 test('S23 an unconfirmed sign-in says "Confirm your email first", and its Resend sends a new email', async ({ page, healthy, db, lang, personaProject }, testInfo) => {
@@ -133,6 +134,7 @@ test('S23 an unconfirmed sign-in says "Confirm your email first", and its Resend
     const { error } = await adminClient().auth.admin.createUser({ email, password: E2E_PASSWORD, email_confirm: false });
     if (error) throw error;
     await page.goto('/login');
+    await page.getByTestId('button-toggle-password-login').click(); // the password form is folded under Amazon sign-in
     await page.getByTestId('input-email').fill(email);
     await page.getByTestId('input-password').fill(E2E_PASSWORD);
     await captchaReady(page);
@@ -141,7 +143,8 @@ test('S23 an unconfirmed sign-in says "Confirm your email first", and its Resend
     await expect(alert).toHaveAttribute('data-kind', 'email_not_confirmed');
     await expect(alert).toContainText(tr(lang, 'auth.errors.confirmFirstTitle'));
     if (turnstile.enabled) expect(captchaTokenOf(bodies('/auth/v1/token')[0]), 'the password grant carries the captcha token').toBeTruthy();
-    await healthy({ screenshotName: 'S23-unconfirmed' });
+    // GoTrue refuses the password grant with 400 email_not_confirmed: the outcome under test.
+    await healthy({ screenshotName: 'S23-unconfirmed', allowStatus: [{ url: /\/auth\/v1\/token/, status: 400 }] });
 
     await captchaReady(alert);
     await page.waitForTimeout(1_500);
@@ -197,6 +200,7 @@ test('S24 password reset: the Mailpit link opens the form; the new password work
 test('S24 /reset-password with an ordinary session shows the invalid-link state', async ({ page, loginAs, healthy }, testInfo) => {
   test.skip(!runsOn(testInfo, PROJECTS), 'S24 runs on desktop-en and desktop-ar');
   await loginAs('mentee');
+  await tokenSettle(page);
   await page.goto('/reset-password');
   await expect(page.getByTestId('card-reset-invalid')).toBeVisible();
   await expect(page.getByTestId('button-reset-password')).toHaveCount(0);
@@ -223,7 +227,9 @@ test('S24 an Amazon account in a recovery session is refused and signed out', as
     await expect(page.getByTestId('card-reset-amazon')).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId('button-reset-password')).toHaveCount(0);
     await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), e2eEnv.authStorageKey)).toBeNull();
-    await healthy({ screenshotName: 'S24-amazon-refused' });
+    // The header's bell may already be loading for the recovery session when the page signs it
+    // out; supabase-js then sends that read without a session (401). Nothing is shown for it.
+    await healthy({ screenshotName: 'S24-amazon-refused', allowStatus: [{ url: /\/rest\/v1\/notifications/, status: 401 }] });
   } finally {
     await deleteAccounts(db, [email]);
   }

@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures/test';
 import { e2eNamespace, personaEmail } from '../fixtures/personas';
-import { expectNoDemo, fillMentorOnboarding, purgeMentorsByEmail, runsOn } from './c-helpers';
+import { expectNoDemo, fillMentorOnboarding, purgeMentorsByEmail, runsOn, tokenSettle } from './c-helpers';
 
 /**
  * Mentor onboarding in database mode (design §6.4 S27; C12, F25, F49, AM3). A mentor whose
@@ -13,6 +13,7 @@ const PROJECTS = ['desktop-en', 'mobile-ar'];
 test('S27 a mentor whose profile the programme linked goes to the portal, with no form and no second profile', async ({ page, loginAs, healthy, db, personaProject }, testInfo) => {
   test.skip(!runsOn(testInfo, PROJECTS), 'S27 runs on desktop-en and mobile-ar');
   await loginAs('mentor-linked');
+  await tokenSettle(page);
   await page.goto('/mentor-onboarding');
   await expect(page).toHaveURL((u) => u.pathname.startsWith('/mentor-portal'));
   await expect(page.getByTestId('input-name')).toHaveCount(0);
@@ -25,6 +26,7 @@ test('S27 a mentor whose profile the programme linked goes to the portal, with n
 test('S27 a mentor with a profile goes to the portal', async ({ page, loginAs, healthy }, testInfo) => {
   test.skip(!runsOn(testInfo, PROJECTS), 'S27 runs on desktop-en and mobile-ar');
   await loginAs('mentor');
+  await tokenSettle(page);
   await page.goto('/mentor-onboarding');
   await expect(page).toHaveURL((u) => u.pathname.startsWith('/mentor-portal'));
   await expect(page.getByTestId('input-name')).toHaveCount(0);
@@ -39,6 +41,7 @@ test('S27 a new mentor completes onboarding and lands on the database-backed por
   await purgeMentorsByEmail(db, email);
   try {
     await loginAs('mentor-new');
+    await tokenSettle(page);
     await page.goto('/mentor-onboarding');
     await expect(page.getByTestId('input-name')).toBeVisible();
     await expect(page.getByTestId('input-email')).toHaveValue(email);

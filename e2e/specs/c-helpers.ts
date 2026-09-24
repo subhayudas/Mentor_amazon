@@ -56,6 +56,15 @@ export async function deleteAccounts(db: postgres.Sql, emails: string[]): Promis
   }
 }
 
+/**
+ * Give a freshly issued session a moment before the page uses it: PostgREST compares the
+ * token's `iat` with a clock it refreshes once a second, and answers a token used within
+ * that second with 401 "JWT issued at future" (PGRST303), which the health check reports.
+ */
+export async function tokenSettle(page: Page): Promise<void> {
+  await page.waitForTimeout(1_100);
+}
+
 /** Wait until the Turnstile widget (test sitekey) has produced its token, when Turnstile is on. */
 export async function captchaReady(scope: Page | Locator): Promise<void> {
   if (!turnstile.enabled) return;
@@ -108,7 +117,7 @@ export async function fillMentorOnboarding(page: Page, opts: { name: string; cal
   await page.getByTestId('input-calcom').fill(opts.calLink);
 }
 
-/** Sign out through the header (account menu on desktop, the menu sheet on mobile). */
+/** Sign out through the header (account menu on desktop, the menu sheet on mobile); it ends on the home page. */
 export async function signOut(page: Page, lang: 'en' | 'ar', isMobile: boolean): Promise<void> {
   if (isMobile) {
     await page.getByTestId('button-mobile-menu').click();
@@ -117,7 +126,8 @@ export async function signOut(page: Page, lang: 'en' | 'ar', isMobile: boolean):
     await page.getByTestId('button-account-menu').click();
     await page.getByRole('menuitem', { name: tr(lang, 'auth.logout') }).click();
   }
-  await expect(page).toHaveURL((u) => u.pathname === '/login');
+  await expect(page).toHaveURL((u) => u.pathname === '/');
+  await expect.poll(() => page.evaluate((key) => window.localStorage.getItem(key), e2eEnv.authStorageKey), { message: 'session removed' }).toBeNull();
 }
 
 /** Remove mentors rows with this email and everything hanging off them (rows a spec created). */

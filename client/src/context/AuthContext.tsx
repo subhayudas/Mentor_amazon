@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, ReactNode, useState, useEffect, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useLocation } from "wouter";
 import { IS_LOCAL } from "@/lib/demo";
 import { findLocalAccount, getLocalSession, setLocalSession } from "@/lib/localAuth";
@@ -154,8 +155,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async (): Promise<void> => {
     if (IS_LOCAL) setLocalSession(null);
     else await auth.logout();
-    setUser(null);
-    setError(null);
+    // Render "signed out" before the cache is emptied: a component still mounted for the old
+    // account (the header's notification bell) would otherwise refetch its emptied queries
+    // with the anonymous key in the render the navigation below triggers (401s).
+    flushSync(() => {
+      setUser(null);
+      setError(null);
+    });
 
     // Clear all cached data
     queryClient.clear();

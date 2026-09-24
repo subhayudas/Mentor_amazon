@@ -1,7 +1,7 @@
 import { test, expect, turnstile, e2eEnv } from '../fixtures/test';
 import { tr } from '../fixtures/i18n';
 import { bookingId } from '../fixtures/personas';
-import { captchaReady, runsOn } from './c-helpers';
+import { captchaReady, runsOn, tokenSettle } from './c-helpers';
 
 /**
  * Backend mode, outage and stale browser data (design §6.4 S20–S22; C1, C2, D7, F05, F11,
@@ -106,6 +106,7 @@ test('S20 outage: banner, database mode kept, no local fallback, visible failure
 
   // The Cal.com embed (stub) opens under the production CSP.
   await loginAs('mentee');
+  await tokenSettle(page);
   await page.goto('/dashboard/bookings');
   await page.getByTestId('tab-upcoming').click();
   await page.getByTestId(`button-choose-time-${bookingId(personaProject, 'accepted')}`).click();
