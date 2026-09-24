@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useIsPhone } from "@/hooks/useMediaQuery";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
 import { bookingService, menteeService, mentorService } from "@/lib/services";
+import { parseTimestamp } from "@/lib/timestamps";
 import { formatTime } from "@/lib/format";
 import { csvFilename, downloadCsv, isoDate, toCsv, type CsvValue } from "@/lib/csv";
 import { ROUTES } from "@/lib/routes";
@@ -236,8 +237,9 @@ export default function Analytics() {
 
   const bucketOf = useCallback(
     (row: BookingRow) => {
-      const requested = bucketKey(new Date(row.clickedAt ?? 0), bucket);
-      const completed = row.status === "completed" ? bucketKey(new Date(row.completedAt || row.scheduledAt || row.clickedAt || 0), bucket) : null;
+      // Stored timestamps are UTC wall-clock with no offset (lib/timestamps.ts).
+      const requested = bucketKey(parseTimestamp(row.clickedAt) ?? new Date(0), bucket);
+      const completed = row.status === "completed" ? bucketKey(parseTimestamp(row.completedAt || row.scheduledAt || row.clickedAt) ?? new Date(0), bucket) : null;
       return { requested, completed };
     },
     [bucket],

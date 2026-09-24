@@ -8,6 +8,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { intlLocale } from "@/lib/format";
+import { parseTimestamp, timestampMs } from "@/lib/timestamps";
 import { localizedField } from "@/lib/localized";
 import type { Booking, Mentor, Mentee } from "@/lib/database";
 
@@ -385,8 +386,8 @@ export function periodWindow(
   if (period === "all") {
     let oldest = now;
     bookings.forEach((booking) => {
-      const at = new Date(requestedAt(booking));
-      if (!Number.isNaN(at.getTime()) && at < oldest) oldest = at;
+      const at = parseTimestamp(requestedAt(booking));
+      if (at && at < oldest) oldest = at;
     });
     return { start: startOfMonth(oldest), end };
   }
@@ -400,9 +401,9 @@ export function previousWindow(period: Period, window: DateWindow): DateWindow |
   return { start: new Date(window.start.getTime() - length), end: window.start };
 }
 
+/** Whether a stored timestamp (UTC wall-clock, lib/timestamps.ts) falls in the window. */
 export function inWindow(iso: string | undefined, window: DateWindow): boolean {
-  if (!iso) return false;
-  const at = new Date(iso).getTime();
+  const at = timestampMs(iso);
   return !Number.isNaN(at) && at >= window.start.getTime() && at < window.end.getTime();
 }
 
@@ -460,12 +461,13 @@ export function timeSeries(
     points.set(bucketKey(start, bucket), { key: bucketKey(start, bucket), start, requests: 0, completed: 0 });
   });
   requestRows.forEach((booking) => {
-    const point = points.get(bucketKey(new Date(requestedAt(booking)), bucket));
+    const at = parseTimestamp(requestedAt(booking));
+    const point = at ? points.get(bucketKey(at, bucket)) : undefined;
     if (point) point.requests += 1;
   });
   completedRows.forEach((booking) => {
-    const at = completionDate(booking);
-    const point = at ? points.get(bucketKey(new Date(at), bucket)) : undefined;
+    const at = parseTimestamp(completionDate(booking));
+    const point = at ? points.get(bucketKey(at, bucket)) : undefined;
     if (point) point.completed += 1;
   });
   return Array.from(points.values());

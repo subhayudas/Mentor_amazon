@@ -16,6 +16,9 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // A non-UTC zone (the programme's, no DST) so code that reads a stored UTC timestamp as
+    // local time fails here too, not only on developer machines (tests/timestamps.test.ts).
+    env: { TZ: 'Asia/Dubai' },
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/integration/**', 'node_modules/**'],
     restoreMocks: true,

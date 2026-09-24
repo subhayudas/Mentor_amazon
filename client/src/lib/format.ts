@@ -9,6 +9,7 @@
  * cycle (en-GB "18:00", ar-AE "6:00 م"). Time zones are always labelled.
  */
 import i18n from "@/lib/i18n";
+import { parseTimestamp, type TimestampInput } from "@/lib/timestamps";
 
 export const LOCALE = { en: "en-GB", ar: "ar-AE" } as const;
 export type Lang = keyof typeof LOCALE;
@@ -17,13 +18,13 @@ export type Lang = keyof typeof LOCALE;
 export const intlLocale = (lang: string = i18n.language ?? "en"): string =>
   lang.startsWith("ar") ? "ar-AE-u-nu-latn" : "en-GB";
 
-type DateInput = string | number | Date | null | undefined;
+type DateInput = TimestampInput;
 
-function toDate(value: DateInput): Date | null {
-  if (value == null || value === "") return null;
-  const d = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
+/**
+ * Stored timestamps are UTC wall-clock with no offset (lib/timestamps.ts):
+ * "2026-09-24T10:00:00" is 10:00 UTC, never 10:00 in the viewer's zone.
+ */
+const toDate = parseTimestamp;
 
 /** Placeholder for a missing or unparsable value; distinct from a real zero. */
 export const UNAVAILABLE = "—";
@@ -321,10 +322,9 @@ export function localizeCountry(country: string, lang?: string): string {
 
 /** "3 hours ago" / "in 2 days" for feeds and notification rows; bad input shows the placeholder. */
 export function formatRelativeTime(iso: string | null | undefined, lang?: string, now: Date = new Date()): string {
-  if (!iso) return UNAVAILABLE;
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return UNAVAILABLE;
-  const diffSeconds = Math.round((then - now.getTime()) / 1000);
+  const at = toDate(iso);
+  if (!at) return UNAVAILABLE;
+  const diffSeconds = Math.round((at.getTime() - now.getTime()) / 1000);
   const abs = Math.abs(diffSeconds);
   const rtf = new Intl.RelativeTimeFormat(intlLocale(lang), { numeric: "auto" });
   if (abs < 60) return rtf.format(diffSeconds, "second");

@@ -13,6 +13,7 @@
  */
 import { isValidCalLink } from "@/lib/calLink";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
+import { asUtcIso } from "@/lib/timestamps";
 
 export type DashboardRole = "mentor" | "mentee" | "admin";
 
@@ -62,16 +63,8 @@ export function selectDashboardRows<T extends Booking>(input: SelectRowsInput<T>
   return { rows: [...local, ...(input.mockRows ?? [])], demo: true, needsProfile: false };
 }
 
-/** `2026-09-24T10:00:00` (a `timestamp without time zone`, stored as UTC) → `2026-09-24T10:00:00Z`. */
-export function asUtcIso(value: string | null | undefined): string | undefined {
-  if (value == null || value === "") return undefined;
-  const trimmed = value.trim().replace(" ", "T");
-  // Already carries an offset or a Z.
-  if (/(Z|[+-]\d{2}:?\d{2})$/i.test(trimmed)) return trimmed;
-  // Date-time without an offset: PostgREST returns base-table timestamps this way (UTC wall-clock).
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) return `${trimmed}Z`;
-  return trimmed;
-}
+/** `2026-09-24T10:00:00` (a `timestamp without time zone`, stored as UTC) → `2026-09-24T10:00:00Z` (lib/timestamps.ts). */
+export { asUtcIso };
 
 const TIME_FIELDS = ["scheduled_at", "clicked_at", "responded_at", "completed_at", "canceled_at", "created_at", "cal_requested_start"] as const;
 
@@ -79,7 +72,7 @@ const TIME_FIELDS = ["scheduled_at", "clicked_at", "responded_at", "completed_at
  * Base-table timestamps are UTC wall-clock without a zone (open risk R14), and
  * `new Date("2026-09-24T10:00:00")` would read them as the viewer's local time.
  * Normalising them once here makes every dashboard time correct in the
- * viewer's zone.
+ * viewer's zone (the shared formatters parse through lib/timestamps.ts too).
  */
 export function normalizeBookingTimes<T extends Booking>(row: T): T {
   const out = { ...row } as T;

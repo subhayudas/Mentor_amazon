@@ -25,6 +25,12 @@ integration suites plus the idempotency check on a fresh
 `supabase start` (job `db-integration`). The E2E suite runs locally (it needs a browser and
 internet for Turnstile); attach its report to the PR.
 
+The unit suite runs in `Asia/Dubai` (`env.TZ` in `vitest.config.ts`), not the machine's zone.
+Base-table timestamps are UTC wall-clock with no offset, and a client that reads one as local
+time is only wrong away from UTC; `tests/timestamps.test.ts` fails on such a misread even on a
+UTC CI runner. Parse stored timestamps with `client/src/lib/timestamps.ts` (the shared
+formatters in `client/src/lib/format.ts` already do).
+
 ### The local stack
 
 ```bash

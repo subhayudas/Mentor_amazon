@@ -114,7 +114,8 @@ export default function TaskManager({ mentorId }: { mentorId: string }) {
             {!completed && task.due_date && (
               <span className="inline-flex items-center gap-1">
                 <Clock className="size-3.5" aria-hidden="true" />
-                {t("dashboardV2.tasks.due", { date: formatDate(task.due_date, i18n.language) })}
+                {/* A due date is a calendar day, saved as its UTC midnight: show that day in every zone. */}
+                {t("dashboardV2.tasks.due", { date: formatDate(task.due_date, i18n.language, "UTC") })}
               </span>
             )}
             {completed && task.completed_at && <span>{t("dashboardV2.tasks.completedOn", { date: formatDate(task.completed_at, i18n.language) })}</span>}
