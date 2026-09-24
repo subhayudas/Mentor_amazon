@@ -9,14 +9,16 @@ with secrets that must **never** be prefixed `VITE_` or imported from `client/`.
 | `GET /api/auth/callback/amazon` | `auth/callback/amazon.ts` | Registered redirect URI — token exchange, role lookup, Supabase bridge |
 | `POST /api/auth/logout` | `auth/logout.ts` | Clear `mc_oidc*` cookies, 302 to `/login` |
 | `GET /api/auth/debug-claims` | `auth/debug-claims.ts` | Integ-only: show the claims from the last sign-in (404 unless `AMAZON_OIDC_DEBUG=true`) |
-| `POST /api/webhooks/cal` | `webhooks/cal.ts` | Cal.com booking webhooks — HMAC-SHA256 verified, idempotent; confirms / reschedules / cancels the matching booking, creates it when booked directly on cal.com |
-| `GET /api/cron/reminders` | `cron/reminders.ts` | Hourly (GitHub Actions `reminders.yml`, bearer `CRON_SECRET`): 24h and 1h session reminders as in-app notifications (+ email via Resend when configured) |
-| `POST /api/turnstile` | `turnstile.ts` | Verifies a Cloudflare Turnstile token for the public request form (no-op when not configured) |
+| `POST /api/requests` | `requests.ts` | Anonymous mentorship request: validation, IP limit, Cloudflare Turnstile (server-side), then the `create_booking_request` RPC. Signed-in visitors use the `create_my_booking_request` RPC instead |
+| `POST /api/webhooks/cal?mentor=<id>` | `webhooks/cal.ts` | Cal.com booking webhooks — per-mentor secret (or the optional global one), HMAC-SHA256 over the raw body, one transactional `cal_apply_event` per event. Never creates a booking |
+| `GET /api/cron/reminders` | `cron/reminders.ts` | Hourly (GitHub Actions `reminders.yml`, bearer `CRON_SECRET`): 24h and 1h reminders for **confirmed** sessions as in-app notifications (+ email via Resend when configured), each claimed once |
 
 Shared helpers live in `_lib/` (the leading underscore keeps Vercel from
 exposing them as routes): `env.ts` (Zod-validated variables), `http.ts`,
 `cookies.ts`, `oidc.ts`, `supabaseAdmin.ts`, `ratelimit.ts` (per-IP fixed
-window; Upstash Redis when configured, in-memory per instance otherwise). Relative imports use the `.js` suffix on purpose — the
+window; Upstash Redis when configured, in-memory per instance otherwise),
+`turnstile.ts` (siteverify), `calWebhook.ts` and `reminders.ts` (pure logic,
+unit-tested). Relative imports use the `.js` suffix on purpose — the
 project is `"type": "module"` and Vercel emits each `.ts` as an ES module, so
 Node needs the full filename at runtime.
 
@@ -77,7 +79,9 @@ When `AMAZON_OIDC_DEBUG=true`, error redirects carry `&reason=<code>`
 (e.g. `token_invalid_grant`, `id_token_nonce`, `alias_conflict`, `alias_invalid`).
 Never enable this in production.
 
-Any missing env var → `500 {"error":"server_misconfigured","missing":[...]}`.
+Any missing SSO env var → `500 {"error":"server_misconfigured","missing":[...]}`.
+(The request, webhook and cron routes answer `503 {"error":"unavailable"}`
+instead and name nothing; the missing names go to the function log.)
 Logs contain only `[sso] <event> alias=<alias> outcome=<code>` — never tokens,
 codes or secrets.
 
@@ -128,6 +132,102 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 
 ---
 
+## Booking requests — `POST /api/requests`
+
+The only way an anonymous visitor creates a request (the `bookings` table
+accepts no inserts from the browser once `migrations/0003` has run).
+
+Request: `Content-Type: application/json`, body ≤ 16 KiB:
+
+```json
+{ "mentorId": "<uuid>", "name": "1..120", "email": "≤ 254", "goal": "20..1000 (trimmed)", "turnstileToken": "optional, ≤ 2048" }
+```
+
+Checks, in order:
+
+| Step | Failure |
+| --- | --- |
+| method is POST | `405` |
+| size, then `Content-Type` | `413 payload_too_large`, `415 unsupported_media_type` |
+| body shape (Zod) | `400 {"error":"invalid_request","fields":["email",…]}` |
+| IP limit: 10 per 10 minutes | `429 {"error":"rate_limited"}` + `Retry-After` |
+| Turnstile, when `TURNSTILE_SECRET_KEY` is set: token verified with Cloudflare (`remoteip` sent; `TURNSTILE_ALLOWED_HOSTNAMES` enforced when set) | `403 {"error":"captcha_failed"}`; Cloudflare unreachable → `503 {"error":"captcha_unavailable"}` (fail closed) |
+| `VITE_TURNSTILE_SITE_KEY` set but the secret missing | `503 {"error":"unavailable"}` (logged: the widget would be shown but nothing verified) |
+| server env | `503 {"error":"unavailable"}` |
+| `create_booking_request` (service role): validates again, dedupes a pending request, limits 5 per requester and 20 per mentor per hour, notifies the mentor (every admin for a programme-managed mentor) | `22023` → `400 invalid_request` with the field · `mentor_unavailable` → `422` · `P0001` → `429 rate_limited` · function missing (migration not applied) → `503` · anything else → `500 server_error` |
+
+Success is always `200 {"ok":true}` — the same answer whether the request was
+created or one was already pending, so the endpoint cannot be used to learn
+whether someone has an open request. With neither Turnstile key set there is
+no captcha check (local development); only the IP and database limits apply.
+
+---
+
+## Cal.com webhooks — `POST /api/webhooks/cal`
+
+Each mentor connects their own Cal.com account from **Profile settings → Cal.com
+booking sync** (dashboard or mentor portal). The panel shows:
+
+- **Subscriber URL:** `https://mentor-amazon.vercel.app/api/webhooks/cal?mentor=<their mentor id>`
+- **Secret:** 64 hex characters, readable only by that mentor
+  (`get_my_cal_webhook`). **Rotate** creates a new one; the previous secret keeps
+  verifying for 24 hours so Cal.com can be updated calmly. Admins can rotate a
+  leaked secret but never read one.
+
+In Cal.com: **Settings → Developer → Webhooks → New**, paste the URL and the
+secret, tick **Booking Created, Booking Rescheduled, Booking Cancelled, Booking
+Requested and Booking Rejected**, and **leave "Custom payload template" empty**
+(the handler reads Cal.com's standard payload). Save, then **Ping test**: the
+panel shows "Ping · just now".
+
+A programme Cal.com Team/Org webhook can use the URL **without** `?mentor=` and
+the optional global secret `CAL_WEBHOOK_SECRET` (at least 16 characters;
+`openssl rand -hex 32`). Unset means that path is off.
+
+Handling, in order: `405` for anything but POST → `413` over 256 KiB → a
+malformed `?mentor=` or `x-cal-signature-256` header is `401` without touching
+the database → IP pre-limit → `503` without server env → HMAC-SHA256 of the raw
+body against the mentor's secret (and the previous one within its grace), or
+the global secret → the same `401 {"error":"invalid_signature"}` for an unknown
+mentor, a missing secret, `no-secret-provided` or a wrong secret (30 failures a
+minute from one IP → `429`) → `400` for invalid JSON → `200` with the outcome.
+
+Every booking event is applied by the `cal_apply_event` RPC in one
+transaction: the delivery is recorded first (a replay answers `duplicate`),
+the booking is matched **exactly** (Cal uid, the reschedule uid, the
+`metadata.mc_booking` our embed sends — only when the attendee's email and the
+mentor agree — then a unique attendee e-mail), the Cal organizer must be the
+mentor's Cal.com username, the transition table decides the change, reminders
+are reset when the time moves, and both parties get a neutral notification.
+A booking made directly on Cal.com is **recorded, never created**
+(`unmatched_direct_booking`).
+
+Outcomes (shown in the mentor's panel; the last one is kept per mentor):
+
+| Working | Needs attention |
+| --- | --- |
+| `ping`, `confirmed`, `requested`, `rejected`, `canceled`, `cal_booking_released`, `rescheduled`, `reschedule_requested`, `rescheduled_revived`, `no_change`, `duplicate` | `unmatched`, `unmatched_direct_booking`, `ambiguous`, `organizer_mismatch`, `stale_state`, `ignored`, `unrecognised_payload`, `invalid_payload` |
+
+Cal.com does not retry a failed delivery, so a `5xx` (for example a database
+outage) loses that event; the mentee's embed confirmation
+(`record_cal_booking_from_embed`) is the second path for confirmations.
+
+---
+
+## Reminder cron — `GET /api/cron/reminders`
+
+Called hourly by `.github/workflows/reminders.yml` with
+`Authorization: Bearer $CRON_SECRET` (set the same value as a GitHub Actions
+secret and on Vercel). For each **confirmed** session starting within 24 hours
+(`24h`) or 1 hour (`1h`) it first claims the reminder
+(`booking_reminders`, unique per booking and kind — concurrent runs send once),
+then writes an in-app notification per party and, with `RESEND_API_KEY`, sends
+an e-mail with escaped HTML. If nothing reached anyone the claim is released
+and the next run retries. Programme-managed mentors (placeholder `.invalid`
+addresses) receive nothing. Response: `{"ok":true,"reminders":n,"emails":n,"failures":n}`.
+
+---
+
 ## Environment variables (Vercel → Settings → Environment Variables, Production **and** Preview)
 
 | Name | Required | Value |
@@ -141,6 +241,12 @@ All cookies: `HttpOnly; Secure; SameSite=Lax; Path=/api/auth`.
 | `SUPABASE_URL` | yes | `https://<project>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Service-role key (bypasses RLS). Server only. |
 | `APP_ORIGIN` | yes | `https://mentor-amazon.vercel.app` (every redirect target is built from this) |
+| `CRON_SECRET` | yes (reminders) | ≥ 16 characters; the same value as the GitHub Actions secret |
+| `RESEND_API_KEY`, `MAIL_FROM` | no | E-mail reminders through Resend; unset → in-app only |
+| `TURNSTILE_SECRET_KEY` | with the site key | Cloudflare Turnstile secret. Set it **and** `VITE_TURNSTILE_SITE_KEY`, or neither (a site key without the secret makes `/api/requests` refuse with 503) |
+| `TURNSTILE_ALLOWED_HOSTNAMES` | no | e.g. `mentor-amazon.vercel.app`; tokens issued elsewhere are refused |
+| `CAL_WEBHOOK_SECRET` | no | Only for a programme Cal.com Team/Org webhook without `?mentor=` (≥ 16 characters). Per-mentor secrets live in the database |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | no | Shared rate-limit counters across function instances |
 
 See the root `.env.example`. For `vercel dev` put them in a root `.env`.
 
@@ -267,12 +373,26 @@ no `reason`.
 
 ## Local development
 
-`vite` alone serves only the SPA. To run the functions locally use
-`vercel dev` with a root `.env` (the discovery document must be reachable
-from your machine).
+Plain `vite` serves only the SPA. With the local Supabase stack, the dev server
+also runs the functions:
 
-`npm test` runs the SSO suite (`tests/`, Vitest) with no network and no
-credentials: a local mock of Federate (same endpoint paths as the real
+```bash
+source scripts/e2e/env.sh          # local stack keys, MC_LOCAL_API=1, Turnstile test keys, mock-IdP OIDC env
+npx tsx scripts/e2e/mock-idp.ts &  # only needed for "Sign in with Amazon"
+npx vite --port 5173 --strictPort
+```
+
+With `MC_LOCAL_API=1`, `vite.config.ts` serves `/api/requests`,
+`/api/webhooks/cal` and `/api/cron/reminders` through `ssrLoadModule` (the raw
+body is kept, and `x-e2e-client-ip` becomes `x-forwarded-for` so each E2E spec
+has its own rate-limit bucket). When `AMAZON_OIDC_ISSUER` is also set,
+`/api/auth/*` runs too, against the mock IdP on `127.0.0.1:54399`; otherwise the
+SSO entry keeps redirecting to `/login?error=sso_unavailable_local`.
+`vercel dev` with a root `.env` also works.
+
+`npm test` (Vitest, no network, no database) runs the unit suites for the
+request, webhook, Turnstile and reminder handlers and the SSO suite. The SSO
+suite uses no credentials: a local mock of Federate (same endpoint paths as the real
 discovery document; it enforces the exact redirect URI, S256 PKCE, client
 authentication and single-use codes, and signs RS256 ID tokens) and an
 in-memory Supabase that the real `supabaseAdmin.ts` queries run against. It
@@ -280,3 +400,7 @@ drives the real handlers through login → authorize → callback → bridge and
 covers first sign-in, returning users, roles, revocation, the takeover guards,
 state/nonce/signature/audience/expiry failures, the basic→post fallback,
 debug-claims and logout.
+
+`npm run test:integration` drives the same handlers against the local Supabase
+stack (real Postgres, PostgREST and GoTrue), including an Amazon sign-in end to
+end with the mock IdP; see `TESTING.md`.

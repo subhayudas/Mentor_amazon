@@ -2,13 +2,17 @@
 
 Factual description of what the application stores, who can reach it, and how
 that is enforced. Written for the Amazon security/privacy review of the UAE
-mentorship programme. Branch `feat/amazon-readiness`; database setup is
-`supabase_setup_v2.sql`.
+mentorship programme. Database setup, in order: `supabase_setup_v2.sql`,
+`supabase_phase2.sql`, `migrations/0002_production_readiness.sql`, and — once the
+current client is deployed — `migrations/0003_restrict_legacy_writes.sql`
+(`migrations/0004_seed_featured_mentors.sql` is optional). This document
+describes the state after 0003.
 
 ## 1. Architecture in one paragraph
 
 Static React SPA (Vite) on Vercel + two kinds of server code: Vercel
-serverless functions under `api/` (Amazon Federate OIDC bridge) and Postgres
+serverless functions under `api/` (Amazon Federate OIDC bridge, anonymous
+booking requests, the Cal.com webhook, the reminder cron) and Postgres
 functions inside Supabase. The browser talks to Supabase directly with the
 **anon key**; **row level security (RLS) is the security boundary**, not the
 client. `server-legacy/` is dead code and is never deployed.
@@ -18,8 +22,13 @@ client. `server-legacy/` is dead code and is never deployed.
 | Table | Personal data | Who writes it | Who can read it |
 |---|---|---|---|
 | `mentors` | name, work email, LinkedIn URL, Cal.com links, assistant email, bio, photo, country, timezone | the mentor (own row), admin | owner, admin. **Public directory** reads only the `mentors_public` view (no email / LinkedIn / Cal.com / assistant / why_joined). |
-| `mentees` | name, email, organisation details, verification reference, bio, LinkedIn, photo, goals | the mentee, anonymous booking flow (name + email only) | owner, admin, mentors who have a booking with that mentee |
-| `bookings` | goal text, ratings, free-text feedback, session duration, country | parties, anonymous requester (pending only) | the two parties, admin |
+| `mentees` | name, email, organisation details, verification reference, bio, LinkedIn, photo, goals | the mentee; the request RPCs (name + email only) | owner, admin, mentors who have a booking with that mentee |
+| `bookings` | goal text, ratings, free-text feedback, session duration, country, Cal.com booking uid and time | created only by the request RPCs (`/api/requests` for anonymous visitors, `create_my_booking_request` when signed in); status changes by the parties; Cal.com columns only by Cal sync | the two parties, admin |
+| `mentee_favorites` | which mentors a mentee saved | the mentee | the mentee, admin |
+| `activity_events` | who did what to a booking or profile (names, statuses, times) | a database trigger for every booking change; users only into their own feed | the people listed in `visible_to`, admin |
+| `booking_reminders` | booking id, reminder kind, channels | reminder cron (service role) | service role only |
+| `cal_webhook_events` | delivery log: mentor id, trigger, Cal.com booking uid, outcome, payload SHA-256 (no payload) | webhook (service role) | service role only |
+| `mentor_cal_webhooks` | per-mentor webhook secret, previous secret (24 h grace), last-delivery status | `get_my_cal_webhook` / `rotate_cal_webhook_secret` | the secret: **only the owning mentor**, through `get_my_cal_webhook`; admins see status via `cal_webhook_status` (never a secret); the webhook verifies with the service role. No table grants to anon or authenticated |
 | `booking_notes` | free text between the parties | parties | parties, admin |
 | `notifications` | recipient email + generated text | database only (`notify_booking_event`) | recipient, admin |
 | `users` | email, role, Amazon alias, placeholder password (Supabase Auth holds the real credential) | Supabase signup (mentee), SSO callback (service role), admin | self, admin |
@@ -28,7 +37,12 @@ client. `server-legacy/` is dead code and is never deployed.
 | `user_identifiers` | alias, email, non-secret OIDC claims | SSO callback (service role) | self, admin |
 | `mentor_activity_log`, `mentor_tasks`, `mentor_availability` | operational, low sensitivity | mentor / database | mentor, admin (availability is public) |
 | `mentor_earnings` | not used by this deployment | admin-only RPC | mentor, admin |
-| Storage bucket `uploads` | profile photos | signed-in users | public (URLs are unguessable UUID paths) |
+| Storage bucket `uploads` | profile photos (≤ 5 MB; JPEG, PNG, WebP, GIF) | signed-in users | public (URLs are unguessable UUID paths) |
+
+The five featured mentors (`migrations/0004`, optional) are programme-managed
+rows (`managed_by_programme = true`) with placeholder addresses under the
+reserved `.invalid` domain: nobody can sign in as them and nothing is sent to
+them. Requests to them notify every admin, who answers them in `/admin/bookings`.
 
 Hosting region: Supabase project region **to be confirmed** by the programme
 owner (recommended: `eu-central-1` or the closest region approved for UAE
@@ -60,9 +74,12 @@ on Vercel's CDN.
   must stay enabled** in Supabase Auth so a squatted address is never a
   usable account.
 * Booking status transitions are role-bound in the database: only the mentor
-  accepts/rejects/completes; a mentee can cancel or, after scheduling,
-  confirm. Each side writes only its own rating; ratings on `mentors` are
-  derived and cannot be typed in.
+  accepts/rejects/completes; a mentee can cancel. A session is confirmed and
+  its time and Cal.com uid are written only by Cal.com sync (the webhook, or
+  the mentee's embed through `record_cal_booking_from_embed`), never by a
+  direct client update. Each side writes only its own rating, and only once
+  the session is completed; ratings on `mentors` are derived and cannot be
+  typed in.
 * Ownership everywhere is `lower(email) = lower(auth.jwt()->>'email')`;
   `localStorage` is never an identity source.
 
@@ -75,8 +92,11 @@ no session.
 | Table | anon | authenticated (non-party) | party / owner | admin |
 |---|---|---|---|---|
 | `mentors` | none (grant revoked); `mentors_public` view only | `mentors_public` only | SELECT/UPDATE own; INSERT own email if allow-listed | all |
-| `mentees` | INSERT (email required) | INSERT own email only | SELECT/UPDATE own; mentors with a booking: SELECT | all; verification columns admin-only |
-| `bookings` | INSERT pending for an available mentor, rate-limited | none | SELECT/UPDATE; mentee cannot edit duration/country/parties | all |
+| `mentees` | none (privileges revoked) | INSERT own email only | SELECT/UPDATE own; mentors with a booking: SELECT | all; verification columns admin-only |
+| `bookings` | none (privileges revoked; `/api/requests` → service-role RPC) | none (no INSERT privilege; `create_my_booking_request`) | SELECT/UPDATE; parties, duration/country, scheduling columns, ratings before completion are guarded | all |
+| `mentee_favorites` | none | none | ALL own rows | all |
+| `activity_events` | none | INSERT only as themselves, visible only to themselves | SELECT rows listing them | all |
+| `booking_reminders`, `cal_webhook_events`, `mentor_cal_webhooks`, `schema_migrations`, `mc_settings` | none | none | none (RPCs only) | via RPCs |
 | `booking_notes` | none | none | SELECT/INSERT; UPDATE/DELETE own notes | all |
 | `notifications` | RPC only | RPC only | SELECT/UPDATE own; **no INSERT policy** | SELECT all |
 | `mentor_tasks`, `mentor_availability` | availability: SELECT | availability: SELECT | ALL own | all |
@@ -93,11 +113,20 @@ Notable mechanics:
   (`security_invoker = false`, Postgres 15+). The first exposes directory
   columns only; the second returns Cal.com links only for the caller's own
   accepted/confirmed/completed bookings.
-* Notifications are created exclusively by `notify_booking_event(booking_id,
-  event)`. It derives recipient and text from the booking, requires the caller
-  to be a party (anonymous callers may only announce a `booking_request` they
-  created within 10 minutes), checks the event matches the booking's real
-  state, and collapses duplicates within 5 minutes.
+* Notifications are created by `notify_booking_event(booking_id, event)`
+  (signed-in parties and the service role; not anon), the request RPCs, the
+  Cal.com sync RPC and the reminder cron. Recipients and text are derived from
+  the booking; the event must match the booking's real state; duplicates
+  within 5 minutes collapse.
+* Requests: `create_booking_request` is executable only by the service role
+  (`/api/requests`, after Turnstile and an IP limit); `create_my_booking_request`
+  only by signed-in users and always under their own JWT email. Both validate,
+  dedupe a pending request and rate-limit in the database.
+* Every new `SECURITY DEFINER` function pins `search_path = public, pg_temp`
+  and has EXECUTE revoked from `PUBLIC`, `anon` and `authenticated` before
+  narrow grants (the full matrix is asserted by the integration suite).
+* `mc.internal_write`, the flag trusted RPCs set for their own writes, cannot be
+  set through PostgREST (`set_config` is not exposed).
 * Mentor ratings are recomputed by a trigger (a mentee cannot update `mentors`).
 * `INSERT … RETURNING` is subject to SELECT policies, so anonymous inserts do
   not ask for the row back; the client generates ids.
@@ -106,10 +135,15 @@ Notable mechanics:
 
 | Secret | Where | Notes |
 |---|---|---|
-| `SUPABASE_SERVICE_ROLE_KEY` | Vercel server env only | bypasses RLS; used only by `api/auth/*` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Vercel server env only | bypasses RLS; used only by `api/` (SSO bridge, requests, Cal webhook, reminders) |
 | `AMAZON_OIDC_CLIENT_SECRET` | Vercel server env only | also derives the HMAC key for the `mc_oidc` state cookie |
-| `VITE_SUPABASE_ANON_KEY`, `VITE_SUPABASE_URL` | client bundle | public by design; grants nothing beyond RLS |
-| Cal.com | none stored | mentors paste their public booking slug |
+| `TURNSTILE_SECRET_KEY` | Vercel server env only | verifies Turnstile tokens; with the site key set and this missing, `/api/requests` refuses (fail closed) |
+| Per-mentor Cal.com webhook secrets | `mentor_cal_webhooks` (database) | 32 random bytes; readable only by the owning mentor through an RPC; rotation keeps the old one valid for 24 h |
+| `CAL_WEBHOOK_SECRET` | Vercel server env only, optional | only for a programme Cal.com Team/Org webhook; ≥ 16 characters |
+| `CRON_SECRET` | Vercel + GitHub Actions secret | bearer token of the reminder cron (constant-time check) |
+| `RESEND_API_KEY` | Vercel server env only, optional | reminder e-mails |
+| `VITE_SUPABASE_ANON_KEY`, `VITE_SUPABASE_URL`, `VITE_TURNSTILE_SITE_KEY` | client bundle | public by design; grant nothing beyond RLS |
+| Cal.com | no API keys stored | mentors paste their public booking slug |
 
 Nothing prefixed `VITE_` may hold a secret. `.env*` files are git-ignored;
 `.env.example` documents names only.
@@ -126,14 +160,20 @@ runtime styles (known, low impact).
 
 ## 7. Rate limiting and abuse controls
 
-* Database triggers (`check_booking_rate_limit`, `check_mentee_rate_limit`):
-  max 5 booking requests per mentee per hour, 20 per mentor per hour, 3 mentee
-  profile creations per email per day. They raise `rate_limited`.
-* Bookings can only be created `pending`, for an existing mentee and an
-  available mentor; reporting fields cannot be set at insert time.
-* `created_at` is stamped server-side so windows cannot be dodged.
+* Anonymous requests: Cloudflare **Turnstile** verified server-side in
+  `/api/requests` (token required whenever `TURNSTILE_SECRET_KEY` is set;
+  Cloudflare unreachable → refused), plus an IP limit of 10 requests per 10
+  minutes. Supabase Auth captcha (sign-up, password sign-in, reset) is switched
+  on in the dashboard only after the client that sends the token is live.
+* In the database (request RPCs and triggers): max 5 booking requests per
+  mentee per hour, 20 per mentor per hour, 3 mentee profile creations per email
+  per day, one pending request per mentor and mentee. They raise `rate_limited`.
+* Bookings are created only `pending`, for an available mentor; `created_at`
+  is stamped server-side so windows cannot be dodged.
+* Cal.com webhook: requests with a malformed signature header or mentor id are
+  refused before any database call; 600 deliveries a minute per IP, and 30
+  failed signatures a minute per IP before `429`.
 * Supabase's own API rate limits and Vercel's edge protection apply in front.
-* Not implemented: IP-based limits (the anon key has no identity) and CAPTCHA.
 
 ## 8. Logging
 
@@ -189,14 +229,17 @@ DELETE FROM public.users WHERE lower(email) = lower('person@example.com');
 
 ## 11. Known gaps
 
-1. No email notifications; the in-app bell is the only channel.
-2. Cal.com is an external dependency for scheduling; the app cannot see or
-   cancel Cal.com bookings.
-3. Anonymous booking requests: `get_or_create_mentee` resolves any existing
-   mentee by email, so an anonymous caller can file a request *on behalf of*
-   a registered mentee (they cannot read anything back). Bounded by the
-   per-mentee and per-mentor rate limits; requiring a session for requests
-   would close it at the cost of the anonymous flow the programme asked for.
+1. Booking notifications are in-app only (reminders can also e-mail through
+   Resend when configured). Notification text generated in the database is
+   English.
+2. Cal.com is an external dependency for scheduling; the app learns about
+   Cal.com bookings only through the signed webhook and the embed, and Cal.com
+   does not retry a failed delivery.
+3. Anonymous booking requests accept any email address, so a visitor can file
+   a request *on behalf of* an address (they cannot read anything back).
+   Bounded by Turnstile, the IP and database limits and the pending-request
+   dedupe; requiring a session for requests would close it at the cost of the
+   anonymous flow the programme asked for.
 4. Mentee surfaces (`/mentee-dashboard`, `/my-bookings`, `/mentee-registration`)
    now require a session and use the session email; the old typed-email
    access is gone.
@@ -205,17 +248,24 @@ DELETE FROM public.users WHERE lower(email) = lower('person@example.com');
 6. `style-src 'unsafe-inline'` in the CSP.
 7. Storage bucket is public-read; photos are not access-controlled beyond URL
    secrecy.
-8. No IP-level rate limiting or CAPTCHA on anonymous booking requests.
+8. An Amazon SSO account with mailbox access can still obtain a password
+   recovery session from Supabase; the reset page refuses it and signs it
+   out, but the server-side hook that would stop the session being issued is
+   a follow-up.
 
 ## 12. Pre-review checklist
 
-- [ ] `supabase_setup_v2.sql` applied; section 9 verification queries pass
-      (anon cannot read `mentors`; policies present on every table).
+- [ ] `supabase_setup_v2.sql`, `supabase_phase2.sql`, `migrations/0002` and
+      (after the deploy) `migrations/0003` applied; the verification queries
+      at the bottom of each file pass (anon cannot read `mentors` or
+      `bookings`; policies present on every table).
 - [ ] First admin promoted (section 8 of the script) and can open `/admin`.
 - [ ] Supabase: email confirmation on, anon signups limited to mentees,
       `uploads` bucket exists, project region confirmed and recorded above.
 - [ ] Vercel: all `AMAZON_OIDC_*`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
-      `APP_ORIGIN` set for Production and Preview; `AMAZON_OIDC_DEBUG` unset.
+      `APP_ORIGIN`, `CRON_SECRET` set for Production and Preview;
+      `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` both set (or both
+      unset); `AMAZON_OIDC_DEBUG` and `VITE_ALLOW_LOCAL_FALLBACK` unset.
 - [ ] Redirect URI registered with Amazon exactly as
       `https://mentor-amazon.vercel.app/api/auth/callback/amazon`.
 - [ ] Security headers verified on the live origin (`curl -I`).
