@@ -372,7 +372,7 @@ describeDb('I9 concurrency (committed rows, separate connections)', () => {
       sql.begin(async (tx) => {
         await mkUser(tx, { id: sub, email: `race.user.${randomUUID()}@mentorconnect.test`, user_type: 'mentee' });
         await asRole(tx, 'authenticated', claims(sub, mentee.email));
-        const [{ r }] = await tx<{ r: { outcome: string } }[]>`select public.record_cal_booking_from_embed(${id}, ${uid}, '2026-10-01T10:00:00Z', 'ACCEPTED') as r`;
+        const [{ r }] = await tx<{ r: { outcome: string } }[]>`select public.record_cal_booking_from_embed(${id}, ${uid}, ${new Date(Date.now() + 7 * 86_400_000).toISOString()}, 'ACCEPTED') as r`;
         await tx`reset role`;
         await tx`delete from public.users where id = ${sub}`;
         return r.outcome;
@@ -384,5 +384,34 @@ describeDb('I9 concurrency (committed rows, separate connections)', () => {
     expect(await booking(sql, id)).toMatchObject({ status: 'confirmed', cal_event_uri: uid });
     const [{ n }] = await sql<{ n: number }[]>`select count(*)::int as n from public.activity_events where subject_id = ${id} and type = 'booking_confirmed'`;
     expect(n).toBe(1);
+  });
+});
+
+describeDb('I10 record_cal_booking_from_embed input checks (the values come from the browser)', () => {
+  it('only the mentee may record; the uid is shaped; the start must lie in the bookable window; a uid is never shared', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'accepted' });
+      const other = await mkBooking(tx, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: 'takenUid001', scheduled_at: new Date(Date.now() + 3 * 86_400_000).toISOString() });
+      expect(other).toBeTruthy();
+      const inDays = (d: number) => new Date(Date.now() + d * 86_400_000).toISOString();
+      const menteeSub = randomUUID();
+      const mentorSub = randomUUID();
+      await mkUser(tx, { id: menteeSub, email: mentee.email, user_type: 'mentee' });
+      await mkUser(tx, { id: mentorSub, email: mentor.email, user_type: 'mentor' });
+
+      await asRole(tx, 'authenticated', claims(mentorSub, mentor.email));
+      await expectPgError(tx, (sp) => sp`select public.record_cal_booking_from_embed(${id}, 'embedUid100', ${inDays(2)}, 'ACCEPTED')`, '42501', /not_allowed/);
+
+      await asRole(tx, 'authenticated', claims(menteeSub, mentee.email));
+      await expectPgError(tx, (sp) => sp`select public.record_cal_booking_from_embed(${id}, 'bad uid!', ${inDays(2)}, 'ACCEPTED')`, '22023', /invalid_uid/);
+      await expectPgError(tx, (sp) => sp`select public.record_cal_booking_from_embed(${id}, 'embedUid100', ${inDays(-2)}, 'ACCEPTED')`, '22023', /invalid_state/);
+      await expectPgError(tx, (sp) => sp`select public.record_cal_booking_from_embed(${id}, 'embedUid100', ${inDays(400)}, 'ACCEPTED')`, '22023', /invalid_state/);
+      await expectPgError(tx, (sp) => sp`select public.record_cal_booking_from_embed(${id}, 'takenUid001', ${inDays(2)}, 'ACCEPTED')`, '23505', /uid_in_use/);
+      const [{ r }] = await tx<{ r: { outcome: string } }[]>`select public.record_cal_booking_from_embed(${id}, 'embedUid100', ${inDays(2)}, 'ACCEPTED') as r`;
+      expect(r.outcome).toBe('confirmed');
+      await tx`reset role`;
+      expect(await booking(tx, id)).toMatchObject({ status: 'confirmed', cal_event_uri: 'embedUid100', cal_status: 'accepted' });
+    });
   });
 });

@@ -1248,6 +1248,12 @@ BEGIN
   IF v_status NOT IN ('ACCEPTED', 'PENDING') OR v_start IS NULL THEN
     RAISE EXCEPTION 'invalid_state' USING ERRCODE = '22023';
   END IF;
+  -- The uid and start come from the mentee's browser (the Cal.com embed event), not from Cal.com.
+  -- A booking made a moment ago starts in the future, so a start in the past or beyond a year is
+  -- refused. The Cal.com webhook, verified by HMAC, stays the authority for later changes.
+  IF v_start < v_now - interval '1 hour' OR v_start > v_now + interval '366 days' THEN
+    RAISE EXCEPTION 'invalid_state' USING ERRCODE = '22023', DETAIL = 'start outside the bookable window';
+  END IF;
 
   SELECT * INTO v_b FROM public.bookings WHERE id = p_booking_id FOR UPDATE;
   IF NOT FOUND THEN

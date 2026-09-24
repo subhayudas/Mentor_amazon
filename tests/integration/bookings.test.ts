@@ -11,6 +11,9 @@ import { asRole, asService, connect, expectPgError, withTx, type Tx } from './sq
  */
 const sql = connect();
 afterAll(() => sql.end());
+/** A UTC date `n` days from now (YYYY-MM-DD): embed starts must lie in the bookable window. */
+const dayOf = (n: number) => new Date(Date.now() + n * 86_400_000).toISOString().slice(0, 10);
+const [D1, D2, D3] = [dayOf(7), dayOf(8), dayOf(9)];
 
 async function parties(tx: Tx) {
   const mentor = await mkMentor(tx, { country: 'United Arab Emirates', name: 'Mentor Mona' });
@@ -176,20 +179,20 @@ describeDb('I14 activity trigger and policy', () => {
       await expectOne('request_accepted', { actor_type: 'mentor', actor_id: p.mentor.id }, { from_status: 'pending', to_status: 'accepted' });
 
       await p.asMentee();
-      await tx`select public.record_cal_booking_from_embed(${id}, 'embedUid001', '2026-10-01T14:00:00+04:00', 'PENDING')`;
-      await expectOne('booking_time_requested', { actor_type: 'mentee' }, { requested_start: '2026-10-01T10:00:00Z' });
+      await tx`select public.record_cal_booking_from_embed(${id}, 'embedUid001', ${`${D1}T14:00:00+04:00`}, 'PENDING')`;
+      await expectOne('booking_time_requested', { actor_type: 'mentee' }, { requested_start: `${D1}T10:00:00Z` });
 
       await tx`select public.cal_apply_event('it-rej-' || ${id}, ${p.mentor.id}, 'BOOKING_REJECTED', 'embedUid001', null,
-                 '2026-10-01T10:00:00Z', '2026-10-01T10:30:00Z', 'REJECTED', array[${p.mentee.email}], null, null, 'busy', 'sha')`;
+                 ${`${D1}T10:00:00Z`}, ${`${D1}T10:30:00Z`}, 'REJECTED', array[${p.mentee.email}], null, null, 'busy', 'sha')`;
       await expectOne('booking_time_declined', { actor_type: 'system', actor_id: null }, { change_source: 'cal' });
 
       await p.asMentee();
-      await tx`select public.record_cal_booking_from_embed(${id}, 'embedUid002', '2026-10-02T09:00:00Z', 'ACCEPTED')`;
-      await expectOne('booking_confirmed', { actor_type: 'mentee' }, { to_status: 'confirmed', scheduled_at: '2026-10-02T09:00:00Z' });
+      await tx`select public.record_cal_booking_from_embed(${id}, 'embedUid002', ${`${D2}T09:00:00Z`}, 'ACCEPTED')`;
+      await expectOne('booking_confirmed', { actor_type: 'mentee' }, { to_status: 'confirmed', scheduled_at: `${D2}T09:00:00Z` });
 
       await tx`select public.cal_apply_event('it-res-' || ${id}, ${p.mentor.id}, 'BOOKING_RESCHEDULED', 'embedUid003', 'embedUid002',
-                 '2026-10-03T09:00:00Z', '2026-10-03T09:30:00Z', 'ACCEPTED', array[${p.mentee.email}], null, null, null, 'sha')`;
-      await expectOne('booking_rescheduled', { actor_type: 'system' }, { change_source: 'cal', scheduled_at: '2026-10-03T09:00:00Z' });
+                 ${`${D3}T09:00:00Z`}, ${`${D3}T09:30:00Z`}, 'ACCEPTED', array[${p.mentee.email}], null, null, null, 'sha')`;
+      await expectOne('booking_rescheduled', { actor_type: 'system' }, { change_source: 'cal', scheduled_at: `${D3}T09:00:00Z` });
 
       await p.asMentor();
       await tx`update public.bookings set status = 'completed', completed_at = now(), session_duration_minutes = 40 where id = ${id}`;

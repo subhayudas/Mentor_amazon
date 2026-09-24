@@ -270,7 +270,9 @@ running with `MC_LOCAL_API=1`.
 ## Removing test data
 
 Testers' rows on a real project, in delete order (SQL editor as the owner). Replace the
-condition with the testers' addresses, e.g. `lower(email) like '%@example.test'`:
+condition with the testers' addresses, e.g. `lower(email) like '%@example.test'`. It covers
+every foreign key into `mentors`, `mentees`, `bookings` and `users` (checked against the
+catalog); run it in one transaction (`begin; … commit;`) so a surprise leaves nothing half-done:
 
 ```sql
 -- the people and their rows
@@ -280,15 +282,18 @@ create temp table t_bookings as select id from public.bookings
   where mentor_id in (select id from t_mentors) or mentee_id in (select id from t_mentees);
 
 delete from public.activity_events where subject_id in (select id from t_bookings)
-  or visible_to && array(select id from t_mentors union all select id from t_mentees);
+  or visible_to && array(select id::text from t_mentors union all select id::text from t_mentees);
 delete from public.booking_reminders where booking_id in (select id from t_bookings);
 delete from public.mentee_favorites where mentee_id in (select id from t_mentees) or mentor_id in (select id from t_mentors);
 delete from public.mentor_cal_webhooks where mentor_id in (select id from t_mentors);
 delete from public.notifications where booking_id in (select id from t_bookings) or lower(recipient_email) like '%@example.test';
 delete from public.booking_notes where booking_id in (select id from t_bookings);
-delete from public.mentor_tasks where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors);
+delete from public.mentor_tasks where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors)
+  or mentee_id in (select id from t_mentees);
 delete from public.mentor_earnings where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors);
-delete from public.mentor_activity_log where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors);
+delete from public.mentor_activity_log where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors)
+  or mentee_id in (select id from t_mentees);
+delete from public.mentor_availability where mentor_id in (select id from t_mentors);
 delete from public.bookings where id in (select id from t_bookings);
 update public.approved_users set mentor_id = null where mentor_id in (select id from t_mentors);
 update public.users set profile_id = null where profile_id in (select id from t_mentors union all select id from t_mentees);
