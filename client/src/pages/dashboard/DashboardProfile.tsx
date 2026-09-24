@@ -414,11 +414,9 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
           <SaveButton saved={saved} pending={save.isPending || uploading} />
         </div>
       </form>
-      {!IS_LOCAL && (
-        <section id="cal-sync" className="scroll-mt-24" aria-label={t("showcase.profileSettings.calSyncSection")}>
-          <CalSyncPanel mentorId={mentor.id} calLink={mentor.cal_link ?? ""} />
-        </section>
-      )}
+      {/* The panel is its own labelled region with id="cal-sync" (the calendar page links to it);
+          a wrapper here duplicated both the id and the landmark. Its title follows the page's h1. */}
+      {!IS_LOCAL && <CalSyncPanel mentorId={mentor.id} calLink={mentor.cal_link ?? ""} headingLevel="h2" />}
     </div>
   );
 }

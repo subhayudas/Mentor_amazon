@@ -80,7 +80,18 @@ function DeliveryAnnouncer({ status, message }: { status: ReturnType<typeof calS
   );
 }
 
-export function CalSyncPanel({ mentorId, calLink }: { mentorId: string; calLink?: string | null }): JSX.Element | null {
+export function CalSyncPanel({
+  mentorId,
+  calLink,
+  headingLevel = "h3",
+}: {
+  mentorId: string;
+  calLink?: string | null;
+  /** The panel title's level where it sits (the steps title is one below): h2 right under a page's h1. */
+  headingLevel?: "h2" | "h3";
+}): JSX.Element | null {
+  const Title = headingLevel;
+  const StepsTitle = headingLevel === "h2" ? "h3" : "h4";
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const qc = useQueryClient();
@@ -291,7 +302,7 @@ export function CalSyncPanel({ mentorId, calLink }: { mentorId: string; calLink?
         {copied === "failed" && <p className="text-caption text-destructive">{t("calSync.copyFailed")}</p>}
 
         <div className="space-y-2">
-          <h4 className="text-body-sm font-medium text-foreground">{t("calSync.stepsTitle")}</h4>
+          <StepsTitle className="text-body-sm font-medium text-foreground">{t("calSync.stepsTitle")}</StepsTitle>
           <ol className="list-decimal space-y-1.5 ps-5 text-body-sm text-foreground marker:text-muted-foreground" data-testid="cal-sync-steps">
             {(["step1", "step2", "step3", "step4", "step5", "step6"] as const).map((step) => (
               <li key={step} className="text-pretty">
@@ -321,9 +332,9 @@ export function CalSyncPanel({ mentorId, calLink }: { mentorId: string; calLink?
   return (
     <section id="cal-sync" aria-labelledby={`${ids}-title`} className="scroll-mt-32 space-y-4 rounded-lg border border-border bg-card p-4 md:p-6" data-testid="cal-sync-panel">
       <div className="space-y-1">
-        <h3 id={`${ids}-title`} className="text-h3 text-foreground">
+        <Title id={`${ids}-title`} className="text-h3 text-foreground">
           {t("calSync.title")}
-        </h3>
+        </Title>
         <p className="text-body-sm text-muted-foreground text-pretty">{t("calSync.intro")}</p>
       </div>
       {content}
