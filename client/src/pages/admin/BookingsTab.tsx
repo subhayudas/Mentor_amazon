@@ -26,16 +26,21 @@ import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
+  AdminCard,
+  AdminCardList,
   BookingStatusBadge,
+  CardField,
+  CardFields,
   DetailField,
   EmptyRow,
   LoadingRows,
   QueueError,
   SearchBox,
+  useAdminTable,
   useFormatters,
 } from "@/pages/admin/shared";
 
-const COLS = 8;
+const COLS = 6;
 const STATUSES: Booking["status"][] = ["pending", "accepted", "confirmed", "completed", "rejected", "canceled"];
 type Filter = "all" | Booking["status"];
 type Decision = { booking: AdminBooking; action: "accept" | "decline" };
@@ -51,8 +56,22 @@ function Rating({ value, lang }: { value?: number | null; lang: string }) {
   );
 }
 
+/** Recorded duration and the session's country, under its time; nothing when neither is known. */
+function SessionMeta({ booking, lang }: { booking: AdminBooking; lang: string }) {
+  const { t } = useTranslation();
+  const country = localizeCountry(booking.country || booking.mentor?.country || "", lang);
+  const parts = [
+    booking.session_duration_minutes != null ? t("admin.bookings.minutes", { count: booking.session_duration_minutes }) : null,
+    country || null,
+  ].filter(Boolean);
+  if (parts.length === 0) return null;
+  return <span className="block text-caption text-muted-foreground">{parts.join(" · ")}</span>;
+}
+
 const menteeLabel = (b: AdminBooking) => b.mentee?.organization_name || b.mentee?.name || UNAVAILABLE;
 const mentorLabel = (b: AdminBooking) => b.mentor?.name || UNAVAILABLE;
+/** The mentee's second line: the person behind an organisation, else their address. */
+const menteeDetail = (b: AdminBooking) => (b.mentee?.organization_name ? b.mentee.name : b.mentee?.email);
 
 /**
  * Admin bookings (design B5, F07). Besides the full list with status chips
@@ -74,6 +93,7 @@ export default function BookingsTab() {
   const [programmeOnly, setProgrammeOnly] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [decision, setDecision] = useState<Decision | null>(null);
+  const asTable = useAdminTable();
 
   const bookingsQuery = useQuery({ queryKey: adminQueryKeys.bookings, queryFn: adminService.getBookings });
   const rows = useMemo(() => bookingsQuery.data ?? [], [bookingsQuery.data]);
@@ -117,6 +137,7 @@ export default function BookingsTab() {
   const busyId = decide.isPending ? decide.variables?.booking.id : undefined;
 
   const chips: Filter[] = ["all", ...STATUSES];
+  const emptyText = search || filter !== "all" || programmeOnly ? t("admin.noMatches") : t("admin.bookings.empty");
 
   const actionButtons = (booking: AdminBooking, size: "sm" | "md" = "sm") =>
     isProgrammeRequest(booking) ? (
@@ -186,46 +207,51 @@ export default function BookingsTab() {
         </div>
       )}
 
-      <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
-        <div className="flex flex-wrap items-center gap-2">
-          <ChipRadioGroup aria-label={t("admin.bookings.filterLabel")} value={filter} onValueChange={(value) => setFilter(value as Filter)}>
-            {chips.map((chip) => (
-              <ChipRadio key={chip} value={chip} count={formatNumber(counts[chip], lang)} data-testid={`chip-booking-${chip}`}>
-                {chip === "all" ? t("common.all") : t(`status.${chip}`)}
-              </ChipRadio>
-            ))}
-          </ChipRadioGroup>
+      {/* Status chips on their own row (one line at 1280 px), then the other filter, search and analytics. */}
+      <div className="space-y-3">
+        <ChipRadioGroup aria-label={t("admin.bookings.filterLabel")} value={filter} onValueChange={(value) => setFilter(value as Filter)}>
+          {chips.map((chip) => (
+            <ChipRadio key={chip} value={chip} count={formatNumber(counts[chip], lang)} data-testid={`chip-booking-${chip}`}>
+              {chip === "all" ? t("common.all") : t(`status.${chip}`)}
+            </ChipRadio>
+          ))}
+        </ChipRadioGroup>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <FilterChip
             selected={programmeOnly}
             onToggle={setProgrammeOnly}
             count={formatNumber(programmeCount, lang)}
+            className="self-start sm:self-auto"
             data-testid="chip-booking-programme"
           >
             {t("admin.bookings.programmeFilter")}
           </FilterChip>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <SearchBox value={search} onChange={setSearch} placeholder={t("admin.bookings.searchPlaceholder")} testId="input-booking-search" />
-          <Button asChild variant="outline" className="shrink-0" data-testid="link-open-analytics">
-            <Link href="/analytics"><BarChart3 aria-hidden="true" />{t("admin.bookings.openAnalytics")}</Link>
-          </Button>
+          <div className="flex flex-col gap-3 sm:ms-auto sm:flex-row sm:items-center">
+            {/* A set width: inside this auto-width row the box would shrink to its content and cut the placeholder. */}
+            <div className="w-full sm:w-80">
+              <SearchBox value={search} onChange={setSearch} placeholder={t("admin.bookings.searchPlaceholder")} testId="input-booking-search" />
+            </div>
+            <Button asChild variant="outline" className="shrink-0 max-md:h-11" data-testid="link-open-analytics">
+              <Link href="/analytics"><BarChart3 aria-hidden="true" />{t("admin.bookings.openAnalytics")}</Link>
+            </Button>
+          </div>
         </div>
       </div>
 
       {bookingsQuery.isError ? (
         <QueueError queue={t("admin.queues.bookings")} onRetry={() => bookingsQuery.refetch()} />
-      ) : (
-      <Card className="overflow-x-auto" aria-busy={bookingsQuery.isLoading || undefined}>
+      ) : asTable ? (
+      <Card aria-busy={bookingsQuery.isLoading || undefined}>
+        {/* Fits 1024 px and up without scrolling sideways: duration and country sit under the session
+            time, and the creation date (also in the sheet) shows from 1280 px. */}
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="text-start">{t("admin.bookings.colCreated")}</TableHead>
+              <TableHead className="hidden text-start xl:table-cell">{t("admin.bookings.colCreated")}</TableHead>
               <TableHead className="text-start">{t("admin.bookings.colMentor")}</TableHead>
               <TableHead className="text-start">{t("admin.bookings.colMentee")}</TableHead>
               <TableHead className="text-start">{t("admin.bookings.colStatus")}</TableHead>
               <TableHead className="text-start">{t("admin.bookings.colScheduled")}</TableHead>
-              <TableHead className="text-end">{t("admin.bookings.colDuration")}</TableHead>
-              <TableHead className="text-start">{t("admin.colCountry")}</TableHead>
               <TableHead className="text-end">
                 <span className="sr-only">{t("admin.actions")}</span>
               </TableHead>
@@ -235,7 +261,7 @@ export default function BookingsTab() {
             {bookingsQuery.isLoading ? (
               <LoadingRows colSpan={COLS} />
             ) : bookings.length === 0 ? (
-              <EmptyRow colSpan={COLS}>{search || filter !== "all" || programmeOnly ? t("admin.noMatches") : t("admin.bookings.empty")}</EmptyRow>
+              <EmptyRow colSpan={COLS}>{emptyText}</EmptyRow>
             ) : (
               bookings.map((booking) => (
                   <TableRow
@@ -245,7 +271,7 @@ export default function BookingsTab() {
                     data-testid={`row-booking-${booking.id}`}
                     data-programme={booking.mentor?.managed_by_programme ? "true" : undefined}
                   >
-                    <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDate(booking.created_at)}</TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-body-sm text-muted-foreground tabular-nums xl:table-cell">{formatDate(booking.created_at)}</TableCell>
                     <TableCell>
                       <p className="max-w-[12rem] truncate font-medium text-foreground">
                         <bdi>{booking.mentor?.name || UNAVAILABLE}</bdi>
@@ -257,7 +283,7 @@ export default function BookingsTab() {
                           <bdi dir="ltr">{booking.mentor?.email}</bdi>
                         </p>
                       )}
-                      {/* Next to the mentor, not in the last column: visible without scrolling the table on any screen. */}
+                      {/* Next to the mentor: the programme team's actions are never in a clipped column. */}
                       {isProgrammeRequest(booking) && <div className="mt-2 flex flex-wrap gap-2">{actionButtons(booking)}</div>}
                     </TableCell>
                     <TableCell>
@@ -265,29 +291,28 @@ export default function BookingsTab() {
                         <bdi>{menteeLabel(booking)}</bdi>
                       </p>
                       <p className="max-w-[12rem] truncate text-caption text-muted-foreground">
-                        <bdi dir={booking.mentee?.organization_name ? undefined : "ltr"}>{booking.mentee?.organization_name ? booking.mentee.name : booking.mentee?.email}</bdi>
+                        <bdi dir={booking.mentee?.organization_name ? undefined : "ltr"}>{menteeDetail(booking)}</bdi>
                       </p>
                     </TableCell>
                     <TableCell><BookingStatusBadge status={booking.status} /></TableCell>
-                    <TableCell className="whitespace-nowrap text-body-sm tabular-nums">{formatDateTime(booking.scheduled_at)}</TableCell>
-                    <TableCell className="text-end text-body-sm tabular-nums">{booking.session_duration_minutes != null ? formatNumber(booking.session_duration_minutes, lang) : UNAVAILABLE}</TableCell>
-                    <TableCell className="text-body-sm">{localizeCountry(booking.country || booking.mentor?.country || "", lang) || UNAVAILABLE}</TableCell>
+                    <TableCell>
+                      <p className="whitespace-nowrap text-body-sm tabular-nums">{formatDateTime(booking.scheduled_at)}</p>
+                      <SessionMeta booking={booking} lang={lang} />
+                    </TableCell>
                     <TableCell className="text-end">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* The real control: rows also open on click as a pointer convenience. */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setDetailId(booking.id);
-                          }}
-                          aria-label={t("admin.bookings.viewA11y", { mentor: mentorLabel(booking), mentee: menteeLabel(booking) })}
-                          data-testid={`button-view-booking-${booking.id}`}
-                        >
-                          {t("admin.viewDetails")}
-                        </Button>
-                      </div>
+                      {/* The real control: rows also open on click as a pointer convenience. */}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setDetailId(booking.id);
+                        }}
+                        aria-label={t("admin.bookings.viewA11y", { mentor: mentorLabel(booking), mentee: menteeLabel(booking) })}
+                        data-testid={`button-view-booking-${booking.id}`}
+                      >
+                        {t("admin.viewDetails")}
+                      </Button>
                     </TableCell>
                   </TableRow>
               ))
@@ -295,6 +320,52 @@ export default function BookingsTab() {
           </TableBody>
         </Table>
       </Card>
+      ) : (
+        <AdminCardList loading={bookingsQuery.isLoading} emptyText={emptyText} count={bookings.length} testId="list-bookings">
+          {bookings.map((booking) => (
+            <AdminCard
+              key={booking.id}
+              data-testid={`row-booking-${booking.id}`}
+              data-programme={booking.mentor?.managed_by_programme ? "true" : undefined}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <BookingStatusBadge status={booking.status} />
+                <span className="text-caption text-muted-foreground tabular-nums">{formatDate(booking.created_at)}</span>
+              </div>
+              <CardFields className="mt-3">
+                <CardField label={t("admin.bookings.colMentor")}>
+                  <bdi className="font-medium">{mentorLabel(booking)}</bdi>
+                  {booking.mentor?.managed_by_programme && <Badge tone="info" className="ms-2 align-middle">{t("admin.bookings.programmeBadge")}</Badge>}
+                </CardField>
+                <CardField label={t("admin.bookings.colMentee")}>
+                  <bdi className="font-medium">{menteeLabel(booking)}</bdi>
+                  {menteeDetail(booking) && (
+                    <span className="block break-all text-caption text-muted-foreground">
+                      <bdi dir={booking.mentee?.organization_name ? undefined : "ltr"}>{menteeDetail(booking)}</bdi>
+                    </span>
+                  )}
+                </CardField>
+                <CardField label={t("admin.bookings.colScheduled")}>
+                  <span className="tabular-nums">{formatDateTime(booking.scheduled_at)}</span>
+                  <SessionMeta booking={booking} lang={lang} />
+                </CardField>
+              </CardFields>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {actionButtons(booking, "md")}
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => setDetailId(booking.id)}
+                  aria-label={t("admin.bookings.viewA11y", { mentor: mentorLabel(booking), mentee: menteeLabel(booking) })}
+                  data-testid={`button-view-booking-${booking.id}`}
+                >
+                  {t("admin.viewDetails")}
+                </Button>
+              </div>
+            </AdminCard>
+          ))}
+        </AdminCardList>
       )}
 
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetailId(null)}>

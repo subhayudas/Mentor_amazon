@@ -17,6 +17,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import {
+  AdminCard,
+  AdminCardList,
+  CardField,
+  CardFields,
   DetailField,
   EmptyRow,
   LoadingRows,
@@ -24,6 +28,7 @@ import {
   SearchBox,
   VerificationBadge,
   errorMessage,
+  useAdminTable,
   useFormatters,
   useRowHighlight,
 } from "@/pages/admin/shared";
@@ -41,6 +46,7 @@ export default function MenteesTab() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [detail, setDetail] = useState<Mentee | null>(null);
+  const asTable = useAdminTable();
 
   const menteesQuery = useQuery({ queryKey: adminQueryKeys.mentees, queryFn: adminService.getMentees });
 
@@ -86,6 +92,36 @@ export default function MenteesTab() {
     onError: (error) => toast.error(errorMessage(error, t)),
   });
 
+  const emptyText = search || filter !== "all" ? t("admin.noMatches") : t("admin.mentees.empty");
+
+  const identity = (mentee: Mentee) => (
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar className="size-9 shrink-0">
+        <AvatarImage src={mentee.photo_url || undefined} alt="" />
+        <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(mentee.name)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <p className="truncate font-medium text-foreground">
+          <bdi>{mentee.name}</bdi>
+        </p>
+        <p className="truncate text-caption text-muted-foreground">
+          <bdi dir="ltr">{mentee.email}</bdi>
+        </p>
+      </div>
+    </div>
+  );
+
+  const typeLabel = (mentee: Mentee) => (
+    <span className="inline-flex items-center gap-1.5 text-body-sm">
+      {mentee.user_type === "organization" ? (
+        <Building2 className="size-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+      ) : (
+        <UserIcon className="size-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+      )}
+      {t(`admin.mentees.type.${mentee.user_type}`)}
+    </span>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -113,17 +149,18 @@ export default function MenteesTab() {
 
       {menteesQuery.isError ? (
         <QueueError queue={t("admin.queues.mentees")} onRetry={() => menteesQuery.refetch()} />
-      ) : (
-      <Card className="overflow-x-auto" aria-busy={menteesQuery.isLoading || undefined}>
+      ) : asTable ? (
+      <Card aria-busy={menteesQuery.isLoading || undefined}>
+        {/* Country and registration date show from 1280 px, so the table never scrolls sideways at 1024. */}
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="text-start">{t("admin.mentees.colName")}</TableHead>
               <TableHead className="text-start">{t("admin.mentees.colType")}</TableHead>
               <TableHead className="text-start">{t("admin.mentees.colOrganization")}</TableHead>
-              <TableHead className="text-start">{t("admin.colCountry")}</TableHead>
+              <TableHead className="hidden text-start xl:table-cell">{t("admin.colCountry")}</TableHead>
               <TableHead className="text-start">{t("admin.mentees.colVerification")}</TableHead>
-              <TableHead className="text-start">{t("admin.mentees.colRegistered")}</TableHead>
+              <TableHead className="hidden text-start xl:table-cell">{t("admin.mentees.colRegistered")}</TableHead>
               <TableHead className="text-end">
                 <span className="sr-only">{t("admin.actions")}</span>
               </TableHead>
@@ -133,11 +170,10 @@ export default function MenteesTab() {
             {menteesQuery.isLoading ? (
               <LoadingRows colSpan={COLS} />
             ) : mentees.length === 0 ? (
-              <EmptyRow colSpan={COLS}>{search || filter !== "all" ? t("admin.noMatches") : t("admin.mentees.empty")}</EmptyRow>
+              <EmptyRow colSpan={COLS}>{emptyText}</EmptyRow>
             ) : (
               mentees.map((mentee) => {
                 const rp = rowProps(mentee.id);
-                const isOrg = mentee.user_type === "organization";
                 return (
                   <TableRow
                     key={mentee.id}
@@ -146,32 +182,12 @@ export default function MenteesTab() {
                     onClick={() => setDetail(mentee)}
                     data-testid={`row-mentee-${mentee.id}`}
                   >
-                    <TableCell>
-                      <div className="flex min-w-[12rem] items-center gap-3">
-                        <Avatar className="size-9">
-                          <AvatarImage src={mentee.photo_url || undefined} alt="" />
-                          <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(mentee.name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">
-                            <bdi>{mentee.name}</bdi>
-                          </p>
-                          <p className="truncate text-caption text-muted-foreground">
-                            <bdi dir="ltr">{mentee.email}</bdi>
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 text-body-sm">
-                        {isOrg ? <Building2 className="size-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" /> : <UserIcon className="size-4 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />}
-                        {t(`admin.mentees.type.${mentee.user_type}`)}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-body-sm">{mentee.organization_name ? <bdi>{mentee.organization_name}</bdi> : UNAVAILABLE}</TableCell>
-                    <TableCell className="text-body-sm">{mentee.country ? localizeCountry(mentee.country, i18n.language) : UNAVAILABLE}</TableCell>
+                    <TableCell className="max-w-[18rem]">{identity(mentee)}</TableCell>
+                    <TableCell>{typeLabel(mentee)}</TableCell>
+                    <TableCell className="max-w-[14rem] truncate text-body-sm">{mentee.organization_name ? <bdi>{mentee.organization_name}</bdi> : UNAVAILABLE}</TableCell>
+                    <TableCell className="hidden text-body-sm xl:table-cell">{mentee.country ? localizeCountry(mentee.country, i18n.language) : UNAVAILABLE}</TableCell>
                     <TableCell><VerificationBadge status={mentee.verification_status} /></TableCell>
-                    <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDate(mentee.created_at)}</TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-body-sm text-muted-foreground tabular-nums xl:table-cell">{formatDate(mentee.created_at)}</TableCell>
                     <TableCell className="text-end">
                       {/* The real control (the sheet holds verify/reject); rows also open on click. */}
                       <Button
@@ -194,6 +210,38 @@ export default function MenteesTab() {
           </TableBody>
         </Table>
       </Card>
+      ) : (
+        <AdminCardList loading={menteesQuery.isLoading} emptyText={emptyText} count={mentees.length} testId="list-mentees">
+          {mentees.map((mentee) => {
+            const rp = rowProps(mentee.id);
+            return (
+              <AdminCard key={mentee.id} {...rp} className={rp.className} data-testid={`row-mentee-${mentee.id}`}>
+                <div className="flex items-start justify-between gap-3">
+                  {identity(mentee)}
+                  <VerificationBadge status={mentee.verification_status} />
+                </div>
+                <CardFields className="mt-3">
+                  <CardField label={t("admin.mentees.colType")}>{typeLabel(mentee)}</CardField>
+                  {mentee.organization_name && (
+                    <CardField label={t("admin.mentees.colOrganization")}><bdi>{mentee.organization_name}</bdi></CardField>
+                  )}
+                  <CardField label={t("admin.colCountry")}>{mentee.country ? localizeCountry(mentee.country, i18n.language) : undefined}</CardField>
+                  <CardField label={t("admin.mentees.colRegistered")}>{formatDate(mentee.created_at)}</CardField>
+                </CardFields>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4 h-11"
+                  onClick={() => setDetail(mentee)}
+                  aria-label={t("admin.mentees.viewA11y", { name: mentee.organization_name || mentee.name })}
+                  data-testid={`button-view-mentee-${mentee.id}`}
+                >
+                  {t("admin.viewDetails")}
+                </Button>
+              </AdminCard>
+            );
+          })}
+        </AdminCardList>
       )}
 
       <Sheet open={!!detail} onOpenChange={(open) => !open && setDetail(null)}>
