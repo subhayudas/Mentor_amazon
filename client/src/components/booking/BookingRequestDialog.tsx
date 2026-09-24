@@ -626,7 +626,8 @@ export function BookingRequestDialog({
                     className="min-h-[65px]"
                     onToken={(token) => {
                       setCaptchaToken(token);
-                      if (token) setServerError((current) => (current === "botCheck" || current === "captcha" ? null : current));
+                      // "Complete the check" is answered by the token; a server-side rejection stays until the next send.
+                      if (token) setServerError((current) => (current === "botCheck" ? null : current));
                     }}
                   />
                 </div>

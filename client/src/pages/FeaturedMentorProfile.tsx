@@ -8,6 +8,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Skeleton } from "@/components/ui/skeleton";
 import { resolveShowcaseMentor, type FeaturedMentor } from "@/data/featuredMentors";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { useAuth } from "@/context/AuthContext";
 import type { PublicMentor } from "@/lib/database";
 import { IS_LOCAL } from "@/lib/demo";
 import { featuredPageState, type FeaturedPageState } from "@/lib/directory";
@@ -143,6 +144,7 @@ export default function FeaturedMentorProfile() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const params = useParams<{ id?: string }>();
+  const { user } = useAuth();
   const { base, state, retry, isFetching } = useFeaturedPageMentor(params.id);
   // App.tsx only routes curated ids here; anything else is the standard profile.
   if (!base || !state) return null;
@@ -153,7 +155,9 @@ export default function FeaturedMentorProfile() {
   const bio = pickLang(lang, mentor.bio, mentor.bio_ar);
   const sessionTitle = pickLang(lang, mentor.session.title, mentor.session.title_ar);
   const bookHref = `/mentor/${mentor.id}/book`;
-  const sent = getSentRequest(state.requestId);
+  // The per-browser "request sent" memory; a signed-in viewer only sees one sent from their own address.
+  const memory = getSentRequest(state.requestId);
+  const sent = memory && (!user?.email || memory.email.trim().toLowerCase() === user.email.trim().toLowerCase()) ? memory : null;
   const similarHref = discoveryUrl({ expertise: mentor.expertise?.[0] ? [mentor.expertise[0]] : [] });
 
   const ratingCount = Number(mentor.total_ratings ?? 0);

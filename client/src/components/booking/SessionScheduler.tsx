@@ -442,7 +442,9 @@ function RequestFlow({
     );
   }
 
-  if (remembered) {
+  // A signed-in viewer never inherits a memory written under another address on this browser.
+  const memory = remembered && (!signedIn || !user?.email || remembered.email.trim().toLowerCase() === user.email.trim().toLowerCase()) ? remembered : null;
+  if (memory) {
     return (
       <div className="mt-6 rounded-[12px] bg-[var(--sc-sand)] p-4" data-testid="scheduler-sent-before" role="status">
         <p className="flex items-center gap-2 text-[15px] font-bold text-[var(--sc-ink)]">
@@ -452,7 +454,7 @@ function RequestFlow({
         <p className="mt-1 text-[14px] leading-[22px] text-[var(--sc-ink-soft)]">
           <Trans
             i18nKey="showcase.scheduler.sentBefore"
-            values={{ when: formatRelativeDay(remembered.sentAt, lang), email: remembered.email }}
+            values={{ when: formatRelativeDay(memory.sentAt, lang), email: memory.email }}
             components={{ email: <bdi dir="ltr" /> }}
           />
         </p>
@@ -584,7 +586,8 @@ function RequestFlow({
             className="min-h-[65px]"
             onToken={(token) => {
               setCaptchaToken(token);
-              if (token) setServerError((current) => (current === "botCheck" || current === "captcha" ? null : current));
+              // "Complete the check" is answered by the token; a server-side rejection stays until the next send.
+              if (token) setServerError((current) => (current === "botCheck" ? null : current));
             }}
           />
         </div>
