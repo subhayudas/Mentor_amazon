@@ -268,8 +268,6 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
                 </FormItem>
               )}
             />
-            {/* Sync status and setup for the saved link (not the unsaved field value). */}
-            <CalSyncPanel mentorId={mentorId} calLink={mentor.cal_link} />
             <div className="grid gap-4 md:grid-cols-2">
               <FormField
                 control={form.control}
@@ -325,6 +323,8 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
                 )}
               />
             </div>
+            {/* Sync status and setup for the saved link (not the unsaved field value), after the fields it depends on. */}
+            <CalSyncPanel mentorId={mentorId} calLink={mentor.cal_link} />
           </div>
         </PanelSection>
 

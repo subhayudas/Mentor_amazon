@@ -1216,7 +1216,7 @@
     "step1": "في Cal.com، افتح Settings ← Developer ← Webhooks واختر New.",
     "step2": "الصق رابط المشترك في حقل Subscriber URL.",
     "step3": "الصق المفتاح السري في حقل Secret.",
-    "step4": "فعّل الأحداث Booking Created وBooking Rescheduled وBooking Cancelled وBooking Requested وBooking Rejected.",
+    "step4": "فعّل الأحداث التالية: Booking Created، Booking Rescheduled، Booking Cancelled، Booking Requested، Booking Rejected.",
     "step5": "اترك حقل Custom payload template فارغًا.",
     "step6": "احفظ، ثم اختر Ping test. تظهر نتيجة الاختبار في هذه اللوحة خلال ثوانٍ.",
     "rotate": "تغيير المفتاح السري",
