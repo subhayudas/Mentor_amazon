@@ -297,7 +297,9 @@ ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_requested_start timesta
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS canceled_by text;
 -- Provenance of the Cal.com uid: the uid the signed webhook last delivered for this booking.
 -- cal_event_uri = cal_verified_uid means Cal.com itself vouched for the booking; anything else
--- (NULL, or another uid) was only reported by the mentee's browser (§11).
+-- (NULL, or another uid) was only reported by the mentee's browser (§11). No backfill: before this
+-- file no delivery could be verified (per-mentor secrets are new, and the one global secret was
+-- never set in production), so every existing uid really was reported by a browser.
 ALTER TABLE public.bookings ADD COLUMN IF NOT EXISTS cal_verified_uid text;
 
 -- Pre-checks: stop with the offending values rather than half-apply.
@@ -805,6 +807,19 @@ CREATE TABLE IF NOT EXISTS public.mentor_cal_webhooks (
 ALTER TABLE public.mentor_cal_webhooks ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.mentor_cal_webhooks FROM anon, authenticated;
 
+-- Cal.com uids a booking moved away from (a reschedule, a correction, a rejected or released time).
+-- A late delivery about one of them is stale: it never moves the booking back (cal_apply_event),
+-- and the embed cannot record one again (record_cal_booking_from_embed). Written only by those
+-- SECURITY DEFINER functions: RLS on, no policies, no client privileges.
+CREATE TABLE IF NOT EXISTS public.booking_cal_superseded_uids (
+  booking_id    varchar NOT NULL REFERENCES public.bookings (id) ON DELETE CASCADE,
+  uid           text NOT NULL,
+  superseded_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (booking_id, uid)
+);
+ALTER TABLE public.booking_cal_superseded_uids ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.booking_cal_superseded_uids FROM PUBLIC, anon, authenticated;
+
 -- The owning mentor's webhook settings (created on first read). Admins never see a secret.
 CREATE OR REPLACE FUNCTION public.get_my_cal_webhook(p_mentor_id text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
@@ -1057,6 +1072,12 @@ BEGIN
                         THEN 'unmatched_direct_booking' ELSE 'unmatched' END;
       EXIT apply;
     END IF;
+    -- A delivery about a uid this booking already moved away from (it arrived late, after a
+    -- reschedule or a rejected time) changes nothing.
+    IF EXISTS (SELECT 1 FROM public.booking_cal_superseded_uids s WHERE s.booking_id = v_b.id AND s.uid = p_uid) THEN
+      v_outcome := 'stale_state';
+      EXIT apply;
+    END IF;
 
     -- The new uid must not already belong to a different booking (unique index).
     IF v_trigger NOT IN ('BOOKING_CANCELLED', 'BOOKING_REJECTED')
@@ -1215,6 +1236,14 @@ BEGIN
     END IF;
   END apply;
 
+  -- The uid this delivery moved the booking away from, if any, is superseded.
+  IF v_b.id IS NOT NULL AND v_b.cal_event_uri IS NOT NULL THEN
+    INSERT INTO public.booking_cal_superseded_uids (booking_id, uid)
+    SELECT b.id, v_b.cal_event_uri FROM public.bookings b
+    WHERE b.id = v_b.id AND b.cal_event_uri IS DISTINCT FROM v_b.cal_event_uri
+    ON CONFLICT DO NOTHING;
+  END IF;
+
   -- Provenance: this signed delivery vouches for the booking's Cal.com uid, or for its having none
   -- (a rejected or released time). record_cal_booking_from_embed never overwrites a verified uid.
   IF v_b.id IS NOT NULL AND v_outcome IN ('confirmed', 'requested', 'rejected', 'canceled', 'cal_booking_released',
@@ -1314,6 +1343,10 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.bookings b WHERE b.cal_event_uri = p_uid AND b.id <> v_b.id) THEN
     RAISE EXCEPTION 'uid_in_use' USING ERRCODE = '23505';
   END IF;
+  -- A uid this booking already moved away from (a stale success event replayed by the browser).
+  IF EXISTS (SELECT 1 FROM public.booking_cal_superseded_uids s WHERE s.booking_id = v_b.id AND s.uid = p_uid) THEN
+    RETURN jsonb_build_object('outcome', 'already_recorded', 'booking_id', v_b.id);
+  END IF;
   -- Cal.com's signed webhook already delivered this booking (or the one being rescheduled): its
   -- record stands, and a reschedule reaches it through the webhook too.
   IF v_b.status IN ('accepted', 'confirmed') AND v_b.cal_event_uri IS NOT NULL
@@ -1377,6 +1410,13 @@ BEGIN
     RAISE EXCEPTION 'invalid_state' USING ERRCODE = '22023';
   END IF;
   PERFORM set_config('mc.internal_write', 'off', true);
+  -- A reschedule through the embed supersedes the uid it replaced.
+  IF p_reschedule_uid IS NOT NULL AND p_reschedule_uid IS DISTINCT FROM p_uid
+     AND v_outcome IN ('rescheduled', 'reschedule_requested', 'requested', 'confirmed')
+     AND p_reschedule_uid IS NOT DISTINCT FROM v_b.cal_event_uri THEN
+    INSERT INTO public.booking_cal_superseded_uids (booking_id, uid) VALUES (v_b.id, p_reschedule_uid)
+    ON CONFLICT DO NOTHING;
+  END IF;
 
   IF v_moved THEN
     SELECT * INTO v_m FROM public.mentors WHERE id = v_b.mentor_id;

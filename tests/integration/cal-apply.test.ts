@@ -410,10 +410,9 @@ describeDb('I9 provenance: the signed webhook is authoritative, in both arrival 
       expect(await reminders(tx, w.id)).toBe(0);
       const moved = (await notes(tx, w.id)).filter((x) => x.title === 'Session moved').map((x) => x.recipient_email).sort();
       expect(moved).toEqual([w.mentor.email, w.mentee.email].sort());
-      // The corrected booking is verified: the fabricated uid cannot come back from the browser.
-      await asRole(tx, 'authenticated', claims(w.sub, w.mentee.email));
-      await expectPgError(tx, (sp) => sp`select public.record_cal_booking_from_embed(${w.id}, 'pvFake0001', ${at(3, 6)}, 'ACCEPTED')`, '22023', /invalid_state/);
-      await asService(tx);
+      // The fabricated uid is superseded and the booking verified: the browser cannot bring it back.
+      expect(await embed(tx, w, 'pvFake0001', at(3, 6))).toBe('already_recorded');
+      expect(await booking(tx, w.id)).toMatchObject({ cal_event_uri: 'pvReal0001', scheduled_at: wall(real) });
     });
   });
 
@@ -507,6 +506,44 @@ describeDb('I9 provenance: the signed webhook is authoritative, in both arrival 
       expect(await verifiedUid(tx, w.id)).toBeNull();
       expect(await embed(tx, w, 'pvReq00002', at(8), 'PENDING')).toBe('requested');
       expect(await booking(tx, w.id)).toMatchObject({ cal_status: 'requested', cal_event_uri: 'pvReq00002' });
+    });
+  });
+
+  it('a late delivery for a uid the booking was rescheduled away from is stale and moves nothing back', async () => {
+    await withTx(sql, async (tx) => {
+      const w = await setup(tx);
+      expect(await embed(tx, w, 'pvStaleX01', at(3))).toBe('confirmed');
+      const moved = at(6, 15);
+      expect(await embed(tx, w, 'pvStaleY01', moved, 'ACCEPTED', 'pvStaleX01')).toBe('rescheduled');
+      const [{ before }] = await tx<{ before: number }[]>`select count(*)::int as before from public.notifications where booking_id = ${w.id}`;
+      // Cal.com's CREATED for the original booking, delayed past the reschedule, still carries the metadata.
+      const late = await apply(tx, { mentor: w.mentor.id, trigger: 'BOOKING_CREATED', uid: 'pvStaleX01', start: at(3), emails: [w.mentee.email], mc: w.id });
+      expect(late).toEqual({ outcome: 'stale_state', booking_id: w.id, changed: false });
+      expect(await booking(tx, w.id)).toMatchObject({ status: 'confirmed', cal_event_uri: 'pvStaleY01', scheduled_at: wall(moved) });
+      const [{ after }] = await tx<{ after: number }[]>`select count(*)::int as after from public.notifications where booking_id = ${w.id}`;
+      expect(after).toBe(before);
+      // The RESCHEDULED delivery for the new uid still verifies the booking.
+      const resched = await apply(tx, { mentor: w.mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'pvStaleY01', reschedule: 'pvStaleX01', start: moved, emails: [w.mentee.email], mc: w.id });
+      expect(resched.outcome).toBe('no_change');
+      expect(await verifiedUid(tx, w.id)).toBe('pvStaleY01');
+    });
+  });
+
+  it('a rejected time stays rejected: a late REQUESTED for it (by metadata or by e-mail) and a replayed embed event are ignored', async () => {
+    await withTx(sql, async (tx) => {
+      const w = await setup(tx);
+      expect((await apply(tx, { mentor: w.mentor.id, trigger: 'BOOKING_REQUESTED', uid: 'pvRejX0001', start: at(4), status: 'PENDING', emails: [w.mentee.email], mc: w.id })).outcome).toBe('requested');
+      expect((await apply(tx, { mentor: w.mentor.id, trigger: 'BOOKING_REJECTED', uid: 'pvRejX0001', status: 'REJECTED' })).outcome).toBe('rejected');
+      const viaMeta = await apply(tx, { mentor: w.mentor.id, trigger: 'BOOKING_REQUESTED', uid: 'pvRejX0001', start: at(4, 11), status: 'PENDING', emails: [w.mentee.email], mc: w.id });
+      expect(viaMeta.outcome).toBe('stale_state');
+      const viaEmail = await apply(tx, { mentor: w.mentor.id, trigger: 'BOOKING_REQUESTED', uid: 'pvRejX0001', start: at(4, 12), status: 'PENDING', emails: [w.mentee.email] });
+      expect(viaEmail.outcome).toBe('stale_state');
+      expect(await booking(tx, w.id)).toMatchObject({ status: 'accepted', cal_status: 'rejected', cal_event_uri: null, cal_requested_start: null });
+      // The browser replaying the old success event records nothing; a new pick is recorded.
+      expect(await embed(tx, w, 'pvRejX0001', at(5), 'PENDING')).toBe('already_recorded');
+      expect(await booking(tx, w.id)).toMatchObject({ cal_event_uri: null, cal_status: 'rejected' });
+      expect(await embed(tx, w, 'pvRejZ0001', at(5), 'PENDING')).toBe('requested');
+      expect(await booking(tx, w.id)).toMatchObject({ cal_event_uri: 'pvRejZ0001', cal_status: 'requested' });
     });
   });
 

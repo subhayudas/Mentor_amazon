@@ -73,7 +73,7 @@ describeDb('I3 catalog', () => {
              has_table_privilege('authenticated', 'public.bookings', 'SELECT') as sel,
              has_table_privilege('authenticated', 'public.bookings', 'UPDATE') as upd`;
     expect(auth).toEqual({ ins: false, sel: true, upd: true });
-    for (const t of ['mentor_cal_webhooks', 'schema_migrations', 'mc_settings']) {
+    for (const t of ['mentor_cal_webhooks', 'schema_migrations', 'mc_settings', 'booking_cal_superseded_uids']) {
       for (const role of ['anon', 'authenticated']) {
         const [row] = await sql<{ any: boolean }[]>`
           select has_table_privilege(${role}, ${`public.${t}`}, 'SELECT,INSERT,UPDATE,DELETE') as any`;

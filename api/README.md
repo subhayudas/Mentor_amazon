@@ -233,7 +233,11 @@ delivery stores the uid it vouched for in `bookings.cal_verified_uid`:
   `already_recorded` (the reschedule arrives as `BOOKING_RESCHEDULED`); any other
   uid is `22023 invalid_state`.
 
-Clients can never write `cal_verified_uid` (booking guard). One consequence:
+A uid the booking moved away from (a reschedule, a correction, a rejected or released
+time) is kept in `booking_cal_superseded_uids`. A late delivery about it answers
+`stale_state` and changes nothing, and the embed cannot record it again.
+
+Clients can never write `cal_verified_uid` (booking guard) or the superseded list (no grants). One consequence:
 if a mentor removes the webhook after a verified delivery, later reschedules of
 that booking through the embed are not recorded until Cal.com delivers them.
 
