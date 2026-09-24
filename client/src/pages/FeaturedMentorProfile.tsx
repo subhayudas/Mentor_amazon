@@ -11,7 +11,7 @@ import { FavoriteButton } from "@/components/FavoriteButton";
 import type { PublicMentor } from "@/lib/database";
 import { IS_LOCAL } from "@/lib/demo";
 import { featuredPageState, type FeaturedPageState } from "@/lib/directory";
-import { bidi, formatNumber, formatRelativeDay } from "@/lib/format";
+import { bidi, formatNumber, formatRelativeDay, languageName, localizeCountry } from "@/lib/format";
 import { discoveryUrl } from "@/lib/routes";
 import { getSentRequest } from "@/lib/sentRequests";
 import { mentorService } from "@/lib/services";
@@ -207,7 +207,8 @@ export default function FeaturedMentorProfile() {
           <bdi>{name}</bdi>
         </h1>
         <p className="mt-2 text-[15px] leading-[22px] text-white/90">
-          {headline} | {mentor.country}
+          {headline}
+          {mentor.country ? ` | ${localizeCountry(mentor.country, lang)}` : ""}
         </p>
         {ratingLine && (
           <p className="mt-5 text-[13px] leading-[22px] text-white/90" data-testid="featured-rating-line">
@@ -218,7 +219,7 @@ export default function FeaturedMentorProfile() {
         <ul className="mt-5 flex flex-wrap items-center gap-2" aria-label={t("showcase.profile.facts")}>
           <li className="inline-flex items-center gap-1.5 rounded-[8px] bg-black/25 px-2.5 py-1.5 text-[12px] font-semibold">
             <Languages className="size-3.5" aria-hidden="true" />
-            {mentor.languages_spoken.join(" · ")}
+            {mentor.languages_spoken.map((l) => languageName(l, lang)).join(" · ")}
           </li>
           <li className="inline-flex items-center gap-1.5 rounded-[8px] bg-black/25 px-2.5 py-1.5 text-[12px] font-semibold">
             <Globe className="size-3.5" aria-hidden="true" />

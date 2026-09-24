@@ -65,9 +65,9 @@ const inputClass =
   "mt-1 h-11 w-full rounded-[6px] border border-[#d9d9d9] bg-white px-3 text-[14px] text-[var(--sc-ink)] aria-[invalid=true]:border-[#c40000] read-only:bg-[var(--sc-sand)] read-only:text-[#5c5c5c]";
 const primaryButton =
   "inline-flex h-12 w-full items-center justify-center gap-2 rounded-[6px] bg-[var(--sc-ink)] text-[15px] font-bold text-white hover:bg-black disabled:opacity-60";
-const primaryLink = "inline-flex h-11 flex-1 items-center justify-center rounded-[6px] bg-[var(--sc-ink)] px-4 text-center text-[14px] font-bold text-white hover:bg-black";
+const primaryLink = "inline-flex h-11 items-center sm:flex-1 justify-center rounded-[6px] bg-[var(--sc-ink)] px-4 text-center text-[14px] font-bold text-white hover:bg-black";
 const secondaryLink =
-  "inline-flex h-11 flex-1 items-center justify-center rounded-[6px] border border-[#e3e8ed] px-4 text-center text-[14px] font-semibold text-[var(--sc-ink)] hover:bg-[var(--sc-sand)]";
+  "inline-flex h-11 items-center justify-center rounded-[6px] border border-[#e3e8ed] sm:flex-1 px-4 text-center text-[14px] font-semibold text-[var(--sc-ink)] hover:bg-[var(--sc-sand)]";
 
 function readStored(key: string): string {
   try {
