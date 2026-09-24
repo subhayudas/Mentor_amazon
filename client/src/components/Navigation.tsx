@@ -19,12 +19,14 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from 
 import { useAuth } from "@/context/AuthContext";
 import { syncRoleStorage } from "@/lib/auth";
 import { IS_LOCAL } from "@/lib/demo";
+import { ensureAllStrings } from "@/lib/i18n";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
 // Demo (local) mode only: database-mode visitors never download the browser-store bell.
+// It waits for every string too: the entry chunk carries only the English its own modules use (lib/i18n).
 const LocalNotificationBell = lazy(() =>
-  import("@/components/LocalNotificationBell").then((m) => ({ default: m.LocalNotificationBell })),
+  Promise.all([import("@/components/LocalNotificationBell"), ensureAllStrings()]).then(([m]) => ({ default: m.LocalNotificationBell })),
 );
 
 /**
