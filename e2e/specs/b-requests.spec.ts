@@ -267,3 +267,17 @@ test('S8 a signed-in mentee requests through the RPC: no captcha, a row, then "a
     }
   }
 });
+
+test('S21 demo mode: the curated /book page is the request form, never a Cal.com calendar; the request stays in this browser @demo-local', async ({ page, healthy }) => {
+  await page.goto('/mentor/manav-gupta/book');
+  await expect(page.getByTestId('form-session-request')).toBeVisible();
+  await expect(page.locator('iframe[src*="cal.com"]')).toHaveCount(0);
+  await expect(page.getByTestId('turnstile')).toHaveCount(0);
+  await fillSessionForm(page, 'Demo Visitor', 'demo.visitor@example.com', 'I would like help preparing my first investor meetings.');
+  await page.getByTestId('button-send-request').click();
+  await expect(page.getByTestId('slot-confirmation')).toBeVisible();
+  const local = await page.evaluate(() => JSON.parse(window.localStorage.getItem('mentorconnect.local.bookings') || '[]') as Array<{ mentor_id: string; status: string }>);
+  expect(local.some((b) => b.mentor_id === 'manav-gupta' && b.status === 'pending')).toBe(true);
+  expect(page.frames().some((f) => /cal\.com/.test(f.url()))).toBe(false);
+  await healthy({ screenshotName: 'S21-demo-book' });
+});

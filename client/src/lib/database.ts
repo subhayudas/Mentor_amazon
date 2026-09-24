@@ -1182,10 +1182,15 @@ class DatabaseService {
    * lose every window on a failed insert.
    */
   async setMentorAvailability(mentorId: string, slots: Omit<MentorAvailability, 'id' | 'created_at' | 'mentor_id'>[]): Promise<MentorAvailability[]> {
+    // The RPC accepts exactly `HH:MM` (24 h, zero-padded): "9:00" and "09:00:00" both become "09:00".
+    const hhmm = (value: string) => {
+      const [h = '', m = '00'] = String(value).trim().split(':');
+      return `${h.padStart(2, '0')}:${m.padStart(2, '0').slice(0, 2)}`;
+    };
     const p_slots = slots.map((slot) => ({
       day_of_week: slot.day_of_week,
-      start_time: String(slot.start_time).slice(0, 5),
-      end_time: String(slot.end_time).slice(0, 5),
+      start_time: hhmm(slot.start_time),
+      end_time: hhmm(slot.end_time),
       is_active: slot.is_active !== false,
     }));
     const { data, error } = await supabase.rpc('set_my_availability', { p_mentor_id: mentorId, p_slots });

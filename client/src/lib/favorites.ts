@@ -1,10 +1,11 @@
+import { useSyncExternalStore } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import type { Favorite } from "@/lib/database";
 import { IS_LOCAL } from "@/lib/demo";
-import { localStore, newId, useLocalCollection } from "@/lib/localStore";
+import { localStore, newId } from "@/lib/localStore";
 import { supabase } from "@/lib/supabase";
 import { logActivity } from "@/lib/activity";
 
@@ -27,10 +28,20 @@ export type FavoriteToggleInput = {
 };
 type ToggleVariables = FavoriteToggleInput & { add: boolean };
 
+const NO_FAVOURITES: Favorite[] = [];
+const noSubscription = () => () => undefined;
+
+/** Demo-mode favourites from this browser; against the database it never touches browser storage. */
+function useDemoFavorites(): Favorite[] {
+  const isLocal = IS_LOCAL;
+  const read = () => (isLocal ? localStore.list("favorites") : NO_FAVOURITES);
+  return useSyncExternalStore(isLocal ? localStore.subscribe : noSubscription, read, read);
+}
+
 export function useFavorites(menteeId: string | null, menteeName?: string) {
   const qc = useQueryClient();
   const { t } = useTranslation();
-  const local = useLocalCollection("favorites");
+  const local = useDemoFavorites();
   const queryKey = ["favorites", menteeId] as const;
   const live = useQuery<Favorite[]>({
     queryKey,
