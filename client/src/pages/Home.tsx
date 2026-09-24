@@ -232,7 +232,7 @@ function Bento() {
                 <CalendarPlus className="size-4" aria-hidden="true" /> {t("showcase.bento.invite")}
               </Pill>
             </div>
-            <div className="mt-auto">
+            <div className="mt-auto pt-6">
               <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t4requestBig")}</p>
               <p className="mt-3 max-w-[360px] text-[18px] leading-[26px] text-[var(--sc-ink)]">{t("showcase.bento.t4requestA")}</p>
             </div>

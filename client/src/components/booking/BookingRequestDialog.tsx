@@ -185,6 +185,16 @@ export function BookingRequestDialog({
     wasOpen.current = open;
   }, [open, prefill.name, prefill.email, form]);
 
+  // The account can finish loading after the dialog opened (a fast click on a
+  // fresh page): fill what the person has not typed themselves, and always the
+  // read-only account fields, so a read-only email is never left empty.
+  React.useEffect(() => {
+    if (!open) return;
+    const dirty = form.formState.dirtyFields;
+    if (prefill.email && (prefill.emailReadOnly || !dirty.email) && form.getValues("email") !== prefill.email) form.setValue("email", prefill.email);
+    if (prefill.name && (prefill.nameReadOnly || !dirty.name) && form.getValues("name") !== prefill.name) form.setValue("name", prefill.name);
+  }, [open, prefill.email, prefill.name, prefill.emailReadOnly, prefill.nameReadOnly, form]);
+
   const mutation = useMutation({
     mutationFn: (data: { mentor_id: string; mentee_name: string; mentee_email: string; goal: string; turnstileToken?: string | null }) =>
       bookingService.createRequest(data),
