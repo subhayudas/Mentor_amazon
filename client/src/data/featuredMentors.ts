@@ -18,6 +18,12 @@ export interface Testimonial {
 }
 
 export interface FeaturedMentor extends PublicMentor {
+  /**
+   * The `mentors.id` this entry has in the database: UUIDv5 (URL namespace) of
+   * `https://mentor-amazon.vercel.app/mentor/<slug>` for the curated five, the
+   * row id itself for onboarded mentors. `id` stays the public slug.
+   */
+  dbId: string;
   /** Short line under the name on cards ("Founder & CEO, Brinc"). */
   headline: string;
   headline_ar: string;
@@ -54,6 +60,7 @@ const now = "2026-09-01T00:00:00.000Z";
 export const FEATURED_MENTORS: FeaturedMentor[] = [
   {
     id: "manav-gupta",
+    dbId: "738d7465-42c6-5550-be9a-6e7ef35f52bc",
     name: "Manav Gupta",
     name_ar: "ماناف غوبتا",
     company: "Brinc",
@@ -120,6 +127,7 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
   },
   {
     id: "bashar-aboudaoud",
+    dbId: "caf1ee67-267d-591f-9842-5ae649ec2a26",
     name: "Bashar Aboudaoud",
     name_ar: "بشار أبو داود",
     company: "Brinc",
@@ -186,6 +194,7 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
   },
   {
     id: "nick-ramil",
+    dbId: "20b28010-7bf8-5b6b-a1cc-d9435478d131",
     name: "Nick Ramil",
     name_ar: "نيك راميل",
     company: "Brinc",
@@ -252,6 +261,7 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
   },
   {
     id: "levi-lewandowski",
+    dbId: "ec758eba-8efc-5c32-a3ee-768badd8c9c9",
     name: "Levi Lewandowski",
     name_ar: "ليفاي ليفاندوفسكي",
     company: "Brinc",
@@ -318,6 +328,7 @@ export const FEATURED_MENTORS: FeaturedMentor[] = [
   },
   {
     id: "ghita-elidrissi",
+    dbId: "6afa7b6d-d098-568a-b629-2b04c6edeef1",
     name: "Ghita Elidrissi",
     name_ar: "غيثة الإدريسي",
     company: "UpRound by Brinc",
@@ -389,6 +400,20 @@ export function featuredMentor(id: string | undefined): FeaturedMentor | undefin
   return FEATURED_MENTORS.find((m) => m.id === id);
 }
 
+/** Database ids of the curated five (design §3.1). */
+export const FEATURED_DB_IDS: ReadonlySet<string> = new Set(FEATURED_MENTORS.map((m) => m.dbId));
+
+/** True when the id is one of the curated five's database ids. */
+export function isFeaturedDbId(id: string | null | undefined): boolean {
+  return !!id && FEATURED_DB_IDS.has(id);
+}
+
+/** Curated mentor by slug or by database id; undefined otherwise. */
+export function featuredMentorByAnyId(id: string | null | undefined): FeaturedMentor | undefined {
+  if (!id) return undefined;
+  return FEATURED_MENTORS.find((m) => m.id === id || m.dbId === id);
+}
+
 const TINTS: FeaturedMentor["tint"][] = ["green", "orange", "purple"];
 
 /**
@@ -408,6 +433,7 @@ export function toShowcaseMentor(m: Mentor): FeaturedMentor {
   for (let i = 0; i < m.id.length; i++) h = (h * 31 + m.id.charCodeAt(i)) >>> 0;
   return {
     ...m,
+    dbId: m.id,
     headline,
     headline_ar: headlineAr,
     chip: m.company || m.country || "Mentor",

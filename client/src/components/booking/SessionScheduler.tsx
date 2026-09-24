@@ -25,12 +25,7 @@ const Cal = lazy(() => import("@calcom/embed-react"));
  * shows up on the dashboard.
  */
 const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY ?? "").trim();
-
-declare global {
-  interface Window {
-    turnstile?: { render: (el: HTMLElement, opts: { sitekey: string; callback: (token: string) => void; "expired-callback"?: () => void; theme?: string }) => string; reset: (id?: string) => void };
-  }
-}
+// `window.turnstile` is typed in components/Turnstile.tsx (one global declaration).
 
 /** Cloudflare Turnstile widget; renders nothing unless VITE_TURNSTILE_SITE_KEY is set. */
 function Turnstile({ onToken }: { onToken: (token: string | null) => void }) {

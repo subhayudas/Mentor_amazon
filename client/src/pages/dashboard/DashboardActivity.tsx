@@ -33,6 +33,8 @@ const ICONS: Record<ActivityType, LucideIcon> = {
   mentor_unlisted: CalendarX,
   mentee_verified: CheckCircle2,
   mentee_rejected: CalendarX,
+  booking_time_requested: CalendarCheck,
+  booking_time_declined: CalendarX,
 };
 
 type Group = "all" | "bookings" | "accounts" | "favorites" | "settings";

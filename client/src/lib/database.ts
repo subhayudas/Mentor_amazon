@@ -49,6 +49,8 @@ export interface Mentor {
   is_available: boolean;
   average_rating?: string;
   total_ratings?: number;
+  /** Curated mentor whose requests the programme admins answer (no owner account). */
+  managed_by_programme?: boolean;
   created_at: string;
   updated_at?: string;
 }
@@ -141,6 +143,12 @@ export interface Booking {
   session_duration_minutes?: number;
   /** Country the session is attributed to for reporting (defaults to the mentor's country). */
   country?: string;
+  /** State of the linked Cal.com booking, written only by the scheduler RPCs and the webhook. */
+  cal_status?: 'requested' | 'accepted' | 'rejected' | 'cancelled' | null;
+  /** Start time of a Cal.com booking awaiting the mentor's confirmation (UTC). */
+  cal_requested_start?: string | null;
+  /** Who cancelled the session. */
+  canceled_by?: 'mentor' | 'mentee' | 'admin' | 'cal' | null;
   created_at: string;
 }
 
@@ -280,7 +288,9 @@ export type ActivityType =
   | 'mentor_listed'
   | 'mentor_unlisted'
   | 'mentee_verified'
-  | 'mentee_rejected';
+  | 'mentee_rejected'
+  | 'booking_time_requested'
+  | 'booking_time_declined';
 
 /**
  * Append-only audit event (`activity_events`). Written by the app at every

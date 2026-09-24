@@ -75,11 +75,5 @@ export async function resolveBackend(): Promise<void> {
  */
 export const DEFAULT_CAL_LINK: string = (import.meta.env.VITE_DEFAULT_CAL_LINK ?? "cal").trim();
 
-/** `https://cal.com/user/30min`, `cal.com/user/30min` or `user/30min` → `user/30min`. */
-export function normalizeCalLink(value: string | null | undefined): string {
-  return String(value ?? "")
-    .trim()
-    .replace(/^https?:\/\/(www\.)?(app\.)?cal\.com\//i, "")
-    .replace(/^(www\.)?cal\.com\//i, "")
-    .replace(/^\/+|\/+$/g, "");
-}
+/** Transitional re-export; the implementation lives in lib/calLink.ts. */
+export { normalizeCalLink } from "@/lib/calLink";
