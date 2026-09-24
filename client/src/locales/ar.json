@@ -2127,7 +2127,9 @@
         "hours": "ساعات الإرشاد",
         "hoursSub": "وقت الجلسات المكتملة",
         "sessions": "الجلسات",
-        "sessionsSub": "الجلسات المكتملة"
+        "sessionsSub": "الجلسات المكتملة",
+        "requests": "الطلبات المستلمة",
+        "requestsSub": "طلبات الجلسات في هذه الفترة"
       },
       "trend": "مشاهدات الملف عبر الوقت",
       "refreshed": "آخر تحديث: {{time}}",
@@ -2182,7 +2184,22 @@
       "editProfile": "تعديل ملفي",
       "sampleTitle": "بيانات عيّنة — ليست نتائج البرنامج.",
       "sampleBody": "يوجد أقل من خمسة حجوزات حقيقية، لذا كل رقم ومخطط هنا توضيحي. لا تستشهد بها كنتائج؛ تحل المقاييس الحقيقية محلها تلقائياً مع تراكم الجلسات.",
-      "brandAdmin": "إدارة البرنامج"
+      "brandAdmin": "إدارة البرنامج",
+      "trendRequests": "الطلبات عبر الزمن",
+      "trendSummary_zero": "لا طلبات في هذه الفترة",
+      "trendSummary_one": "طلب واحد في هذه الفترة",
+      "trendSummary_two": "طلبان في هذه الفترة",
+      "trendSummary_few": "{{count}} طلبات في هذه الفترة",
+      "trendSummary_many": "{{count}} طلبًا في هذه الفترة",
+      "trendSummary_other": "{{count}} طلب في هذه الفترة",
+      "loadError": "تعذّر تحميل التحليلات.",
+      "noProfile": "تظهر تحليلاتك بعد اكتمال ملفك كمرشد.",
+      "requestsCount_zero": "لا طلبات",
+      "requestsCount_one": "طلب واحد",
+      "requestsCount_two": "طلبان",
+      "requestsCount_few": "{{count}} طلبات",
+      "requestsCount_many": "{{count}} طلبًا",
+      "requestsCount_other": "{{count}} طلب"
     },
     "legal": {
       "terms": "الشروط",
@@ -2237,7 +2254,41 @@
         "declined": "تم رفض الطلب",
         "canceled": "أُلغيت الجلسة",
         "completed": "تم وضع علامة مكتملة على الجلسة",
-        "rescheduled": "أُعيدت جدولة الجلسة"
+        "rescheduled": "أُعيدت جدولة الجلسة",
+        "error": "تعذّر تحديث هذه الجلسة. لم يتغيّر شيء؛ يرجى المحاولة مرة أخرى.",
+        "withdrawn": "تم سحب الطلب"
+      },
+      "withdraw": "سحب الطلب",
+      "chooseTime": "اختر موعدًا",
+      "chooseAnotherTime": "اختر موعدًا آخر",
+      "durationNotRecorded": "المدة غير مسجّلة",
+      "loadError": "تعذّر تحميل جلساتك.",
+      "note": {
+        "waitingForTime": "تم القبول. بانتظار أن يختار {{name}} موعدًا عبر رابط Cal.com الخاص بك.",
+        "timeRequested": "اخترت {{time}}. بانتظار أن يؤكده {{name}} على Cal.com.",
+        "timeRequestedUntimed": "اخترت موعدًا. بانتظار أن يؤكده {{name}} على Cal.com.",
+        "timeRequestedMentor": "اختار {{name}} موعد {{time}}. أكّده أو ارفضه على Cal.com.",
+        "timeRequestedMentorUntimed": "اختار {{name}} موعدًا. أكّده أو ارفضه على Cal.com.",
+        "timeDeclined": "لم يتمكن {{name}} من حضور ذلك الموعد. اختر موعدًا آخر.",
+        "programmeArranges": "سيراسلك فريق البرنامج عبر البريد الإلكتروني لتحديد موعد.",
+        "mentorWillShare": "قبل {{name}} طلبك وسيتواصل معك لتحديد موعد.",
+        "awaitingCompletion": "انتهى موعد هذه الجلسة. ضع علامة مكتملة عليها لتسجيل ساعاتك.",
+        "sessionPassed": "انتهى موعد هذه الجلسة. سيضع {{name}} علامة مكتملة عليها."
+      },
+      "confirm": {
+        "declineTitle": "هل تريد رفض طلب {{name}}؟",
+        "declineBody": "سيُبلَّغ بأنك لا تستطيع قبول هذا الطلب. لا يمكن التراجع عن ذلك.",
+        "declineAction": "رفض الطلب",
+        "keepRequest": "الإبقاء على الطلب",
+        "withdrawTitle": "هل تريد سحب طلبك إلى {{name}}؟",
+        "withdrawBody": "سيُلغى الطلب ولن يعود بالإمكان قبوله.",
+        "withdrawAction": "سحب الطلب",
+        "cancelTitle": "هل تريد إلغاء هذه الجلسة؟",
+        "cancelBody": "سيُبلَّغ {{name}} بإلغاء الجلسة.",
+        "cancelAction": "إلغاء الجلسة",
+        "keepSession": "الإبقاء على الجلسة",
+        "alsoCancelOnCal": "هذه الجلسة محجوزة أيضًا على Cal.com. ألغِها هناك أيضًا لإزالة دعوة التقويم.",
+        "openCal": "فتح في Cal.com"
       }
     },
     "calendar": {
@@ -2283,7 +2334,27 @@
       "unavailable": "غير متاح",
       "save": "حفظ التغييرات",
       "saved": "تم الحفظ",
-      "saveHint": "تنطبق التغييرات على الحجوزات الجديدة فقط."
+      "saveHint": "تنطبق التغييرات على الحجوزات الجديدة فقط.",
+      "fixTimes": "يجب أن تنتهي كل فترة بعد بدايتها. صحّح الأوقات المحدّدة ثم احفظ.",
+      "savedToast": "تم حفظ إعدادات التقويم",
+      "saveError": "لم تُحفظ تغييراتك. حاول مرة أخرى.",
+      "loadError": "تعذّر تحميل إعدادات التقويم.",
+      "timezoneSubLive": "تستخدم ساعاتك المكتبية وملفك هذه المنطقة الزمنية.",
+      "calcomTitle": "فترة الحجز والإشعار المسبق والتقاويم",
+      "calcomSub": "تُضبط فترة الحجز ومدة الإشعار المسبق وربط التقاويم من نوع الحدث في Cal.com.",
+      "calcomCta": "فتح التوفر في Cal.com",
+      "syncTitle": "مزامنة الحجوزات",
+      "syncSub": "مزامنة الحجوزات: تُضبط من إعدادات الملف الشخصي.",
+      "syncCta": "إعداد مزامنة الحجوزات",
+      "scheduleSubLive": "الساعات المكتبية الأسبوعية بتوقيت {{zone}}، وتظهر في ملفك العام. يختار المتدربون المواعيد الدقيقة عبر رابط Cal.com.",
+      "fromDay": "{{day}}: من",
+      "toDay": "{{day}}: إلى",
+      "removeWindow": "إزالة ساعات يوم {{day}} هذه",
+      "addWindowDay": "إضافة ساعات يوم {{day}}",
+      "addWindow": "إضافة ساعات",
+      "endAfterStart": "يجب أن تكون النهاية بعد البداية",
+      "unsaved": "لديك تغييرات غير محفوظة.",
+      "saveHintLive": "تظهر الساعات المكتبية في ملفك العام فور الحفظ."
     },
     "dashboard": {
       "hi": "مرحباً {{name}}",
@@ -2337,7 +2408,32 @@
       "suggested": "مرشدون لك",
       "suggestedSub": "ابدأ بجلسة 30 دقيقة",
       "awaitingMentor": "بانتظار رد المرشد",
-      "demoName": "مرشد تجريبي"
+      "demoName": "مرشد تجريبي",
+      "finishProfileTitle": "أكمل ملفك الشخصي",
+      "finishProfileBody": "يمكن للمتدربين العثور عليك وطلب جلسة معك بعد اكتمال ملفك كمرشد: صورتك وخبراتك ورابط Cal.com.",
+      "finishProfileCta": "إكمال الملف الشخصي",
+      "completeRegistrationTitle": "أكمل تسجيلك",
+      "completeRegistrationBody": "أخبرنا قليلًا عن نفسك ليعرف المرشدون من سيقابلون. يستغرق ذلك دقيقتين.",
+      "completeRegistrationCta": "إكمال التسجيل",
+      "loadError": "تعذّر تحميل لوحتك.",
+      "noPageYet": "تظهر صفحتك العامة هنا بعد اكتمال ملفك.",
+      "hoursMissing_zero": "لكل الجلسات مدة مسجّلة",
+      "hoursMissing_one": "جلسة واحدة بلا مدة مسجّلة",
+      "hoursMissing_two": "جلستان بلا مدة مسجّلة",
+      "hoursMissing_few": "{{count}} جلسات بلا مدة مسجّلة",
+      "hoursMissing_many": "{{count}} جلسة بلا مدة مسجّلة",
+      "hoursMissing_other": "{{count}} جلسة بلا مدة مسجّلة",
+      "calendarLinked": "رابط Cal.com مضاف",
+      "calendarMissing": "أضف رابط Cal.com",
+      "stepDone": "مكتمل",
+      "newBadge": "جديد",
+      "stepsLive": {
+        "availability": "أضف ساعاتك المكتبية الأسبوعية في التقويم. تظهر في ملفك العام.",
+        "profile": "أضف صورة ومنصبك ونبذة عنك والمجالات التي ترشد فيها.",
+        "sessions": "تكتمل مع وصول أول طلب. شارك رابطك لتحصل عليه.",
+        "calendar": "أضف رابط Cal.com ليختار المتدربون المقبولون موعدًا.",
+        "share": "انشر صفحتك على LinkedIn أو في قناة فريقك، ثم ضع علامة على هذه الخطوة."
+      }
     },
     "onboarding": {
       "stepsLabel": "أقسام النموذج",
@@ -2368,7 +2464,12 @@
       "calLink": "رابط Cal.com",
       "calHint": "صفحة الحجز الخاصة بك؛ تُدمج في صفحة جلستك.",
       "organisation": "المؤسسة",
-      "goals": "ما تريده من الإرشاد"
+      "goals": "ما تريده من الإرشاد",
+      "loadError": "تعذّر تحميل ملفك.",
+      "saveError": "لم تُحفظ تغييراتك. تحقّق من اتصالك وحاول مرة أخرى.",
+      "photoType": "اختر صورة بصيغة JPEG أو PNG أو WebP أو GIF.",
+      "calHintLive": "حدث Cal.com الخاص بك، مثل yourname/30min. يختار المتدربون موعدًا عليه بعد قبولك. اتركه فارغًا لإزالته.",
+      "calSyncSection": "مزامنة حجوزات Cal.com"
     },
     "activity": {
       "title": "النشاط",
@@ -2490,7 +2591,13 @@
         "sessions": "الجلسات",
         "area": "المجال",
         "country": "البلد"
-      }
+      },
+      "missingDurations_zero": "لكل الجلسات المكتملة مدة مسجّلة.",
+      "missingDurations_one": "جلسة مكتملة واحدة بلا مدة مسجّلة، ولم تُحتسب في الساعات.",
+      "missingDurations_two": "جلستان مكتملتان بلا مدة مسجّلة، ولم تُحتسبا في الساعات.",
+      "missingDurations_few": "{{count}} جلسات مكتملة بلا مدة مسجّلة، ولم تُحتسب في الساعات.",
+      "missingDurations_many": "{{count}} جلسة مكتملة بلا مدة مسجّلة، ولم تُحتسب في الساعات.",
+      "missingDurations_other": "{{count}} جلسة مكتملة بلا مدة مسجّلة، ولم تُحتسب في الساعات."
     },
     "admin": {
       "title": "إدارة البرنامج",

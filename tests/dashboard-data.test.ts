@@ -2,11 +2,16 @@ import { describe, expect, it } from 'vitest';
 import type { Booking } from '../client/src/lib/database.ts';
 import {
   asUtcIso,
+  bookingsTabFor,
+  checklistDone,
+  mentorProfileComplete,
+  upcomingWithin,
   displayNameFor,
   firstNameOf,
   normalizeBookingTimes,
   ownRows,
   recordedMinutes,
+  rowActionsFor,
   selectDashboardRows,
   type DashboardRole,
 } from '../client/src/pages/dashboard/dataSource.ts';
@@ -171,5 +176,97 @@ describe('displayNameFor / firstNameOf', () => {
     expect(firstNameOf('Layla Haddad')).toBe('Layla');
     expect(firstNameOf('dev.c.mentee')).toBe('dev.c.mentee');
     expect(firstNameOf('')).toBe('');
+  });
+});
+
+describe('bookingsTabFor', () => {
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  it('sorts rows into the four tabs', () => {
+    expect(bookingsTabFor({ status: 'pending' }, now)).toBe('requests');
+    expect(bookingsTabFor({ status: 'accepted' }, now)).toBe('upcoming');
+    expect(bookingsTabFor({ status: 'confirmed', scheduled_at: '2026-09-25T09:00:00Z' }, now)).toBe('upcoming');
+    expect(bookingsTabFor({ status: 'confirmed' }, now)).toBe('upcoming');
+    expect(bookingsTabFor({ status: 'confirmed', scheduled_at: '2026-09-23T09:00:00Z' }, now)).toBe('completed');
+    expect(bookingsTabFor({ status: 'completed' }, now)).toBe('completed');
+    expect(bookingsTabFor({ status: 'canceled' }, now)).toBe('canceled');
+    expect(bookingsTabFor({ status: 'rejected' }, now)).toBe('canceled');
+  });
+});
+
+describe('rowActionsFor', () => {
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  const future = '2026-09-25T09:00:00Z';
+  const past = '2026-09-23T09:00:00Z';
+  const mentor = { role: 'mentor' as const, now, hasCalLink: true, programmeManaged: false };
+  const mentee = { role: 'mentee' as const, now, hasCalLink: true, programmeManaged: false };
+
+  it('mentor: accept or decline a pending request', () => {
+    expect(rowActionsFor({ status: 'pending' }, mentor)).toEqual({ actions: ['accept', 'decline'], note: null });
+  });
+  it('mentor: complete or cancel accepted and confirmed sessions, with the right note', () => {
+    expect(rowActionsFor({ status: 'accepted' }, mentor)).toEqual({ actions: ['complete', 'cancel'], note: 'waitingForTime' });
+    expect(rowActionsFor({ status: 'accepted', cal_status: 'requested', cal_event_uri: 'uid-1' }, mentor).note).toBe('timeRequestedMentor');
+    expect(rowActionsFor({ status: 'confirmed', scheduled_at: future, cal_event_uri: 'uid-1' }, mentor)).toEqual({ actions: ['complete', 'cancel'], note: null });
+    expect(rowActionsFor({ status: 'confirmed', scheduled_at: past }, mentor)).toEqual({ actions: ['complete', 'cancel'], note: 'awaitingCompletion' });
+  });
+  it.each(['completed', 'canceled', 'rejected'] as const)('mentor: no actions on %s rows', (status) => {
+    expect(rowActionsFor({ status }, mentor)).toEqual({ actions: [], note: null });
+    expect(rowActionsFor({ status }, mentee)).toEqual({ actions: [], note: null });
+  });
+  it('mentee: withdraw a pending request', () => {
+    expect(rowActionsFor({ status: 'pending' }, mentee)).toEqual({ actions: ['withdraw'], note: null });
+  });
+  it('mentee: choose a time once accepted when the mentor has a Cal link', () => {
+    expect(rowActionsFor({ status: 'accepted' }, mentee)).toEqual({ actions: ['chooseTime', 'cancel'], note: null });
+    // A Cal booking that was released (cancelled on Cal) leaves no uid: choose again.
+    expect(rowActionsFor({ status: 'accepted', cal_status: 'cancelled' }, mentee)).toEqual({ actions: ['chooseTime', 'cancel'], note: null });
+  });
+  it('mentee: waits while the mentor confirms a requested time, re-picks after a decline', () => {
+    expect(rowActionsFor({ status: 'accepted', cal_status: 'requested', cal_event_uri: 'uid' }, mentee)).toEqual({ actions: ['cancel'], note: 'timeRequested' });
+    expect(rowActionsFor({ status: 'accepted', cal_status: 'rejected' }, mentee)).toEqual({ actions: ['chooseAnotherTime', 'cancel'], note: 'timeDeclined' });
+    expect(rowActionsFor({ status: 'accepted', cal_status: 'rejected' }, { ...mentee, hasCalLink: false })).toEqual({ actions: ['cancel'], note: 'timeDeclined' });
+  });
+  it('mentee: without a Cal link, the programme team (featured) or the mentor arranges the time', () => {
+    expect(rowActionsFor({ status: 'accepted' }, { ...mentee, hasCalLink: false, programmeManaged: true })).toEqual({ actions: ['cancel'], note: 'programmeArranges' });
+    expect(rowActionsFor({ status: 'accepted' }, { ...mentee, hasCalLink: false })).toEqual({ actions: ['cancel'], note: 'mentorWillShare' });
+  });
+  it('mentee: reschedule only a Cal booking; a past session has no actions', () => {
+    expect(rowActionsFor({ status: 'confirmed', scheduled_at: future, cal_event_uri: 'uid-1' }, mentee)).toEqual({ actions: ['reschedule', 'cancel'], note: null });
+    expect(rowActionsFor({ status: 'confirmed', scheduled_at: future }, mentee)).toEqual({ actions: ['cancel'], note: null });
+    expect(rowActionsFor({ status: 'confirmed', scheduled_at: past, cal_event_uri: 'uid-1' }, mentee)).toEqual({ actions: [], note: 'sessionPassed' });
+  });
+});
+
+describe('checklistDone / mentorProfileComplete', () => {
+  const complete = { name: 'Sara', bio: 'I help people move into product roles.', photo_url: 'https://x/p.jpg', expertise: ['Product Management'], position: 'PM', company: 'Amazon', cal_link: 'sara/30min' };
+  it('treats a profile as complete only with photo, bio, expertise and a headline', () => {
+    expect(mentorProfileComplete(complete)).toBe(true);
+    expect(mentorProfileComplete({ ...complete, photo_url: '' })).toBe(false);
+    expect(mentorProfileComplete({ ...complete, bio: '  ' })).toBe(false);
+    expect(mentorProfileComplete({ ...complete, expertise: [] })).toBe(false);
+    expect(mentorProfileComplete({ ...complete, position: '', company: '' })).toBe(false);
+    expect(mentorProfileComplete({ ...complete, position: '' })).toBe(true);
+    expect(mentorProfileComplete(null)).toBe(false);
+  });
+  it('computes every step from state (only "share" comes from this browser)', () => {
+    expect(Array.from(checklistDone({ mentor: complete, availabilityWindows: 3, bookings: 1, shared: true })).sort()).toEqual(['availability', 'calendar', 'profile', 'sessions', 'share']);
+    expect(Array.from(checklistDone({ mentor: { ...complete, cal_link: '' }, availabilityWindows: 0, bookings: 0, shared: false }))).toEqual(['profile']);
+    expect(checklistDone({ mentor: { ...complete, cal_link: 'not a link' }, availabilityWindows: 0, bookings: 0, shared: false }).has('calendar')).toBe(false);
+    expect(checklistDone({ mentor: null, availabilityWindows: 0, bookings: 0, shared: false }).size).toBe(0);
+  });
+});
+
+describe('upcomingWithin', () => {
+  const now = Date.parse('2026-09-24T12:00:00Z');
+  it('keeps confirmed sessions in the window, soonest first', () => {
+    const rows = [
+      { id: 'late', status: 'confirmed' as const, scheduled_at: '2026-10-20T09:00:00Z' },
+      { id: 'b', status: 'confirmed' as const, scheduled_at: '2026-09-30T09:00:00Z' },
+      { id: 'a', status: 'confirmed' as const, scheduled_at: '2026-09-25T09:00:00Z' },
+      { id: 'past', status: 'confirmed' as const, scheduled_at: '2026-09-20T09:00:00Z' },
+      { id: 'accepted', status: 'accepted' as const, scheduled_at: '2026-09-26T09:00:00Z' },
+      { id: 'untimed', status: 'confirmed' as const },
+    ];
+    expect(upcomingWithin(rows, now, 14).map((r) => r.id)).toEqual(['a', 'b']);
   });
 });

@@ -11,6 +11,7 @@
  *   the showcase (no account) sees the browser rows plus the seeded sample set
  *   behind the "Demo data" badge.
  */
+import { isValidCalLink } from "@/lib/calLink";
 import type { Booking, Mentee, Mentor } from "@/lib/database";
 
 export type DashboardRole = "mentor" | "mentee" | "admin";
@@ -112,4 +113,122 @@ export function displayNameFor(name: string | null | undefined, email: string | 
 /** First word of a display name ("Layla Haddad" → "Layla"; an email local part stays whole). */
 export function firstNameOf(displayName: string): string {
   return displayName.trim().split(/\s+/)[0] ?? "";
+}
+
+/** The `/dashboard/bookings` tab a row belongs to. A confirmed session whose time has passed waits under Completed for its duration. */
+export type BookingsTab = "requests" | "upcoming" | "completed" | "canceled";
+
+function isPast(iso: string | null | undefined, now: number): boolean {
+  if (!iso) return false;
+  const at = new Date(iso).getTime();
+  return !Number.isNaN(at) && at <= now;
+}
+
+export function bookingsTabFor(b: Pick<Booking, "status" | "scheduled_at">, now: number): BookingsTab {
+  switch (b.status) {
+    case "pending":
+      return "requests";
+    case "accepted":
+      return "upcoming";
+    case "confirmed":
+      return isPast(b.scheduled_at, now) ? "completed" : "upcoming";
+    case "completed":
+      return "completed";
+    default:
+      return "canceled";
+  }
+}
+
+export type RowAction = "accept" | "decline" | "complete" | "cancel" | "withdraw" | "chooseTime" | "chooseAnotherTime" | "reschedule";
+export type RowNote =
+  | "waitingForTime"
+  | "timeRequested"
+  | "timeRequestedMentor"
+  | "timeDeclined"
+  | "programmeArranges"
+  | "mentorWillShare"
+  | "awaitingCompletion"
+  | "sessionPassed"
+  | null;
+
+/**
+ * What a signed-in mentor or mentee can do with one of their own rows in
+ * database mode (design C5), and the one-line note that explains the state.
+ * Mirrors the status guard in the database: a mentor accepts or declines
+ * pending requests, completes or cancels accepted/confirmed sessions; a
+ * mentee withdraws a pending request, picks (or re-picks) a time on the
+ * mentor's Cal.com link once accepted, reschedules a Cal booking, cancels.
+ */
+export function rowActionsFor(
+  b: Pick<Booking, "status" | "scheduled_at" | "cal_event_uri" | "cal_status">,
+  context: { role: "mentor" | "mentee"; now: number; hasCalLink: boolean; programmeManaged: boolean },
+): { actions: RowAction[]; note: RowNote } {
+  const past = isPast(b.scheduled_at, context.now);
+  if (context.role === "mentor") {
+    switch (b.status) {
+      case "pending":
+        return { actions: ["accept", "decline"], note: null };
+      case "accepted":
+        return { actions: ["complete", "cancel"], note: b.cal_status === "requested" ? "timeRequestedMentor" : "waitingForTime" };
+      case "confirmed":
+        return { actions: ["complete", "cancel"], note: past ? "awaitingCompletion" : null };
+      default:
+        return { actions: [], note: null };
+    }
+  }
+  switch (b.status) {
+    case "pending":
+      return { actions: ["withdraw"], note: null };
+    case "accepted":
+      if (b.cal_status === "requested") return { actions: ["cancel"], note: "timeRequested" };
+      if (b.cal_status === "rejected") return { actions: context.hasCalLink ? ["chooseAnotherTime", "cancel"] : ["cancel"], note: "timeDeclined" };
+      if (!b.cal_event_uri && context.hasCalLink) return { actions: ["chooseTime", "cancel"], note: null };
+      return { actions: ["cancel"], note: context.programmeManaged ? "programmeArranges" : "mentorWillShare" };
+    case "confirmed":
+      if (past) return { actions: [], note: "sessionPassed" };
+      return { actions: b.cal_event_uri && context.hasCalLink ? ["reschedule", "cancel"] : ["cancel"], note: null };
+    default:
+      return { actions: [], note: null };
+  }
+}
+
+/** The "Make the page yours" steps on the mentor home. */
+export const CHECKLIST_KEYS = ["availability", "profile", "sessions", "calendar", "share"] as const;
+export type ChecklistKey = (typeof CHECKLIST_KEYS)[number];
+
+/** The profile fields a mentee judges the page by: photo, headline, bio and the areas mentored on. */
+export function mentorProfileComplete(m: Pick<Mentor, "name" | "bio" | "photo_url" | "expertise" | "position" | "company"> | null | undefined): boolean {
+  if (!m) return false;
+  return Boolean(m.name?.trim() && m.bio?.trim() && m.photo_url?.trim() && (m.expertise?.length ?? 0) > 0 && (m.position?.trim() || m.company?.trim()));
+}
+
+/**
+ * Checklist state computed from the database (design C6, F40), never ticked by
+ * hand — except "share", which only this browser can know about.
+ */
+export function checklistDone(input: {
+  mentor: Pick<Mentor, "name" | "bio" | "photo_url" | "expertise" | "position" | "company" | "cal_link"> | null | undefined;
+  availabilityWindows: number;
+  bookings: number;
+  shared: boolean;
+}): Set<ChecklistKey> {
+  const done = new Set<ChecklistKey>();
+  if (input.availabilityWindows > 0) done.add("availability");
+  if (mentorProfileComplete(input.mentor)) done.add("profile");
+  if (input.bookings > 0) done.add("sessions");
+  if (isValidCalLink(input.mentor?.cal_link)) done.add("calendar");
+  if (input.shared) done.add("share");
+  return done;
+}
+
+/** Confirmed sessions starting within `days` from `now` (the home's "upcoming" strip). */
+export function upcomingWithin<T extends Pick<Booking, "status" | "scheduled_at">>(rows: readonly T[], now: number, days: number): T[] {
+  const end = now + days * 86_400_000;
+  return rows
+    .filter((b) => {
+      if (b.status !== "confirmed" || !b.scheduled_at) return false;
+      const at = new Date(b.scheduled_at).getTime();
+      return !Number.isNaN(at) && at > now && at <= end;
+    })
+    .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime());
 }

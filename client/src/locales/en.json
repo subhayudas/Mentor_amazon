@@ -2127,7 +2127,9 @@
         "hours": "Hours mentored",
         "hoursSub": "Completed session time",
         "sessions": "Sessions",
-        "sessionsSub": "Completed sessions"
+        "sessionsSub": "Completed sessions",
+        "requests": "Requests received",
+        "requestsSub": "Session requests in this period"
       },
       "trend": "Profile views over time",
       "refreshed": "Last refreshed: {{time}}",
@@ -2182,7 +2184,22 @@
       "editProfile": "Edit my profile",
       "sampleTitle": "Sample data — not programme outcomes.",
       "sampleBody": "Fewer than five real bookings exist, so every number and chart here is illustrative. Do not quote these as results; real metrics replace them automatically as sessions accumulate.",
-      "brandAdmin": "Programme Admin"
+      "brandAdmin": "Programme Admin",
+      "trendRequests": "Requests over time",
+      "trendSummary_zero": "No requests in this period",
+      "trendSummary_one": "{{count}} request in this period",
+      "trendSummary_two": "{{count}} requests in this period",
+      "trendSummary_few": "{{count}} requests in this period",
+      "trendSummary_many": "{{count}} requests in this period",
+      "trendSummary_other": "{{count}} requests in this period",
+      "loadError": "We couldn't load the analytics.",
+      "noProfile": "Your analytics appear once your mentor profile is complete.",
+      "requestsCount_zero": "No requests",
+      "requestsCount_one": "{{count}} request",
+      "requestsCount_two": "{{count}} requests",
+      "requestsCount_few": "{{count}} requests",
+      "requestsCount_many": "{{count}} requests",
+      "requestsCount_other": "{{count}} requests"
     },
     "legal": {
       "terms": "Terms",
@@ -2237,7 +2254,41 @@
         "declined": "Request declined",
         "canceled": "Session cancelled",
         "completed": "Session marked completed",
-        "rescheduled": "Session rescheduled"
+        "rescheduled": "Session rescheduled",
+        "error": "We couldn't update this session. Nothing changed; please try again.",
+        "withdrawn": "Request withdrawn"
+      },
+      "withdraw": "Withdraw",
+      "chooseTime": "Choose a time",
+      "chooseAnotherTime": "Choose another time",
+      "durationNotRecorded": "Duration not recorded",
+      "loadError": "We couldn't load your sessions.",
+      "note": {
+        "waitingForTime": "Accepted. Waiting for {{name}} to pick a time on your Cal.com link.",
+        "timeRequested": "You picked {{time}}. Waiting for {{name}} to confirm it on Cal.com.",
+        "timeRequestedUntimed": "You picked a time. Waiting for {{name}} to confirm it on Cal.com.",
+        "timeRequestedMentor": "{{name}} picked {{time}}. Confirm or decline it in Cal.com.",
+        "timeRequestedMentorUntimed": "{{name}} picked a time. Confirm or decline it in Cal.com.",
+        "timeDeclined": "{{name}} couldn't make that time. Choose another one.",
+        "programmeArranges": "The programme team will email you to arrange a time.",
+        "mentorWillShare": "{{name}} accepted and will get in touch to arrange a time.",
+        "awaitingCompletion": "This session's time has passed. Mark it completed to record your hours.",
+        "sessionPassed": "This session's time has passed. {{name}} will mark it completed."
+      },
+      "confirm": {
+        "declineTitle": "Decline {{name}}'s request?",
+        "declineBody": "They'll be told you can't take this request. This can't be undone.",
+        "declineAction": "Decline request",
+        "keepRequest": "Keep request",
+        "withdrawTitle": "Withdraw your request to {{name}}?",
+        "withdrawBody": "The request is cancelled and can't be accepted any more.",
+        "withdrawAction": "Withdraw request",
+        "cancelTitle": "Cancel this session?",
+        "cancelBody": "{{name}} will be told the session is cancelled.",
+        "cancelAction": "Cancel session",
+        "keepSession": "Keep session",
+        "alsoCancelOnCal": "This session is also booked on Cal.com. Cancel it there too so the calendar invite is removed.",
+        "openCal": "Open in Cal.com"
       }
     },
     "calendar": {
@@ -2283,7 +2334,27 @@
       "unavailable": "Unavailable",
       "save": "Save changes",
       "saved": "Saved",
-      "saveHint": "Changes apply to new bookings only."
+      "saveHint": "Changes apply to new bookings only.",
+      "fixTimes": "Each window must end after it starts. Fix the highlighted times, then save.",
+      "savedToast": "Calendar settings saved",
+      "saveError": "Your changes weren't saved. Try again.",
+      "loadError": "We couldn't load your calendar settings.",
+      "timezoneSubLive": "Your office hours and your profile use this time zone.",
+      "calcomTitle": "Booking window, notice and calendars",
+      "calcomSub": "Booking window, notice and calendar connections are set on your Cal.com event type.",
+      "calcomCta": "Open Cal.com availability",
+      "syncTitle": "Booking sync",
+      "syncSub": "Booking sync: set up in Profile settings.",
+      "syncCta": "Set up booking sync",
+      "scheduleSubLive": "Weekly office hours in {{zone}}, shown on your public profile. Mentees pick exact times on your Cal.com link.",
+      "fromDay": "{{day}}: from",
+      "toDay": "{{day}}: to",
+      "removeWindow": "Remove these {{day}} hours",
+      "addWindowDay": "Add hours on {{day}}",
+      "addWindow": "Add hours",
+      "endAfterStart": "End after the start time",
+      "unsaved": "You have unsaved changes.",
+      "saveHintLive": "Office hours show on your public profile as soon as you save."
     },
     "dashboard": {
       "hi": "Hi, {{name}}",
@@ -2337,7 +2408,32 @@
       "suggested": "Mentors for you",
       "suggestedSub": "Start with a 30-minute session",
       "awaitingMentor": "Awaiting the mentor's reply",
-      "demoName": "Demo mentor"
+      "demoName": "Demo mentor",
+      "finishProfileTitle": "Finish your profile",
+      "finishProfileBody": "Mentees can find and request you once your mentor profile is complete: your photo, expertise and Cal.com link.",
+      "finishProfileCta": "Finish your profile",
+      "completeRegistrationTitle": "Complete your registration",
+      "completeRegistrationBody": "Tell us a little about you so mentors know who they're meeting. It takes two minutes.",
+      "completeRegistrationCta": "Complete registration",
+      "loadError": "We couldn't load your dashboard.",
+      "noPageYet": "Your public page appears here once your profile is complete.",
+      "hoursMissing_zero": "Every session has a recorded duration",
+      "hoursMissing_one": "{{count}} session without a recorded duration",
+      "hoursMissing_two": "{{count}} sessions without a recorded duration",
+      "hoursMissing_few": "{{count}} sessions without a recorded duration",
+      "hoursMissing_many": "{{count}} sessions without a recorded duration",
+      "hoursMissing_other": "{{count}} sessions without a recorded duration",
+      "calendarLinked": "Cal.com linked",
+      "calendarMissing": "Add your Cal.com link",
+      "stepDone": "done",
+      "newBadge": "NEW",
+      "stepsLive": {
+        "availability": "Add your weekly office hours in Calendar. They show on your public profile.",
+        "profile": "Add a photo, your role, a bio and the areas you mentor on.",
+        "sessions": "Done once your first request arrives. Share your link to get one.",
+        "calendar": "Add your Cal.com link so accepted mentees can pick a time.",
+        "share": "Post your page on LinkedIn or in your team channel, then tick this off."
+      }
     },
     "onboarding": {
       "stepsLabel": "Form sections",
@@ -2368,7 +2464,12 @@
       "calLink": "Cal.com link",
       "calHint": "Your booking page; it is embedded on your session page.",
       "organisation": "Organisation",
-      "goals": "What you want from mentoring"
+      "goals": "What you want from mentoring",
+      "loadError": "We couldn't load your profile.",
+      "saveError": "Your changes weren't saved. Check your connection and try again.",
+      "photoType": "Choose a JPEG, PNG, WebP or GIF image.",
+      "calHintLive": "Your Cal.com event, e.g. yourname/30min. Mentees pick a time on it after you accept. Leave it empty to remove it.",
+      "calSyncSection": "Cal.com booking sync"
     },
     "activity": {
       "title": "Activity",
@@ -2490,7 +2591,13 @@
         "sessions": "Sessions",
         "area": "Area",
         "country": "Country"
-      }
+      },
+      "missingDurations_zero": "Every completed session has a recorded duration.",
+      "missingDurations_one": "{{count}} completed session has no recorded duration and is not counted in the hours.",
+      "missingDurations_two": "{{count}} completed sessions have no recorded duration and are not counted in the hours.",
+      "missingDurations_few": "{{count}} completed sessions have no recorded duration and are not counted in the hours.",
+      "missingDurations_many": "{{count}} completed sessions have no recorded duration and are not counted in the hours.",
+      "missingDurations_other": "{{count}} completed sessions have no recorded duration and are not counted in the hours."
     },
     "admin": {
       "title": "Programme admin",

@@ -5,14 +5,19 @@ import { ArrowLeft, Printer } from "lucide-react";
 
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { Badge } from "@/components/ui/badge";
-import { FEATURED_MENTORS } from "@/data/featuredMentors";
+import { FEATURED_MENTORS, featuredMentorByAnyId } from "@/data/featuredMentors";
 import { localizeCountry } from "@/lib/format";
 import { useDashboardData } from "@/pages/dashboard/data";
+import { recordedMinutes } from "@/pages/dashboard/dataSource";
+import { DashboardError, DashboardLoading } from "@/pages/dashboard/states";
 
 /**
- * Printable impact report `/analytics/report`. One branded page (EN or AR,
- * RTL-aware) with the period's KPIs, sessions by month, mentors by sessions
- * and hours, expertise and country distribution. "Download PDF" is the
+ * Printable impact report `/analytics/report` (admins only, design C3/C10).
+ * One branded page (EN or AR, RTL-aware) with the period's KPIs, sessions by
+ * month, mentors by sessions and hours, expertise and country distribution.
+ * In database mode every figure comes from the programme's real bookings and
+ * hours add up recorded durations only (the footnote counts sessions without
+ * one); the sample badge exists only in demo mode. "Download PDF" is the
  * browser's print-to-PDF: the page marks itself printable so the content
  * guard lets printing through here only, and the print stylesheet drops the
  * app chrome.
@@ -22,7 +27,7 @@ const PERIODS = [30, 90, 365, 0] as const;
 export default function AnalyticsReport() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const { bookings, mentors, mentees, demo } = useDashboardData();
+  const { bookings, mentors, mentees, demo, isLoading, isError, refetch } = useDashboardData({ programme: true });
   const [days, setDays] = React.useState<(typeof PERIODS)[number]>(90);
 
   React.useEffect(() => {
@@ -35,9 +40,16 @@ export default function AnalyticsReport() {
   const since = days ? Date.now() - days * 86_400_000 : 0;
   const rows = bookings.filter((b) => new Date(b.created_at).getTime() >= since);
   const completed = rows.filter((b) => b.status === "completed");
-  const minutes = completed.reduce((s, b) => s + (b.session_duration_minutes ?? 30), 0);
+  // Only recorded durations count; sessions without one are counted separately, never assumed.
+  const recorded = recordedMinutes(completed);
+  const minutes = recorded.minutes;
   const nf = new Intl.NumberFormat(lang);
-  const mentorName = (id: string) => mentors.find((m) => m.id === id)?.name ?? FEATURED_MENTORS.find((m) => m.id === id)?.name ?? id;
+  const mentorName = (id: string) => {
+    const m = mentors.find((x) => x.id === id) ?? featuredMentorByAnyId(id) ?? FEATURED_MENTORS.find((x) => x.id === id);
+    if (!m) return t("showcase.bookings.mentor");
+    return lang === "ar" && m.name_ar ? m.name_ar : m.name;
+  };
+  const recordedCount = completed.length - recorded.missing;
   const uniqueMentees = new Set(completed.map((b) => b.mentee_id)).size;
   const uniqueMentors = new Set(completed.map((b) => b.mentor_id)).size;
   const avgRating = (() => {
@@ -55,7 +67,7 @@ export default function AnalyticsReport() {
       entry.requests += 1;
       if (b.status === "completed") {
         entry.completed += 1;
-        entry.hours += (b.session_duration_minutes ?? 30) / 60;
+        entry.hours += (b.session_duration_minutes ?? 0) / 60;
       }
       map.set(key, entry);
     }
@@ -67,7 +79,7 @@ export default function AnalyticsReport() {
     for (const b of completed) {
       const e = map.get(b.mentor_id) ?? { sessions: 0, hours: 0 };
       e.sessions += 1;
-      e.hours += (b.session_duration_minutes ?? 30) / 60;
+      e.hours += (b.session_duration_minutes ?? 0) / 60;
       map.set(b.mentor_id, e);
     }
     return Array.from(map.entries())
@@ -79,7 +91,7 @@ export default function AnalyticsReport() {
   const byExpertise = React.useMemo(() => {
     const map = new Map<string, number>();
     for (const b of completed) {
-      const m = mentors.find((x) => x.id === b.mentor_id) ?? FEATURED_MENTORS.find((x) => x.id === b.mentor_id);
+      const m = mentors.find((x) => x.id === b.mentor_id) ?? featuredMentorByAnyId(b.mentor_id);
       for (const tag of m?.expertise ?? []) map.set(tag, (map.get(tag) ?? 0) + 1);
     }
     return Array.from(map.entries())
@@ -149,6 +161,13 @@ export default function AnalyticsReport() {
 
         {demo && <p className="mt-4 rounded-[8px] bg-[#fff7e6] px-4 py-3 text-[13px] text-[#7a4b00]">{t("showcase.report.sampleNote")}</p>}
 
+        {!demo && isError && (
+          <div className="mt-6 print:hidden">
+            <DashboardError message={t("showcase.analytics.loadError")} onRetry={refetch} />
+          </div>
+        )}
+        {!demo && isLoading && <DashboardLoading rows={3} label={t("common.loading")} />}
+
         <section className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4" aria-label={t("showcase.report.kpis")}>
           {[
             { label: t("showcase.report.kpi.completed"), value: nf.format(completed.length) },
@@ -158,7 +177,7 @@ export default function AnalyticsReport() {
             { label: t("showcase.report.kpi.requests"), value: nf.format(rows.length) },
             { label: t("showcase.report.kpi.completionRate"), value: rows.length ? `${Math.round((completed.length / rows.length) * 100)}%` : "—" },
             { label: t("showcase.report.kpi.rating"), value: avgRating ? avgRating.toFixed(1) : "—" },
-            { label: t("showcase.report.kpi.avgLength"), value: completed.length ? t("showcase.rail.minutes", { minutes: Math.round(minutes / completed.length) }) : "—" },
+            { label: t("showcase.report.kpi.avgLength"), value: recordedCount > 0 ? t("mentorPortal.durationMinutes", { count: Math.round(minutes / recordedCount) }) : "—" },
           ].map((k) => (
             <div key={k.label} className="rounded-[10px] border border-[var(--sc-hairline)] p-4">
               <p className="text-[12px] text-[#6c6c84]">{k.label}</p>
@@ -264,6 +283,11 @@ export default function AnalyticsReport() {
           </section>
         </div>
 
+        {recorded.missing > 0 && (
+          <p className="mt-8 text-[12px] text-[#6c6c84]" data-testid="text-report-missing-durations">
+            {t("showcase.report.missingDurations", { count: recorded.missing })}
+          </p>
+        )}
         <footer className="mt-12 border-t border-[var(--sc-hairline)] pt-4 text-[12px] text-[#6c6c84]">{t("showcase.report.footer")}</footer>
       </article>
     </div>
