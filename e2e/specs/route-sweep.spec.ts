@@ -72,7 +72,7 @@ const ROWS: Row[] = [
   { routes: ['/dashboard/admin'], cells: signedIn('login', { mentee: 'forbiddenViaAdmin', 'mentee-new': 'forbidden', mentor: 'forbidden', 'mentor-new': 'forbidden', admin: { redirect: /^\/admin$/ } }) },
   { routes: ['/analytics'], cells: signedIn('login', { mentee: 'forbidden', 'mentee-new': 'forbidden', mentor: 'ok', 'mentor-new': 'ok', admin: 'ok' }) },
   { routes: ['/analytics/report'], cells: signedIn('login', { mentee: 'forbidden', 'mentee-new': 'forbidden', mentor: 'forbidden', 'mentor-new': 'forbidden', admin: 'ok' }) },
-  { routes: ['/analytics/reports'], cells: signedIn('login', { mentee: 'existing', 'mentee-new': 'existing', mentor: 'ok', 'mentor-new': 'ok', admin: 'ok' }) },
+  { routes: ['/analytics/reports'], cells: signedIn('login', { mentee: 'forbidden', 'mentee-new': 'forbidden', mentor: 'ok', 'mentor-new': 'ok', admin: 'ok' }) },
   { routes: ['/mentor-onboarding'], cells: signedIn('login', { mentee: 'gate', 'mentee-new': 'gate', mentor: { redirect: /^\/mentor-portal/ }, 'mentor-new': 'ok', admin: 'existing' }) },
   { routes: ['/mentor-portal'], cells: signedIn('login', { mentee: 'forbidden', 'mentee-new': 'forbidden', mentor: 'ok', 'mentor-new': 'ok', admin: 'forbidden' }) },
   { routes: ['/mentor-portal/profile'], cells: signedIn('login', { mentee: 'forbidden', 'mentee-new': 'forbidden', mentor: 'calPanel', 'mentor-new': 'ok', admin: 'forbidden' }) },
