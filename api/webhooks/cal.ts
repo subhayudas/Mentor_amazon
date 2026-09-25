@@ -69,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const env =readEnv(['supabaseUrl', 'supabaseServiceRoleKey'] as const);
+  const env = readEnv(['supabaseUrl', 'supabaseServiceRoleKey'] as const);
   if (!env.ok) {
     console.error('[cal-webhook] server env missing:', env.missing.join(', '));
     sendUnavailable(res);

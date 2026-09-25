@@ -113,6 +113,10 @@ class ReminderFakeDb {
   failNotifications = false;
   /** Recipient addresses whose notification insert fails. */
   failNotificationsFor = new Set<string>();
+  /** Booking ids whose notification inserts throw (not an error result: an exception). */
+  throwFor = new Set<string>();
+  /** Booking ids whose claim throws. */
+  throwClaimFor = new Set<string>();
   private seq = 0;
 
   seedClaim(bookingId: string, kind: string, channels: string[], minutesAgo: number): ClaimRow {
@@ -152,6 +156,9 @@ class ReminderFakeDb {
 
   private run(table: string, op: string, payload: Row | undefined, filters: Array<[string, 'eq' | 'lt', unknown]>, returning: boolean, single: boolean) {
     this.calls.push({ table, op, payload, filter: Object.fromEntries(filters.map(([c, , v]) => [c, v])) });
+    const bookingId = String((payload as Row | undefined)?.booking_id ?? filters.find(([c]) => c === 'booking_id')?.[2] ?? '');
+    if (table === 'notifications' && this.throwFor.has(bookingId)) throw new TypeError('fetch failed');
+    if (table === 'booking_reminders' && this.throwClaimFor.has(bookingId)) throw new TypeError('fetch failed');
     const matches = (row: Row) =>
       filters.every(([c, how, v]) => (how === 'eq' ? row[c] === v : Date.parse(String(row[c])) < Date.parse(String(v))));
     if (table === 'bookings') return { data: this.bookings, error: null };
@@ -364,6 +371,20 @@ describe('GET /api/cron/reminders', () => {
       const [a, b] = await Promise.all([run(), run()]);
       expect([a.json().reminders, b.json().reminders].sort()).toEqual([0, 1]);
       expect(db.notifications).toHaveLength(2);
+    });
+
+    it('an exception in one reminder never stops the others', async () => {
+      db.bookings = [booking('b1', 30), booking('b2', 45), booking('b3', 50)];
+      db.throwFor.add('b1');
+      db.throwClaimFor.add('b3');
+      const res = await run();
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ ok: true, reminders: 2, emails: 4, failures: 3 });
+      expect(db.notifications.map((n) => n.booking_id)).toEqual(['b2', 'b2']);
+      expect(db.claims.some((c) => c.booking_id === 'b3')).toBe(false);
+      // b1's e-mails went out and are recorded; its in-app part is retried after the lease.
+      expect(db.claims.find((c) => c.booking_id === 'b1')?.channels).toEqual(['mentee:email', 'mentor:email']);
+      expect(db.claims.find((c) => c.booking_id === 'b2')?.channels).toEqual(['in_app', 'email']);
     });
 
     it('sends the e-mails of a run concurrently, not one after another', async () => {

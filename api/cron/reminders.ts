@@ -27,7 +27,7 @@ import { createAdminClient, type AdminClient } from '../_lib/supabaseAdmin.js';
  * vercel.json gives it maxDuration 60.
  *
  * For every CONFIRMED booking starting within 24 hours ('24h') or one hour ('1h'), up to
- * five reminders at a time:
+ * five reminders at a time (one that fails, even with an exception, never stops the others):
  *   1. claim the reminder: insert (booking_id, kind) into booking_reminders, ON CONFLICT DO
  *      NOTHING — only the run that claims it continues, so concurrent runs send once. A claim
  *      that is still empty or only partly delivered after 15 minutes (its run died, or a part
@@ -197,7 +197,12 @@ async function processReminder(
       );
     }
   }
-  await Promise.all(tasks);
+  for (const result of await Promise.allSettled(tasks)) {
+    if (result.status === 'rejected') {
+      console.error('[reminders] send threw', { booking: row.id, kind });
+      out.failures += 1;
+    }
+  }
 
   if (done.size === 0) {
     // Nobody was reached: give the reminder back so the next run tries again.
@@ -269,7 +274,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const due = ((data ?? []) as unknown as ReminderRow[])
     .map((row) => ({ row, kind: reminderKind(now, row.scheduled_at) }))
     .filter((d): d is { row: ReminderRow; kind: ReminderKind } => d.kind !== null);
-  await forEachLimit(due, CONCURRENCY, ({ row, kind }) => processReminder(admin, row, kind, now, { resendApiKey, mailFrom, appOrigin }, out));
+  await forEachLimit(due, CONCURRENCY, async ({ row, kind }) => {
+    try {
+      await processReminder(admin, row, kind, now, { resendApiKey, mailFrom, appOrigin }, out);
+    } catch {
+      // One bad reminder never stops the others; its claim is taken over by a later run.
+      console.error('[reminders] reminder failed unexpectedly', { booking: row.id, kind });
+      out.failures += 1;
+    }
+  });
 
   sendJson(res, 200, { ok: true, ...out });
 }
