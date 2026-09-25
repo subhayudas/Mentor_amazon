@@ -8,7 +8,8 @@ import { tokenSettle } from './c-helpers';
  * `/admin/bookings` in database mode.
  * - R1-68: an admin can cancel a pending, accepted or confirmed booking from its detail sheet
  *   (the demo's local admin could; the database admin could not). The database stamps
- *   canceled_by 'admin', writes one activity line and tells the mentee; a session also booked
+ *   canceled_by 'admin', writes one activity line and tells the mentee and the mentor that the
+ *   programme team cancelled (never "<Mentor> has canceled your session"); a session also booked
  *   on Cal.com links to its Cal.com cancel page; a booking that changed meanwhile is left alone.
  * - R1-83: a pending request to a programme-managed mentor reads "Awaiting programme team",
  *   because the programme team answers it, not the mentor.
@@ -43,7 +44,7 @@ async function closeSheet(page: Page, lang: 'en' | 'ar'): Promise<void> {
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 
-test('R1-68 an admin cancels bookings from the detail sheet; the database, the feed and the mentee agree', async ({ page, loginAs, healthy, db, lang, personaProject }) => {
+test('R1-68 an admin cancels bookings from the detail sheet; the database, the feed, the mentee and the mentor agree', async ({ page, loginAs, healthy, db, lang, personaProject }) => {
   const p = personaProject;
   const ns = e2eNamespace();
   const { mentor, mentee } = ids(p);
@@ -95,9 +96,22 @@ test('R1-68 an admin cancels bookings from the detail sheet; the database, the f
     expect((await status(db, accepted)).canceled_by).toBe('admin');
     const events = await db<{ type: string }[]>`select type from public.activity_events where subject_id = ${accepted}`;
     expect(events.map((e) => e.type), 'one activity line').toEqual(['booking_canceled']);
-    const notices = await db<{ recipient_email: string }[]>`
-      select recipient_email from public.notifications where booking_id = ${accepted} and type = 'booking_canceled'`;
-    expect(notices.map((n) => n.recipient_email), 'the mentee is told').toEqual([personaEmail(p, 'mentee')]);
+    // Both are told, and the programme team (not the mentor) is named as the one who cancelled.
+    const notices = await db<{ recipient_type: string; recipient_email: string; message: string }[]>`
+      select recipient_type, recipient_email, message from public.notifications
+      where booking_id = ${accepted} and type = 'booking_canceled' order by recipient_type`;
+    expect(notices, 'the mentee and the mentor are told the programme team cancelled').toEqual([
+      {
+        recipient_type: 'mentee',
+        recipient_email: personaEmail(p, 'mentee'),
+        message: `The programme team has canceled your session with ${displayName(p, 'mentor')}.`,
+      },
+      {
+        recipient_type: 'mentor',
+        recipient_email: personaEmail(p, 'mentor'),
+        message: `The programme team has canceled your session with ${displayName(p, 'mentee')}.`,
+      },
+    ]);
     // Keyboard focus lands on the sheet title, not the page body, once the cancel button is gone.
     await expect(page.getByTestId('button-admin-cancel-booking')).toHaveCount(0);
     await expect(page.getByRole('dialog').getByRole('heading', { name: tr(lang, 'admin.bookings.detailTitle') })).toBeFocused();

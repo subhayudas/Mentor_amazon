@@ -347,16 +347,44 @@ describeDb('notify_booking_event routing (R1-19, R1-23)', () => {
     });
   });
 
-  it('an admin cancel is announced to the mentee, not to the mentor as if the mentee had cancelled', async () => {
+  it('an admin cancel tells the mentee and the mentor that the programme team cancelled, never naming the mentor as the one who did (R1-68)', async () => {
     await withTx(sql, async (tx) => {
       const w = await setup(tx);
       const id = await mkBooking(tx, w.mentor.id, w.mentee.id, { status: 'confirmed', scheduled_at: '2026-10-20 10:00:00' });
       await w.asAdmin();
       await tx`update public.bookings set status = 'canceled', canceled_at = now() where id = ${id}`;
       await tx`select public.notify_booking_event(${id}, 'booking_canceled')`;
+      // A repeat within five minutes (a retry, a double click) adds nothing for either party.
+      await tx`select public.notify_booking_event(${id}, 'booking_canceled')`;
       await asService(tx);
-      expect((await notes(tx, id)).map((n) => [n.recipient_email, n.type, n.message])).toEqual([
-        [w.mentee.email, 'booking_canceled', 'Mentor Mona has canceled your session.'],
+      const told = (await notes(tx, id)).map((n) => [n.recipient_type, n.recipient_email, n.type, n.title, n.message]).sort();
+      expect(told).toEqual([
+        ['mentee', w.mentee.email, 'booking_canceled', 'Session canceled', 'The programme team has canceled your session with Mentor Mona.'],
+        ['mentor', w.mentor.email, 'booking_canceled', 'Session canceled', 'The programme team has canceled your session with Omar.'],
+      ]);
+      expect(told.some((n) => String(n[4]).startsWith('Mentor Mona has canceled'))).toBe(false);
+      // The mentor's own cancel still names the mentor to the mentee, and only the mentee hears of it.
+      const own = await mkBooking(tx, w.mentor.id, w.mentee.id, { status: 'accepted' });
+      await w.asMentor();
+      await tx`update public.bookings set status = 'canceled', canceled_at = now() where id = ${own}`;
+      await tx`select public.notify_booking_event(${own}, 'booking_canceled')`;
+      await asService(tx);
+      expect((await notes(tx, own)).map((n) => [n.recipient_email, n.message])).toEqual([
+        [w.mentee.email, 'Mentor Mona has canceled your session.'],
+      ]);
+    });
+  });
+
+  it('an admin cancel for a programme-managed mentor tells only the mentee: the admins acted themselves (R1-68)', async () => {
+    await withTx(sql, async (tx) => {
+      const w = await setup(tx, { email: `featured.it-${randomUUID()}@mentorconnect.invalid`, managed_by_programme: true, cal_link: '' });
+      const id = await mkBooking(tx, w.mentor.id, w.mentee.id, { status: 'accepted' });
+      await w.asAdmin();
+      await tx`update public.bookings set status = 'canceled', canceled_at = now() where id = ${id}`;
+      await tx`select public.notify_booking_event(${id}, 'booking_canceled')`;
+      await asService(tx);
+      expect((await notes(tx, id)).map((n) => [n.recipient_type, n.recipient_email, n.message])).toEqual([
+        ['mentee', w.mentee.email, 'The programme team has canceled your session with Mentor Mona.'],
       ]);
     });
   });

@@ -1044,8 +1044,23 @@ BEGIN
       v_to := v_me.email; v_to_type := 'mentee'; v_type := 'booking_completed'; v_title := 'Session completed';
       v_msg := 'Your session with ' || v_m.name || ' has been marked completed. You can now leave feedback.';
     WHEN 'booking_canceled' THEN
-      -- The other party is told: the mentee when the mentor (or an admin, for the programme) canceled.
-      IF v_is_mentor OR (NOT v_is_mentee AND v_b.canceled_by IN ('mentor', 'admin')) THEN
+      IF v_b.canceled_by = 'admin' AND NOT (v_is_mentor OR v_is_mentee) THEN
+        -- The programme team canceled (R1-68): both parties are told, and neither is named as the
+        -- one who canceled. The mentor's notice is written here (a programme-managed mentor has no
+        -- inbox of their own: the admins acted themselves); the mentee's follows below.
+        v_to := lower(v_m.email);
+        IF NOT v_m.managed_by_programme AND nullif(trim(coalesce(v_to, '')), '') IS NOT NULL AND v_to NOT LIKE '%.invalid'
+           AND NOT EXISTS (SELECT 1 FROM public.notifications n
+                           WHERE n.booking_id = v_b.id AND n.type = 'booking_canceled' AND n.recipient_email = v_to
+                             AND n.created_at > timezone('utc', now()) - interval '5 minutes') THEN
+          INSERT INTO public.notifications (id, recipient_email, recipient_type, type, title, message, booking_id, is_read, created_at)
+          VALUES (gen_random_uuid()::text, v_to, 'mentor', 'booking_canceled', 'Session canceled',
+                  'The programme team has canceled your session with ' || v_me.name || '.', v_b.id, false, timezone('utc', now()));
+        END IF;
+        v_to := v_me.email; v_to_type := 'mentee';
+        v_msg := 'The programme team has canceled your session with ' || v_m.name || '.';
+      -- Otherwise the other party is told: the mentee when the mentor canceled.
+      ELSIF v_is_mentor OR (NOT v_is_mentee AND v_b.canceled_by = 'mentor') THEN
         v_to := v_me.email; v_to_type := 'mentee'; v_msg := v_m.name || ' has canceled your session.';
       ELSE
         v_to := v_m.email; v_to_type := 'mentor'; v_msg := v_me.name || ' has canceled the session.';
