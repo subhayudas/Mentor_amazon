@@ -108,6 +108,36 @@ describe('smoke test i1 matches the rollout (R1-25)', () => {
   });
 });
 
+describe('signed-out requests in the smoke tests say "Request submitted" and use an address with no account (R2-08)', () => {
+  const row = (id: string) => smokeI.split('\n').find((l) => l.startsWith(`| ${id} |`)) ?? '';
+  it('i1b and i1c expect "Request submitted", never "Request sent", from an address with no account', () => {
+    for (const id of ['i1b', 'i1c']) {
+      expect(row(id), id).toMatch(/"Request submitted"/);
+      expect(row(id), id).not.toMatch(/"Request sent"/);
+    }
+    expect(row('i1b')).toMatch(/\*\*no\*\* MentorConnect account/);
+    expect(row('i1b')).not.toMatch(/your own test address/);
+    expect(row('i1b')).toMatch(/Request not sent: please sign in/);
+  });
+  it('e1 gives the signed-out title as "Request submitted"', () => {
+    const e1 = testing.split('\n').find((l) => l.startsWith('| e1 |')) ?? '';
+    expect(e1).toMatch(/signed out it reads "Request submitted"/);
+  });
+});
+
+describe('previews refuse anonymous requests without a captcha (R2-06)', () => {
+  it('the preview check expects 503 captcha_unavailable for the anonymous request, and Preview gets no Turnstile variables', () => {
+    const section = between(apiReadme, '## Verify on a preview (before merging)', '\n---\n');
+    expect(section).toMatch(/Expect `503 \{"error":"captcha_unavailable"\}`/);
+    expect(section).not.toMatch(/Expect `200 \{"ok":true\}`/);
+    const preview = steps.get(stepOf(/Verify on a preview/))!;
+    expect(preview).toMatch(/503 \{"error":"captcha_unavailable"\}/);
+    const env = steps.get(stepOf(/Vercel — environment variables/))!;
+    expect(env).toMatch(/On Preview leave all Turnstile variables unset, `TURNSTILE_DISABLED` included/);
+    expect(env).not.toMatch(/use Cloudflare's always-pass test pair to see the widget/);
+  });
+});
+
 describe('rollback order (R1-28)', () => {
   it('once 0003 has run, its ROLLBACK block runs before the previous deployment comes back', () => {
     const afterContract = rollback.split('\n- ').find((b) => /once `0003` has run/.test(b)) ?? '';

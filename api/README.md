@@ -153,7 +153,7 @@ Checks, in order:
 | IP limit: 10 per 10 minutes | `429 {"error":"rate_limited"}` + `Retry-After` |
 | Turnstile, when `TURNSTILE_SECRET_KEY` is set: token verified with Cloudflare (`remoteip` sent; `TURNSTILE_ALLOWED_HOSTNAMES` enforced when set) | `403 {"error":"captcha_failed"}`; Cloudflare unreachable → `503 {"error":"captcha_unavailable"}` (fail closed) |
 | `VITE_TURNSTILE_SITE_KEY` set but the secret missing | `503 {"error":"unavailable"}` (logged: the widget would be shown but nothing verified) |
-| Production (`VERCEL_ENV=production`) with neither key set | `503 {"error":"captcha_unavailable"}`, logged, unless `TURNSTILE_DISABLED=1` (then the request goes through without a captcha and a warning is logged for each one) |
+| A Vercel deployment (`VERCEL_ENV` `production` or `preview`: previews use the production database) with neither key set | `503 {"error":"captcha_unavailable"}`, logged, unless `TURNSTILE_DISABLED=1` (then the request goes through without a captcha and a warning is logged for each one) |
 | server env | `503 {"error":"unavailable"}` |
 | `create_booking_request` (service role): validates again, dedupes a pending request, limits 5 per requester and 20 per mentor per hour, notifies the mentor (every admin for a programme-managed mentor) | `22023` → `400 invalid_request` with the field · `mentor_unavailable` → `422` · `P0001` → `429 rate_limited` · function missing (migration not applied) → `503` · anything else → `500 server_error` |
 
@@ -168,16 +168,18 @@ nothing; the owner is told in their bell). A request under the mentor's own addr
 `200`: a distinct status would reveal which address belongs to which mentor.
 Signed-in callers of `create_my_booking_request` get the `not_allowed` error.
 
-With neither Turnstile key set there is no captcha check on a local machine, in
-development or on a Preview deployment; only the IP and database limits apply.
-Production never runs that way by accident: with `VERCEL_ENV=production` (Vercel
-sets it on every production deployment while "Automatically expose System
+With neither Turnstile key set there is no captcha check on a local machine or
+under `vercel dev`; only the IP and database limits apply. A Vercel deployment
+never runs that way by accident: with `VERCEL_ENV` `production` or `preview`
+(Vercel sets it on every deployment while "Automatically expose System
 Environment Variables" is on, the default) and no keys, every anonymous request
 is refused (`503 captcha_unavailable`, and the function log says which variables
-to set). Set both keys for Production. The only
-way to run Production without a captcha is the explicit `TURNSTILE_DISABLED=1`,
-which is logged on every request it lets through and has no effect while
-`TURNSTILE_SECRET_KEY` is set.
+to set). Previews are included because they write to the production database.
+Set both keys for Production and none on Preview (signed-in requests work there;
+anonymous ones are checked on production). The only way to run a deployment
+without a captcha is the explicit `TURNSTILE_DISABLED=1`, which is logged on
+every request it lets through and has no effect while `TURNSTILE_SECRET_KEY` is
+set. Do not set it on Preview.
 
 ---
 
@@ -298,7 +300,8 @@ Cal.com delivery fail its signature check and every anonymous request "invalid",
 test green; `tests/api-vercel-runtime.test.ts` now covers it with Vercel's own dev-server). So
 before merging, send one signed Cal.com Ping and one anonymous request to the PR's **preview**
 deployment. `migrations/0002` must already be applied (it is step 3 of the rollout in
-`TESTING.md`); the preview uses the production database, so both calls write real rows.
+`TESTING.md`); the preview uses the production database, so the Ping writes a real delivery
+row (the anonymous request is refused before anything is written).
 
 1. **Bypass token.** Previews sit behind Vercel Deployment Protection. In Vercel → Project →
    Settings → Deployment Protection → **Protection Bypass for Automation**, create a secret
@@ -335,8 +338,9 @@ deployment. `migrations/0002` must already be applied (it is step 3 of the rollo
    A `401 {"error":"invalid_signature"}` with the right secret means the function did not get
    the body: do not merge.
 
-3. **One anonymous request** to an ordinary (non-featured) mentor, from your own address.
-   Preview has no Turnstile keys (they are Production-only), so no token is needed:
+3. **One anonymous request** to an ordinary (non-featured) mentor, from an address with no
+   MentorConnect account. Preview has no Turnstile keys (they are Production-only), so it
+   refuses anonymous requests, but only after reading and validating the body:
 
    ```bash
    curl -si -X POST "$PREVIEW/api/requests" \
@@ -344,10 +348,11 @@ deployment. `migrations/0002` must already be applied (it is step 3 of the rollo
      --data '{"mentorId":"<mentor id>","name":"Preview check","email":"<your address>","goal":"Preview check of POST /api/requests, please decline."}'
    ```
 
-   Expect `200 {"ok":true}` and a new request in that mentor's inbox and bell. Decline it
-   afterwards. A `400 {"error":"invalid_request","fields":["body"]}` means the body did not
-   reach the function: do not merge. With Cloudflare's always-pass test keys on Preview, add
-   `"turnstileToken":"XXXX.DUMMY.TOKEN.XXXX"` to the JSON.
+   Expect `503 {"error":"captcha_unavailable"}`: the body arrived and passed validation, and
+   nothing was written. A `400 {"error":"invalid_request","fields":["body"]}` means the body did
+   not reach the function: do not merge. A `200` means the preview accepts anonymous requests
+   without a captcha (Turnstile variables or `TURNSTILE_DISABLED` set on Preview): remove them,
+   redeploy, and do not merge until it answers `503`.
 
 Subhayu runs these two checks (he holds the Vercel project settings) and pastes both
 responses into the PR.
@@ -372,9 +377,9 @@ Turnstile variables are Production-only).
 | `APP_ORIGIN` | yes | `https://mentor-amazon.vercel.app` (every redirect target is built from this) |
 | `CRON_SECRET` | yes (reminders) | ≥ 16 characters; the same value as the GitHub Actions secret |
 | `RESEND_API_KEY`, `MAIL_FROM` | no | E-mail reminders through Resend; unset → in-app only |
-| `TURNSTILE_SECRET_KEY` | **Production** (with the site key) | Cloudflare Turnstile secret for the widget registered on `mentor-amazon.vercel.app`. Set it **and** `VITE_TURNSTILE_SITE_KEY` for the **Production** environment only: in Production without both, `/api/requests` refuses with 503 (and a site key without the secret refuses everywhere). On **Preview** leave both unset, or use Cloudflare's always-pass test pair (see `TESTING.md` → "Before merging"), because the production widget rejects preview hostnames and password sign-in needs a token whenever the site key is set |
+| `TURNSTILE_SECRET_KEY` | **Production** (with the site key) | Cloudflare Turnstile secret for the widget registered on `mentor-amazon.vercel.app`. Set it **and** `VITE_TURNSTILE_SITE_KEY` for the **Production** environment only: in Production without both, `/api/requests` refuses with 503 (and a site key without the secret refuses everywhere). On **Preview** leave both unset: the production widget rejects preview hostnames and password sign-in needs a token whenever the site key is set; a preview without keys refuses anonymous requests (503), because it writes to the production database. Cloudflare's always-pass test pair is for local development only |
 | `TURNSTILE_ALLOWED_HOSTNAMES` | no | Production only, e.g. `mentor-amazon.vercel.app`; tokens issued elsewhere are refused |
-| `TURNSTILE_DISABLED` | no | Leave unset. Exactly `1` lets Production accept anonymous requests with no Turnstile keys (logged on every request). No effect while `TURNSTILE_SECRET_KEY` is set |
+| `TURNSTILE_DISABLED` | no | Leave unset, in Production and on Preview. Exactly `1` lets a deployment accept anonymous requests with no Turnstile keys (logged on every request). No effect while `TURNSTILE_SECRET_KEY` is set |
 | `CAL_WEBHOOK_SECRET` | no | Only for a programme Cal.com Team/Org webhook without `?mentor=` (≥ 16 characters). Per-mentor secrets live in the database |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | recommended for Production | Shared rate-limit counters across function instances. Without them each instance counts on its own, so the IP limits on `/api/requests` and the SSO routes only hold per instance |
 

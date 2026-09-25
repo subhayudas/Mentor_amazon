@@ -226,14 +226,28 @@ describe('Turnstile in Production (R1-01: fail closed)', () => {
     expect(siteverify).toHaveBeenCalledTimes(1);
   });
 
-  it('Preview and development deployments keep the no-keys behaviour (no check)', async () => {
-    for (const env of ['preview', 'development']) {
-      process.env.VERCEL_ENV = env;
-      const res = await send(VALID);
-      expect(res.statusCode, `VERCEL_ENV=${env}`).toBe(200);
-    }
+  it('a Preview deployment fails closed too: it writes to the production database (R2-06)', async () => {
+    process.env.VERCEL_ENV = 'preview';
+    const res = await send(VALID);
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: 'captcha_unavailable' });
+    expect(res.body).not.toMatch(ENV_NAMES);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('TURNSTILE_SECRET_KEY is not set in a Preview deployment'));
+    expect(createAdminClient).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+    // The same explicit, logged opt-out as Production.
+    process.env.TURNSTILE_DISABLED = '1';
+    expect((await send(VALID)).statusCode).toBe(200);
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('TURNSTILE_DISABLED=1: accepting an anonymous request in a Preview deployment'));
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('vercel dev (development) keeps the no-keys behaviour of a local machine (no check)', async () => {
+    process.env.VERCEL_ENV = 'development';
+    const res = await send(VALID);
+    expect(res.statusCode).toBe(200);
     expect(siteverify).not.toHaveBeenCalled();
-    expect(rpc).toHaveBeenCalledTimes(2);
+    expect(rpc).toHaveBeenCalledTimes(1);
   });
 });
 

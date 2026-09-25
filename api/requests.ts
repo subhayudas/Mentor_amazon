@@ -14,9 +14,10 @@ import { parseHostnames, verifyTurnstile } from './_lib/turnstile.js';
  * Checks, in order: method (405) → size (413) and content type (415) → validation (400
  * { error: 'invalid_request', fields }) → IP limit, 10 per 10 minutes (429 + Retry-After) →
  * Turnstile when TURNSTILE_SECRET_KEY is set (403 captcha_failed / 503 captcha_unavailable;
- * a site key without its secret fails closed with 503; in Production, VERCEL_ENV=production,
- * no keys at all also fails closed with 503 captcha_unavailable unless TURNSTILE_DISABLED=1
- * is set, which is logged on every request) → server env (503) → the
+ * a site key without its secret fails closed with 503; on a Vercel deployment, VERCEL_ENV
+ * production or preview (previews use the production database), no keys at all also fails
+ * closed with 503 captcha_unavailable unless TURNSTILE_DISABLED=1 is set, which is logged on
+ * every request) → server env (503) → the
  * create_booking_request RPC under the service role, which validates again, dedupes a pending
  * request, rate-limits per mentee and mentor, and notifies the mentor (or every admin for a
  * programme-managed mentor).
@@ -107,18 +108,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     console.error('[requests] TURNSTILE_SECRET_KEY missing while the site key is set; refusing requests');
     sendUnavailable(res);
     return;
-  } else if (turnstile.vercelEnv === 'production') {
-    // No captcha keys at all is the local-development mode; Production never falls into it by
-    // accident. Only an explicit TURNSTILE_DISABLED=1 lets anonymous requests through here.
+  } else if (turnstile.vercelEnv === 'production' || turnstile.vercelEnv === 'preview') {
+    // No captcha keys at all is the local-development mode. A Vercel deployment never falls into
+    // it by accident, previews included: they write to the production database (R2-06). Only an
+    // explicit TURNSTILE_DISABLED=1 lets anonymous requests through here.
+    const where = turnstile.vercelEnv === 'production' ? 'Production' : 'a Preview deployment';
     if (turnstile.turnstileDisabled !== '1') {
       console.error(
-        '[requests] TURNSTILE_SECRET_KEY is not set in Production; refusing anonymous requests. ' +
+        `[requests] TURNSTILE_SECRET_KEY is not set in ${where}; refusing anonymous requests. ` +
           'Set TURNSTILE_SECRET_KEY and VITE_TURNSTILE_SITE_KEY, or TURNSTILE_DISABLED=1 to accept requests without a captcha.',
       );
       sendJson(res, 503, { error: 'captcha_unavailable' });
       return;
     }
-    console.warn('[requests] TURNSTILE_DISABLED=1: accepting an anonymous request in Production without a captcha');
+    console.warn(`[requests] TURNSTILE_DISABLED=1: accepting an anonymous request in ${where} without a captcha`);
   }
 
   const env = readEnv(['supabaseUrl', 'supabaseServiceRoleKey'] as const);
