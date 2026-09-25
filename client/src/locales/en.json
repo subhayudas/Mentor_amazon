@@ -2178,7 +2178,10 @@
       "t2dbA": "Every request starts with",
       "t2dbB": "what you want to work on",
       "t4requestBig": "Request, then schedule",
-      "t4requestA": "Send a request. Once it's accepted, pick a time on their calendar and the invite with the video link lands in both calendars."
+      "t4requestA": "Send a request. Once it's accepted, pick a time on their calendar and the invite with the video link lands in both calendars.",
+      "t6dbBig": "Find your mentor",
+      "t6dbA": "Search by what you are working on",
+      "t6dbB": "and filter by expertise, industry and language."
     },
     "rail": {
       "title": "See what the best mentors bring to Amazon",
