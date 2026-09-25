@@ -111,7 +111,8 @@ function LegacyLocalDataNoticeInner() {
         </div>
         <ul id={listId} hidden={!open} className="mt-3 space-y-1.5 border-t border-warning-border pt-3 text-body-sm" data-testid="list-legacy-items">
           {data.items.map((item) => (
-            <li key={`${item.kind}-${item.id}`} className="flex flex-wrap gap-x-2">
+            // Baseline alignment: the smaller caption date sits on the description's baseline, not raised (R1-82).
+            <li key={`${item.kind}-${item.id}`} className="flex flex-wrap items-baseline gap-x-2">
               <span className="min-w-0">
                 {describe(item)}
               </span>
