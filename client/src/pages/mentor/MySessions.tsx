@@ -28,7 +28,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { BookingNotes } from "@/components/dashboard/BookingNotes";
 import { toast } from "sonner";
-import type { Booking, Mentee, Mentor } from "@/lib/database";
+import { isBookingStateChangedError, type Booking, type Mentee, type Mentor } from "@/lib/database";
 import { bidi, formatDateTime, formatNumber, tzDisplayLabel, viewerTimeZone } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
 import { isFuture } from "@/lib/menteeBookings";
@@ -89,13 +89,23 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
     queryClient.invalidateQueries({ queryKey: ["analytics"] });
   };
 
+  // The session changed in another tab (R1-16): nothing was written, say so and show its real status.
+  const onWriteError = (error: unknown) => {
+    if (isBookingStateChangedError(error)) {
+      invalidate();
+      toast.error(t("showcase.bookings.toast.stale"));
+      return;
+    }
+    toast.error(t("dashboardV2.sessions.updateError"));
+  };
+
   const cancelMutation = useMutation({
     mutationFn: (bookingId: string) => bookingService.updateStatus(bookingId, "canceled"),
     onSuccess: () => {
       invalidate();
       toast.success(t("dashboardV2.sessions.cancelledToast"));
     },
-    onError: () => toast.error(t("dashboardV2.sessions.updateError")),
+    onError: onWriteError,
   });
 
   const completeMutation = useMutation({
@@ -108,7 +118,10 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
       setHighlightedId(variables.bookingId);
       toast.success(t("mentorPortal.sessionCompleted", { minutes: variables.minutes }));
     },
-    onError: () => toast.error(t("dashboardV2.sessions.updateError")),
+    onError: (error) => {
+      if (isBookingStateChangedError(error)) setCompleteFor(null);
+      onWriteError(error);
+    },
   });
 
   const { upcoming, completed } = useMemo(() => {

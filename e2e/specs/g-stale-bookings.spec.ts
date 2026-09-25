@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '../fixtures/test';
-import { tr } from '../fixtures/i18n';
+import { tr, trPattern } from '../fixtures/i18n';
 import { bookingId, ids } from '../fixtures/personas';
 import { recordToasts } from '../fixtures/toasts';
 import { tokenSettle } from './c-helpers';
@@ -128,5 +128,65 @@ test('R1-16 a fresh Cancel still works: the write matches, the mentee is told on
       select count(*)::int as n from public.notifications where booking_id = ${id} and type = 'booking_canceled'`;
     expect(notices.n, 'one cancellation notice').toBe(1);
     expect((await counts(db, id)).activity).toBe(sent.activity + 1);
+  });
+});
+
+/**
+ * The legacy mentor portal completes through lib/reporting.completeSession (R1-16 review): the
+ * same conditional write, so a second "Mark completed" from /mentor-portal/sessions cannot
+ * overwrite the duration recorded first or send the mentee a second completion notice.
+ */
+async function openPortalSessions(page: Page, id: string): Promise<void> {
+  await page.goto('/mentor-portal/sessions');
+  await page.getByTestId('tab-upcoming').click();
+  await expect(page.getByTestId(`session-card-${id}`)).toBeVisible();
+}
+
+async function completeFromPortal(page: Page, id: string): Promise<void> {
+  await page.getByTestId(`session-card-${id}`).getByTestId(`button-complete-${id}`).click();
+  const complete = page.getByTestId('dialog-complete-session');
+  await expect(complete).toBeVisible();
+  await complete.getByTestId('button-minutes-90').click();
+  await complete.getByTestId('button-confirm-complete').click();
+}
+
+test('R1-16 a stale Mark completed on /mentor-portal/sessions keeps the first duration and notifies nobody again', async ({ page, loginAs, healthy, db, lang, personaProject }) => {
+  await withAcceptedBooking(db, personaProject, 'portal-stale-complete', async (id) => {
+    await loginAs('mentor');
+    await tokenSettle(page);
+    const toasts = await recordToasts(page);
+    await openPortalSessions(page, id);
+
+    // Another tab completes it first, with 30 minutes.
+    await db`
+      update public.bookings set status = 'completed', session_duration_minutes = 30,
+        completed_at = timezone('utc', now())
+      where id = ${id}`;
+    const before = await row(db, id);
+    const sent = await counts(db, id);
+
+    await completeFromPortal(page, id);
+
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: tr(lang, 'showcase.bookings.toast.stale') })).toBeVisible();
+    expect(await toasts.seen(trPattern(lang, 'mentorPortal.sessionCompleted')), 'no "Session completed" for a write that changed nothing').toBe(false);
+    expect(await row(db, id), 'the first recorded duration stands').toEqual(before);
+    expect((await row(db, id)).session_duration_minutes).toBe(30);
+    expect(await counts(db, id), 'no second booking_completed notification').toEqual(sent);
+    await healthy({ screenshotName: 'R1-16-portal-stale-complete' });
+  });
+});
+
+test('R1-16 a fresh Mark completed on /mentor-portal/sessions still records the duration and tells the mentee once', async ({ page, loginAs, db, lang, personaProject }) => {
+  await withAcceptedBooking(db, personaProject, 'portal-fresh-complete', async (id) => {
+    await loginAs('mentor');
+    await tokenSettle(page);
+    await openPortalSessions(page, id);
+    await completeFromPortal(page, id);
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: trPattern(lang, 'mentorPortal.sessionCompleted') })).toBeVisible();
+    await expect.poll(async () => (await row(db, id)).status).toBe('completed');
+    expect((await row(db, id)).session_duration_minutes).toBe(90);
+    const [notices] = await db<{ n: number }[]>`
+      select count(*)::int as n from public.notifications where booking_id = ${id} and type = 'booking_completed'`;
+    expect(notices.n, 'one completion notice').toBe(1);
   });
 });
