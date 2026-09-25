@@ -2,8 +2,8 @@
  * Sent-request memory (P1-21): remembers, per mentor, that this browser sent a
  * request, so the profile rail and cards can show "Request sent" without a
  * readable booking row (anonymous requesters cannot read bookings back).
- * localStorage `mc.sentRequests` = { [mentorId]: { email, sentAt } }, 7-day
- * TTL pruned on read, every access wrapped in try/catch.
+ * localStorage `mc.sentRequests` = { [mentorId]: { email, sentAt, anonymous? } },
+ * 7-day TTL pruned on read, every access wrapped in try/catch.
  */
 const KEY = "mc.sentRequests";
 const TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -12,6 +12,12 @@ export interface SentRequest {
   email: string;
   /** ISO timestamp of the successful send. */
   sentAt: string;
+  /**
+   * Sent while signed out (R2-01). The server answers the same whether or not the address has an
+   * account, and for one that has, nothing was created. So this memory only ever speaks to a
+   * signed-out viewer ("Request submitted"); once someone is signed in, their own rows decide.
+   */
+  anonymous?: boolean;
 }
 
 type Store = Record<string, SentRequest>;
@@ -25,11 +31,11 @@ function read(now = Date.now()): Store {
     const out: Store = {};
     for (const [mentorId, entry] of Object.entries(parsed as Record<string, unknown>)) {
       if (!entry || typeof entry !== "object") continue;
-      const { email, sentAt } = entry as Partial<SentRequest>;
+      const { email, sentAt, anonymous } = entry as Partial<SentRequest>;
       if (typeof email !== "string" || typeof sentAt !== "string") continue;
       const at = new Date(sentAt).getTime();
       if (Number.isNaN(at) || now - at > TTL_MS) continue;
-      out[mentorId] = { email, sentAt };
+      out[mentorId] = anonymous === true ? { email, sentAt, anonymous: true } : { email, sentAt };
     }
     return out;
   } catch {
@@ -51,10 +57,11 @@ export function getSentRequest(mentorId: string): SentRequest | null {
   return read()[mentorId] ?? null;
 }
 
-/** Record a successful send. */
-export function markSent(mentorId: string, email: string, sentAt: Date = new Date()): void {
+/** Record a successful send; `anonymous` when it went out while signed out (see SentRequest). */
+export function markSent(mentorId: string, email: string, options: { anonymous?: boolean; sentAt?: Date } = {}): void {
   const store = read();
-  store[mentorId] = { email, sentAt: sentAt.toISOString() };
+  const sentAt = (options.sentAt ?? new Date()).toISOString();
+  store[mentorId] = options.anonymous ? { email, sentAt, anonymous: true } : { email, sentAt };
   write(store);
 }
 

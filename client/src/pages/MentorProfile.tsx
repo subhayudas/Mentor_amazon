@@ -198,10 +198,11 @@ export default function MentorProfile() {
   const openCal = React.useCallback(() => setCalOpen(true), []);
   const handleSent = React.useCallback(
     (sentEmail: string) => {
-      markSent(mentorId, sentEmail);
+      // A signed-out send is remembered as such: it never reads as "Request sent" to an account (R2-01).
+      markSent(mentorId, sentEmail, { anonymous: !signedIn });
       setLocalSent(getSentRequest(mentorId));
     },
-    [mentorId],
+    [mentorId, signedIn],
   );
 
   if (!mentorId || (mentorQuery.isSuccess && !mentor)) {

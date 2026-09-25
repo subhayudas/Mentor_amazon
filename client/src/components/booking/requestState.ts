@@ -42,13 +42,16 @@ const sameEmail = (a: string, b: string) => a.trim().toLowerCase() === b.trim().
 
 /**
  * The per-browser "request sent" memory as one viewer may see it: anyone
- * signed out sees it; a signed-in viewer only when it was sent from their own
- * address (someone else may have used this browser anonymously). One rule for
- * the cards, the profile and the scheduler.
+ * signed out sees it; a signed-in viewer only when they sent it signed in, from
+ * their own address. Someone else may have used this browser anonymously, and a
+ * signed-out send proves nothing about the account: for an address that has one,
+ * the server created nothing and answered the same (R1-08), so their own rows
+ * decide (R2-01). One rule for the cards, the profile and the scheduler.
  */
 export function sentMemoryForViewer(memory: SentRequest | null, viewerEmail: string | null | undefined): SentRequest | null {
   if (!memory) return null;
-  return !viewerEmail || sameEmail(memory.email, viewerEmail) ? memory : null;
+  if (!viewerEmail) return memory;
+  return !memory.anonymous && sameEmail(memory.email, viewerEmail) ? memory : null;
 }
 
 type VisibleBookings = ReadonlyArray<Booking & { mentor?: Pick<Mentor, "cal_link"> | null }>;
@@ -79,9 +82,9 @@ export function isSentMemoryStale(params: {
 /**
  * Prefer the real row (newest live booking for this mentor) over the local
  * memory; fall back to the memory only when no row is visible yet. A signed-in
- * viewer never inherits a memory written under a different email (someone
- * else may have used this browser anonymously), and once their bookings were
- * fetched after the send, those bookings decide (`isSentMemoryStale`).
+ * viewer never inherits a memory written under a different email or while
+ * signed out (`sentMemoryForViewer`), and once their bookings were fetched after
+ * the send, those bookings decide (`isSentMemoryStale`).
  */
 export function resolveRequestState(params: {
   mentorId: string;
@@ -111,7 +114,7 @@ export function resolveRequestState(params: {
   }
   if (
     local &&
-    (!viewerEmail || sameEmail(local.email, viewerEmail)) &&
+    sentMemoryForViewer(local, viewerEmail) &&
     !isSentMemoryStale({ mentorId, bookings, bookingsAsOf, viewerEmail, local })
   ) {
     return { kind: "sent", email: local.email, sentAt: local.sentAt, source: "local" };

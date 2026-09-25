@@ -343,7 +343,9 @@ function RequestFlow({
       } catch {
         /* storage unavailable */
       }
-      markSent(requestId, signedIn && user?.email ? user.email : result.email);
+      // A signed-out send is remembered as such: it never reads as "Request sent" to an account (R2-01).
+      const accountEmail = signedIn ? user?.email : undefined;
+      markSent(requestId, accountEmail ?? result.email, { anonymous: !accountEmail });
       setRemembered(getSentRequest(requestId));
       setServerError(null);
       setSent(result);

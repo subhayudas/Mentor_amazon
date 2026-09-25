@@ -440,6 +440,48 @@ test('R1-08 signed out, a request never claims it was sent: an email with an acc
   }
 });
 
+test('R2-01 a signed-out request from an address that has an account never reads as "Request sent" once that account signs in', async ({ page, db, healthy, lang, loginAs, personaProject }, testInfo) => {
+  test.skip(!['desktop-en', 'mobile-ar'].includes(testInfo.project.name), 'R2-01 runs on desktop-en and mobile-ar');
+  const f = featuredFor(testInfo.project.name, 2);
+  // mentee-empty has an account (auth user, users and mentees rows) and no bookings.
+  const email = personaEmail(personaProject, 'mentee-empty');
+  const name = lang === 'ar' ? f.nameAr : f.name;
+  const notice = () => db`delete from public.notifications where lower(recipient_email) = ${email} and booking_id is null`;
+  const memoryBadges = page.locator('[data-testid^="badge-request-memory-"]');
+  try {
+    // Signed out, with the account's address: the server creates nothing and answers 200 all the same.
+    await page.goto(`/mentor/${f.slug}/book`);
+    if (turnstile.enabled) await expect(tokenInput(page)).toHaveValue(/.+/, { timeout: 20_000 });
+    await fillSessionForm(page, 'Dev B Account Holder', email);
+    const response = page.waitForResponse((r) => r.url().endsWith('/api/requests') && r.request().method() === 'POST');
+    await page.getByTestId('button-send-request').click();
+    expect((await response).status()).toBe(200);
+    await expect(page.getByTestId('slot-confirmation')).toBeVisible();
+    expect(await requestRows(db, email)).toHaveLength(0);
+    // This browser remembers the submission, as submitted, on the book page, the profile and the card.
+    await page.goto(`/mentor/${f.slug}/book`);
+    await expect(page.getByTestId('scheduler-sent-before')).toContainText(tr(lang, 'bookingRequest.status.submitted'));
+    await page.goto(`/mentors?q=${encodeURIComponent(name)}`);
+    await expect(memoryBadges.first()).toHaveText(tr(lang, 'mentorCard.requestSubmitted'));
+
+    // The account signs in on this browser: no request exists, so nothing may say one was sent.
+    await loginAs('mentee-empty');
+    await page.goto(`/mentor/${f.slug}/book`);
+    await expect(page.getByTestId('form-session-request')).toBeVisible();
+    await expect(page.getByTestId('scheduler-sent-before')).toHaveCount(0);
+    await healthy({ screenshotName: 'R2-01-signed-in-book-form' });
+    await page.goto(`/mentor/${f.slug}`);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByTestId('featured-request-sent')).toHaveCount(0);
+    await page.goto(`/mentors?q=${encodeURIComponent(name)}`);
+    await expect(page.locator('[data-testid^="link-mentor-"]').first()).toBeVisible();
+    await expect(memoryBadges).toHaveCount(0);
+    await healthy({ screenshotName: 'R2-01-signed-in-card' });
+  } finally {
+    await notice();
+  }
+});
+
 test('S21 demo mode: the curated /book page is the request form, never a Cal.com calendar; the request stays in this browser @demo-local', async ({ page, healthy }) => {
   await page.goto('/mentor/manav-gupta/book');
   await expect(page.getByTestId('form-session-request')).toBeVisible();

@@ -13,6 +13,7 @@ import {
 import { classifyBookingError, invalidRequestFields, isSendBlocked, rateLimitCooldownMs } from '../client/src/components/booking/bookingErrors.ts';
 import { isSentMemoryStale, railStatesFor, railStopsFor, resolveRequestState, sentMemoryForViewer, type RequestState } from '../client/src/components/booking/requestState.ts';
 import { FEATURED_MENTORS } from '../client/src/data/featuredMentors.ts';
+import { getSentRequest, markSent } from '../client/src/lib/sentRequests.ts';
 import type { Booking } from '../client/src/lib/database.ts';
 
 const input = {
@@ -193,6 +194,47 @@ describe('sentMemoryForViewer (cards, profile and scheduler share it)', () => {
     expect(sentMemoryForViewer(memory, 'sara@example.com')).toBe(memory);
     expect(sentMemoryForViewer(memory, 'omar@example.com')).toBeNull();
     expect(sentMemoryForViewer(null, 'sara@example.com')).toBeNull();
+  });
+});
+
+describe('a signed-out send never reads as "Request sent" to a signed-in account (R2-01)', () => {
+  // For an address that has an account the server creates nothing and answers the same (R1-08), so
+  // the browser memory of that send must not stand in for a request once the account signs in.
+  const anon = { email: 'sara@example.com', sentAt: '2026-09-20T10:00:00.000Z', anonymous: true };
+  const pending: Booking = { id: 'b1', mentor_id: 'm-db', mentee_id: 'me1', status: 'pending', created_at: anon.sentAt };
+
+  it('the memory speaks to signed-out viewers only, whatever address signs in', () => {
+    expect(sentMemoryForViewer(anon, undefined)).toBe(anon);
+    expect(sentMemoryForViewer(anon, 'sara@example.com')).toBeNull();
+    expect(sentMemoryForViewer(anon, ' SARA@example.com')).toBeNull();
+  });
+
+  it('signed in, the account\'s own rows decide: no row is the request button, a row is "sent" from the row', () => {
+    const base = { mentorId: 'm-db', viewerEmail: 'sara@example.com', local: anon };
+    expect(resolveRequestState({ ...base, isAvailable: true, bookings: undefined })).toEqual({ kind: 'cta' });
+    expect(resolveRequestState({ ...base, isAvailable: true, bookings: [] })).toEqual({ kind: 'cta' });
+    expect(resolveRequestState({ ...base, isAvailable: false, bookings: undefined })).toEqual({ kind: 'unavailable' });
+    expect(resolveRequestState({ ...base, isAvailable: true, bookings: [pending] })).toMatchObject({ kind: 'sent', source: 'row', status: 'pending' });
+    expect(resolveRequestState({ ...base, viewerEmail: undefined, isAvailable: true, bookings: undefined })).toMatchObject({ kind: 'sent', source: 'local' });
+  });
+
+  it('markSent records whether the send was signed out, and the memory keeps it', () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    });
+    try {
+      markSent('m-anon', 'sara@example.com', { anonymous: true });
+      markSent('m-account', 'sara@example.com');
+      expect(getSentRequest('m-anon')).toMatchObject({ email: 'sara@example.com', anonymous: true });
+      expect(getSentRequest('m-account')).not.toHaveProperty('anonymous');
+      expect(sentMemoryForViewer(getSentRequest('m-anon'), 'sara@example.com')).toBeNull();
+      expect(sentMemoryForViewer(getSentRequest('m-account'), 'sara@example.com')).not.toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 
