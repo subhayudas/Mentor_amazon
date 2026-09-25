@@ -212,11 +212,12 @@ export const Turnstile = React.forwardRef<TurnstileHandle, TurnstileProps>(funct
           <TriangleAlert aria-hidden="true" />
           <AlertDescription className="flex flex-col items-start gap-2">
             <p className="text-pretty">{failure === "load" ? words.load : words.widget}</p>
-            {fallback && <p className="text-pretty">{fallback}</p>}
             <Button type="button" variant="outline" size="sm" className="max-md:h-11" onClick={retry} data-testid="button-turnstile-retry">
               <RotateCw className="rtl:-scale-x-100" aria-hidden="true" />
               {words.retry}
             </Button>
+            {/* "Still not working?" follows the Retry it refers to. */}
+            {fallback && <p className="text-pretty">{fallback}</p>}
           </AlertDescription>
         </Alert>
       )}

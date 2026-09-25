@@ -3,7 +3,8 @@
  * forms offer it when their security check cannot run, so a visitor behind a blocker is never
  * stuck; an unset or malformed value means no contact line. Pure: no Supabase import.
  */
-const EMAIL_RE = /^[^\s@<>()"',;:]+@[^\s@<>()"',;:]+\.[^\s@<>()"',;:]+$/;
+/** A plain address only: nothing that would change the mailto link (`?`, `&`, `#`, `%`, spaces, lists). */
+const EMAIL_RE = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 
 export function programmeContactEmail(raw: unknown): string | null {
   const value = typeof raw === "string" ? raw.trim() : "";

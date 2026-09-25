@@ -94,14 +94,16 @@ test('S4 bot check: no token means no POST; a request the server rejects shows t
     if (r.url().endsWith('/api/requests') && r.method() === 'POST') posts += 1;
   });
   try {
-    // 1. The widget never hands out a token (its script cannot load): the send is refused locally.
+    // 1. The widget never hands out a token (its script cannot load): the check says so, and the
+    //    send is refused locally with a message that points at it (R1-72).
     await page.route('https://challenges.cloudflare.com/**', (route) => route.abort());
     await page.goto(`/mentor/${f.slug}/book`);
+    await expect(page.getByTestId('turnstile-failed')).toBeVisible();
     await fillSessionForm(page, 'Dev B Bot', email);
     await page.getByTestId('button-send-request').click();
     const error = page.getByTestId('booking-error');
     await expect(error).toHaveAttribute('data-kind', 'botCheck');
-    await expect(error).toHaveText(tr(lang, 'bookingRequest.error.botCheck'));
+    await expect(error).toHaveText(tr(lang, 'bookingRequest.captchaNotSent'));
     expect(posts).toBe(0);
     await healthy({ screenshotName: 'S4-no-token' });
     await page.unroute('https://challenges.cloudflare.com/**');
