@@ -1,5 +1,6 @@
 import { test, expect, signedCalPost, type Page } from '../fixtures/test';
 import { bookingId, confirmedCalUid, displayName, ids, mentorCalLink, personaEmail } from '../fixtures/personas';
+import { recordToasts } from '../fixtures/toasts';
 import { calUid, calWebhookBody, plain, tr, useLanguage, webhookSecret } from './b-helpers';
 
 /**
@@ -101,10 +102,15 @@ test('S11 requires confirmation: PENDING waits (no confirmed toast), the BOOKING
   try {
     await loginAs('mentee');
     await openChooseTime(page, id, 'mentee-dashboard');
+    // Every toast from here on is recorded: a "confirmed" toast for a PENDING time must never appear,
+    // not even one that is gone again by the time we look (R1-54: toHaveCount(0) would wait it out).
+    const toasts = await recordToasts(page);
     await cal.post('bookingSuccessfulV2', v2(uid, start, 'PENDING'));
     await expect.poll(async () => (await row(db, id))?.cal_status).toBe('requested');
     expect(await row(db, id)).toMatchObject({ status: 'accepted', cal_event_uri: uid, requested: utcWall(start) });
-    await expect(page.getByText(tr(lang, 'dashboardV2.cal.toastConfirmed'), { exact: true })).toHaveCount(0);
+    // Wait for the outcome toast (the "waiting for the mentor" one), then check it was not "confirmed".
+    await expect.poll(async () => (await toasts.texts()).length, { message: 'the embed outcome shows a toast' }).toBeGreaterThan(0);
+    expect(await toasts.seen(tr(lang, 'dashboardV2.cal.toastConfirmed')), 'no "Session confirmed" toast for a time still waiting on the mentor').toBe(false);
     await page.keyboard.press('Escape');
     await expect(page.getByTestId(`badge-time-waiting-${id}`)).toBeVisible();
     await expect(page.getByTestId(`button-schedule-booking-${id}`)).toHaveCount(0);
