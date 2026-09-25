@@ -2500,7 +2500,8 @@
       "addWindow": "Add hours",
       "endAfterStart": "End after the start time",
       "unsaved": "You have unsaved changes.",
-      "saveHintLive": "Office hours show on your public profile as soon as you save."
+      "saveHintLive": "Office hours show on your public profile as soon as you save.",
+      "noChangesLive": "No changes to save yet. Office hours show on your public profile as soon as you save a change."
     },
     "dashboard": {
       "hi": "Hi, {{name}}",

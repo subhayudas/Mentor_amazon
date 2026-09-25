@@ -334,19 +334,27 @@ function DatabaseCalendar() {
         )}
         {!failed && !loading && (
           <div className="flex flex-wrap items-center gap-3 py-6">
+            {/* Nothing changed: the button stays focusable but says why it does nothing (R1-49). */}
             <button
               type="button"
-              onClick={() => void save()}
+              onClick={() => dirty && void save()}
               disabled={saving}
               aria-busy={saving || undefined}
-              className="inline-flex h-11 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-5 text-[14px] font-bold text-white hover:bg-black disabled:opacity-70"
+              aria-disabled={(!dirty && !saving) || undefined}
+              aria-describedby={`${ids}-calendar-status`}
+              className="inline-flex h-11 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-5 text-[14px] font-bold text-white hover:bg-black disabled:opacity-70 aria-disabled:cursor-not-allowed aria-disabled:bg-[#e6e4de] aria-disabled:text-[#6c6c84] aria-disabled:hover:bg-[#e6e4de]"
               data-testid="button-save-calendar"
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : saved ? <Check className="size-4" aria-hidden="true" /> : null}
               {saved ? t("showcase.calendar.saved") : t("showcase.calendar.save")}
             </button>
-            <p className={cn("text-[13px]", saveError ? "font-medium text-destructive" : "text-[#6c6c84]")} role={saveError ? "alert" : undefined} data-testid="text-calendar-status">
-              {saveError ?? (dirty ? t("showcase.calendar.unsaved") : t("showcase.calendar.saveHintLive"))}
+            <p
+              id={`${ids}-calendar-status`}
+              className={cn("text-[13px]", saveError ? "font-medium text-destructive" : "text-[#6c6c84]")}
+              role={saveError ? "alert" : undefined}
+              data-testid="text-calendar-status"
+            >
+              {saveError ?? (dirty ? t("showcase.calendar.unsaved") : saved ? t("showcase.calendar.saveHintLive") : t("showcase.calendar.noChangesLive"))}
             </p>
           </div>
         )}
