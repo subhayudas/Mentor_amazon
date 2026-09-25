@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, expect, it } from 'vitest';
-import { describeDb } from './env.ts';
-import { Accounts, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser } from './fixtures.ts';
+import { describeDb, TEST_DB_URL } from './env.ts';
+import { Accounts, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, rand } from './fixtures.ts';
 import { asRole, asService, connect, expectPgError, withTx, type Sql, type Tx } from './sql.ts';
 
 /** I9 — cal_apply_event, one test per row of the design §3.3 transition table, plus the edges. */
@@ -403,6 +403,48 @@ describeDb('I9 deliveries out of order are parked and replayed (R1-14)', () => {
       const left = await tx`select id, outcome from public.cal_webhook_events where id in (${foreign}, ${stale}) order by id`;
       expect(left.map((e) => e.outcome)).toEqual(['unmatched', 'unmatched']);
     });
+  });
+});
+
+describeDb('I9 concurrent deliveries for one mentor are applied one at a time (R2-10)', () => {
+  it('a CANCELLED(B) that arrives while RESCHEDULED A→B is still being applied ends the session cancelled, as on Cal.com', async () => {
+    const mentorEmail = itEmail('race-mentor');
+    const menteeEmail = itEmail('race-mentee');
+    accounts.track(mentorEmail);
+    accounts.track(menteeEmail);
+    const mentor = await mkMentor(sql, { email: mentorEmail, cal_link: 'jane.doe/30min', name: 'Jane Doe' });
+    const mentee = await mkMentee(sql, { email: menteeEmail, name: 'Omar' });
+    const uidA = `raceA${rand()}`;
+    const uidB = `raceB${rand()}`;
+    const id = await mkBooking(sql, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: uidA, scheduled_at: '2026-10-10 10:00:00' });
+    // Two webhook invocations, each on its own connection, the reschedule still uncommitted when
+    // the cancellation arrives (serverless deliveries that overtake each other arrive close together).
+    const first = connect(TEST_DB_URL, 1);
+    const second = connect(TEST_DB_URL, 1);
+    try {
+      let release = () => {};
+      const held = new Promise<void>((resolve) => (release = resolve));
+      let applied = () => {};
+      const rescheduleApplied = new Promise<void>((resolve) => (applied = resolve));
+      const reschedule = first.begin(async (tx) => {
+        const r = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: uidB, reschedule: uidA, start: '2026-10-11T10:00:00Z' });
+        applied();
+        await held; // the transaction stays open
+        return r;
+      });
+      await rescheduleApplied;
+      const cancel = second.begin((tx) => apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CANCELLED', uid: uidB, status: 'CANCELLED', reason: 'Changed plans' }));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      release();
+      const [r1, r2] = await Promise.all([reschedule, cancel]);
+      expect(r1).toMatchObject({ outcome: 'rescheduled', booking_id: id });
+      expect(r2).toMatchObject({ outcome: 'canceled', booking_id: id });
+      expect(await booking(sql, id)).toMatchObject({ status: 'canceled', canceled_by: 'cal', cal_status: 'cancelled', cal_event_uri: uidB });
+    } finally {
+      await first.end({ timeout: 5 });
+      await second.end({ timeout: 5 });
+      await sql`delete from public.cal_webhook_events where mentor_id = ${mentor.id}`;
+    }
   });
 });
 

@@ -1488,6 +1488,12 @@ BEGIN
       v_outcome := 'unmatched';
       EXIT apply;
     END IF;
+    -- One delivery per mentor at a time (R2-10). The matching below sees only committed rows, so a
+    -- CANCELLED(B) processed while RESCHEDULED A→B is still uncommitted would find nothing and be
+    -- parked after that reschedule's replay had already looked. Waiting here, each statement that
+    -- follows takes a new snapshot and sees what the delivery before it committed. Replays run in
+    -- the same transaction, so they already hold the lock.
+    PERFORM pg_advisory_xact_lock(hashtext('mc_cal_apply:' || v_mentor.id));
 
     -- Organizer check: a personal link must belong to the organizer of this Cal.com booking.
     v_cal_user := nullif(split_part(regexp_replace(lower(trim(coalesce(v_mentor.cal_link, ''))),
