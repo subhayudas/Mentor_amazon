@@ -84,6 +84,19 @@ describe('request shape', () => {
     expect(longGoal.json()).toEqual({ error: 'invalid_request', fields: ['goal'] });
     expect(rpc).not.toHaveBeenCalled();
   });
+
+  it('an e-mail address over 254 characters is refused before the RPC; 254 is accepted (R1-63)', async () => {
+    const domain = '@example.com';
+    const tooLong = `${'a'.repeat(255 - domain.length)}${domain}`;
+    expect(tooLong).toHaveLength(255);
+    const res = await send({ ...VALID, email: tooLong });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toEqual({ error: 'invalid_request', fields: ['email'] });
+    expect(rpc).not.toHaveBeenCalled();
+    const longest = `${'a'.repeat(254 - domain.length)}${domain}`;
+    expect((await send({ ...VALID, email: longest })).statusCode).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('Turnstile', () => {
@@ -101,6 +114,19 @@ describe('Turnstile', () => {
     siteverify.mockImplementation(async () => new Response(JSON.stringify({ success: false }), { status: 200 }));
     const res = await send({ ...VALID, turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX' });
     expect(res.statusCode).toBe(403);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('a siteverify answer without success: true is 403 and nothing reaches the RPC (R1-55)', async () => {
+    process.env.TURNSTILE_SECRET_KEY = '1x0000000000000000000000000000000AA';
+    for (const body of [{}, { success: 'true' }, { success: 1 }]) {
+      siteverify.mockImplementation(async () => new Response(JSON.stringify(body), { status: 200 }));
+      const res = await send({ ...VALID, turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX' });
+      expect(res.statusCode, JSON.stringify(body)).toBe(403);
+      expect(res.json()).toEqual({ error: 'captcha_failed' });
+    }
+    expect(siteverify).toHaveBeenCalledTimes(3);
+    expect(createAdminClient).not.toHaveBeenCalled();
     expect(rpc).not.toHaveBeenCalled();
   });
 

@@ -37,6 +37,11 @@ describe('verifyHmac', () => {
     expect(verifyHmac(body, sig, [])).toBe(false);
     expect(verifyHmac(body, sig, [''])).toBe(false);
   });
+  it('never verifies with an empty secret, even against a signature made with the empty string (R1-63)', () => {
+    const emptyKeyed = signCal(body.toString(), '');
+    expect(verifyHmac(body, emptyKeyed, [''])).toBe(false);
+    expect(verifyHmac(body, emptyKeyed, ['', 'real-secret-value'])).toBe(false);
+  });
   it('is over the exact bytes', () => {
     const sig = signCal(body.toString(), 's');
     expect(verifyHmac(Buffer.from('{"triggerEvent": "PING"}'), sig, ['s'])).toBe(false);
