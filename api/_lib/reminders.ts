@@ -70,6 +70,68 @@ export function recipientsFor(row: ReminderRow): ReminderRecipient[] {
   return out;
 }
 
+// ---------------------------------------------------------------------------
+// Claim progress (booking_reminders.channels)
+//
+// A reminder is claimed by inserting its (booking_id, kind) row with `channels = '{}'`; `sent_at`
+// is the time of the claim (or of the latest take-over). When every part has gone out the row
+// holds the channel names, e.g. ['in_app', 'email'], the format every earlier run wrote too. While
+// a send is only partial the row holds the parts that did go out, '<recipient>:<channel>', so a
+// later run sends only what is missing. An empty or partial row older than the lease is taken
+// over by the next run: its owner died (function timeout, crash) or one part failed.
+
+export type ReminderChannel = 'in_app' | 'email';
+export type ReminderPart = `${ReminderRecipient['type']}:${ReminderChannel}`;
+
+/** How long a claim belongs to the run that made it before another run may take it over. */
+export const CLAIM_LEASE_MS = 15 * 60_000;
+
+export function reminderPart(type: ReminderRecipient['type'], channel: ReminderChannel): ReminderPart {
+  return `${type}:${channel}`;
+}
+
+/** Complete when the row holds a plain channel name; otherwise the parts already delivered. */
+export function claimProgress(channels: readonly string[] | null | undefined): { complete: boolean; done: Set<string> } {
+  const list = channels ?? [];
+  return { complete: list.some((c) => !c.includes(':')), done: new Set(list.filter((c) => c.includes(':'))) };
+}
+
+/** Every part a reminder needs: in-app per recipient, plus e-mail when Resend is configured. */
+export function neededParts(recipients: readonly ReminderRecipient[], email: boolean): ReminderPart[] {
+  return recipients.flatMap((r) => [reminderPart(r.type, 'in_app'), ...(email ? [reminderPart(r.type, 'email')] : [])]);
+}
+
+/** Channel names (in_app first) of the given parts. */
+export function channelNames(parts: Iterable<string>): ReminderChannel[] {
+  const names = new Set(Array.from(parts, (p) => p.slice(p.indexOf(':') + 1)));
+  return (['in_app', 'email'] as const).filter((c) => names.has(c));
+}
+
+/** What to store after a run: the channel names when nothing is missing, else the parts done so far. */
+export function channelsToStore(done: ReadonlySet<string>, needed: readonly string[]): string[] {
+  return needed.every((p) => done.has(p)) ? channelNames(done) : Array.from(done).sort();
+}
+
+/** A claim another run may take over: work left, and older than the lease. */
+export function isReclaimable(row: { channels: string[] | null; sent_at: string }, now: number, leaseMs = CLAIM_LEASE_MS): boolean {
+  if (claimProgress(row.channels).complete) return false;
+  const claimedAt = parseDbTimestamp(row.sent_at).getTime();
+  return Number.isFinite(claimedAt) && claimedAt <= now - leaseMs;
+}
+
+/** Run `task` over `items` with at most `limit` in flight. */
+export async function forEachLimit<T>(items: readonly T[], limit: number, task: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, async () => {
+    while (next < items.length) {
+      const item = items[next];
+      next += 1;
+      await task(item);
+    }
+  });
+  await Promise.all(workers);
+}
+
 function when(row: ReminderRow): string {
   return parseDbTimestamp(row.scheduled_at).toUTCString();
 }

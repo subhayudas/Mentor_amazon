@@ -153,6 +153,7 @@ Checks, in order:
 | IP limit: 10 per 10 minutes | `429 {"error":"rate_limited"}` + `Retry-After` |
 | Turnstile, when `TURNSTILE_SECRET_KEY` is set: token verified with Cloudflare (`remoteip` sent; `TURNSTILE_ALLOWED_HOSTNAMES` enforced when set) | `403 {"error":"captcha_failed"}`; Cloudflare unreachable → `503 {"error":"captcha_unavailable"}` (fail closed) |
 | `VITE_TURNSTILE_SITE_KEY` set but the secret missing | `503 {"error":"unavailable"}` (logged: the widget would be shown but nothing verified) |
+| Production (`VERCEL_ENV=production`) with neither key set | `503 {"error":"captcha_unavailable"}`, logged, unless `TURNSTILE_DISABLED=1` (then the request goes through without a captcha and a warning is logged for each one) |
 | server env | `503 {"error":"unavailable"}` |
 | `create_booking_request` (service role): validates again, dedupes a pending request, limits 5 per requester and 20 per mentor per hour, notifies the mentor (every admin for a programme-managed mentor) | `22023` → `400 invalid_request` with the field · `mentor_unavailable` → `422` · `P0001` → `429 rate_limited` · function missing (migration not applied) → `503` · anything else → `500 server_error` |
 
@@ -162,8 +163,18 @@ whether someone has an open request. A request under the mentor's own address
 (or an identity an admin linked to that mentor) is refused by the RPC
 (`42501 not_allowed`, detail `self_request`, nothing written) but also answers
 `200`: a distinct status would reveal which address belongs to which mentor.
-Signed-in callers of `create_my_booking_request` get the `not_allowed` error. With neither Turnstile key set there is
-no captcha check (local development); only the IP and database limits apply.
+Signed-in callers of `create_my_booking_request` get the `not_allowed` error.
+
+With neither Turnstile key set there is no captcha check on a local machine, in
+development or on a Preview deployment; only the IP and database limits apply.
+Production never runs that way by accident: with `VERCEL_ENV=production` (Vercel
+sets it on every production deployment while "Automatically expose System
+Environment Variables" is on, the default) and no keys, every anonymous request
+is refused (`503 captcha_unavailable`, and the function log says which variables
+to set). Set both keys for Production. The only
+way to run Production without a captcha is the explicit `TURNSTILE_DISABLED=1`,
+which is logged on every request it lets through and has no effect while
+`TURNSTILE_SECRET_KEY` is set.
 
 ---
 
@@ -190,11 +201,17 @@ the optional global secret `CAL_WEBHOOK_SECRET` (at least 16 characters;
 
 Handling, in order: `405` for anything but POST → `413` over 256 KiB → a
 malformed `?mentor=` or `x-cal-signature-256` header is `401` without touching
-the database → IP pre-limit → `503` without server env → HMAC-SHA256 of the raw
+the database → `503` without server env → HMAC-SHA256 of the raw
 body against the mentor's secret (and the previous one within its grace), or
 the global secret → the same `401 {"error":"invalid_signature"}` for an unknown
 mentor, a missing secret, `no-secret-provided` or a wrong secret (30 failures a
 minute from one IP → `429`) → `400` for invalid JSON → `200` with the outcome.
+
+Only deliveries that fail the signature check are rate-limited. Cal.com sends
+every mentor's webhooks from the same few egress IPs and never retries, so a
+limit counted before the check would let anyone with a Cal.com account (a
+webhook aimed at any mentor id, with a wrong secret) get real deliveries
+refused. A delivery whose signature verifies is never answered `429`.
 
 Every booking event is applied by the `cal_apply_event` RPC in one
 transaction: the delivery is recorded first (a replay answers `duplicate`),
@@ -253,13 +270,91 @@ secret and on Vercel). For each **confirmed** session starting within 24 hours
 (`24h`) or 1 hour (`1h`) it first claims the reminder
 (`booking_reminders`, unique per booking and kind — concurrent runs send once),
 then writes an in-app notification per party and, with `RESEND_API_KEY`, sends
-an e-mail with escaped HTML. If nothing reached anyone the claim is released
-and the next run retries. Programme-managed mentors (placeholder `.invalid`
-addresses) receive nothing. Response: `{"ok":true,"reminders":n,"emails":n,"failures":n}`.
+an e-mail with escaped HTML, all parts at once and up to five reminders at a
+time (`vercel.json` gives the function `maxDuration: 60`). If nothing reached
+anyone the claim is released and the next run retries. Programme-managed
+mentors (placeholder `.invalid` addresses) receive nothing. Response:
+`{"ok":true,"reminders":n,"emails":n,"failures":n}`.
+
+`booking_reminders.channels` holds the channel names (`{in_app,email}`) once
+every part went out. While a part is missing it holds the parts that did, e.g.
+`{mentor:in_app,mentor:email,mentee:email}`. A claim that is still empty or
+partial 15 minutes after it was made (`sent_at`) belongs to a run that died or
+to a part that failed. The next run takes it over (one run wins, through a
+conditional update on `sent_at`) and sends only what is missing. On a take-over,
+a reminder notification that is already in `notifications` counts as sent. An
+e-mail sent just before a crash can still go out twice; nothing else does.
 
 ---
 
-## Environment variables (Vercel → Settings → Environment Variables, Production **and** Preview)
+## Verify on a preview (before merging)
+
+The unit and integration suites call the handlers directly. Only a deployment shows that
+Vercel's runtime hands the functions the request bodies intact (a regression here made every
+Cal.com delivery fail its signature check and every anonymous request "invalid", with every
+test green; `tests/api-vercel-runtime.test.ts` now covers it with Vercel's own dev-server). So
+before merging, send one signed Cal.com Ping and one anonymous request to the PR's **preview**
+deployment. `migrations/0002` must already be applied (it is step 3 of the rollout in
+`TESTING.md`); the preview uses the production database, so both calls write real rows.
+
+1. **Bypass token.** Previews sit behind Vercel Deployment Protection. In Vercel → Project →
+   Settings → Deployment Protection → **Protection Bypass for Automation**, create a secret
+   (or copy the existing one). It is sent as the `x-vercel-protection-bypass` header, or as a
+   query parameter of the same name where headers cannot be set (Cal.com). Keep it out of
+   the repo and the PR.
+
+   ```bash
+   PREVIEW=https://<the PR's preview host>.vercel.app
+   BYPASS=<Protection Bypass for Automation secret>
+   ```
+
+2. **One Cal.com Ping.** Use a test mentor whose Cal.com sync panel you can open
+   (Profile settings → Cal.com booking sync: the mentor id is in the Subscriber URL, the
+   secret is behind Show). Either add a separate test webhook in Cal.com with the subscriber
+   URL `$PREVIEW/api/webhooks/cal?mentor=<id>&x-vercel-protection-bypass=$BYPASS` and that
+   secret, click **Ping test** and delete the webhook afterwards, or send the same signed
+   delivery yourself:
+
+   ```bash
+   MENTOR=<mentor id>; SECRET=<that mentor's webhook secret>
+   BODY="{\"triggerEvent\":\"PING\",\"createdAt\":\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\",\"payload\":{\"type\":\"Test\"}}"
+   SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
+   curl -si -X POST "$PREVIEW/api/webhooks/cal?mentor=$MENTOR" \
+     -H "x-vercel-protection-bypass: $BYPASS" -H 'content-type: application/json' \
+     -H "x-cal-signature-256: $SIG" --data-binary "$BODY"
+   ```
+
+   Expect `200 {"ok":true,"outcome":"ping"}`, and the mentor's panel shows "Ping · just now".
+   `BODY` carries the current time, so every run signs a new delivery. If the same body is
+   sent twice (for example a pasted literal instead of the `date` expansion), the second
+   answer is `200 {"ok":true,"outcome":"duplicate"}`: that also proves the body arrived, but
+   nothing new is recorded and the panel does not change.
+   A `401 {"error":"invalid_signature"}` with the right secret means the function did not get
+   the body: do not merge.
+
+3. **One anonymous request** to an ordinary (non-featured) mentor, from your own address.
+   Preview has no Turnstile keys (they are Production-only), so no token is needed:
+
+   ```bash
+   curl -si -X POST "$PREVIEW/api/requests" \
+     -H "x-vercel-protection-bypass: $BYPASS" -H 'content-type: application/json' \
+     --data '{"mentorId":"<mentor id>","name":"Preview check","email":"<your address>","goal":"Preview check of POST /api/requests, please decline."}'
+   ```
+
+   Expect `200 {"ok":true}` and a new request in that mentor's inbox and bell. Decline it
+   afterwards. A `400 {"error":"invalid_request","fields":["body"]}` means the body did not
+   reach the function: do not merge. With Cloudflare's always-pass test keys on Preview, add
+   `"turnstileToken":"XXXX.DUMMY.TOKEN.XXXX"` to the JSON.
+
+Subhayu runs these two checks (he holds the Vercel project settings) and pastes both
+responses into the PR.
+
+---
+
+## Environment variables (Vercel → Settings → Environment Variables)
+
+Tick **Production and Preview** for each, except where a row says otherwise (the
+Turnstile variables are Production-only).
 
 | Name | Required | Value |
 | --- | --- | --- |
@@ -274,10 +369,11 @@ addresses) receive nothing. Response: `{"ok":true,"reminders":n,"emails":n,"fail
 | `APP_ORIGIN` | yes | `https://mentor-amazon.vercel.app` (every redirect target is built from this) |
 | `CRON_SECRET` | yes (reminders) | ≥ 16 characters; the same value as the GitHub Actions secret |
 | `RESEND_API_KEY`, `MAIL_FROM` | no | E-mail reminders through Resend; unset → in-app only |
-| `TURNSTILE_SECRET_KEY` | with the site key | Cloudflare Turnstile secret. Set it **and** `VITE_TURNSTILE_SITE_KEY`, or neither (a site key without the secret makes `/api/requests` refuse with 503) |
-| `TURNSTILE_ALLOWED_HOSTNAMES` | no | e.g. `mentor-amazon.vercel.app`; tokens issued elsewhere are refused |
+| `TURNSTILE_SECRET_KEY` | **Production** (with the site key) | Cloudflare Turnstile secret for the widget registered on `mentor-amazon.vercel.app`. Set it **and** `VITE_TURNSTILE_SITE_KEY` for the **Production** environment only: in Production without both, `/api/requests` refuses with 503 (and a site key without the secret refuses everywhere). On **Preview** leave both unset, or use Cloudflare's always-pass test pair (see `TESTING.md` → "Before merging"), because the production widget rejects preview hostnames and password sign-in needs a token whenever the site key is set |
+| `TURNSTILE_ALLOWED_HOSTNAMES` | no | Production only, e.g. `mentor-amazon.vercel.app`; tokens issued elsewhere are refused |
+| `TURNSTILE_DISABLED` | no | Leave unset. Exactly `1` lets Production accept anonymous requests with no Turnstile keys (logged on every request). No effect while `TURNSTILE_SECRET_KEY` is set |
 | `CAL_WEBHOOK_SECRET` | no | Only for a programme Cal.com Team/Org webhook without `?mentor=` (≥ 16 characters). Per-mentor secrets live in the database |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | no | Shared rate-limit counters across function instances |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | recommended for Production | Shared rate-limit counters across function instances. Without them each instance counts on its own, so the IP limits on `/api/requests` and the SSO routes only hold per instance |
 
 See the root `.env.example`. For `vercel dev` put them in a root `.env`.
 
@@ -423,7 +519,12 @@ SSO entry keeps redirecting to `/login?error=sso_unavailable_local`.
 `vercel dev` with a root `.env` also works.
 
 `npm test` (Vitest, no network, no database) runs the unit suites for the
-request, webhook, Turnstile and reminder handlers and the SSO suite. The SSO
+request, webhook, Turnstile and reminder handlers and the SSO suite.
+`tests/api-vercel-runtime.test.ts` also runs the request and webhook handlers
+behind `@vercel/node`'s own dev-server, forked the way `vercel dev` forks it, with
+the platform's request helpers on and off. It is the only suite that sees what
+those helpers do to the request stream; the other suites hand the handlers a
+fresh stream. The SSO
 suite uses no credentials: a local mock of Federate (same endpoint paths as the real
 discovery document; it enforces the exact redirect URI, S256 PKCE, client
 authentication and single-use codes, and signs RS256 ID tokens) and an

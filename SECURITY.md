@@ -148,7 +148,7 @@ Notable mechanics:
 |---|---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` | Vercel server env only | bypasses RLS; used only by `api/` (SSO bridge, requests, Cal webhook, reminders) |
 | `AMAZON_OIDC_CLIENT_SECRET` | Vercel server env only | also derives the HMAC key for the `mc_oidc` state cookie |
-| `TURNSTILE_SECRET_KEY` | Vercel server env only | verifies Turnstile tokens; with the site key set and this missing, `/api/requests` refuses (fail closed) |
+| `TURNSTILE_SECRET_KEY` | Vercel server env only (Production) | verifies Turnstile tokens; `/api/requests` refuses (fail closed) when the site key is set and this is missing, and in Production (`VERCEL_ENV=production`) when neither key is set, unless `TURNSTILE_DISABLED=1` is set as an explicit, logged opt-out |
 | Per-mentor Cal.com webhook secrets | `mentor_cal_webhooks` (database) | 32 random bytes; readable only by the owning mentor through an RPC; rotation keeps the old one valid for 24 h |
 | `CAL_WEBHOOK_SECRET` | Vercel server env only, optional | only for a programme Cal.com Team/Org webhook; ≥ 16 characters |
 | `CRON_SECRET` | Vercel + GitHub Actions secret | bearer token of the reminder cron (constant-time check) |
@@ -173,8 +173,11 @@ runtime styles (known, low impact).
 
 * Anonymous requests: Cloudflare **Turnstile** verified server-side in
   `/api/requests` (token required whenever `TURNSTILE_SECRET_KEY` is set;
-  Cloudflare unreachable → refused), plus an IP limit of 10 requests per 10
-  minutes. Supabase Auth captcha (sign-up, password sign-in, reset) is switched
+  Cloudflare unreachable → refused; Production with no keys → refused unless
+  `TURNSTILE_DISABLED=1`), plus an IP limit of 10 requests per 10
+  minutes. The IP limits share their counters across function instances only
+  when Upstash Redis is configured (`UPSTASH_REDIS_REST_URL` / `_TOKEN`,
+  recommended for Production); otherwise each instance counts on its own. Supabase Auth captcha (sign-up, password sign-in, reset) is switched
   on in the dashboard only after the client that sends the token is live.
 * In the database (request RPCs and triggers): max 5 booking requests per
   mentee per hour, 20 per mentor per hour, 3 mentee profile creations per email
@@ -182,8 +185,11 @@ runtime styles (known, low impact).
 * Bookings are created only `pending`, for an available mentor; `created_at`
   is stamped server-side so windows cannot be dodged.
 * Cal.com webhook: requests with a malformed signature header or mentor id are
-  refused before any database call; 600 deliveries a minute per IP, and 30
-  failed signatures a minute per IP before `429`.
+  refused before any database call; after 30 failed signatures a minute from
+  one IP, further failures get `429`. A delivery whose signature verifies is
+  never rate-limited: Cal.com shares egress IPs across all its customers and
+  does not retry, so counting deliveries before the check would let anyone's
+  failing webhooks block real ones.
 * Supabase's own API rate limits and Vercel's edge protection apply in front.
 
 ## 8. Logging
@@ -275,8 +281,11 @@ DELETE FROM public.users WHERE lower(email) = lower('person@example.com');
       `uploads` bucket exists, project region confirmed and recorded above.
 - [ ] Vercel: all `AMAZON_OIDC_*`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
       `APP_ORIGIN`, `CRON_SECRET` set for Production and Preview;
-      `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` both set (or both
-      unset); `AMAZON_OIDC_DEBUG` and `VITE_ALLOW_LOCAL_FALLBACK` unset.
+      `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` both set for
+      Production only (Preview: unset, or Cloudflare's always-pass test keys);
+      `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` set for Production;
+      `TURNSTILE_DISABLED`, `AMAZON_OIDC_DEBUG` and `VITE_ALLOW_LOCAL_FALLBACK`
+      unset.
 - [ ] Redirect URI registered with Amazon exactly as
       `https://mentor-amazon.vercel.app/api/auth/callback/amazon`.
 - [ ] Security headers verified on the live origin (`curl -I`).

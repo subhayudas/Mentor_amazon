@@ -32,6 +32,28 @@ describe('verifyTurnstile', () => {
     await expect(verifyTurnstile('tok', '1.1.1.1', { secret: 's', fetchImpl })).resolves.toEqual({ ok: false, reason: 'failed' });
   });
 
+  it('failed for any answer that does not carry success: true exactly (R1-55: never fail open)', async () => {
+    for (const body of [{}, { success: 'true' }, { success: 1 }, { success: null }, { hostname: 'mentor-amazon.vercel.app' }]) {
+      const fetchImpl = fakeFetch(() => json(body));
+      await expect(verifyTurnstile('tok', '1.1.1.1', { secret: 's', fetchImpl }), JSON.stringify(body)).resolves.toEqual({ ok: false, reason: 'failed' });
+    }
+  });
+
+  it('unavailable when siteverify never answers: the request is abandoned after timeoutMs (R1-63)', async () => {
+    const hanging = vi.fn(
+      (_url: string | URL | Request, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(init.signal?.reason ?? new Error('aborted')));
+        }),
+    );
+    const result = await Promise.race([
+      verifyTurnstile('tok', '1.1.1.1', { secret: 's', fetchImpl: hanging, timeoutMs: 50 }),
+      new Promise((resolve) => setTimeout(() => resolve('still waiting after 1 s'), 1000)),
+    ]);
+    expect(result).toEqual({ ok: false, reason: 'unavailable' });
+    expect(hanging.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('unavailable on a network error, a non-2xx answer or garbage', async () => {
     const boom = vi.fn(async () => {
       throw new TypeError('fetch failed');

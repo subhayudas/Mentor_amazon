@@ -23,9 +23,13 @@ import { createAdminClient } from '../_lib/supabaseAdmin.js';
  * Cal.com Team/Org webhook. Leave Cal.com's "Custom payload template" empty.
  *
  * Checks, in order: method (405) → body ≤ 256 KiB (413) → `?mentor=` shape and signature
- * header shape (401, no database call) → IP pre-limit → server env (503) → HMAC-SHA256 of the
- * raw body against the candidate secrets in constant time (401, the same answer for an unknown
- * mentor, a missing secret or a wrong one; repeated failures from one IP → 429) → JSON (400).
+ * header shape (401, no database call) → server env (503) → HMAC-SHA256 of the raw body
+ * against the candidate secrets in constant time (401, the same answer for an unknown mentor,
+ * a missing secret or a wrong one; repeated failures from one IP → 429) → JSON (400).
+ * Only deliveries that fail the signature check are ever rate-limited: Cal.com sends every
+ * mentor's webhooks from shared egress IPs and does not retry, so a limit counted before the
+ * check would let anyone's failing webhooks get real deliveries refused. A delivery whose
+ * signature verifies is never answered 429.
  * Deliveries that change no booking (PING, unsupported trigger, unreadable payload) are logged
  * with cal_record_delivery and answered 200. Booking events go to cal_apply_event, which
  * applies the whole change in one transaction: exact matching (Cal uid, reschedule uid,
@@ -36,7 +40,7 @@ import { createAdminClient } from '../_lib/supabaseAdmin.js';
  * `req.body` is never read, so the raw bytes stay exactly as Cal.com signed them.
  */
 export const MAX_BODY_BYTES = 256 * 1024;
-export const PRE_LIMIT: RateLimitRule = { name: 'cal-webhook', limit: 600, windowSeconds: 60 };
+/** Failed signature checks per IP per minute before those failures are answered 429. */
 export const FAIL_LIMIT: RateLimitRule = { name: 'cal-webhook-fail', limit: 30, windowSeconds: 60 };
 
 type SecretRow = { secret: string; previous_secret: string | null; previous_valid_until: string | null };
@@ -64,8 +68,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendJson(res, 401, { error: 'invalid_signature' });
     return;
   }
-
-  if (!(await enforceRateLimit(req, res, PRE_LIMIT))) return;
 
   const env = readEnv(['supabaseUrl', 'supabaseServiceRoleKey'] as const);
   if (!env.ok) {
