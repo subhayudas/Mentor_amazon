@@ -9,7 +9,9 @@ import { expectNoDemo, recordPaths, tokenSettle } from './c-helpers';
  *   real mentors from the directory are listed under a neutral title;
  * - "Refer now" really shares an invitation (share sheet, else the clipboard with a toast, or
  *   an e-mail draft) instead of bouncing an onboarded mentor to their own portal;
- * - the quick action that opened office hours no longer promises "session types".
+ * - the quick action that opened office hours no longer promises "session types";
+ * - R1-77: the arrow on the "Your page" link points the reading way (mirrored in Arabic), like
+ *   every other directional icon.
  */
 
 type Db = import('postgres').Sql;
@@ -105,4 +107,14 @@ test('R1-44 without a share sheet "Refer now" copies the invitation, says so, an
   expect(params.get('body')).toContain(loginUrl);
   await expect(page).toHaveURL((u) => u.pathname === '/dashboard');
   await healthy({ screenshotName: 'R1-44-refer-copied' });
+});
+
+test('R1-77 the "Your page" arrow points the reading way: mirrored in Arabic, untouched in English', async ({ page, loginAs, healthy, lang }) => {
+  await openMentorHome(page, loginAs);
+  const yourPage = page.getByTestId('link-your-page');
+  await expect(yourPage).toBeVisible();
+  const transform = await yourPage.locator('svg').first().evaluate((el) => getComputedStyle(el).transform);
+  if (lang === 'ar') expect(transform, 'the arrow is mirrored in Arabic').toBe('matrix(-1, 0, 0, 1, 0, 0)');
+  else expect(transform, 'the arrow is untouched in English').toBe('none');
+  await healthy({ screenshotName: 'R1-77-your-page-arrow' });
 });

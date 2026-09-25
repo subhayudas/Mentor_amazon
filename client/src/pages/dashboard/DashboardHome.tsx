@@ -186,7 +186,7 @@ function MentorHome() {
                 <span className="truncate" dir="ltr">
                   {shortLink}
                 </span>
-                <ArrowUpRight className="size-4 shrink-0" aria-hidden="true" />
+                <ArrowUpRight className="size-4 shrink-0 rtl:-scale-x-100" aria-hidden="true" />
               </Link>
               <button type="button" onClick={copy} className="inline-flex size-11 shrink-0 items-center justify-center rounded-[10px] border border-[var(--sc-hairline)] bg-[#fcfbf9] text-[var(--sc-ink)] hover:bg-[var(--sc-sand)]" aria-label={t("showcase.dashboard.copy")}>
                 {copied ? <Check className="size-4" aria-hidden="true" /> : <Copy className="size-4" aria-hidden="true" />}
