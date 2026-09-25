@@ -1035,7 +1035,8 @@ BEGIN
     RAISE EXCEPTION 'invalid_email' USING ERRCODE = '22023';
   END IF;
   IF NOT public.is_privileged() AND lower(v_email) IS DISTINCT FROM public.current_email()
-     AND EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = lower(v_email)) THEN
+     AND (EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = lower(v_email))
+          OR EXISTS (SELECT 1 FROM auth.users a WHERE lower(a.email) = lower(v_email))) THEN
     RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501', DETAIL = 'sign_in_required';
   END IF;
   SELECT id INTO v_id FROM public.mentees WHERE lower(email) = lower(v_email) LIMIT 1;

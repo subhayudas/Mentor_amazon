@@ -159,7 +159,10 @@ Checks, in order:
 
 Success is always `200 {"ok":true}` — the same answer whether the request was
 created or one was already pending, so the endpoint cannot be used to learn
-whether someone has an open request. A request under the mentor's own address
+whether someone has an open request. The limits run before the database looks at
+whether the address has an account, so the 6th request in an hour from one
+address is `429 rate_limited` either way (an account-holder's address creates
+nothing; the owner is told in their bell). A request under the mentor's own address
 (or an identity an admin linked to that mentor) is refused by the RPC
 (`42501 not_allowed`, detail `self_request`, nothing written) but also answers
 `200`: a distinct status would reveal which address belongs to which mentor.

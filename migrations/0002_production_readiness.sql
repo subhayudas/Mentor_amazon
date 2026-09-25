@@ -875,6 +875,19 @@ REVOKE ALL ON FUNCTION public.bookings_activity_events() FROM PUBLIC, anon, auth
 -- =============================================================================
 -- §9 BOOKING REQUESTS (the only request paths once 0003 revokes direct inserts)
 -- =============================================================================
+-- Requests made for an address other than the caller's own (the anonymous path, /api/requests):
+-- one row per attempt that passed the checks, keyed by md5 of the address. The anonymous
+-- per-address limit counts these rows before anything depends on whether the address has an
+-- account, so its answer is the same for every address (R2-15). Rows older than an hour are
+-- removed by _create_booking_request. Service-only: RLS on, no policies, no client privileges.
+CREATE TABLE IF NOT EXISTS public.booking_request_attempts (
+  requester  text NOT NULL,
+  created_at timestamp NOT NULL DEFAULT timezone('utc', now())
+);
+CREATE INDEX IF NOT EXISTS booking_request_attempts_requester_idx ON public.booking_request_attempts (requester, created_at);
+ALTER TABLE public.booking_request_attempts ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.booking_request_attempts FROM PUBLIC, anon, authenticated;
+
 -- Core, callable only through the two wrappers below. Validates, resolves or creates the
 -- mentee, dedupes a pending request, rate-limits (privileged callers bypass the triggers,
 -- so the limits are explicit here), inserts, and notifies: the mentor, or every admin when the
@@ -890,6 +903,7 @@ DECLARE
   v_mentee_id   text;
   v_mentee_name text;
   v_booking_id  text;
+  v_anonymous   boolean := public.current_email() IS DISTINCT FROM lower(trim(coalesce(p_email, '')));
 BEGIN
   IF v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' OR length(v_email) > 254 THEN
     RAISE EXCEPTION 'invalid_email' USING ERRCODE = '22023';
@@ -916,13 +930,33 @@ BEGIN
      OR EXISTS (SELECT 1 FROM public.users u WHERE u.profile_id = p_mentor_id AND lower(u.email) = v_email) THEN
     RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501', DETAIL = 'self_request';
   END IF;
+  -- The limits run before anything depends on whether the address has an account, so they
+  -- answer the same for every address (R2-15): a limit that only an address without an account
+  -- could reach (bookings are created for those alone) would tell the two apart. Anonymous
+  -- requests: 5 per address an hour, counted in booking_request_attempts; signed-in requests keep
+  -- the booking-based limit below. Every request: 20 per mentor an hour.
+  IF v_anonymous THEN
+    PERFORM pg_advisory_xact_lock(hashtext('mc_booking_request:' || v_email));
+    DELETE FROM public.booking_request_attempts WHERE created_at < v_now - interval '1 hour';
+    IF (SELECT count(*) FROM public.booking_request_attempts a WHERE a.requester = md5(v_email)) >= 5 THEN
+      RAISE EXCEPTION 'rate_limited' USING ERRCODE = 'P0001', DETAIL = 'max 5 booking requests per mentee per hour';
+    END IF;
+  END IF;
+  IF (SELECT count(*) FROM public.bookings b WHERE b.mentor_id = p_mentor_id AND b.created_at > v_now - interval '1 hour') >= 20 THEN
+    RAISE EXCEPTION 'rate_limited' USING ERRCODE = 'P0001', DETAIL = 'max 20 booking requests per mentor per hour';
+  END IF;
+  IF v_anonymous THEN
+    INSERT INTO public.booking_request_attempts (requester, created_at) VALUES (md5(v_email), v_now);
+  END IF;
   -- An address with an account belongs to someone who can sign in. A request made for it by
   -- anyone else (the anonymous path: the server calls this with no session) never attaches to
   -- that person's profile, which the mentor would then read, and never creates one. The outcome
   -- is neutral (/api/requests answers as for a created request, so it is no account oracle) and
-  -- the owner is told in their bell, at most once a day.
-  IF public.current_email() IS DISTINCT FROM v_email
-     AND EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = v_email) THEN
+  -- the owner is told in their bell, at most once a day. An account is a users row or, for one
+  -- whose users row was never written, the auth user itself (R2-14).
+  IF v_anonymous
+     AND (EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = v_email)
+          OR EXISTS (SELECT 1 FROM auth.users a WHERE lower(a.email) = v_email)) THEN
     INSERT INTO public.notifications (id, recipient_email, recipient_type, type, title, message, booking_id, is_read, created_at)
     SELECT gen_random_uuid()::text, v_email, 'mentee', 'booking_request', 'Request not sent: please sign in',
            'A session with ' || v_mentor.name || ' was requested with your email address while signed out, so it was not sent. '
@@ -964,11 +998,9 @@ BEGIN
     RETURN jsonb_build_object('booking_id', v_booking_id, 'outcome', 'already_pending');
   END IF;
 
-  IF (SELECT count(*) FROM public.bookings b WHERE b.mentee_id = v_mentee_id AND b.created_at > v_now - interval '1 hour') >= 5 THEN
+  IF NOT v_anonymous
+     AND (SELECT count(*) FROM public.bookings b WHERE b.mentee_id = v_mentee_id AND b.created_at > v_now - interval '1 hour') >= 5 THEN
     RAISE EXCEPTION 'rate_limited' USING ERRCODE = 'P0001', DETAIL = 'max 5 booking requests per mentee per hour';
-  END IF;
-  IF (SELECT count(*) FROM public.bookings b WHERE b.mentor_id = p_mentor_id AND b.created_at > v_now - interval '1 hour') >= 20 THEN
-    RAISE EXCEPTION 'rate_limited' USING ERRCODE = 'P0001', DETAIL = 'max 20 booking requests per mentor per hour';
   END IF;
 
   v_booking_id := gen_random_uuid()::text;
@@ -1161,7 +1193,8 @@ BEGIN
     RAISE EXCEPTION 'invalid_email' USING ERRCODE = '22023';
   END IF;
   IF NOT public.is_privileged() AND lower(v_email) IS DISTINCT FROM public.current_email()
-     AND EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = lower(v_email)) THEN
+     AND (EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = lower(v_email))
+          OR EXISTS (SELECT 1 FROM auth.users a WHERE lower(a.email) = lower(v_email))) THEN
     RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501', DETAIL = 'sign_in_required';
   END IF;
   SELECT id INTO v_id FROM public.mentees WHERE lower(email) = lower(v_email) LIMIT 1;

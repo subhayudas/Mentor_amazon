@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { afterAll, beforeAll, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { describeDb, describeOnline } from './env.ts';
 import { Accounts, GOAL, anonClient, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, lazyClient, rand, serviceClient } from './fixtures.ts';
 import { useStackEnv } from './http.ts';
@@ -253,6 +253,110 @@ describeDb('I7 requests under an address that has an account (R1-08)', () => {
       const [{ id: own }] = await tx`select public.get_or_create_mentee(${registered.email}, 'x') as id`;
       expect(own).toBe(registered.id);
       await asService(tx);
+    });
+  });
+});
+
+describeDb('I7 no account oracle, no attaching to an account without a users row (R2-14, R2-15)', () => {
+  it('an account whose users row was never written is still an account: nothing attaches to its mentees row (R2-14)', async () => {
+    const owner = await accounts.create('norow'); // auth user only: the client may never have written its users row
+    await withTx(sql, async (tx) => {
+      const mentor = await mkMentor(tx);
+      const mentorSub = randomUUID();
+      await mkUser(tx, { id: mentorSub, email: mentor.email, user_type: 'mentor' });
+      const profile = await mkMentee(tx, { email: owner.email, name: 'Real Person', goals: 'private goals' });
+      const [{ r }] = await tx`select public.create_booking_request(${mentor.id}, ${owner.email}, 'Anyone', ${GOAL}) as r`;
+      expect(r).toEqual({ outcome: 'sign_in_required', booking_id: null });
+      expect(await tx`select id from public.bookings where mentee_id = ${profile.id}`).toEqual([]);
+      // So the mentor never gets to read that person's profile.
+      await asRole(tx, 'authenticated', claims(mentorSub, mentor.email));
+      expect(await tx`select id from public.mentees where id = ${profile.id}`).toEqual([]);
+      // The pre-release client's lookup refuses it too (anon keeps EXECUTE until 0003).
+      await asService(tx);
+      await tx`grant execute on function public.get_or_create_mentee(text, text) to anon`;
+      await asRole(tx, 'anon');
+      await expectPgError(tx, (sp) => sp`select public.get_or_create_mentee(${owner.email}, 'x')`, '42501', /not_allowed/);
+      await asService(tx);
+    });
+  });
+
+  /** The outcome of one anonymous request, or the error it raised (code and message). */
+  async function attempt(tx: Tx, mentorId: string, email: string): Promise<string> {
+    let outcome = '';
+    try {
+      await tx.savepoint(async (sp) => {
+        const [{ r }] = await sp`select public.create_booking_request(${mentorId}, ${email}, 'x', ${GOAL}) as r`;
+        outcome = r.outcome;
+      });
+    } catch (err) {
+      const e = err as { code?: string; message?: string };
+      outcome = `${e.code} ${e.message}`;
+    }
+    return outcome;
+  }
+
+  it('the 6th anonymous request in an hour gets the same answer whether or not the address has an account (R2-15)', async () => {
+    await withTx(sql, async (tx) => {
+      const registered = itEmail('oracle-reg');
+      await mkUser(tx, { email: registered, user_type: 'mentee' });
+      const fresh = itEmail('oracle-new');
+      const answers: Record<'registered' | 'fresh', string[]> = { registered: [], fresh: [] };
+      for (const [who, email] of [['registered', registered], ['fresh', fresh]] as const) {
+        for (let i = 0; i < 6; i++) answers[who].push(await attempt(tx, (await mkMentor(tx)).id, email));
+      }
+      expect(answers.registered.slice(0, 5)).toEqual(Array(5).fill('sign_in_required'));
+      expect(answers.fresh.slice(0, 5)).toEqual(Array(5).fill('created'));
+      expect(answers.registered[5]).toBe('P0001 rate_limited');
+      expect(answers.fresh[5]).toBe(answers.registered[5]);
+    });
+  });
+
+  describe('over HTTP', () => {
+    const admin = lazyClient(serviceClient);
+    let restore = () => {};
+    let handler: (req: never, res: never) => Promise<void>;
+    beforeAll(async () => {
+      // Local-development mode: no captcha keys, not a Vercel deployment.
+      restore = useStackEnv({ TURNSTILE_SECRET_KEY: undefined, VITE_TURNSTILE_SITE_KEY: undefined, VERCEL_ENV: undefined, TURNSTILE_DISABLED: undefined });
+      handler = (await import('../../api/requests.ts')).default as never;
+    });
+    afterAll(() => restore());
+
+    it('/api/requests answers the 6th request from a registered and from an unregistered address alike: 429 rate_limited', async () => {
+      const mentors: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        const email = itEmail(`oracle-mentor${i}`);
+        accounts.track(email);
+        const id = randomUUID();
+        const { error } = await admin.from('mentors').insert({
+          id, name: `Oracle Mentor ${i}`, email, timezone: 'UTC', bio: 'x', cal_link: `oracle${i}/30min`,
+          expertise: ['x'], industries: ['x'], languages_spoken: ['English'], comms_owner: 'exec',
+        });
+        if (error) throw new Error(error.message);
+        mentors.push(id);
+      }
+      const registered = await accounts.create('oracle-http', { userType: 'mentee' });
+      const fresh = itEmail('oracle-http-new');
+      accounts.track(fresh);
+      const answers = async (email: string) => {
+        const out: string[] = [];
+        for (const mentorId of mentors) {
+          const res = await invoke(handler as never, '/api/requests', {
+            method: 'POST',
+            ip: nextIp(),
+            headers: { 'content-type': 'application/json' },
+            body: { mentorId, name: 'Oracle Probe', email, goal: GOAL },
+          });
+          out.push(`${res.statusCode} ${JSON.stringify(res.json())}`);
+        }
+        return out;
+      };
+      const reg = await answers(registered.email);
+      const unreg = await answers(fresh);
+      expect(reg.slice(0, 5)).toEqual(Array(5).fill('200 {"ok":true}'));
+      expect(unreg.slice(0, 5)).toEqual(Array(5).fill('200 {"ok":true}'));
+      expect(reg[5]).toBe('429 {"error":"rate_limited"}');
+      expect(unreg[5]).toBe(reg[5]);
     });
   });
 });
