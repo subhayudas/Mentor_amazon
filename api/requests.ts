@@ -14,7 +14,9 @@ import { parseHostnames, verifyTurnstile } from './_lib/turnstile.js';
  * Checks, in order: method (405) → size (413) and content type (415) → validation (400
  * { error: 'invalid_request', fields }) → IP limit, 10 per 10 minutes (429 + Retry-After) →
  * Turnstile when TURNSTILE_SECRET_KEY is set (403 captcha_failed / 503 captcha_unavailable;
- * a site key without its secret fails closed with 503) → server env (503) → the
+ * a site key without its secret fails closed with 503; in Production, VERCEL_ENV=production,
+ * no keys at all also fails closed with 503 captcha_unavailable unless TURNSTILE_DISABLED=1
+ * is set, which is logged on every request) → server env (503) → the
  * create_booking_request RPC under the service role, which validates again, dedupes a pending
  * request, rate-limits per mentee and mentor, and notifies the mentor (or every admin for a
  * programme-managed mentor).
@@ -77,12 +79,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (!(await enforceRateLimit(req, res, REQUESTS_RULE))) return;
 
-  const turnstileEnv = readEnv(['turnstileSecret', 'turnstileSiteKey', 'turnstileAllowedHostnames'] as const);
-  const secret = turnstileEnv.ok ? turnstileEnv.env.turnstileSecret : '';
-  if (secret) {
+  const turnstileEnv = readEnv([
+    'turnstileSecret',
+    'turnstileSiteKey',
+    'turnstileAllowedHostnames',
+    'turnstileDisabled',
+    'vercelEnv',
+  ] as const);
+  const turnstile = turnstileEnv.ok
+    ? turnstileEnv.env
+    : { turnstileSecret: '', turnstileSiteKey: '', turnstileAllowedHostnames: '', turnstileDisabled: '', vercelEnv: '' };
+  if (turnstile.turnstileSecret) {
     const verdict = await verifyTurnstile(input.turnstileToken, clientIp(req), {
-      secret,
-      allowedHostnames: parseHostnames(turnstileEnv.ok ? turnstileEnv.env.turnstileAllowedHostnames : ''),
+      secret: turnstile.turnstileSecret,
+      allowedHostnames: parseHostnames(turnstile.turnstileAllowedHostnames),
     });
     if (!verdict.ok) {
       if (verdict.reason === 'unavailable') {
@@ -93,10 +103,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       return;
     }
-  } else if (turnstileEnv.ok && turnstileEnv.env.turnstileSiteKey) {
+  } else if (turnstile.turnstileSiteKey) {
     console.error('[requests] TURNSTILE_SECRET_KEY missing while the site key is set; refusing requests');
     sendUnavailable(res);
     return;
+  } else if (turnstile.vercelEnv === 'production') {
+    // No captcha keys at all is the local-development mode; Production never falls into it by
+    // accident. Only an explicit TURNSTILE_DISABLED=1 lets anonymous requests through here.
+    if (turnstile.turnstileDisabled !== '1') {
+      console.error(
+        '[requests] TURNSTILE_SECRET_KEY is not set in Production; refusing anonymous requests. ' +
+          'Set TURNSTILE_SECRET_KEY and VITE_TURNSTILE_SITE_KEY, or TURNSTILE_DISABLED=1 to accept requests without a captcha.',
+      );
+      sendJson(res, 503, { error: 'captcha_unavailable' });
+      return;
+    }
+    console.warn('[requests] TURNSTILE_DISABLED=1: accepting an anonymous request in Production without a captcha');
   }
 
   const env = readEnv(['supabaseUrl', 'supabaseServiceRoleKey'] as const);

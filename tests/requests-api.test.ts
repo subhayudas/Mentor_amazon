@@ -42,7 +42,9 @@ beforeEach(() => {
   delete process.env.TURNSTILE_SECRET_KEY;
   delete process.env.VITE_TURNSTILE_SITE_KEY;
   delete process.env.TURNSTILE_ALLOWED_HOSTNAMES;
-  siteverify = vi.fn(async () => new Response(JSON.stringify({ success: true, hostname: 'mentor-amazon.vercel.app' }), { status: 200 }));
+  delete process.env.TURNSTILE_DISABLED;
+  delete process.env.VERCEL_ENV;
+  siteverify =vi.fn(async () => new Response(JSON.stringify({ success: true, hostname: 'mentor-amazon.vercel.app' }), { status: 200 }));
   vi.spyOn(globalThis, 'fetch').mockImplementation(siteverify as unknown as typeof fetch);
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -142,6 +144,70 @@ describe('Turnstile', () => {
     const res = await send(VALID);
     expect(res.statusCode).toBe(200);
     expect(siteverify).not.toHaveBeenCalled();
+  });
+});
+
+describe('Turnstile in Production (R1-01: fail closed)', () => {
+  beforeEach(() => {
+    process.env.VERCEL_ENV = 'production';
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  it('neither key set: anonymous requests are refused with 503 captcha_unavailable, logged, nothing written', async () => {
+    const res = await send(VALID);
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: 'captcha_unavailable' });
+    expect(res.body).not.toMatch(ENV_NAMES);
+    expect(console.error).toHaveBeenCalledWith(expect.stringContaining('TURNSTILE_SECRET_KEY is not set in Production'));
+    expect(siteverify).not.toHaveBeenCalled();
+    expect(createAdminClient).not.toHaveBeenCalled();
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('TURNSTILE_DISABLED=1 is the explicit opt-out, and it is logged on every request it lets through', async () => {
+    process.env.TURNSTILE_DISABLED = '1';
+    const res = await send(VALID);
+    expect(res.statusCode).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('TURNSTILE_DISABLED=1'));
+  });
+
+  it('only exactly "1" opts out', async () => {
+    for (const value of ['true', 'yes', '0', ' ']) {
+      process.env.TURNSTILE_DISABLED = value;
+      const res = await send(VALID);
+      expect(res.statusCode, `TURNSTILE_DISABLED=${JSON.stringify(value)}`).toBe(503);
+    }
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it('the opt-out never switches off a configured check', async () => {
+    process.env.TURNSTILE_DISABLED = '1';
+    process.env.TURNSTILE_SECRET_KEY = '1x0000000000000000000000000000000AA';
+    const missing = await send(VALID);
+    expect(missing.statusCode).toBe(403);
+    expect(missing.json()).toEqual({ error: 'captcha_failed' });
+    const verified = await send({ ...VALID, turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX' });
+    expect(verified.statusCode).toBe(200);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('with both keys set a verified token goes through as before', async () => {
+    process.env.TURNSTILE_SECRET_KEY = '1x0000000000000000000000000000000AA';
+    process.env.VITE_TURNSTILE_SITE_KEY = '1x00000000000000000000AA';
+    const res = await send({ ...VALID, turnstileToken: 'XXXX.DUMMY.TOKEN.XXXX' });
+    expect(res.statusCode).toBe(200);
+    expect(siteverify).toHaveBeenCalledTimes(1);
+  });
+
+  it('Preview and development deployments keep the no-keys behaviour (no check)', async () => {
+    for (const env of ['preview', 'development']) {
+      process.env.VERCEL_ENV = env;
+      const res = await send(VALID);
+      expect(res.statusCode, `VERCEL_ENV=${env}`).toBe(200);
+    }
+    expect(siteverify).not.toHaveBeenCalled();
+    expect(rpc).toHaveBeenCalledTimes(2);
   });
 });
 

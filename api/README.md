@@ -153,6 +153,7 @@ Checks, in order:
 | IP limit: 10 per 10 minutes | `429 {"error":"rate_limited"}` + `Retry-After` |
 | Turnstile, when `TURNSTILE_SECRET_KEY` is set: token verified with Cloudflare (`remoteip` sent; `TURNSTILE_ALLOWED_HOSTNAMES` enforced when set) | `403 {"error":"captcha_failed"}`; Cloudflare unreachable → `503 {"error":"captcha_unavailable"}` (fail closed) |
 | `VITE_TURNSTILE_SITE_KEY` set but the secret missing | `503 {"error":"unavailable"}` (logged: the widget would be shown but nothing verified) |
+| Production (`VERCEL_ENV=production`) with neither key set | `503 {"error":"captcha_unavailable"}`, logged, unless `TURNSTILE_DISABLED=1` (then the request goes through without a captcha and a warning is logged for each one) |
 | server env | `503 {"error":"unavailable"}` |
 | `create_booking_request` (service role): validates again, dedupes a pending request, limits 5 per requester and 20 per mentor per hour, notifies the mentor (every admin for a programme-managed mentor) | `22023` → `400 invalid_request` with the field · `mentor_unavailable` → `422` · `P0001` → `429 rate_limited` · function missing (migration not applied) → `503` · anything else → `500 server_error` |
 
@@ -162,8 +163,16 @@ whether someone has an open request. A request under the mentor's own address
 (or an identity an admin linked to that mentor) is refused by the RPC
 (`42501 not_allowed`, detail `self_request`, nothing written) but also answers
 `200`: a distinct status would reveal which address belongs to which mentor.
-Signed-in callers of `create_my_booking_request` get the `not_allowed` error. With neither Turnstile key set there is
-no captcha check (local development); only the IP and database limits apply.
+Signed-in callers of `create_my_booking_request` get the `not_allowed` error.
+
+With neither Turnstile key set there is no captcha check on a local machine, in
+development or on a Preview deployment; only the IP and database limits apply.
+Production never runs that way by accident: with `VERCEL_ENV=production` and no
+keys, every anonymous request is refused (`503 captcha_unavailable`, and the
+function log says which variables to set). Set both keys for Production. The only
+way to run Production without a captcha is the explicit `TURNSTILE_DISABLED=1`,
+which is logged on every request it lets through and has no effect while
+`TURNSTILE_SECRET_KEY` is set.
 
 ---
 
@@ -259,7 +268,10 @@ addresses) receive nothing. Response: `{"ok":true,"reminders":n,"emails":n,"fail
 
 ---
 
-## Environment variables (Vercel → Settings → Environment Variables, Production **and** Preview)
+## Environment variables (Vercel → Settings → Environment Variables)
+
+Tick **Production and Preview** for each, except where a row says otherwise (the
+Turnstile variables are Production-only).
 
 | Name | Required | Value |
 | --- | --- | --- |
@@ -274,8 +286,9 @@ addresses) receive nothing. Response: `{"ok":true,"reminders":n,"emails":n,"fail
 | `APP_ORIGIN` | yes | `https://mentor-amazon.vercel.app` (every redirect target is built from this) |
 | `CRON_SECRET` | yes (reminders) | ≥ 16 characters; the same value as the GitHub Actions secret |
 | `RESEND_API_KEY`, `MAIL_FROM` | no | E-mail reminders through Resend; unset → in-app only |
-| `TURNSTILE_SECRET_KEY` | with the site key | Cloudflare Turnstile secret. Set it **and** `VITE_TURNSTILE_SITE_KEY`, or neither (a site key without the secret makes `/api/requests` refuse with 503) |
-| `TURNSTILE_ALLOWED_HOSTNAMES` | no | e.g. `mentor-amazon.vercel.app`; tokens issued elsewhere are refused |
+| `TURNSTILE_SECRET_KEY` | **Production** (with the site key) | Cloudflare Turnstile secret for the widget registered on `mentor-amazon.vercel.app`. Set it **and** `VITE_TURNSTILE_SITE_KEY` for the **Production** environment only: in Production without both, `/api/requests` refuses with 503 (and a site key without the secret refuses everywhere). On **Preview** leave both unset, or use Cloudflare's always-pass test pair (see `TESTING.md` → "Before merging"), because the production widget rejects preview hostnames and password sign-in needs a token whenever the site key is set |
+| `TURNSTILE_ALLOWED_HOSTNAMES` | no | Production only, e.g. `mentor-amazon.vercel.app`; tokens issued elsewhere are refused |
+| `TURNSTILE_DISABLED` | no | Leave unset. Exactly `1` lets Production accept anonymous requests with no Turnstile keys (logged on every request). No effect while `TURNSTILE_SECRET_KEY` is set |
 | `CAL_WEBHOOK_SECRET` | no | Only for a programme Cal.com Team/Org webhook without `?mentor=` (≥ 16 characters). Per-mentor secrets live in the database |
 | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | no | Shared rate-limit counters across function instances |
 

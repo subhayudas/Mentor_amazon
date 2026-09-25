@@ -36,6 +36,11 @@ export const ENV_SCHEMA = {
   turnstileAllowedHostnames: { name: 'TURNSTILE_ALLOWED_HOSTNAMES', schema: z.string(), default: '' },
   // The public site key, read only to detect "widget on, secret missing" (fail closed).
   turnstileSiteKey: { name: 'VITE_TURNSTILE_SITE_KEY', schema: z.string(), default: '' },
+  // Exactly '1' lets /api/requests run in Production with no Turnstile keys (logged on every
+  // request). Without it, Production refuses anonymous requests until both keys are set.
+  turnstileDisabled: { name: 'TURNSTILE_DISABLED', schema: z.string(), default: '' },
+  // Set by Vercel: 'production', 'preview' or 'development' ('' elsewhere).
+  vercelEnv: { name: 'VERCEL_ENV', schema: z.string(), default: '' },
   upstashUrl: { name: 'UPSTASH_REDIS_REST_URL', schema: url, default: '' },
   upstashToken: { name: 'UPSTASH_REDIS_REST_TOKEN', schema: nonEmpty, default: '' },
 } as const;
