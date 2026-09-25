@@ -210,6 +210,12 @@
       "amazonBody": "This account uses Amazon sign-in, so it has no MentorConnect password to reset. We signed you out of this link; use Sign in with Amazon instead.",
       "checkFailedTitle": "We couldn't check this reset link",
       "checkFailedBody": "We could not confirm which account this link is for, so the password form stays closed. Check your connection and try again."
+    },
+    "captcha": {
+      "loadFailed": "The bot check couldn't load. Check your connection, or allow challenges.cloudflare.com if a content blocker, VPN or company network is stopping it, then retry.",
+      "error": "The bot check ran into a problem. Retry it. If it keeps failing, try another browser or network.",
+      "retry": "Retry the check",
+      "unavailable": "The bot check couldn't run. Retry the check, then try again."
     }
   },
   "nav": {
@@ -1459,7 +1465,13 @@
     },
     "allRequired": "All fields are required.",
     "tzLine": "<name>{{name}}</name>'s time zone: {{zone}} · {{relative}}",
-    "captchaLabel": "Security check"
+    "captchaLabel": "Security check",
+    "captchaLoadFailed": "The security check couldn't load. Check your connection, or allow challenges.cloudflare.com if a content blocker, VPN or company network is stopping it, then retry.",
+    "captchaError": "The security check ran into a problem. Retry it. If it keeps failing, try another browser or network.",
+    "captchaRetry": "Retry the check",
+    "captchaContact": "Still not working? Email your request to the programme team at <email>{{email}}</email>.",
+    "captchaContactSubject": "Session request: {{name}}",
+    "captchaNotSent": "Your request wasn't sent because the security check couldn't run. Retry the check, then send."
   },
   "dashboardV2": {
     "tabs": {

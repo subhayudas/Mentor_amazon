@@ -11,7 +11,7 @@ import { authService } from "@/lib/services";
 import { LOCAL_ADMIN_EMAIL, findLocalAccount, setLocalSession } from "@/lib/localAuth";
 import { clearRoleStorage, rememberedMenteeEmail } from "@/lib/auth";
 import { authErrorKey, mapAuthError, toAuthFlowError, type AuthErrorKind } from "@/lib/authErrors";
-import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle, type TurnstileStatus } from "@/components/Turnstile";
 import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES, isMenteePath } from "@/lib/routes";
@@ -62,6 +62,7 @@ export default function Login() {
   const emailRef = useRef<HTMLInputElement | null>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = useState<TurnstileStatus>("loading");
   const needsCaptcha = !IS_LOCAL && turnstileEnabled();
 
   const loginSchema = useMemo(
@@ -216,7 +217,7 @@ export default function Login() {
               setFormError(null);
               setErrorKind(null);
               if (needsCaptcha && !captchaToken) {
-                setFormError(t("auth.errors.captchaRequired"));
+                setFormError(captchaStatus === "failed" ? t("auth.captcha.unavailable") : t("auth.errors.captchaRequired"));
                 return;
               }
               loginMutation.mutate(data);
@@ -288,7 +289,7 @@ export default function Login() {
             />
             )}
 
-            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} action="login" />}
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} onStatus={setCaptchaStatus} action="login" copy="auth" />}
 
             <Button type="submit" variant={menteePath ? "primary" : "secondary"} size="lg" className="w-full" loading={loginMutation.isPending} data-testid="button-login">
               {loginMutation.isPending ? t("auth.loggingIn") : t("auth.loginButton")}

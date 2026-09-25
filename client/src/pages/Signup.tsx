@@ -10,7 +10,7 @@ import { AlertCircle, Lock, Mail, MailCheck, Users } from "lucide-react";
 import { auth, rememberedMenteeEmail } from "@/lib/auth";
 import { authErrorKey, mapAuthError, toAuthFlowError } from "@/lib/authErrors";
 import { authService, menteeService } from "@/lib/services";
-import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle, type TurnstileStatus } from "@/components/Turnstile";
 import { ResendConfirmation } from "@/components/auth/ResendConfirmation";
 import { queryClient } from "@/lib/queryClient";
 import { ROUTES, isMenteePath } from "@/lib/routes";
@@ -43,6 +43,7 @@ export default function Signup() {
   const [confirmSentAt, setConfirmSentAt] = useState<number | null>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = useState<TurnstileStatus>("loading");
   const needsCaptcha = turnstileEnabled();
   const nextPath = safeNext(new URLSearchParams(searchString).get("next"), "");
   // The booking success state's "Create one" arrives with ?next=<mentee path>
@@ -152,7 +153,7 @@ export default function Signup() {
             onSubmit={form.handleSubmit((data) => {
               setFormError(null);
               if (needsCaptcha && !captchaToken) {
-                setFormError(t("auth.errors.captchaRequired"));
+                setFormError(captchaStatus === "failed" ? t("auth.captcha.unavailable") : t("auth.errors.captchaRequired"));
                 return;
               }
               signupMutation.mutate(data);
@@ -261,7 +262,7 @@ export default function Signup() {
               </div>
             </div>
 
-            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} action="signup" />}
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} onStatus={setCaptchaStatus} action="signup" copy="auth" />}
 
             <Button type="submit" variant="primary" size="lg" className="w-full" loading={signupMutation.isPending} data-testid="button-signup">
               {signupMutation.isPending ? t("auth.signingUp") : t("auth.signupButton")}

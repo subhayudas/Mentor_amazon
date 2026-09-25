@@ -245,7 +245,7 @@ export function CalSyncPanel({
               readOnly
               value={url}
               dir="ltr"
-              className="min-w-0 flex-1 text-start font-mono text-caption"
+              className="min-w-0 flex-1 text-start font-mono text-caption max-md:h-11"
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={swallowEnter}
               data-testid="cal-sync-url"
@@ -257,13 +257,13 @@ export function CalSyncPanel({
           </div>
         </div>
 
-        <div className="space-y-1.5">
+        {/* The label names the group (the secret and its buttons): ARIA does not allow naming a <code>. */}
+        <div role="group" aria-labelledby={`${ids}-secret-label`} className="space-y-1.5" data-testid="cal-sync-secret-group">
           <p id={`${ids}-secret-label`} className="text-body-sm font-medium text-foreground">
             {t("calSync.secretLabel")}
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <code
-              aria-labelledby={`${ids}-secret-label`}
               dir="ltr"
               className="min-h-10 min-w-0 flex-1 break-all rounded-lg border border-input bg-muted/40 px-3 py-2 text-start font-mono text-caption text-foreground"
               data-testid="cal-sync-secret"
@@ -272,13 +272,14 @@ export function CalSyncPanel({
               {revealed ? secret : maskSecret(secret)}
             </code>
             <div className="flex shrink-0 gap-2">
+              {/* The name says what the button does next (Show / Hide), so no aria-pressed: a toggle's name must not change with its state. */}
               <Button
                 type="button"
                 variant="outline"
                 className="max-md:h-11"
-                aria-pressed={revealed}
                 onClick={() => setRevealed((v) => !v)}
                 data-testid="button-toggle-cal-secret"
+                data-revealed={revealed ? "true" : "false"}
               >
                 {revealed ? <EyeOff aria-hidden="true" /> : <Eye aria-hidden="true" />}
                 {revealed ? t("calSync.hideSecret") : t("calSync.showSecret")}

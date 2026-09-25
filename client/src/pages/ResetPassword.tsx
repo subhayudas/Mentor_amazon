@@ -87,7 +87,7 @@ export default function ResetPassword() {
         if (cancelled) return;
         // getCurrentUser answers null when GoTrue could not confirm the user: unknown, so no form.
         if (!current || current.id !== sessionUser.id) throw new Error("reset-account-unverified");
-        if (current.amazon_alias || isAmazonSessionUser({ email: current.email })) {
+        if (current.amazon_alias) {
           await refuseAmazon();
           return;
         }

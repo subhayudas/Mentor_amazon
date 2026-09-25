@@ -99,10 +99,12 @@ export function calEmbedLink(calLink: string | null | undefined, rescheduleUid?:
 /**
  * Embed config: prefills the booking form and tags the Cal.com booking with our
  * booking id (`metadata[mc_booking]`), which the webhook cross-checks against
- * the mentor and an attendee email before trusting it.
+ * the mentor and an attendee email before trusting it. The calendar is always
+ * light and in month view, like the inline embed, so a mentor's own Cal.com
+ * theme (possibly dark) never shows inside the app's white dialog.
  */
 export function calEmbedConfig(input: { menteeName?: string; menteeEmail?: string; bookingId?: string }): Record<string, string> {
-  const config: Record<string, string> = {};
+  const config: Record<string, string> = { theme: "light", layout: "month_view" };
   const name = input.menteeName?.trim();
   const email = input.menteeEmail?.trim();
   if (name) config.name = name;

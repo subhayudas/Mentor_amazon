@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle, type TurnstileStatus } from "@/components/Turnstile";
 import { SHORT_RETRY_SECONDS, classifyBookingError, invalidRequestFields, useSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
 import { DiscardRequestDialog } from "@/components/booking/DiscardRequestDialog";
 import { railStopsFor } from "@/components/booking/requestState";
@@ -30,6 +30,7 @@ import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
 import { inlineLinkClass, textLinkDestructiveClass } from "@/components/profile/styles";
 import type { PublicMentor } from "@/lib/database";
 import { bidi, formatNumber } from "@/lib/format";
+import { PROGRAMME_CONTACT_EMAIL, programmeMailto } from "@/lib/programmeContact";
 import { isBookingRequestError } from "@/lib/requests";
 import { ROUTES, loginHref } from "@/lib/routes";
 import { bookingService } from "@/lib/services";
@@ -134,6 +135,7 @@ export function BookingRequestDialog({
   // Anonymous senders prove they are human; a signed-in request is tied to the account instead.
   const needsCaptcha = !signedIn && turnstileEnabled();
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = React.useState<TurnstileStatus>("loading");
   const turnstileRef = React.useRef<TurnstileHandle>(null);
 
   const nameRef = React.useRef<HTMLInputElement>(null);
@@ -495,7 +497,8 @@ export function BookingRequestDialog({
                           />
                         )}
                         {serverError === "captcha" && t("bookingRequest.error.captcha")}
-                        {serverError === "botCheck" && t("bookingRequest.error.botCheck")}
+                        {serverError === "botCheck" &&
+                          (captchaStatus === "failed" ? t("bookingRequest.captchaNotSent") : t("bookingRequest.error.botCheck"))}
                         {serverError === "invalid" && t("bookingRequest.error.invalid")}
                         {serverError === "invalidEmail" && t("bookingRequest.error.invalidEmail")}
                         {serverError === "generic" && t("bookingRequest.error.generic")}
@@ -634,7 +637,27 @@ export function BookingRequestDialog({
                   <Turnstile
                     ref={turnstileRef}
                     action="booking-request"
+                    copy="booking"
                     className="min-h-[65px]"
+                    onStatus={setCaptchaStatus}
+                    fallback={
+                      PROGRAMME_CONTACT_EMAIL ? (
+                        <Trans
+                          i18nKey="bookingRequest.captchaContact"
+                          values={{ email: PROGRAMME_CONTACT_EMAIL }}
+                          components={{
+                            email: (
+                              <a
+                                href={programmeMailto(PROGRAMME_CONTACT_EMAIL, t("bookingRequest.captchaContactSubject", { name: mentorName }))}
+                                dir="ltr"
+                                className="font-semibold underline underline-offset-4"
+                                data-testid="link-captcha-contact"
+                              />
+                            ),
+                          }}
+                        />
+                      ) : undefined
+                    }
                     onToken={(token) => {
                       setCaptchaToken(token);
                       // "Complete the check" is answered by the token; a server-side rejection stays until the next send.
