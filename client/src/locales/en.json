@@ -2121,6 +2121,17 @@
       "mentorTitle": "No requests yet",
       "mentorBody": "Requests mentees send you appear here, with the sessions that follow.",
       "browse": "Browse mentors"
+    },
+    "demoLocalBody": "Demo mode: every number and chart on this page is illustrative sample data, not programme metrics.",
+    "lowData": {
+      "title": "Real programme data",
+      "none": "No requests yet. Every number on this page is real and fills in as soon as mentees send requests.",
+      "few_zero": "No requests yet. Every number on this page is real and fills in as soon as mentees send requests.",
+      "few_one": "Only {{count}} request so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_two": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_few": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_many": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_other": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded."
     }
   },
   "showcase": {
