@@ -90,3 +90,23 @@ test('R1-42 with five or more real bookings there is no low-data note', async ({
   await expect(page.getByTestId('banner-demo-data')).toHaveCount(0);
   await healthy({ screenshotName: 'R1-42-reports-six-real-bookings' });
 });
+
+test('R1-65 growth analytics are for admins and mentors: a mentee gets the no-access card', async ({ page, loginAs, healthy, lang }) => {
+  await loginAs('mentee');
+  await tokenSettle(page);
+  await page.goto('/analytics/reports');
+  await expect(page.getByText(tr(lang, 'guard.noAccessTitle')).first()).toBeVisible();
+  await expect(page.getByTestId('metric-requests')).toHaveCount(0);
+  await expect(page.getByTestId('analytics-nothing-yet')).toHaveCount(0);
+  await healthy({ screenshotName: 'R1-65-mentee-forbidden' });
+});
+
+test('R1-65 a mentor still opens growth analytics (their own sessions)', async ({ page, loginAs, healthy }) => {
+  await loginAs('mentor');
+  await tokenSettle(page);
+  await page.goto('/analytics/reports');
+  await expect(page.getByTestId('analytics-summary')).toBeVisible();
+  await expect(page.getByTestId('banner-demo-data')).toHaveCount(0);
+  await expect(page.getByTestId('note-low-data'), 'the low-data note is the programme view only').toHaveCount(0);
+  await healthy({ screenshotName: 'R1-65-mentor-reports' });
+});

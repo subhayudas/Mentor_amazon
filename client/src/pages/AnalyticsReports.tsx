@@ -40,6 +40,7 @@ import { MOCK_BOOKINGS, MOCK_MENTEES, MOCK_MENTORS } from "@/data/mockAnalytics"
 import { bookingStatusLabel, type BookingStatus } from "@/components/StatusBadge";
 import { Container } from "@/components/layout/Container";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { RequireRole } from "@/components/RouteGuard";
 import { IS_LOCAL } from "@/lib/demo";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -100,7 +101,19 @@ const FILTER_LABEL_KEY: Record<FilterKey, string> = {
  * however few rows there are (a young programme has a handful; a note says
  * so), and a failed fetch is an error state with retry (findings C3, R1-42).
  */
-export default function Analytics() {
+/**
+ * Growth analytics are for the programme (admins) and mentors, like `/analytics` (F14, R1-65):
+ * mentees have no analytics and no link here, so a mentee opening the URL gets the no-access card.
+ */
+export default function AnalyticsReports() {
+  return (
+    <RequireRole role={["admin", "mentor"]}>
+      <GrowthAnalytics />
+    </RequireRole>
+  );
+}
+
+function GrowthAnalytics() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { user } = useAuth();
