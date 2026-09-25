@@ -77,9 +77,12 @@ export async function enforceRateLimit(req: VercelRequest, res: VercelResponse, 
   return false;
 }
 
+/**
+ * Rules shared by the SSO routes. The request and webhook routes define their own next to
+ * the handler (REQUESTS_RULE, FAIL_LIMIT); tests/ratelimit-rules.test.ts keeps the names unique
+ * and fails on a rule no route uses.
+ */
 export const RULES = {
   authLogin: { name: 'auth-login', limit: 20, windowSeconds: 60 },
   authCallback: { name: 'auth-callback', limit: 30, windowSeconds: 60 },
-  calWebhook: { name: 'cal-webhook', limit: 120, windowSeconds: 60 },
-  turnstile: { name: 'turnstile', limit: 30, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitRule>;
