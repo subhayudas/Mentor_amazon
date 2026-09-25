@@ -1,5 +1,5 @@
--- Catalog snapshot of schema public (plus the storage policies the repo defines), one line
--- per object, sorted: two databases built by different re-run chains must print the same
+-- Catalog snapshot of schema public (plus the storage policies and the auth.users triggers the
+-- repo defines), one line per object, sorted: two databases built by different re-run chains must print the same
 -- text. Used by scripts/db/verify-idempotency.sh and tests/integration (I1, I2).
 -- Data is not part of it (applied_at timestamps, seeded rows).
 WITH lines(line) AS (
@@ -33,7 +33,7 @@ WITH lines(line) AS (
   SELECT format('trigger %s %s', t.tgrelid::regclass, pg_get_triggerdef(t.oid))
   FROM pg_trigger t
   JOIN pg_class rel ON rel.oid = t.tgrelid
-  WHERE rel.relnamespace = 'public'::regnamespace AND NOT t.tgisinternal
+  WHERE (rel.relnamespace = 'public'::regnamespace OR t.tgrelid = to_regclass('auth.users')) AND NOT t.tgisinternal
   UNION ALL
   SELECT format('relation %s kind=%s rls=%s acl=%s', rel.relname, rel.relkind, rel.relrowsecurity,
                 coalesce((SELECT string_agg(a::text, ',' ORDER BY a::text) FROM unnest(rel.relacl) a), '-'))

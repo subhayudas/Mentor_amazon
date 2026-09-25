@@ -6,7 +6,8 @@
 # All auth users are deleted as well. It refuses to touch anything but 127.0.0.1 / localhost.
 #
 # Usage: bash scripts/db/reset-local.sh [--no-contract] [--no-seed] [--e2e-seed]
-#   --no-contract  stop after 0002 (the state production is in between the migration and the deploy)
+#   --no-contract  stop after 0002 (the state production is in between the migration and the deploy);
+#                  0004 needs 0003, so the featured mentors stay static as with --no-seed
 #   --no-seed      skip 0004 (the featured mentors stay static, "opening soon")
 #   --e2e-seed     afterwards run scripts/e2e/seed.ts (Playwright personas and fixture bookings)
 # Env: DATABASE_URL (default postgresql://postgres:postgres@127.0.0.1:54322/postgres)
@@ -57,7 +58,11 @@ run_sql supabase_setup_v2.sql
 run_sql supabase_phase2.sql
 run_sql migrations/0002_production_readiness.sql
 if [[ $CONTRACT == 1 ]]; then run_sql migrations/0003_restrict_legacy_writes.sql; fi
-if [[ $SEED == 1 ]]; then run_sql migrations/0004_seed_featured_mentors.sql; fi
+if [[ $SEED == 1 && $CONTRACT == 0 ]]; then
+  echo "  skipping migrations/0004_seed_featured_mentors.sql: it runs only after 0003"
+elif [[ $SEED == 1 ]]; then
+  run_sql migrations/0004_seed_featured_mentors.sql
+fi
 
 psql "$DB" -q -c "NOTIFY pgrst, 'reload schema';"
 echo "reset-local: ok — $(psql "$DB" -Atc "select string_agg(version, ', ' order by version) from public.schema_migrations") applied; \

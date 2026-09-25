@@ -76,12 +76,15 @@ $$;
 revoke all on function public.my_profile_ids() from public;
 grant execute on function public.my_profile_ids() to authenticated, service_role;
 
--- A user may only post into their own feed; booking lifecycle rows are written by the
--- bookings_activity_events trigger (migrations/0002), which bypasses this policy.
+-- A user may only post into their own feed, with bounded text; booking lifecycle rows are
+-- written by the bookings_activity_events trigger (migrations/0002), which bypasses this policy.
+-- Same policy as migrations/0002 §3.
 drop policy if exists "events: append as self" on public.activity_events;
 create policy "events: append as self" on public.activity_events
   for insert
-  with check (public.is_admin() or (actor_id = any (public.my_profile_ids()) and visible_to <@ public.my_profile_ids()));
+  with check ((public.is_admin() or (actor_id = any (public.my_profile_ids()) and visible_to <@ public.my_profile_ids()))
+              and length(summary) <= 500 and length(type) <= 64 and length(coalesce(actor_name, '')) <= 200
+              and pg_column_size(meta) <= 8192);
 
 drop policy if exists "events: read mine" on public.activity_events;
 create policy "events: read mine" on public.activity_events
