@@ -34,7 +34,8 @@ import { createAdminClient, type AdminClient } from '../_lib/supabaseAdmin.js';
  *      failed) is taken over by one later run (a conditional update on `sent_at`);
  *   2. send what is still missing, all at once: an in-app notification per party (explicit id
  *      and created_at; every error checked) and, when RESEND_API_KEY is set, an e-mail per party
- *      (escaped HTML). On a take-over, reminder notifications already written count as sent;
+ *      (escaped HTML). On a take-over, reminder notifications already written for the session's
+ *      current time count as sent;
  *   3. if nothing reached anyone, release the claim so the next run retries;
  *   4. record the channels (or, while a part is missing, the parts delivered) and, on the first
  *      delivery, a `reminder_sent` activity row.
@@ -137,10 +138,12 @@ async function processReminder(
 
   const done = new Set(claim.before);
   if (claim.resumed) {
-    // A run that died may have written some notifications before recording them.
+    // A run that died may have written some notifications before recording them. Only one for the
+    // session's current time counts: a reschedule clears the claims but keeps the reminders sent for
+    // the old time, and only the message names the time (R2-05, R2-12).
     const { data: notes, error } = await admin
       .from('notifications')
-      .select('recipient_email')
+      .select('recipient_email, message')
       .eq('booking_id', row.id)
       .eq('type', 'reminder')
       .eq('title', reminderTitle(kind));
@@ -149,9 +152,9 @@ async function processReminder(
       out.failures += 1;
       return; // the claim stays stale and is retried by the next run
     }
-    for (const note of (notes ?? []) as Array<{ recipient_email: string | null }>) {
+    for (const note of (notes ?? []) as Array<{ recipient_email: string | null; message: string | null }>) {
       const r = recipients.find((x) => x.email === (note.recipient_email ?? '').trim().toLowerCase());
-      if (r) done.add(reminderPart(r.type, 'in_app'));
+      if (r && note.message === reminderNotification(kind, row, r).message) done.add(reminderPart(r.type, 'in_app'));
     }
   }
   const fromEarlierRuns = new Set(done);
@@ -216,9 +219,10 @@ async function processReminder(
   if (channelError) console.error('[reminders] channel update failed', { booking: row.id, kind, code: channelError.code });
 
   const delivered = Array.from(done).filter((p) => !fromEarlierRuns.has(p));
-  if (delivered.length === 0) return;
-  out.reminders += 1;
-  // A run that recorded progress also wrote the activity row; write it once, on the first delivery.
+  if (delivered.length > 0) out.reminders += 1;
+  // The activity row is written once, by the run that records the first progress: a claim that had
+  // progress recorded already has it. A take-over whose parts were all written by the run that died
+  // (which recorded nothing) still writes it (R2-07).
   if (claim.before.size > 0) return;
 
   const channelList = channelNames(done);

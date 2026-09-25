@@ -12,6 +12,7 @@ import {
   recipientsFor,
   reminderEmail,
   reminderKind,
+  reminderNotification,
   reminderTitle,
   type ReminderRow,
 } from '../api/_lib/reminders.ts';
@@ -298,6 +299,14 @@ describe('GET /api/cron/reminders', () => {
   });
 
   describe('crash safety (R1-03)', () => {
+    /** The 1h reminder notification a run writes for this recipient of b1, as the cron builds it. */
+    const written = (email: string) => {
+      const row = db.bookings[0] as ReminderRow;
+      const r = recipientsFor(row).find((x) => x.email === email)!;
+      return { booking_id: 'b1', recipient_email: email, type: 'reminder', ...reminderNotification('1h', row, r) };
+    };
+    /** The same reminder, sent for the session's time before a reschedule. */
+    const oldTime = (email: string) => ({ ...written(email), message: `Mentoring session with Someone — Tue, 22 Sep 2026, 09:00 UTC` });
     it('a claim left empty by a run that died is taken over after 15 minutes and the reminder goes out', async () => {
       db.seedClaim('b1', '1h', [], 20);
       const res = await run();
@@ -356,13 +365,53 @@ describe('GET /api/cron/reminders', () => {
 
     it('notifications a dead run wrote before recording them are not written twice', async () => {
       db.seedClaim('b1', '1h', [], 20);
-      db.notifications.push({ booking_id: 'b1', recipient_email: 'mentor@example.com', type: 'reminder', title: reminderTitle('1h') });
+      db.notifications.push(written('mentor@example.com'));
       delete process.env.RESEND_API_KEY;
       const res = await run();
       expect(res.json()).toEqual({ ok: true, reminders: 1, emails: 0, failures: 0 });
       expect(db.notifications.filter((n) => n.recipient_email === 'mentor@example.com')).toHaveLength(1);
       expect(db.notifications.filter((n) => n.recipient_email === 'mentee@example.com')).toHaveLength(1);
       expect(db.claims[0].channels).toEqual(['in_app']);
+    });
+
+    it('after a reschedule, a take-over does not count the reminder sent for the old time: the mentee is reminded of the new one (R2-05)', async () => {
+      delete process.env.RESEND_API_KEY;
+      // Both parties were reminded of the old time; the reschedule cleared the claims, not those notifications.
+      db.notifications.push(oldTime('mentee@example.com'), oldTime('mentor@example.com'));
+      db.failNotificationsFor.add('mentee@example.com');
+      await run();
+      expect(db.claims[0].channels).toEqual(['mentor:in_app']);
+      db.failNotificationsFor.clear();
+      db.claims[0].sent_at = new Date(Date.now() - 20 * 60_000).toISOString();
+      const res = await run();
+      expect(res.json()).toEqual({ ok: true, reminders: 1, emails: 0, failures: 0 });
+      const toMentee = db.notifications.filter((n) => n.recipient_email === 'mentee@example.com');
+      expect(toMentee.map((n) => n.message)).toEqual([oldTime('mentee@example.com').message, written('mentee@example.com').message]);
+      expect(db.claims[0].channels).toEqual(['in_app']);
+    });
+
+    it('a claim left empty after a reschedule still sends the reminder for the new time to both parties (R2-12)', async () => {
+      delete process.env.RESEND_API_KEY;
+      db.seedClaim('b1', '1h', [], 20);
+      db.notifications.push(oldTime('mentee@example.com'), oldTime('mentor@example.com'));
+      const res = await run();
+      expect(res.json()).toEqual({ ok: true, reminders: 1, emails: 0, failures: 0 });
+      const forNewTime = db.notifications.filter((n) => n.message === written(String(n.recipient_email)).message);
+      expect(forNewTime.map((n) => n.recipient_email).sort()).toEqual(['mentee@example.com', 'mentor@example.com']);
+      expect(db.notifications).toHaveLength(4);
+      expect(db.claims[0].channels).toEqual(['in_app']);
+      expect(db.activity).toHaveLength(1);
+    });
+
+    it('a take-over that finds every notification already written by the run that died still records reminder_sent (R2-07)', async () => {
+      delete process.env.RESEND_API_KEY;
+      db.seedClaim('b1', '1h', [], 20);
+      db.notifications.push(written('mentor@example.com'), written('mentee@example.com'));
+      const res = await run();
+      expect(res.json()).toEqual({ ok: true, reminders: 0, emails: 0, failures: 0 });
+      expect(db.notifications).toHaveLength(2);
+      expect(db.claims[0].channels).toEqual(['in_app']);
+      expect(db.activity).toEqual([expect.objectContaining({ type: 'reminder_sent', subject_id: 'b1' })]);
     });
 
     it('two runs racing for the same stale claim: exactly one takes it over', async () => {
