@@ -22,8 +22,11 @@ import { useTranslation } from "react-i18next";
  *   another app from inside such a frame still blanks the page, and coming
  *   back (even straight into the frame) shows it again.
  *
- * The veil is portalled to `<body>`, outside `#root`, so the rule that hides
- * the app while veiled never hides the veil's own message.
+ * The veil is the `guard-veiled` class on `<html>` (index.css hides the app and
+ * shows the veil), set and cleared synchronously in the event handlers, so a
+ * keyboard user tabbing back into the page finds its controls visible at once.
+ * The veil element is portalled to `<body>`, outside `#root`, so the rule that
+ * hides the app while veiled never hides the veil's own message.
  *
  * Opt out per element with `data-guard="off"` (never needed for inputs).
  */
@@ -38,11 +41,11 @@ function inEditable(target: EventTarget | null): boolean {
 
 export function ContentGuard() {
   const { t } = useTranslation();
-  const [veiled, setVeiled] = React.useState(false);
 
   React.useEffect(() => {
     const root = document.documentElement;
     root.classList.add("guard-active");
+    const setVeiled = (veiled: boolean) => root.classList.toggle("guard-veiled", veiled);
 
     const block = (e: Event) => {
       if (inEditable(e.target)) return;
@@ -109,7 +112,7 @@ export function ContentGuard() {
     document.addEventListener("visibilitychange", onVisibility);
     return () => {
       stopWatching();
-      root.classList.remove("guard-active");
+      root.classList.remove("guard-active", "guard-veiled");
       document.removeEventListener("contextmenu", block);
       document.removeEventListener("dragstart", block);
       document.removeEventListener("selectstart", block);
@@ -122,10 +125,6 @@ export function ContentGuard() {
       document.removeEventListener("visibilitychange", onVisibility);
     };
   }, []);
-
-  React.useEffect(() => {
-    document.documentElement.classList.toggle("guard-veiled", veiled);
-  }, [veiled]);
 
   return createPortal(
     <div className="guard-veil" aria-hidden="true" data-testid="guard-veil">

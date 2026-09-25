@@ -245,7 +245,8 @@ export function CalSyncPanel({
               readOnly
               value={url}
               dir="ltr"
-              className="min-w-0 flex-1 text-start font-mono text-caption max-md:h-11"
+              // Grows along the row from `sm`; in the phone column a flex-1 would collapse it to its text height (33px).
+              className="min-w-0 text-start font-mono text-caption max-md:h-11 sm:flex-1"
               onFocus={(event) => event.currentTarget.select()}
               onKeyDown={swallowEnter}
               data-testid="cal-sync-url"

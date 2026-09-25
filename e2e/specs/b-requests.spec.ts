@@ -240,8 +240,11 @@ test('S6b a server outage is not blamed on the connection; a 429 blocks Send onl
   await expect(error).toHaveAttribute('data-kind', 'rateLimited');
   await expect(error).toHaveText(tr(lang, 'bookingRequest.error.rateLimitedSoon'));
   await expect(send).toHaveAttribute('aria-disabled', 'true');
+  // A screen reader tabbing back to the dimmed Send hears why (R1-81), as in the dialog.
+  await expect(send).toHaveAccessibleDescription(tr(lang, 'bookingRequest.error.rateLimitedSoon'));
   // After the Retry-After the person can try again without reloading.
   await expect(send).not.toHaveAttribute('aria-disabled', 'true', { timeout: 12_000 });
+  await expect(send).not.toHaveAttribute('aria-describedby', /.+/);
   await healthy({ screenshotName: 'S6b-rate-limit-cooled', allowStatus: [{ url: /\/api\/requests$/, status: 429 }, { url: /\/api\/requests$/, status: 503 }] });
 });
 
