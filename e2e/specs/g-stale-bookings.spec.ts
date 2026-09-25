@@ -131,6 +131,40 @@ test('R1-16 a fresh Cancel still works: the write matches, the mentee is told on
   });
 });
 
+test('R2-02 the mentee portal: a stale Cancel on a session the mentor already cancelled says so, changes nothing and refreshes the card', async ({ page, loginAs, healthy, db, lang, personaProject }) => {
+  await withAcceptedBooking(db, personaProject, 'mentee-stale-cancel', async (id) => {
+    await loginAs('mentee');
+    await tokenSettle(page);
+    const toasts = await recordToasts(page);
+    await page.goto('/mentee-dashboard/bookings');
+    const card = page.getByTestId(`card-booking-${id}`);
+    await expect(card).toHaveAttribute('data-status', 'accepted');
+
+    // Meanwhile the mentor cancels; this tab still offers "Cancel request".
+    await db`
+      update public.bookings set status = 'canceled', canceled_by = 'mentor',
+        canceled_at = timezone('utc', now()) - interval '10 minutes'
+      where id = ${id}`;
+    const before = await row(db, id);
+    const sent = await counts(db, id);
+
+    await card.getByTestId(`button-cancel-request-${id}`).click();
+    const dialog = page.getByTestId('dialog-confirm-booking');
+    await expect(dialog).toBeVisible();
+    await dialog.getByTestId('button-confirm-cancel').click();
+
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: tr(lang, 'showcase.bookings.toast.stale') })).toBeVisible();
+    expect(await toasts.seen(tr(lang, 'dashboardV2.confirm.error')), 'no "check your connection" for a booking that moved on').toBe(false);
+    expect(await toasts.seen(tr(lang, 'dashboardV2.confirm.requestWithdrawn'))).toBe(false);
+    expect(await row(db, id), 'canceled_by and canceled_at stay the mentor\'s').toEqual(before);
+    expect(await counts(db, id), 'nobody is notified').toEqual(sent);
+    // The list shows the booking as it is now, without a Cancel button.
+    await expect(card).toHaveAttribute('data-status', 'canceled');
+    await expect(page.getByTestId(`button-cancel-request-${id}`)).toHaveCount(0);
+    await healthy({ screenshotName: 'R2-02-mentee-stale-cancel' });
+  });
+});
+
 /**
  * The legacy mentor portal completes through lib/reporting.completeSession (R1-16 review): the
  * same conditional write, so a second "Mark completed" from /mentor-portal/sessions cannot

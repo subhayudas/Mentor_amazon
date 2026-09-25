@@ -23,7 +23,7 @@ import { ExternalLink } from "lucide-react";
 import { textLinkClass } from "@/components/profile/styles";
 import { calCancelUrl } from "@/lib/calLink";
 import { isCalUid } from "@/lib/calEvents";
-import type { Mentee } from "@/lib/database";
+import { isBookingNotPendingError, isBookingStateChangedError, type Mentee } from "@/lib/database";
 import { bidi } from "@/lib/format";
 import { credentialLine, localizedField } from "@/lib/localized";
 import type { BookingWithMentor } from "@/lib/menteeBookings";
@@ -88,8 +88,12 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
       toast.success(kind === "cancelSession" ? t("dashboardV2.confirm.sessionCancelled") : t("dashboardV2.confirm.requestWithdrawn"));
       highlight(booking.id);
     },
-    onError: () => {
-      toast.error(t("dashboardV2.confirm.error"));
+    onError: (error) => {
+      // Show the database's truth again: the mentor may have cancelled or declined it meanwhile, and
+      // then nothing was written (R1-16). Say so, not "check your connection" (R2-02).
+      invalidate();
+      const stale = isBookingStateChangedError(error) || isBookingNotPendingError(error);
+      toast.error(stale ? t("showcase.bookings.toast.stale") : t("dashboardV2.confirm.error"));
     },
     onSettled: (_row, _error, { booking }) => {
       setPendingIds((ids) => {
