@@ -1,8 +1,12 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { afterEach, expect, it } from 'vitest';
-import { describeDb } from './env.ts';
-import { mkBooking, mkMentee, mkMentor } from './fixtures.ts';
-import { createScratchDb, SQL, type ScratchDb } from './scratchDb.ts';
+import { describeDb, TEST_DB_URL } from './env.ts';
+import { claims, mkBooking, mkMentee, mkMentor } from './fixtures.ts';
+import { createScratchDb, SCRATCH_TTL_SECONDS, SQL, type ScratchDb } from './scratchDb.ts';
+import { asRole, connect, expectPgFailure, withTx } from './sql.ts';
+
+const MANAV = '738d7465-42c6-5550-be9a-6e7ef35f52bc';
+const BASHAR = 'caf1ee67-267d-591f-9842-5ae649ec2a26';
 
 /**
  * I1 (migration and re-run chain), I2 (phase-2 repair) and the I6 pre-check, each on a
@@ -88,6 +92,66 @@ describeDb('I1 migrations and the re-run chain', () => {
       select to_regclass('public.schema_migrations')::text as ledger,
              to_regprocedure('public.create_booking_request(text,text,text,text)')::text as fn`;
     expect({ ledger, fn }).toEqual({ ledger: null, fn: null });
+  });
+});
+
+describeDb('I1 preconditions and the rollout order', () => {
+  it('0002 on a database without supabase_setup_v2.sql stops with its readable list of problems (R1-27)', async () => {
+    const db = await scratch();
+    // (The drizzle base already has approved_users; v2's helpers are what is missing.)
+    await expect(db.apply(SQL.m0002)).rejects.toThrow(
+      /^0002 preconditions failed: public\.is_privileged\(\) is missing: run supabase_setup_v2\.sql first$/,
+    );
+    const [{ ledger }] = await db.sql<{ ledger: string | null }[]>`select to_regclass('public.schema_migrations')::text as ledger`;
+    expect(ledger).toBeNull();
+  });
+
+  it('0004 refuses to run before 0003 (the new client must be live), and seeds nothing (R1-29)', async () => {
+    const db = await scratch();
+    for (const f of [SQL.v2, SQL.phase2, SQL.m0002]) await db.apply(f);
+    await expect(db.apply(SQL.m0004)).rejects.toThrow(/0004 preconditions failed: run migrations\/0003_restrict_legacy_writes\.sql first/);
+    const [{ n }] = await db.sql<{ n: number }[]>`select count(*)::int as n from public.mentors where managed_by_programme`;
+    expect(n).toBe(0);
+    await db.apply(SQL.m0003);
+    await db.apply(SQL.m0004);
+    const [{ seeded }] = await db.sql<{ seeded: number }[]>`select count(*)::int as seeded from public.mentors where managed_by_programme`;
+    expect(seeded).toBe(5);
+  });
+
+  it('after 0002 nobody but an admin creates a featured mentor\'s row; one taken before 0002 stops the first 0004 run (R1-09)', async () => {
+    const db = await scratch();
+    for (const f of [SQL.v2, SQL.phase2]) await db.apply(f);
+    // Before 0002 (production today) any approved mentor could insert a row under a featured id.
+    await mkMentor(db.sql, { id: MANAV, name: 'Manav Gupta', email: 'squatter@amazon.com', bio: 'Squatted bio' });
+    await db.apply(SQL.m0002);
+    await db.apply(SQL.m0003);
+    // An approved Amazon mentor cannot take another featured id now.
+    const sub = randomUUID();
+    await db.sql`insert into public.users (id, email, password, user_type, is_verified, created_at)
+                 values (${sub}, 'late.squatter@amazon.com', 'x', 'mentor', true, now())`;
+    await db.sql`insert into public.approved_users (id, amazon_alias, email, role, is_active, approved_by, approved_at)
+                 values (${randomUUID()}, 'latesquatter', 'late.squatter@amazon.com', 'mentor', true, 'amazon-sso', now())`;
+    await withTx(db.sql, async (tx) => {
+      await asRole(tx, 'authenticated', claims(sub, 'late.squatter@amazon.com'));
+      await expectPgFailure(tx, (sp) => sp`
+        insert into public.mentors (id, name, email, timezone, bio, cal_link, expertise, industries, languages_spoken, comms_owner, created_at, updated_at)
+        values (${BASHAR}, 'Bashar Aboudaoud', 'late.squatter@amazon.com', 'UTC', 'bio', 'late/30min', ${['x']}, ${['x']}, ${['English']}, 'exec', now(), now())`,
+        { code: '42501', detail: /this mentor id is reserved for the programme/ });
+    });
+    // The first 0004 run names the squatted row and seeds nothing.
+    await expect(db.apply(SQL.m0004)).rejects.toThrow(/featured-mentor ids are already used by rows this file did not write: 738d7465-42c6-5550-be9a-6e7ef35f52bc \(squatter@amazon\.com, not programme-managed\)/);
+    const [{ n }] = await db.sql<{ n: number }[]>`select count(*)::int as n from public.mentors where managed_by_programme`;
+    expect(n).toBe(0);
+    // Once an admin deletes it, the seed goes through; re-runs keep later admin edits.
+    await db.sql`delete from public.mentors where id = ${MANAV}`;
+    await db.apply(SQL.m0004);
+    const rows = await db.sql<{ email: string }[]>`select email from public.mentors where managed_by_programme order by email`;
+    expect(rows).toHaveLength(5);
+    expect(rows.every((r) => r.email.endsWith('@mentorconnect.invalid'))).toBe(true);
+    await db.sql`update public.mentors set email = 'manav@brinc.io', managed_by_programme = false where id = ${MANAV}`;
+    await db.apply(SQL.m0004);
+    const [handed] = await db.sql`select email, managed_by_programme from public.mentors where id = ${MANAV}`;
+    expect(handed).toEqual({ email: 'manav@brinc.io', managed_by_programme: false });
   });
 });
 
@@ -177,5 +241,25 @@ describeDb('I6 pre-check: duplicate Cal uids', () => {
     await mkBooking(db.sql, m.id, e.id, { status: 'confirmed', cal_event_uri: 'dupUid123' });
     await mkBooking(db.sql, m.id, e.id, { status: 'confirmed', cal_event_uri: 'dupUid123' });
     await expect(db.apply(SQL.m0002)).rejects.toThrow(/duplicate bookings\.cal_event_uri values: dupUid123 \(2 rows\)/);
+  });
+});
+
+describeDb('scratch databases never pile up (R1-34)', () => {
+  it('a scratch database that a killed run left behind is dropped by the next run; a recent one (a run in progress) stays', async () => {
+    const admin = connect(TEST_DB_URL, 1);
+    const now = Math.floor(Date.now() / 1000);
+    const stale = `mc_scratch_${now - SCRATCH_TTL_SECONDS - 60}_${randomBytes(3).toString('hex')}`;
+    const recent = `mc_scratch_${now - 60}_${randomBytes(3).toString('hex')}`;
+    try {
+      await admin.unsafe(`create database ${stale}`);
+      await admin.unsafe(`create database ${recent}`);
+      const db = await scratch(false);
+      const names = await admin<{ datname: string }[]>`select datname from pg_database where datname in (${stale}, ${recent}, ${db.name})`;
+      expect(names.map((r) => r.datname).sort()).toEqual([db.name, recent].sort());
+    } finally {
+      await admin.unsafe(`drop database if exists ${stale} with (force)`);
+      await admin.unsafe(`drop database if exists ${recent} with (force)`);
+      await admin.end();
+    }
   });
 });

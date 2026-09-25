@@ -40,7 +40,9 @@ BEGIN
     RAISE EXCEPTION '0004 preconditions failed: run migrations/0003_restrict_legacy_writes.sql first (after the new client is deployed)';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0004_seed_featured_mentors') THEN
-    SELECT string_agg(format('%s (%s, managed_by_programme=%s)', m.id, m.email, m.managed_by_programme), ', ' ORDER BY m.id)
+    SELECT string_agg(format('%s (%s, %s)', m.id, m.email,
+                             CASE WHEN m.managed_by_programme THEN 'programme-managed' ELSE 'not programme-managed' END),
+                      ', ' ORDER BY m.id)
       INTO v_held
     FROM public.mentors m JOIN public.reserved_mentor_ids r ON r.id = m.id;
     IF v_held IS NOT NULL THEN

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, expect, it } from 'vitest';
 import { describeDb } from './env.ts';
 import { Accounts, anonClient } from './fixtures.ts';
@@ -46,6 +47,37 @@ describeDb('I15 storage', () => {
 
     await account.client.storage.from('uploads').remove([path]);
   });
+
+  it('the list API shows signed-in users their own objects only and anon nothing; profiles/ uploads go only into the own folder (R1-11)', async () => {
+    const a = await accounts.create('lister-a', { userType: 'mentor' });
+    const b = await accounts.create('lister-b', { userType: 'mentee' });
+    const own = `profiles/${a.id}/it-${Date.now()}.png`;
+    const flat = `mentors/it-${randomUUID()}.png`;
+    try {
+      expect((await a.client.storage.from('uploads').upload(own, PNG, { contentType: 'image/png' })).error).toBeNull();
+      // The live client's flat folders (random file names) keep working.
+      expect((await a.client.storage.from('uploads').upload(flat, PNG, { contentType: 'image/png' })).error).toBeNull();
+      const intruder = await b.client.storage.from('uploads').upload(`profiles/${a.id}/intruder-${Date.now()}.png`, PNG, { contentType: 'image/png' });
+      expect(intruder.error, 'another account cannot write into this folder').not.toBeNull();
+      expect((await b.client.storage.from('uploads').upload(`profiles/${b.id}/mine-${Date.now()}.png`, PNG, { contentType: 'image/png' })).error).toBeNull();
+
+      const anonList = await anonClient().storage.from('uploads').list('profiles');
+      expect(anonList.data ?? []).toEqual([]);
+      const anonFolder = await anonClient().storage.from('uploads').list(`profiles/${a.id}`);
+      expect(anonFolder.data ?? []).toEqual([]);
+      const strangerView = await b.client.storage.from('uploads').list(`profiles/${a.id}`);
+      expect(strangerView.data ?? []).toEqual([]);
+      const ownView = await a.client.storage.from('uploads').list(`profiles/${a.id}`);
+      expect((ownView.data ?? []).map((o) => o.name)).toContain(own.split('/').pop());
+      // Files are still served to everyone through their public URL.
+      const url = anonClient().storage.from('uploads').getPublicUrl(own).data.publicUrl;
+      expect((await fetch(url)).status).toBe(200);
+    } finally {
+      await a.client.storage.from('uploads').remove([own, flat]);
+      const { data } = await b.client.storage.from('uploads').list(`profiles/${b.id}`);
+      await b.client.storage.from('uploads').remove((data ?? []).map((o) => `profiles/${b.id}/${o.name}`));
+    }
+  });
 });
 
 describeDb('I16 featured-mentor seed', () => {
@@ -87,7 +119,7 @@ describeDb('I16 featured-mentor seed', () => {
   it('a re-run never overwrites an admin edit (is_available = false stays false)', async () => {
     const db = await createScratchDb();
     open.push(db);
-    for (const f of [SQL.v2, SQL.phase2, SQL.m0002, SQL.m0004]) await db.apply(f);
+    for (const f of [SQL.v2, SQL.phase2, SQL.m0002, SQL.m0003, SQL.m0004]) await db.apply(f);
     await db.sql`update public.mentors set is_available = false, bio = 'edited by an admin' where id = '738d7465-42c6-5550-be9a-6e7ef35f52bc'`;
     await db.apply(SQL.m0004);
     const [row] = await db.sql`select is_available, bio from public.mentors where id = '738d7465-42c6-5550-be9a-6e7ef35f52bc'`;

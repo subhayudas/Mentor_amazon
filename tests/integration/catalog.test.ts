@@ -3,6 +3,7 @@ import { afterAll, expect, it } from 'vitest';
 import { describeDb } from './env.ts';
 import { claims, mkMentee, mkMentor, mkUser } from './fixtures.ts';
 import { asRole, asService, connect, withTx } from './sql.ts';
+import { FEATURED_DB_IDS } from '../../client/src/data/featuredMentors.ts';
 
 /** I3 (catalog, privilege matrix) and I4 (defaults) on the shared stack (design §6.3). */
 const sql = connect();
@@ -30,6 +31,7 @@ const FUNCTION_MATRIX: Record<string, Role[]> = {
   'public.my_profile_ids()': ['authenticated', 'service_role'],
   'public.recompute_mentor_rating(text)': ['authenticated', 'service_role'],
   'public.is_admin()': ['anon', 'authenticated', 'service_role'],
+  'public.block_sso_password_change()': [],
 };
 
 describeDb('I3 catalog', () => {
@@ -73,7 +75,7 @@ describeDb('I3 catalog', () => {
              has_table_privilege('authenticated', 'public.bookings', 'SELECT') as sel,
              has_table_privilege('authenticated', 'public.bookings', 'UPDATE') as upd`;
     expect(auth).toEqual({ ins: false, sel: true, upd: true });
-    for (const t of ['mentor_cal_webhooks', 'schema_migrations', 'mc_settings', 'booking_cal_superseded_uids']) {
+    for (const t of ['mentor_cal_webhooks', 'schema_migrations', 'mc_settings', 'booking_cal_superseded_uids', 'reserved_mentor_ids']) {
       for (const role of ['anon', 'authenticated']) {
         const [row] = await sql<{ any: boolean }[]>`
           select has_table_privilege(${role}, ${`public.${t}`}, 'SELECT,INSERT,UPDATE,DELETE') as any`;
@@ -96,6 +98,29 @@ describeDb('I3 catalog', () => {
       expect(none).toEqual([]);
       await asService(tx);
     });
+  });
+
+  it('the reserved mentor ids are exactly the featured dbIds of client/src/data/featuredMentors.ts (R1-09)', async () => {
+    const rows = await sql<{ id: string }[]>`select id from public.reserved_mentor_ids order by id`;
+    expect(rows.map((r) => r.id)).toEqual([...FEATURED_DB_IDS].sort());
+  });
+
+  it('a recipient may update only is_read on a notification (R1-12)', async () => {
+    const [row] = await sql<{ table_update: boolean; is_read: boolean; message: boolean; recipient: boolean }[]>`
+      select has_table_privilege('authenticated', 'public.notifications', 'UPDATE') as table_update,
+             has_column_privilege('authenticated', 'public.notifications', 'is_read', 'UPDATE') as is_read,
+             has_column_privilege('authenticated', 'public.notifications', 'message', 'UPDATE') as message,
+             has_column_privilege('authenticated', 'public.notifications', 'recipient_email', 'UPDATE') as recipient`;
+    expect(row).toEqual({ table_update: false, is_read: true, message: false, recipient: false });
+  });
+
+  it('auth.users carries the trigger that refuses a password for an Amazon account (R1-37)', async () => {
+    const rows = await sql<{ enabled: string; def: string }[]>`
+      select t.tgenabled as enabled, pg_get_triggerdef(t.oid) as def from pg_trigger t
+      where t.tgrelid = 'auth.users'::regclass and t.tgname = 'auth_users_block_sso_password'`;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].enabled).toBe('O');
+    expect(rows[0].def).toMatch(/BEFORE UPDATE OF encrypted_password ON auth\.users FOR EACH ROW EXECUTE FUNCTION (public\.)?block_sso_password_change\(\)/);
   });
 
   it('RLS is on for every public table', async () => {

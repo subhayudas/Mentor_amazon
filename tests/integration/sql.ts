@@ -76,6 +76,30 @@ export async function expectPgError(tx: Tx, fn: (sp: Tx) => Promise<unknown>, co
   if (message) expect(failure.message).toMatch(message);
 }
 
+/**
+ * Assert that `fn` fails with `code`, a message and a DETAIL (the guards name the rule they
+ * applied in the detail, e.g. 'profile_id may only name your own profile').
+ */
+export async function expectPgFailure(
+  tx: Tx,
+  fn: (sp: Tx) => Promise<unknown>,
+  want: { code: string; message?: RegExp; detail: RegExp },
+): Promise<void> {
+  let failure: { code: string; message: string; detail: string } | undefined;
+  try {
+    await tx.savepoint(async (sp) => {
+      await fn(sp as unknown as Tx);
+    });
+  } catch (err) {
+    const e = err as { code?: string; message?: string; detail?: string };
+    failure = { code: e.code ?? '', message: e.message ?? String(err), detail: e.detail ?? '' };
+  }
+  if (!failure) throw new Error(`expected a Postgres error with detail ${want.detail}, the statement succeeded`);
+  expect(failure.code, `${failure.message} — ${failure.detail}`).toBe(want.code);
+  if (want.message) expect(failure.message).toMatch(want.message);
+  expect(failure.detail).toMatch(want.detail);
+}
+
 /** Run `fn` in a savepoint; true when it succeeded. */
 export async function succeeds(tx: Tx, fn: (sp: Tx) => Promise<unknown>): Promise<boolean> {
   try {

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, expect, it } from 'vitest';
 import { describeDb } from './env.ts';
 import { anonClient, claims, mkBooking, mkMentee, mkMentor, mkUser } from './fixtures.ts';
-import { asRole, asService, connect, expectPgError, withTx, type Tx } from './sql.ts';
+import { asRole, asService, connect, expectPgError, expectPgFailure, withTx, type Tx } from './sql.ts';
 
 /**
  * I5 (constraints and the booking guard), I6 (unique Cal uid) and I14 (activity trigger and
@@ -129,6 +129,135 @@ describeDb('I5 constraints and the booking guard', () => {
     const { error, status } = await anonClient().rpc('set_config', { setting_name: 'mc.internal_write', new_value: 'on', is_local: true });
     expect(status).toBe(404);
     expect(error?.code).toBe('PGRST202');
+  });
+});
+
+const STATUSES = ['pending', 'accepted', 'rejected', 'confirmed', 'completed', 'canceled'] as const;
+type Status = (typeof STATUSES)[number];
+
+/** Update a booking's status in a savepoint; 'ok', or the SQLSTATE and message it failed with. */
+async function transition(tx: Tx, id: string, to: Status): Promise<string> {
+  try {
+    await tx.savepoint(async (sp) => {
+      const rows = await sp`update public.bookings set status = ${to} where id = ${id} returning id`;
+      if (rows.length !== 1) throw Object.assign(new Error('no row updated'), { code: 'no_row' });
+    });
+    return 'ok';
+  } catch (err) {
+    const e = err as { code?: string; message?: string };
+    return `${e.code} ${e.message}`;
+  }
+}
+
+describeDb('I5 status transitions per role (design §3.3; the shared stack is in the contract state)', () => {
+  // Every pair a party may make once 0003 has run. Only Cal.com sync (the webhook and
+  // record_cal_booking_from_embed) makes a booking 'confirmed'.
+  const ALLOWED: Record<'mentor' | 'mentee', string[]> = {
+    mentor: ['pending>accepted', 'pending>rejected', 'pending>canceled', 'accepted>completed', 'accepted>canceled',
+             'confirmed>completed', 'confirmed>canceled'],
+    mentee: ['pending>canceled', 'accepted>canceled', 'confirmed>canceled'],
+  };
+
+  it('every (role, from, to) pair: the allowed ones succeed, every other one is 42501 forbidden_status_transition', async () => {
+    await withTx(sql, async (tx) => {
+      const p = await parties(tx);
+      const actual: string[] = [];
+      const expected: string[] = [];
+      for (const role of ['mentor', 'mentee'] as const) {
+        for (const from of STATUSES) {
+          for (const to of STATUSES) {
+            if (from === to) continue;
+            await asService(tx);
+            const id = await mkBooking(tx, p.mentor.id, p.mentee.id, { status: from });
+            await (role === 'mentor' ? p.asMentor() : p.asMentee());
+            actual.push(`${role} ${from}>${to}: ${await transition(tx, id, to)}`);
+            expected.push(`${role} ${from}>${to}: ${ALLOWED[role].includes(`${from}>${to}`) ? 'ok' : '42501 forbidden_status_transition'}`);
+          }
+        }
+      }
+      await asService(tx);
+      expect(actual).toEqual(expected);
+    });
+  });
+
+  it('while legacy client writes are allowed (0002 alone), both parties may still confirm an accepted booking by hand', async () => {
+    await withTx(sql, async (tx) => {
+      const p = await parties(tx);
+      await tx`insert into public.mc_settings (key, value) values ('legacy_booking_writes', 'allowed')
+               on conflict (key) do update set value = excluded.value`;
+      for (const as of [p.asMentor, p.asMentee]) {
+        await asService(tx);
+        const id = await mkBooking(tx, p.mentor.id, p.mentee.id, { status: 'accepted' });
+        await as();
+        expect(await transition(tx, id, 'confirmed')).toBe('ok');
+      }
+      await asService(tx);
+    });
+  });
+
+  it('booking parties and dates are fixed; only the mentee rates the mentor and only the mentor records duration and country', async () => {
+    await withTx(sql, async (tx) => {
+      const p = await parties(tx);
+      const otherMentor = await mkMentor(tx);
+      const otherMentee = await mkMentee(tx);
+      const pending = await mkBooking(tx, p.mentor.id, p.mentee.id);
+      const completed = await mkBooking(tx, p.mentor.id, p.mentee.id, { status: 'completed' });
+      const fixed = { code: '42501', message: /forbidden_column_change/, detail: /booking parties are immutable/ };
+      for (const as of [p.asMentee, p.asMentor]) {
+        await as();
+        await expectPgFailure(tx, (sp) => sp`update public.bookings set mentor_id = ${otherMentor.id} where id = ${pending}`, fixed);
+        await expectPgFailure(tx, (sp) => sp`update public.bookings set mentee_id = ${otherMentee.id} where id = ${pending}`, fixed);
+        await expectPgFailure(tx, (sp) => sp`update public.bookings set created_at = '2020-01-01 00:00:00' where id = ${pending}`, fixed);
+      }
+      await p.asMentor();
+      const menteeOnly = { code: '42501', message: /forbidden_column_change/, detail: /only the mentee writes mentee_rating\/mentee_feedback/ };
+      await expectPgFailure(tx, (sp) => sp`update public.bookings set mentee_rating = 5 where id = ${completed}`, menteeOnly);
+      await expectPgFailure(tx, (sp) => sp`update public.bookings set mentee_feedback = 'Brilliant mentor' where id = ${completed}`, menteeOnly);
+      await p.asMentee();
+      const mentorOnly = { code: '42501', message: /forbidden_column_change/, detail: /only the mentor records session duration and country/ };
+      await expectPgFailure(tx, (sp) => sp`update public.bookings set session_duration_minutes = 90 where id = ${completed}`, mentorOnly);
+      await expectPgFailure(tx, (sp) => sp`update public.bookings set country = 'Atlantis' where id = ${completed}`, mentorOnly);
+      await expectPgFailure(tx, (sp) => sp`update public.bookings set mentor_rating = 5 where id = ${completed}`,
+        { code: '42501', detail: /only the mentor writes mentor_rating\/mentor_feedback/ });
+      await asService(tx);
+      const rows = await tx`select mentor_id, mentee_id, mentee_rating, mentor_rating, session_duration_minutes
+                            from public.bookings where id in (${pending}, ${completed}) order by status`;
+      expect(rows).toEqual([
+        { mentor_id: p.mentor.id, mentee_id: p.mentee.id, mentee_rating: null, mentor_rating: null, session_duration_minutes: null },
+        { mentor_id: p.mentor.id, mentee_id: p.mentee.id, mentee_rating: null, mentor_rating: null, session_duration_minutes: null },
+      ]);
+      const [m] = await tx`select average_rating::text as avg, total_ratings from public.mentors where id = ${p.mentor.id}`;
+      expect(m).toEqual({ avg: '0.00', total_ratings: 0 });
+    });
+  });
+
+  it('while legacy writes are allowed, a rating needs a confirmed or completed session (no fake public ratings on a request)', async () => {
+    await withTx(sql, async (tx) => {
+      const p = await parties(tx);
+      await tx`insert into public.mc_settings (key, value) values ('legacy_booking_writes', 'allowed')
+               on conflict (key) do update set value = excluded.value`;
+      const needsSession = { code: '42501', message: /forbidden_column_change/, detail: /ratings and feedback need a confirmed or completed session/ };
+      for (const status of ['pending', 'accepted', 'rejected', 'canceled'] as const) {
+        await asService(tx);
+        const id = await mkBooking(tx, p.mentor.id, p.mentee.id, { status });
+        await p.asMentee();
+        await expectPgFailure(tx, (sp) => sp`update public.bookings set mentee_rating = 1, mentee_feedback = 'terrible' where id = ${id}`, needsSession);
+        await p.asMentor();
+        await expectPgFailure(tx, (sp) => sp`update public.bookings set mentor_rating = 1 where id = ${id}`, needsSession);
+      }
+      // The pre-release client's paths still work: the mentee rates a completed session, the mentor
+      // rates a confirmed session whose time has passed.
+      await asService(tx);
+      const completed = await mkBooking(tx, p.mentor.id, p.mentee.id, { status: 'completed' });
+      const confirmed = await mkBooking(tx, p.mentor.id, p.mentee.id, { status: 'confirmed', scheduled_at: '2026-09-01 09:00:00' });
+      await p.asMentee();
+      await tx`update public.bookings set mentee_rating = 5, mentee_feedback = 'Great' where id = ${completed}`;
+      await p.asMentor();
+      await tx`update public.bookings set mentor_rating = 5, mentor_feedback = 'Prepared' where id = ${confirmed}`;
+      await asService(tx);
+      const [m] = await tx`select average_rating::text as avg, total_ratings from public.mentors where id = ${p.mentor.id}`;
+      expect(m).toEqual({ avg: '5.00', total_ratings: 1 });
+    });
   });
 });
 
