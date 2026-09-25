@@ -26,7 +26,8 @@
 --       image/avif upload from the live client now fails); no public list API; profiles/<uid>/
 --       uploads only into the uploader's own folder;
 --     * users rows: profile_id may only name a profile under the caller's own email, is_verified
---       is set by the SSO bridge or an admin (§3a); an Amazon account cannot set a password (§3a);
+--       is set by the SSO bridge or an admin (§3a); an Amazon account cannot set a password, and
+--       any password one set before is replaced by a random one nobody knows (§3a);
 --     * mentors rows: the five featured ids are reserved, and id, email and managed_by_programme
 --       are set by an admin (§6);
 --     * bookings: parties cannot write cal_status, cal_requested_start, canceled_by or
@@ -85,8 +86,8 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM information_schema.columns
                     WHERE table_schema = 'auth' AND table_name = 'users' AND column_name = 'encrypted_password') THEN
     v_problems := array_append(v_problems, 'auth.users.encrypted_password is missing: this file targets a Supabase database');
-  ELSIF NOT has_table_privilege('auth.users', 'TRIGGER') THEN
-    v_problems := array_append(v_problems, 'the role running this file needs the TRIGGER privilege on auth.users (run it as postgres in the SQL editor)');
+  ELSIF NOT (has_table_privilege('auth.users', 'TRIGGER') AND has_table_privilege('auth.users', 'UPDATE')) THEN
+    v_problems := array_append(v_problems, 'the role running this file needs the TRIGGER and UPDATE privileges on auth.users (run it as postgres in the SQL editor)');
   END IF;
   IF cardinality(v_problems) > 0 THEN
     RAISE EXCEPTION '0002 preconditions failed: %', array_to_string(v_problems, '; ');
@@ -353,6 +354,12 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.block_sso_password_change() FROM PUBLIC, anon, authenticated, service_role;
 DROP TRIGGER IF EXISTS auth_users_block_sso_password ON auth.users;
+-- Until this trigger existed any Amazon session could give itself a password (updateUser). Every
+-- Amazon account gets a new random password nobody knows, as the SSO bridge's rotateAuthPassword
+-- does when it links a legacy account, so a password set that way stops working too.
+UPDATE auth.users a
+SET encrypted_password = extensions.crypt(encode(extensions.gen_random_bytes(32), 'hex'), extensions.gen_salt('bf', 10))
+WHERE EXISTS (SELECT 1 FROM public.users u WHERE u.id = a.id::text AND u.amazon_alias IS NOT NULL);
 CREATE TRIGGER auth_users_block_sso_password BEFORE UPDATE OF encrypted_password ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.block_sso_password_change();
 

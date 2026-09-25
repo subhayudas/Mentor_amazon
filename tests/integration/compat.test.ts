@@ -20,6 +20,11 @@ import { asRole, asService, connect, withTx } from './sql.ts';
  * afterwards. The new client works in both states, which is the point of expand/contract.
  * (c) — each file's idempotency and the v2 → phase2 → 0002 → 0003 re-run chain — is in
  * migrations.test.ts.
+ *
+ * !! SHARED-STACK WARNING: the second I0 (a) block re-grants the legacy anonymous writes on the
+ * !! SHARED database (the 0003 rollback block) until this file's afterAll re-applies 0003. Anything
+ * !! else using the stack meanwhile (Playwright, a dev server, another integration run) sees the
+ * !! expand state. Run `npm run test:integration` only on a quiet stack, never next to E2E.
  */
 const sql = connect();
 const script = connect(TEST_DB_URL, 1);

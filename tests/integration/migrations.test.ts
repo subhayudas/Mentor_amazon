@@ -155,6 +155,30 @@ describeDb('I1 preconditions and the rollout order', () => {
   });
 });
 
+describeDb('I1 Amazon accounts and passwords (R1-37)', () => {
+  it('0002 retires any password an Amazon account gave itself before the fix; e-mail accounts keep theirs', async () => {
+    const db = await scratch();
+    for (const f of [SQL.v2, SQL.phase2]) await db.apply(f);
+    const amazon = randomUUID();
+    const email = randomUUID();
+    await db.sql`insert into auth.users (id, email, encrypted_password) values
+      (${amazon}, 'jdoe@amazon.com', extensions.crypt('set-through-the-old-hole', extensions.gen_salt('bf', 4))),
+      (${email}, 'someone@mentorconnect.test', extensions.crypt('their-own-password', extensions.gen_salt('bf', 4)))`;
+    await db.sql`insert into public.users (id, email, password, user_type, amazon_alias, is_verified, created_at) values
+      (${amazon}, 'jdoe@amazon.com', 'managed-by-amazon-sso', 'mentor', 'jdoe', true, now()),
+      (${email}, 'someone@mentorconnect.test', 'managed-by-supabase-auth', 'mentee', null, false, now())`;
+    await db.apply(SQL.m0002);
+    const rows = await db.sql<{ id: string; works: boolean }[]>`
+      select id::text, encrypted_password = extensions.crypt(case when id = ${amazon}::uuid then 'set-through-the-old-hole'
+                                                                  else 'their-own-password' end, encrypted_password) as works
+      from auth.users where id in (${amazon}::uuid, ${email}::uuid)`;
+    expect(Object.fromEntries(rows.map((r) => [r.id, r.works]))).toEqual({ [amazon]: false, [email]: true });
+    // And from now on the database refuses to set one.
+    await expect(db.sql`update auth.users set encrypted_password = 'x' where id = ${amazon}`).rejects.toThrow(/sso_account_has_no_password/);
+    await db.sql`update auth.users set encrypted_password = extensions.crypt('changed', extensions.gen_salt('bf', 4)) where id = ${email}`;
+  });
+});
+
 describeDb('I2 phase-2 repair', () => {
   it('0002 on base + v2 without phase2 creates the four tables and reaches the same catalog as phase2 + 0002', async () => {
     const withoutPhase2 = await scratch();
