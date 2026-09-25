@@ -317,7 +317,7 @@ deployment. `migrations/0002` must already be applied (it is step 3 of the rollo
 
    ```bash
    MENTOR=<mentor id>; SECRET=<that mentor's webhook secret>
-   BODY='{"triggerEvent":"PING","createdAt":"2026-09-25T10:00:00.000Z","payload":{"type":"Test"}}'
+   BODY="{\"triggerEvent\":\"PING\",\"createdAt\":\"$(date -u +%Y-%m-%dT%H:%M:%S.000Z)\",\"payload\":{\"type\":\"Test\"}}"
    SIG=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$SECRET" -hex | sed 's/^.* //')
    curl -si -X POST "$PREVIEW/api/webhooks/cal?mentor=$MENTOR" \
      -H "x-vercel-protection-bypass: $BYPASS" -H 'content-type: application/json' \
@@ -325,6 +325,10 @@ deployment. `migrations/0002` must already be applied (it is step 3 of the rollo
    ```
 
    Expect `200 {"ok":true,"outcome":"ping"}`, and the mentor's panel shows "Ping · just now".
+   `BODY` carries the current time, so every run signs a new delivery. If the same body is
+   sent twice (for example a pasted literal instead of the `date` expansion), the second
+   answer is `200 {"ok":true,"outcome":"duplicate"}`: that also proves the body arrived, but
+   nothing new is recorded and the panel does not change.
    A `401 {"error":"invalid_signature"}` with the right secret means the function did not get
    the body: do not merge.
 

@@ -11,6 +11,9 @@ import { describe, expect, it } from 'vitest';
 
 const testing = readFileSync(new URL('../TESTING.md', import.meta.url), 'utf8');
 const apiReadme = readFileSync(new URL('../api/README.md', import.meta.url), 'utf8');
+const rootEnv = readFileSync(new URL('../.env.example', import.meta.url), 'utf8');
+const clientEnv = readFileSync(new URL('../client/.env.example', import.meta.url), 'utf8');
+const migration0003 = readFileSync(new URL('../migrations/0003_restrict_legacy_writes.sql', import.meta.url), 'utf8');
 
 function between(text: string, start: string, end: string): string {
   const from = text.indexOf(start);
@@ -114,6 +117,24 @@ describe('rollback order (R1-28)', () => {
     expect(afterContract).toMatch(/remove the leading `-- `/);
   });
 
+  it('names the exact lines to copy, from `-- BEGIN;` through `-- COMMIT;`, and those lines run as SQL once uncommented', () => {
+    const afterContract = rollback.split('\n- ').find((b) => /once `0003` has run/.test(b)) ?? '';
+    // Stripping "-- " from the whole block (headers and the trailing note included) is a syntax
+    // error that stops the emergency rollback before any GRANT runs, so the range must be exact.
+    expect(afterContract).toMatch(/from `-- BEGIN;` through `-- COMMIT;`/);
+    expect(afterContract).toMatch(/nothing above or below/);
+    const block = migration0003.slice(migration0003.indexOf('-- ROLLBACK'));
+    const from = block.indexOf('-- BEGIN;');
+    const to = block.indexOf('-- COMMIT;');
+    expect(from).toBeGreaterThanOrEqual(0);
+    expect(to).toBeGreaterThan(from);
+    const lines = block.slice(from, to + '-- COMMIT;'.length).split('\n');
+    for (const line of lines) expect(line, 'every line in the range is a commented SQL line').toMatch(/^-- ./);
+    const sql = lines.map((l) => l.slice(3)).join('\n');
+    expect(sql).not.toMatch(/^\(/m);
+    expect(sql).toMatch(/^GRANT ALL ON public\.bookings/m);
+  });
+
   it('Supabase CAPTCHA is switched off before the code is rolled back', () => {
     expect(rollback).toMatch(/CAPTCHA[\s\S]*before rolling the code back/);
   });
@@ -127,8 +148,46 @@ describe('api/README.md: verify on a preview before merging', () => {
     expect(section).toMatch(/\/api\/webhooks\/cal\?mentor=/);
     expect(section).toMatch(/openssl dgst -sha256 -hmac/);
     expect(section).toMatch(/200 \{"ok":true,"outcome":"ping"\}/);
+    // A fixed body is recorded once; a repeat answers "duplicate". Each run must sign a new body.
+    const body = section.match(/^\s*BODY=(.*)$/m)?.[1] ?? '';
+    expect(body).toMatch(/\$\(date -u \+%Y-%m-%dT%H:%M:%S/);
+    expect(body).not.toMatch(/"createdAt":"\d{4}-/);
+    expect(section).toMatch(/"outcome":"duplicate"/);
     expect(section).toMatch(/\/api\/requests/);
     expect(section).toMatch(/400 \{"error":"invalid_request","fields":\["body"\]\}/);
     expect(section.match(/do not merge/g)?.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('.env.example files match the Production-only Turnstile rule (R1-01, R1-26)', () => {
+  const turnstileBlock = (text: string) => between(text, 'Cloudflare Turnstile', '\n\n');
+
+  it('the root .env.example marks Turnstile Required in Production, Production only, and documents TURNSTILE_DISABLED', () => {
+    const block = between(rootEnv, '# Bot protection', '\n\n');
+    expect(block).toMatch(/Required in Production \(both keys\)/);
+    expect(block).toMatch(/Production environment only/);
+    expect(block).toMatch(/503 captcha_unavailable/);
+    expect(block).toMatch(/always-pass/);
+    expect(block).toMatch(/^# ?TURNSTILE_DISABLED=$/m);
+    expect(block).toMatch(/exactly 1/i);
+    expect(block).toMatch(/TURNSTILE_ALLOWED_HOSTNAMES=/);
+    expect(block).not.toMatch(/optional/i);
+    expect(block).not.toMatch(/set both or neither/i);
+    expect(rootEnv).not.toMatch(/for both\s+Production and Preview/);
+  });
+
+  it('the root .env.example recommends Upstash for Production (R1-04)', () => {
+    const block = between(rootEnv, '# Distributed IP rate limiting', '\n\n');
+    expect(block).toMatch(/Recommended for Production/);
+  });
+
+  it('client/.env.example gives the site key the same Production-only wording', () => {
+    const block = turnstileBlock(clientEnv);
+    expect(block).toMatch(/Required in Production/);
+    expect(block).toMatch(/Production environment only/);
+    expect(block).toMatch(/always-pass/);
+    expect(block).not.toMatch(/set both or neither/i);
+    expect(block).toMatch(/^VITE_TURNSTILE_SITE_KEY=$/m);
+    expect(clientEnv).toMatch(/except VITE_TURNSTILE_SITE_KEY/);
   });
 });
