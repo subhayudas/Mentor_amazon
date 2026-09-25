@@ -356,9 +356,10 @@ REVOKE ALL ON FUNCTION public.block_sso_password_change() FROM PUBLIC, anon, aut
 DROP TRIGGER IF EXISTS auth_users_block_sso_password ON auth.users;
 -- Until this trigger existed any Amazon session could give itself a password (updateUser). Every
 -- Amazon account gets a new random password nobody knows, as the SSO bridge's rotateAuthPassword
--- does when it links a legacy account, so a password set that way stops working too.
+-- does when it links a legacy account, so a password set that way stops working too. (A random
+-- 256-bit secret: the bcrypt cost adds nothing but time inside this transaction.)
 UPDATE auth.users a
-SET encrypted_password = extensions.crypt(encode(extensions.gen_random_bytes(32), 'hex'), extensions.gen_salt('bf', 10))
+SET encrypted_password = extensions.crypt(encode(extensions.gen_random_bytes(32), 'hex'), extensions.gen_salt('bf'))
 WHERE EXISTS (SELECT 1 FROM public.users u WHERE u.id = a.id::text AND u.amazon_alias IS NOT NULL);
 CREATE TRIGGER auth_users_block_sso_password BEFORE UPDATE OF encrypted_password ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.block_sso_password_change();
