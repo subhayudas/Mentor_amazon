@@ -963,7 +963,19 @@
       "acceptedToast": "Request accepted. Email the mentee to arrange a time.",
       "declinedToast": "Request declined",
       "decisionError": "Unable to update the request. Check your connection and try again.",
-      "decisionStale": "This request was already answered. The list now shows its current status."
+      "decisionStale": "This request was already answered. The list now shows its current status.",
+      "awaitingProgramme": "Awaiting programme team",
+      "cancel": "Cancel booking",
+      "cancelHint": "The mentee is told the session is cancelled.",
+      "cancelTitle": "Cancel this booking?",
+      "cancelBody": "The session between {{mentor}} and {{mentee}} is cancelled, and {{mentee}} is notified. This can’t be undone.",
+      "cancelCalNote": "This session is also booked on Cal.com. Cancel it there too so the calendar invite is removed.",
+      "cancelCalLink": "Open in Cal.com",
+      "cancelKeep": "Keep booking",
+      "cancelConfirm": "Cancel booking",
+      "canceledToast": "Booking cancelled. The mentee has been notified.",
+      "cancelError": "We couldn’t cancel this booking. Nothing changed; please try again.",
+      "cancelStale": "This booking changed in the meantime, so nothing was cancelled. The list now shows its current status."
     },
     "access": {
       "pendingTitle": "Pending requests",
