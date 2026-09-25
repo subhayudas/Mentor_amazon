@@ -77,6 +77,7 @@ describe('mirrored SQL', () => {
     ['guard_users_role_columns', 'profile_id may only name your own profile (R1-07)'],
     ['block_sso_password_change', 'an Amazon account cannot set a password (R1-37)'],
     ['guard_mentor_derived_columns', 'reserved ids and admin-only identity columns (R1-09)'],
+    ['guard_profile_id_namespace', 'mentor and mentee ids never collide (R1-07)'],
     ['notify_booking_event', 'programme-managed fan-out, dashboard link (R1-19, R1-23)'],
     ['get_or_create_mentee', 'a registered address stays with its account (R1-08)'],
   ])('supabase_setup_v2.sql and 0002 carry the same %s (%s)', (name) => {

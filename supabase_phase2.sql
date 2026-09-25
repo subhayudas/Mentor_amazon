@@ -58,16 +58,21 @@ create index if not exists activity_events_visible_idx on public.activity_events
 alter table public.activity_events enable row level security;
 
 -- The ids a signed-in user may act as: mentor and/or mentee rows under their email, plus the
--- profile an admin linked to their account (users.profile_id). Same body as migrations/0002.
+-- profile an admin linked to their account (users.profile_id). Same body as migrations/0002. A row
+-- whose id the other table also holds under another address counts for nobody (R1-07).
 create or replace function public.my_profile_ids()
 returns text[] language sql stable security definer set search_path = public, pg_temp as $$
   select coalesce(array_agg(distinct p.id), '{}'::text[])
   from (
     select m.id::text as id from public.mentors m
       where public.current_email() is not null and lower(m.email) = public.current_email()
+        and not exists (select 1 from public.mentees x
+                        where x.id = m.id and lower(x.email) is distinct from public.current_email())
     union all
     select me.id::text from public.mentees me
       where public.current_email() is not null and lower(me.email) = public.current_email()
+        and not exists (select 1 from public.mentors x
+                        where x.id = me.id and lower(x.email) is distinct from public.current_email())
     union all
     select u.profile_id::text from public.users u
       where auth.uid() is not null and u.id = auth.uid()::text and u.profile_id is not null

@@ -259,16 +259,22 @@ $$;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated, service_role;
 
 -- Mentor and mentee rows under the caller's email, plus the profile an admin linked to the
--- account (users.profile_id). Same body as supabase_phase2.sql.
+-- account (users.profile_id). Same body as supabase_phase2.sql. An own-address row whose id the
+-- other table also holds under another address counts for nobody (fails closed): the id cannot say
+-- which of the two it names, and guard_profile_id_namespace (§6) stops new collisions (R1-07).
 CREATE OR REPLACE FUNCTION public.my_profile_ids()
 RETURNS text[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   select coalesce(array_agg(distinct p.id), '{}'::text[])
   from (
     select m.id::text as id from public.mentors m
       where public.current_email() is not null and lower(m.email) = public.current_email()
+        and not exists (select 1 from public.mentees x
+                        where x.id = m.id and lower(x.email) is distinct from public.current_email())
     union all
     select me.id::text from public.mentees me
       where public.current_email() is not null and lower(me.email) = public.current_email()
+        and not exists (select 1 from public.mentors x
+                        where x.id = me.id and lower(x.email) is distinct from public.current_email())
     union all
     select u.profile_id::text from public.users u
       where auth.uid() is not null and u.id = auth.uid()::text and u.profile_id is not null
@@ -319,14 +325,21 @@ BEGIN
   END IF;
   -- profile_id is an ownership key too: owns_profile(), owns_mentor() and my_profile_ids() trust it,
   -- so it opens that profile's full row, its bookings and its Cal.com webhook secret. An account may
-  -- point it only at a mentors or mentees row under its own verified email (the onboarding and
-  -- registration link), or clear it. Links to any other row are made by an admin or the SSO bridge.
+  -- point it only at its own kind of row (a mentor at a mentors row, a mentee at a mentees row) under
+  -- its own verified email (the onboarding and registration link), or clear it; and never at an id
+  -- that any row under another address also carries (ids are one namespace across both tables, so a
+  -- self-made row reusing a mentor's public id must not open that mentor). Links to any other row are
+  -- made by an admin or the SSO bridge.
   IF NEW.profile_id IS NOT NULL
      AND (TG_OP = 'INSERT' OR NEW.profile_id IS DISTINCT FROM OLD.profile_id)
-     AND NOT EXISTS (SELECT 1 FROM public.mentors m
-                     WHERE m.id = NEW.profile_id AND lower(m.email) = public.current_email())
-     AND NOT EXISTS (SELECT 1 FROM public.mentees me
-                     WHERE me.id = NEW.profile_id AND lower(me.email) = public.current_email()) THEN
+     AND ((NOT EXISTS (SELECT 1 FROM public.mentors m
+                       WHERE NEW.user_type = 'mentor' AND m.id = NEW.profile_id AND lower(m.email) = public.current_email())
+           AND NOT EXISTS (SELECT 1 FROM public.mentees me
+                           WHERE NEW.user_type = 'mentee' AND me.id = NEW.profile_id AND lower(me.email) = public.current_email()))
+          OR EXISTS (SELECT 1 FROM public.mentors m
+                     WHERE m.id = NEW.profile_id AND lower(m.email) IS DISTINCT FROM public.current_email())
+          OR EXISTS (SELECT 1 FROM public.mentees me
+                     WHERE me.id = NEW.profile_id AND lower(me.email) IS DISTINCT FROM public.current_email())) THEN
     RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'profile_id may only name your own profile';
   END IF;
   -- is_verified records that the SSO bridge or an admin vouched for the account.
@@ -531,6 +544,49 @@ END $$;
 DROP TRIGGER IF EXISTS mentors_guard_derived ON public.mentors;
 CREATE TRIGGER mentors_guard_derived BEFORE INSERT OR UPDATE ON public.mentors
   FOR EACH ROW EXECUTE FUNCTION public.guard_mentor_derived_columns();
+-- Mentor and mentee ids are one namespace: users.profile_id, my_profile_ids() and
+-- activity_events.visible_to name a profile by id alone, without its table. So no writer (the
+-- client, anon, an admin, the service role or a trusted RPC) may give a row an id that the other
+-- table or the programme's reserved list already holds, and only an admin or the service role
+-- renames a mentees row (a mentors row's id is guarded above). Otherwise a mentees row under the
+-- caller's own address with a mentor's public id would open that mentor (R1-07).
+-- Identical to supabase_setup_v2.sql §4.
+CREATE OR REPLACE FUNCTION public.guard_profile_id_namespace()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.id IS NOT DISTINCT FROM OLD.id THEN RETURN NEW; END IF;
+  IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'mentees' AND NOT public.is_privileged() THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'a mentee profile id is set when it is created';
+  END IF;
+  -- Two concurrent writers of the same id in different tables would each miss the other's row.
+  PERFORM pg_advisory_xact_lock(hashtext('mc_profile_id:' || NEW.id));
+  IF TG_TABLE_NAME = 'mentees'
+     AND (EXISTS (SELECT 1 FROM public.mentors m WHERE m.id = NEW.id)
+          OR EXISTS (SELECT 1 FROM public.reserved_mentor_ids r WHERE r.id = NEW.id)) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'this id belongs to a mentor profile';
+  END IF;
+  IF TG_TABLE_NAME = 'mentors' AND EXISTS (SELECT 1 FROM public.mentees me WHERE me.id = NEW.id) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'this id belongs to a mentee profile';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS mentees_guard_profile_id ON public.mentees;
+CREATE TRIGGER mentees_guard_profile_id BEFORE INSERT OR UPDATE OF id ON public.mentees
+  FOR EACH ROW EXECUTE FUNCTION public.guard_profile_id_namespace();
+DROP TRIGGER IF EXISTS mentors_guard_profile_id ON public.mentors;
+CREATE TRIGGER mentors_guard_profile_id BEFORE INSERT OR UPDATE OF id ON public.mentors
+  FOR EACH ROW EXECUTE FUNCTION public.guard_profile_id_namespace();
+-- Rows that collided before the guard existed count for nobody in my_profile_ids(); name them so
+-- an admin can remove the stray one (tests/integration/rls.test.ts 'profile ids').
+DO $$
+DECLARE v_ids text;
+BEGIN
+  SELECT string_agg(m.id, ', ' ORDER BY m.id) INTO v_ids
+  FROM public.mentors m JOIN public.mentees me ON me.id = m.id;
+  IF v_ids IS NOT NULL THEN
+    RAISE WARNING 'mentors and mentees rows share these ids (remove the stray row): %', v_ids;
+  END IF;
+END $$;
 -- The public directory needs the flag: handing a featured profile to the real person
 -- (managed_by_programme = false) must switch the client from the programme copy to the row.
 -- Same definition as supabase_setup_v2.sql §3, with the column appended (so REPLACE works).

@@ -237,6 +237,131 @@ describeDb('I18 RLS matrix', () => {
     });
   });
 
+  // Mentor and mentee ids share one namespace: users.profile_id, my_profile_ids() and
+  // activity_events.visible_to name a profile by id alone. A self-made profile under the caller's own
+  // address that reuses a mentor's public id (or a mentee's id, known to their mentor from a booking)
+  // must open nothing (R1-07 review: the takeover through a colliding mentees row, and the feed leak).
+
+  it('profile ids: nobody creates or renames a profile onto an id the other table or the programme holds', async () => {
+    await withTx(sql, async (tx) => {
+      const c = await cast(tx);
+      const taken = { code: '42501', message: /forbidden_column_change/, detail: /this id belongs to a mentor profile/ };
+      const menteeRow = (id: string, email: string) => ({
+        id, name: 'Attacker', email, user_type: 'individual', timezone: 'UTC', languages_spoken: ['English'],
+        areas_exploring: ['x'], verification_status: 'unverified', created_at: new Date().toISOString(),
+      });
+      // The reviewer's repro, step 1: a mentees row under my own address with the victim mentor's id.
+      await c.as.stranger();
+      await tx`insert into public.users (id, email, password, user_type, created_at)
+               values (${c.ids.stranger}, 'stranger@mentorconnect.test', 'x', 'mentee', now())`;
+      await expectPgFailure(tx, (sp) => sp`insert into public.mentees ${sp(menteeRow(c.mentor.id, 'stranger@mentorconnect.test'))}`, taken);
+      await expectPgFailure(tx, (sp) => sp`insert into public.mentees ${sp(menteeRow(MANAV, 'stranger@mentorconnect.test'))}`, taken);
+      // Anonymously (then signing in with that address) it is refused too: by the guard while anon
+      // may still insert mentees (between 0002 and 0003), by the missing privilege after 0003.
+      await c.as.anon();
+      await expectPgError(tx, (sp) => sp`insert into public.mentees ${sp(menteeRow(c.mentor.id, 'stranger@mentorconnect.test'))}`, '42501');
+      // A mentee row of their own cannot be renamed onto the id later.
+      await c.as.stranger();
+      const own = randomUUID();
+      await tx`insert into public.mentees ${tx(menteeRow(own, 'stranger@mentorconnect.test'))}`;
+      await expectPgFailure(tx, (sp) => sp`update public.mentees set id = ${c.mentor.id} where id = ${own}`,
+        { code: '42501', detail: /a mentee profile id is set when it is created/ });
+      // The other direction: an approved mentor cannot take the id of a mentee they have a booking with.
+      await asService(tx);
+      await tx`insert into public.approved_users (id, amazon_alias, email, role, is_active, approved_by, approved_at)
+               values (${randomUUID()}, ${`itns${rand()}`}, ${c.mentor.email}, 'mentor', true, 'it', now())`;
+      await c.as.mentor();
+      const now = new Date().toISOString();
+      await expectPgFailure(tx, (sp) => sp`insert into public.mentors ${sp({
+        id: c.mentee.id, name: 'Second row', email: c.mentor.email, timezone: 'UTC', bio: 'b', cal_link: 'x/30min', expertise: ['x'],
+        industries: ['x'], languages_spoken: ['English'], comms_owner: 'exec', created_at: now, updated_at: now,
+      })}`, { code: '42501', message: /forbidden_column_change/, detail: /this id belongs to a mentee profile/ });
+      // Nor can an admin or the service role make the collision.
+      await c.as.admin();
+      await expectPgFailure(tx, (sp) => sp`insert into public.mentees ${sp(menteeRow(c.mentor.id, 'stranger@mentorconnect.test'))}`, taken);
+      await c.as.service();
+      await expectPgFailure(tx, (sp) => sp`insert into public.mentees ${sp(menteeRow(c.linkedProfile.id, 'x@mentorconnect.test'))}`, taken);
+      // Renaming a mentees row stays possible for an admin, onto a free id.
+      await c.as.admin();
+      const renamed = randomUUID();
+      expect(await tx`update public.mentees set id = ${renamed} where id = ${own} returning id`).toEqual([{ id: renamed }]);
+      await asService(tx);
+    });
+  });
+
+  it('profile ids: a colliding row that already exists (made before the guard) still opens nothing', async () => {
+    await withTx(sql, async (tx) => {
+      const c = await cast(tx);
+      await tx`insert into public.mentor_cal_webhooks (mentor_id, secret) values (${c.mentor.id}, 'it-secret-of-this-mentor')`;
+      await tx`insert into public.activity_events (actor_type, actor_id, type, visible_to, summary)
+               values ('system', null, 'it.private', ${[c.mentor.id]}, 'private feed entry of the mentor'),
+                      ('system', null, 'it.private', ${[c.mentee.id]}, 'private feed entry of the mentee')`;
+      // Legacy data: the rows are written past the id guard, as they could have been before it existed.
+      const attacker = `attacker.${rand()}@mentorconnect.test`;
+      const nosy = `nosy.${rand()}@mentorconnect.test`;
+      await tx`alter table public.mentees disable trigger user`;
+      await tx`alter table public.mentors disable trigger user`;
+      await tx`insert into public.mentees (id, name, email, user_type, timezone, languages_spoken, areas_exploring, verification_status, created_at)
+               values (${c.mentor.id}, 'Attacker', ${attacker}, 'individual', 'UTC', '{English}', '{x}', 'unverified', now())`;
+      await tx`insert into public.mentors (id, name, email, timezone, bio, cal_link, expertise, industries, languages_spoken, comms_owner, created_at, updated_at)
+               values (${c.mentee.id}, 'Nosy mentor', ${nosy}, 'UTC', 'b', 'x/30min', '{x}', '{x}', '{English}', 'exec', now(), now())`;
+      await tx`alter table public.mentees enable trigger user`;
+      await tx`alter table public.mentors enable trigger user`;
+      const refused = { code: '42501', message: /forbidden_column_change/, detail: /profile_id may only name your own profile/ };
+      const feed = async () => (await tx<{ summary: string }[]>`select summary from public.activity_events where type = 'it.private' order by summary`).map((r) => r.summary);
+      const myIds = async () => (await tx<{ ids: string[] }[]>`select public.my_profile_ids() as ids`)[0].ids;
+      // The reviewer's repro, step 2: linking it is refused, and the victim's feed, row, bookings and
+      // webhook secret stay closed.
+      const sub = randomUUID();
+      const nosySub = randomUUID();
+      await mkUser(tx, { id: sub, email: attacker, user_type: 'mentee' });
+      await mkUser(tx, { id: nosySub, email: nosy, user_type: 'mentor' });
+      await asRole(tx, 'authenticated', claims(sub, attacker));
+      await expectPgFailure(tx, (sp) => sp`update public.users set profile_id = ${c.mentor.id} where id = ${sub}`, refused);
+      expect(await myIds()).toEqual([]);
+      expect(await feed()).toEqual([]);
+      await expectPgError(tx, (sp) => sp`
+        insert into public.activity_events (actor_type, actor_id, type, visible_to, summary)
+        values ('mentee', ${c.mentor.id}, 'it.forged', ${[c.mentor.id]}, 'forged')`, '42501');
+      expect(await tx`select id from public.mentors where id = ${c.mentor.id}`).toEqual([]);
+      expect(await tx`select id from public.bookings where mentor_id = ${c.mentor.id}`).toEqual([]);
+      await expectPgError(tx, (sp) => sp`select public.get_my_cal_webhook(${c.mentor.id})`, '42501', /not_allowed/);
+      // The other direction: a mentor's own-address row that carries a mentee's id opens neither the
+      // mentee's feed nor a link to the mentee's profile.
+      await asRole(tx, 'authenticated', claims(nosySub, nosy));
+      expect(await myIds()).toEqual([]);
+      expect(await feed()).toEqual([]);
+      await expectPgFailure(tx, (sp) => sp`update public.users set profile_id = ${c.mentee.id} where id = ${nosySub}`, refused);
+      // The data cannot say which side is the rightful owner, so a colliding id is nobody's feed
+      // (fails closed; 0002 warns about every such id) until an admin removes the stray row.
+      await c.as.mentor();
+      expect(await myIds()).toEqual([]);
+      await c.as.mentee();
+      expect(await myIds()).toEqual([]);
+      await asService(tx);
+      await tx`delete from public.mentees where id = ${c.mentor.id} and email = ${attacker}`;
+      await tx`delete from public.mentors where id = ${c.mentee.id} and email = ${nosy}`;
+      await c.as.mentor();
+      expect(await myIds()).toEqual([c.mentor.id]);
+      expect(await feed()).toEqual(['private feed entry of the mentor']);
+      await c.as.mentee();
+      expect(await myIds()).toEqual([c.mentee.id]);
+      expect(await feed()).toEqual(['private feed entry of the mentee']);
+      // A mentor account links only a mentors row, a mentee account only a mentees row.
+      await asService(tx);
+      const mentorsMenteeRow = await mkMentee(tx, { email: c.mentor.email });
+      await c.as.mentor();
+      await expectPgFailure(tx, (sp) => sp`update public.users set profile_id = ${mentorsMenteeRow.id} where id = ${c.ids.mentor}`, refused);
+      expect(await tx`update public.users set profile_id = ${c.mentor.id} where id = ${c.ids.mentor} returning profile_id`).toEqual([{ profile_id: c.mentor.id }]);
+      await asService(tx);
+      const menteesMentorRow = await mkMentor(tx, { email: c.otherMentee.email });
+      await c.as.other();
+      await expectPgFailure(tx, (sp) => sp`update public.users set profile_id = ${menteesMentorRow.id} where id = ${c.ids.other}`, refused);
+      expect(await tx`update public.users set profile_id = ${c.otherMentee.id} where id = ${c.ids.other} returning profile_id`).toEqual([{ profile_id: c.otherMentee.id }]);
+      await asService(tx);
+    });
+  });
+
   it('users.is_verified is set by the SSO bridge or an admin, never by the account', async () => {
     await withTx(sql, async (tx) => {
       const c = await cast(tx);
