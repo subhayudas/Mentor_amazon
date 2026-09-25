@@ -1362,7 +1362,8 @@
     "ratingA11y_other": "التقييم {{rating}} من 5 بناءً على {{count}} تقييم",
     "listSeparator": "، ",
     "requestSent": "تم إرسال الطلب",
-    "openingSoon": "يُتاح قريبًا"
+    "openingSoon": "يُتاح قريبًا",
+    "requestSubmitted": "تم تقديم الطلب"
   },
   "mentorProfile": {
     "backToMentors": "العودة إلى المرشدين",
@@ -1460,20 +1461,23 @@
     "success": {
       "title": "أُرسل الطلب إلى <name>{{name}}</name>",
       "signedIn": "ستجد رد <name>{{name}}</name> ضمن الحجوزات.",
-      "anonymous": "سجّل الدخول بالبريد <email>{{email}}</email> لرؤية رد <name>{{name}}</name>. استخدم هذا البريد نفسه — فهو ما يربط الطلب بك.",
+      "anonymous": "إن كان للبريد <email>{{email}}</email> حساب بالفعل، فسجّل الدخول وأرسل الطلب من هناك. وإلا فسجّل الدخول بهذا البريد نفسه لرؤية رد <name>{{name}}</name>.",
       "viewBookings": "عرض الحجوزات",
       "signIn": "تسجيل الدخول",
       "backToMentors": "العودة إلى المرشدين",
       "createAccountInline": "ليس لديك حساب بعد؟ <signup>أنشئ حسابًا</signup> بالبريد الإلكتروني نفسه.",
       "pendingTitle": "طلبك إلى <name>{{name}}</name> بانتظار الرد بالفعل",
-      "pendingBody": "لم يردّ <name>{{name}}</name> على طلبك السابق بعد، لذلك لم نرسل طلبًا آخر. ستجد الرد ضمن الحجوزات."
+      "pendingBody": "لم يردّ <name>{{name}}</name> على طلبك السابق بعد، لذلك لم نرسل طلبًا آخر. ستجد الرد ضمن الحجوزات.",
+      "anonymousTitle": "تم تقديم الطلب"
     },
     "status": {
       "sent": "تم إرسال الطلب",
       "sentFrom": "أُرسل {{when}} من <email>{{email}}</email>.",
-      "anonHint": "سجّل الدخول بهذا البريد الإلكتروني لرؤية رد <name>{{name}}</name>.",
+      "anonHint": "إن كان لهذا البريد حساب بالفعل، فسجّل الدخول وأرسل الطلب من هناك. وإلا فسجّل الدخول به لرؤية رد <name>{{name}}</name>.",
       "signIn": "تسجيل الدخول",
-      "viewInBookings": "عرض في الحجوزات"
+      "viewInBookings": "عرض في الحجوزات",
+      "submitted": "تم تقديم الطلب",
+      "submittedFrom": "قُدِّم {{when}} من <email>{{email}}</email>."
     },
     "allRequired": "جميع الحقول مطلوبة.",
     "tzLine": "المنطقة الزمنية لـ<name>{{name}}</name>: {{zone}} · {{relative}}",
@@ -1543,7 +1547,8 @@
       "pickTime": "اختر وقتًا عبر رابط تقويم المرشد",
       "waitingConfirm": "بانتظار أن يؤكد {{name}} الموعد على Cal.com",
       "timeDeclined": "لم يتمكن {{name}} من حضور ذلك الموعد — اختر موعدًا آخر",
-      "programmeTeam": "سيراسلك فريق البرنامج عبر البريد الإلكتروني لتحديد موعد"
+      "programmeTeam": "سيراسلك فريق البرنامج عبر البريد الإلكتروني لتحديد موعد",
+      "submitted": "تم تقديم الطلب"
     },
     "row": {
       "sent": "أُرسل {{when}}",
@@ -2653,7 +2658,11 @@
       "pendingTitle": "طلبك إلى {{name}} بانتظار الرد بالفعل",
       "pendingBody": "أرسلت طلبًا مؤخرًا ولم يُرد عليه بعد، لذلك لم نرسل طلبًا ثانيًا.",
       "sentBefore": "أرسلت طلبًا {{when}} من <email>{{email}}</email>.",
-      "sendAnother": "إرسال طلب آخر"
+      "sendAnother": "إرسال طلب آخر",
+      "submittedTitle": "تم تقديم الطلب",
+      "submittedBodyProgramme": "إن كان للبريد <email>{{email}}</email> حساب بالفعل، فسجّل الدخول وأرسل الطلب من هناك. وإلا فأنشئ حسابًا أو سجّل الدخول بهذا البريد لمتابعته: يردّ فريق البرنامج عبر MentorConnect.",
+      "submittedBodyMentor": "إن كان للبريد <email>{{email}}</email> حساب بالفعل، فسجّل الدخول وأرسل الطلب من هناك. وإلا فأنشئ حسابًا أو سجّل الدخول بهذا البريد لمتابعته: يردّ {{name}} عبر MentorConnect.",
+      "submittedBefore": "قدّمت طلبًا {{when}} من <email>{{email}}</email>. إن كان لهذا البريد حساب بالفعل، فسجّل الدخول وأرسل الطلب من هناك."
     },
     "profileSettings": {
       "saved": "تم حفظ الملف",

@@ -391,30 +391,45 @@ function RequestFlow({
 
   if (sent) {
     const pending = sent.outcome === "already_pending";
+    // Signed out, /api/requests answers the same for every outcome (no account oracle), and an email
+    // that already has an account gets no request: the page never says it was sent, and tells the
+    // visitor what to do in either case (R1-08).
+    const submittedOnly = !signedIn && !pending;
     const bookingsHref = "/dashboard/bookings";
     const signupHref = `${ROUTES.signup}?next=${encodeURIComponent(ROUTES.menteeBookings)}`;
+    const emailTag = <bdi dir="ltr" className="font-semibold text-[var(--sc-ink)]" />;
     return (
       <div role="status" className="mt-6" data-testid="slot-confirmation" data-outcome={sent.outcome}>
         <span className="inline-flex size-12 items-center justify-center rounded-full bg-[#d8f0a3] text-[var(--sc-ink)]">
           <Check className="size-6" aria-hidden="true" />
         </span>
         <h3 ref={successRef} tabIndex={-1} className="mt-4 text-[22px] font-bold text-[var(--sc-ink)] focus:outline-none">
-          {pending ? t("showcase.scheduler.pendingTitle", { name: bidi(firstName) }) : t("showcase.picker.sentTitle", { name: bidi(firstName) })}
+          {pending
+            ? t("showcase.scheduler.pendingTitle", { name: bidi(firstName) })
+            : submittedOnly
+              ? t("showcase.scheduler.submittedTitle")
+              : t("showcase.picker.sentTitle", { name: bidi(firstName) })}
         </h3>
         <p className="mt-2 text-[15px] leading-[24px] text-[var(--sc-ink-soft)]" data-testid="text-request-followup">
-          {pending
-            ? t("showcase.scheduler.pendingBody")
-            : programmeManaged
-              ? t("showcase.scheduler.sentBodyProgramme")
-              : t("showcase.scheduler.sentBodyMentor", { name: bidi(firstName) })}{" "}
-          {signedIn ? (
-            t("showcase.scheduler.followSignedIn")
-          ) : (
+          {submittedOnly ? (
             <Trans
-              i18nKey="showcase.scheduler.followAnon"
-              values={{ email: sent.email }}
-              components={{ email: <bdi dir="ltr" className="font-semibold text-[var(--sc-ink)]" /> }}
+              i18nKey={programmeManaged ? "showcase.scheduler.submittedBodyProgramme" : "showcase.scheduler.submittedBodyMentor"}
+              values={{ email: sent.email, name: bidi(firstName) }}
+              components={{ email: emailTag }}
             />
+          ) : (
+            <>
+              {pending
+                ? t("showcase.scheduler.pendingBody")
+                : programmeManaged
+                  ? t("showcase.scheduler.sentBodyProgramme")
+                  : t("showcase.scheduler.sentBodyMentor", { name: bidi(firstName) })}{" "}
+              {signedIn ? (
+                t("showcase.scheduler.followSignedIn")
+              ) : (
+                <Trans i18nKey="showcase.scheduler.followAnon" values={{ email: sent.email }} components={{ email: emailTag }} />
+              )}
+            </>
           )}
         </p>
         <dl className="mt-6 divide-y divide-[var(--sc-hairline)] rounded-[12px] border border-[var(--sc-hairline)] text-[14px]">
@@ -453,11 +468,12 @@ function RequestFlow({
       <div className="mt-6 rounded-[12px] bg-[var(--sc-sand)] p-4" data-testid="scheduler-sent-before" role="status">
         <p className="flex items-center gap-2 text-[15px] font-bold text-[var(--sc-ink)]">
           <Check className="size-4" aria-hidden="true" />
-          {t("bookingRequest.status.sent")}
+          {/* Signed out, this browser only knows the form went out (R1-08): see the success state. */}
+          {signedIn ? t("bookingRequest.status.sent") : t("bookingRequest.status.submitted")}
         </p>
         <p className="mt-1 text-[14px] leading-[22px] text-[var(--sc-ink-soft)]">
           <Trans
-            i18nKey="showcase.scheduler.sentBefore"
+            i18nKey={signedIn ? "showcase.scheduler.sentBefore" : "showcase.scheduler.submittedBefore"}
             values={{ when: formatRelativeDay(memory.sentAt, lang), email: memory.email }}
             components={{ email: <bdi dir="ltr" /> }}
           />

@@ -94,7 +94,9 @@ interface Values {
  * else the name field. Escape, outside pointer-down, the close button and
  * Cancel all pass through the discard guard while the goal is dirty, and are
  * ignored while the send is in flight. Success is the dialog itself (F-08):
- * the DialogTitle becomes "Request sent to {name}" and receives focus, the
+ * the DialogTitle becomes "Request sent to {name}" (signed out: "Request
+ * submitted", since an email that already has an account gets no request and
+ * the server never says which it was, R1-08) and receives focus, the
  * description carries the follow-up copy, the rail shows stop 1 done, and
  * there is one primary and one text link — no toast, no footer, no second
  * heading. Escape and the close button then close it and focus returns to
@@ -371,11 +373,17 @@ export function BookingRequestDialog({
                 <Check className="size-5" strokeWidth={2} />
               </span>
               <span ref={successRef} tabIndex={-1} className="min-w-0 rounded-sm" data-testid="booking-success-title" data-outcome={alreadyPending ? "already_pending" : "sent"}>
-                <Trans
-                  i18nKey={alreadyPending ? "bookingRequest.success.pendingTitle" : "bookingRequest.success.title"}
-                  values={{ name: mentorName }}
-                  components={{ name: <bdi /> }}
-                />
+                {alreadyPending || signedIn ? (
+                  <Trans
+                    i18nKey={alreadyPending ? "bookingRequest.success.pendingTitle" : "bookingRequest.success.title"}
+                    values={{ name: mentorName }}
+                    components={{ name: <bdi /> }}
+                  />
+                ) : (
+                  // Signed out, /api/requests answers the same for every outcome (no account oracle): an
+                  // email that already has an account gets no request, so nothing claims it was sent (R1-08).
+                  t("bookingRequest.success.anonymousTitle")
+                )}
               </span>
             </span>
           ) : (

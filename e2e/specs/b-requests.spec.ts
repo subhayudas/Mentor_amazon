@@ -1,5 +1,5 @@
 import { test, expect, turnstile, type Page } from '../fixtures/test';
-import { ids, personaEmail } from '../fixtures/personas';
+import { displayName, ids, personaEmail } from '../fixtures/personas';
 import { devEmail, featuredFor, insertPendingRequest, plain, purgeRequester, tr, useLanguage } from './b-helpers';
 
 /**
@@ -55,9 +55,12 @@ test('S3 anonymous request to a curated mentor: validation, Turnstile, DB row, a
     const done = page.getByTestId('slot-confirmation');
     await expect(done).toBeVisible();
     await expect(done).toHaveAttribute('data-outcome', 'sent');
+    // Signed out, the server never says whether the email already has an account (then nothing is
+    // sent), so the page says "Request submitted" and what to do in either case (R1-08).
+    await expect(done.getByRole('heading')).toHaveText(tr(lang, 'showcase.scheduler.submittedTitle'));
     const followup = plain(await page.getByTestId('text-request-followup').innerText());
-    expect(followup).toContain(tr(lang, 'showcase.scheduler.sentBodyProgramme'));
-    expect(followup).toContain(email);
+    expect(followup).toBe(tr(lang, 'showcase.scheduler.submittedBodyProgramme', { email }));
+    expect(plain(await done.innerText())).not.toContain(tr(lang, 'showcase.picker.sentTitle', { name: '' }).trim());
     await expect(page.getByTestId('link-success-signup')).toHaveAttribute('href', '/signup?next=%2Fmentee-dashboard%2Fbookings');
     if (turnstile.enabled) expect(posts[0]?.turnstileToken).toBeTruthy();
     await healthy({ screenshotName: 'S3-success' });
@@ -75,9 +78,12 @@ test('S3 anonymous request to a curated mentor: validation, Turnstile, DB row, a
     const localKeys = await page.evaluate(() => Object.keys(window.localStorage).filter((k) => k.startsWith('mentorconnect.local.')));
     expect(localKeys).toEqual([]);
 
-    // Revisiting the profile shows the request.
+    // Revisiting the profile shows the request, as submitted (R1-08).
     await page.goto(`/mentor/${f.slug}`);
-    await expect(page.getByTestId('featured-request-sent')).toBeVisible();
+    const remembered = page.getByTestId('featured-request-sent');
+    await expect(remembered).toBeVisible();
+    await expect(remembered).toContainText(tr(lang, 'bookingRequest.status.submitted'));
+    await expect(remembered).not.toContainText(tr(lang, 'bookingRequest.status.sent'));
     await healthy({ screenshotName: 'S3-profile-request-sent' });
   } finally {
     await purgeRequester(db, email);
@@ -354,6 +360,81 @@ test('S8c a signed-in mentor who requests another mentor still sees "Request sen
     await expect(page.locator('[data-testid="booking-section"][data-state="sent"]').first()).toBeVisible();
     await expect(page.getByTestId('button-request-session')).toHaveCount(0);
     await healthy({ screenshotName: 'S8c-mentor-request-sent' });
+  } finally {
+    await cleanup();
+  }
+});
+
+test('R1-08 signed out, a request never claims it was sent: an email with an account and a new one see the same "Request submitted", and only the new one reaches the mentor', async ({ page, db, healthy, lang, personaProject }) => {
+  const mentorId = ids(personaProject).mentor;
+  const mentorName = displayName(personaProject, 'mentor');
+  const accountEmail = devEmail('r108-account');
+  const newEmail = devEmail('r108-new');
+  const dialog = page.getByTestId('dialog-booking-request');
+  const cleanup = async () => {
+    await purgeRequester(db, newEmail);
+    await purgeRequester(db, accountEmail);
+    await db`delete from public.notifications where recipient_email = ${accountEmail}`;
+    await db`delete from public.users where email = ${accountEmail}`;
+  };
+
+  // Someone who has an account (a users row) but is not signed in on this browser.
+  await db`insert into public.users (id, email, password, user_type, is_verified, created_at)
+           values (gen_random_uuid()::text, ${accountEmail}, 'managed-by-supabase-auth', 'mentee', true, timezone('utc', now()))`;
+  async function sendAs(email: string, name: string) {
+    await page.goto(`/mentor/${mentorId}`);
+    await page.getByTestId('button-request-session').first().click();
+    await expect(dialog).toBeVisible();
+    await dialog.getByTestId('input-booking-name').fill(name);
+    await dialog.getByTestId('input-booking-email').fill(email);
+    await dialog.getByTestId('textarea-booking-goal').fill(GOAL);
+    if (turnstile.enabled) await expect(dialog.locator('[data-testid="turnstile"] input[name="cf-turnstile-response"]')).toHaveValue(/.+/, { timeout: 20_000 });
+    const response = page.waitForResponse((r) => r.url().endsWith('/api/requests') && r.request().method() === 'POST');
+    await dialog.getByTestId('button-submit-booking').click();
+    const answer = await response;
+    // One neutral answer for every outcome: the endpoint is no account oracle.
+    expect(answer.status()).toBe(200);
+    expect(await answer.json()).toEqual({ ok: true });
+  }
+  async function expectSubmitted(email: string) {
+    await expect(dialog.getByTestId('booking-success-title')).toHaveText(tr(lang, 'bookingRequest.success.anonymousTitle'));
+    const text = plain(await dialog.innerText());
+    expect(text).toContain(tr(lang, 'bookingRequest.success.anonymous', { email, name: mentorName }));
+    expect(text).toContain(tr(lang, 'dashboardV2.rail.submitted'));
+    expect(text, 'nothing says the request was sent').not.toContain(tr(lang, 'dashboardV2.rail.sent'));
+    expect(text).not.toContain(tr(lang, 'bookingRequest.success.title', { name: mentorName }));
+  }
+
+  try {
+    // 1. An address with an account: no booking, no mentee row; the owner is told in their bell.
+    await sendAs(accountEmail, 'Dev B Account');
+    await expectSubmitted(accountEmail);
+    await healthy({ screenshotName: 'R1-08-account-email-submitted' });
+    expect(await requestRows(db, accountEmail)).toHaveLength(0);
+    expect(await db`select 1 from public.mentees where lower(email) = ${accountEmail}`).toHaveLength(0);
+    const bell = await db<{ title: string; booking_id: string | null }[]>`
+      select title, booking_id from public.notifications where recipient_email = ${accountEmail}`;
+    expect(bell).toEqual([{ title: 'Request not sent: please sign in', booking_id: null }]);
+
+    // The profile and the directory card remember it as submitted, never as sent.
+    await page.keyboard.press('Escape');
+    const section = page.locator('[data-testid="booking-section"][data-state="sent"]').first();
+    await expect(section).toContainText(tr(lang, 'bookingRequest.status.submitted'));
+    await expect(section).toContainText(tr(lang, 'bookingRequest.status.anonHint', { name: mentorName }));
+    await expect(section).not.toContainText(tr(lang, 'bookingRequest.status.sent'));
+    await healthy({ screenshotName: 'R1-08-profile-submitted' });
+    await page.goto(`/mentors?q=${encodeURIComponent(mentorName)}`);
+    await expect(page.getByTestId(`badge-request-memory-${mentorId}`)).toHaveText(tr(lang, 'mentorCard.requestSubmitted'));
+    await healthy({ screenshotName: 'R1-08-card-submitted' });
+
+    // 2. A new address: the same words on screen, and this time the mentor has a pending request.
+    await page.evaluate(() => window.localStorage.removeItem('mc.sentRequests'));
+    await sendAs(newEmail, 'Dev B Newcomer');
+    await expectSubmitted(newEmail);
+    await healthy({ screenshotName: 'R1-08-new-email-submitted' });
+    const rows = await requestRows(db, newEmail);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ status: 'pending', mentor_id: mentorId, goal: GOAL });
   } finally {
     await cleanup();
   }

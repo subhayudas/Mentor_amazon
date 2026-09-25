@@ -255,9 +255,11 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
         </Link>
         <span className="flex items-center gap-2">
           {sent && (
-            <Badge tone="info" className="shrink-0">
+            <Badge tone="info" className="shrink-0" data-testid={`badge-request-memory-${mentor.id}`}>
               <MailCheck aria-hidden="true" strokeWidth={2} />
-              {t("mentorCard.requestSent")}
+              {/* Signed out, this browser only knows the form went out: an email that already has an
+                  account gets no request, and the server never says which it was (R1-08). */}
+              {user ? t("mentorCard.requestSent") : t("mentorCard.requestSubmitted")}
             </Badge>
           )}
           <FavoriteButton mentorId={mentor.id} mentorName={f.name} size="sm" disabled={!f.bookable} />

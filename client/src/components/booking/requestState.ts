@@ -210,6 +210,10 @@ export function railStopsFor(
     return { stops: DEFAULT_STOPS(t, progress.states, { signedIn: options.signedIn }), progress };
   }
   const [s1, s2, s3] = progress.states;
+  // A signed-out visitor's browser memory only knows that the form went out. The server never says
+  // whether the email already has an account, and for one that does nothing reached the mentor
+  // (R1-08), so that first stop reads "Request submitted". A signed-in request is exact.
+  const firstLabel = request.source === "local" && !options.signedIn ? t("dashboardV2.rail.submitted") : t("dashboardV2.rail.sent");
   const replyLabel =
     s2 === "done"
       ? t("dashboardV2.rail.accepted", { name: options.name })
@@ -219,7 +223,7 @@ export function railStopsFor(
   return {
     progress,
     stops: [
-      { label: t("dashboardV2.rail.sent"), state: s1 },
+      { label: firstLabel, state: s1 },
       { label: replyLabel, state: s2 },
       { label: progress.stop3Key ? t(progress.stop3Key, { name: options.name }) : t("common.rail.step3"), state: s3 },
     ],

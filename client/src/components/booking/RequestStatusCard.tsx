@@ -52,6 +52,10 @@ export function RequestStatusCard({
   const when = formatRelativeDay(request.sentAt, i18n.language);
   const progress = railStatesFor(request);
   const chooseTime = progress.canChooseTime && Boolean(onChooseTime);
+  // Signed out, only this browser's memory exists and the server never says whether the email
+  // already has an account; for one that does the request was not sent, so the memory reads
+  // "Request submitted" and the hint says what to do in either case (R1-08).
+  const submittedOnly = !request.status && !signedIn;
   // The wrapper carries the caption role: `cn()` inside Badge drops `text-caption` next to the tone colour.
   const badge = (
     <span className="inline-flex text-caption">
@@ -60,7 +64,7 @@ export function RequestStatusCard({
       ) : (
         <Badge tone="warning">
           <Clock aria-hidden="true" strokeWidth={2} />
-          {t("bookingRequest.status.sent")}
+          {submittedOnly ? t("bookingRequest.status.submitted") : t("bookingRequest.status.sent")}
         </Badge>
       )}
     </span>
@@ -106,7 +110,7 @@ export function RequestStatusCard({
       <div>{badge}</div>
       <p className="text-body-sm text-foreground">
         <Trans
-          i18nKey="bookingRequest.status.sentFrom"
+          i18nKey={submittedOnly ? "bookingRequest.status.submittedFrom" : "bookingRequest.status.sentFrom"}
           values={{ when, email: request.email }}
           components={{ email: <bdi dir="ltr" /> }}
         />

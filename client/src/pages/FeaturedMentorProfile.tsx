@@ -246,11 +246,13 @@ export default function FeaturedMentorProfile() {
         {sent && (state.kind === "db" || state.kind === "local") && (
           <p className="mt-6 flex items-start gap-2 text-[13px] leading-[20px] text-white" data-testid="featured-request-sent" role="status">
             <MailCheck className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {/* Signed out, this browser only knows the form went out: an email that already has an
+                account gets no request, and the server never says which it was (R1-08). */}
             <span>
-              <strong className="font-bold">{t("bookingRequest.status.sent")}</strong>
+              <strong className="font-bold">{user ? t("bookingRequest.status.sent") : t("bookingRequest.status.submitted")}</strong>
               {" · "}
               <Trans
-                i18nKey="bookingRequest.status.sentFrom"
+                i18nKey={user ? "bookingRequest.status.sentFrom" : "bookingRequest.status.submittedFrom"}
                 values={{ when: formatRelativeDay(sent.sentAt, lang), email: sent.email }}
                 components={{ email: <bdi dir="ltr" /> }}
               />

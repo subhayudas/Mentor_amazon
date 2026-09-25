@@ -1362,7 +1362,8 @@
     "ratingA11y_other": "Rated {{rating}} out of 5 from {{count}} ratings",
     "listSeparator": ", ",
     "requestSent": "Request sent",
-    "openingSoon": "Opening soon"
+    "openingSoon": "Opening soon",
+    "requestSubmitted": "Request submitted"
   },
   "mentorProfile": {
     "backToMentors": "Back to mentors",
@@ -1460,20 +1461,23 @@
     "success": {
       "title": "Request sent to <name>{{name}}</name>",
       "signedIn": "You'll see <name>{{name}}</name>'s reply under Bookings.",
-      "anonymous": "Sign in with <email>{{email}}</email> to see <name>{{name}}</name>'s reply. Use exactly this email — it's how we match the request to you.",
+      "anonymous": "If <email>{{email}}</email> already has an account, sign in and send the request from there. Otherwise, sign in with exactly this email to see <name>{{name}}</name>'s reply.",
       "viewBookings": "View bookings",
       "signIn": "Sign in",
       "backToMentors": "Back to mentors",
       "createAccountInline": "No account yet? <signup>Create one</signup> with the same email.",
       "pendingTitle": "Your request to <name>{{name}}</name> is already waiting",
-      "pendingBody": "<name>{{name}}</name> hasn't replied to your earlier request yet, so we didn't send another. You'll see the reply under Bookings."
+      "pendingBody": "<name>{{name}}</name> hasn't replied to your earlier request yet, so we didn't send another. You'll see the reply under Bookings.",
+      "anonymousTitle": "Request submitted"
     },
     "status": {
       "sent": "Request sent",
       "sentFrom": "Sent {{when}} from <email>{{email}}</email>.",
-      "anonHint": "Sign in with this email to see <name>{{name}}</name>'s reply.",
+      "anonHint": "If this email already has an account, sign in and send the request from there. Otherwise, sign in with it to see <name>{{name}}</name>'s reply.",
       "signIn": "Sign in",
-      "viewInBookings": "View in bookings"
+      "viewInBookings": "View in bookings",
+      "submitted": "Request submitted",
+      "submittedFrom": "Submitted {{when}} from <email>{{email}}</email>."
     },
     "allRequired": "All fields are required.",
     "tzLine": "<name>{{name}}</name>'s time zone: {{zone}} · {{relative}}",
@@ -1543,7 +1547,8 @@
       "pickTime": "Pick a time on their calendar link",
       "waitingConfirm": "Waiting for {{name}} to confirm the time on Cal.com",
       "timeDeclined": "{{name}} couldn't make that time — choose another",
-      "programmeTeam": "The programme team will email you to arrange a time"
+      "programmeTeam": "The programme team will email you to arrange a time",
+      "submitted": "Request submitted"
     },
     "row": {
       "sent": "Sent {{when}}",
@@ -2653,7 +2658,11 @@
       "pendingTitle": "Your request to {{name}} is already waiting",
       "pendingBody": "You sent one recently and it hasn't been answered yet, so we didn't send a second one.",
       "sentBefore": "You sent a request {{when}} from <email>{{email}}</email>.",
-      "sendAnother": "Send another request"
+      "sendAnother": "Send another request",
+      "submittedTitle": "Request submitted",
+      "submittedBodyProgramme": "If <email>{{email}}</email> already has an account, sign in and send the request from there. Otherwise, create an account or sign in with this email to follow it: the programme team replies in MentorConnect.",
+      "submittedBodyMentor": "If <email>{{email}}</email> already has an account, sign in and send the request from there. Otherwise, create an account or sign in with this email to follow it: {{name}} replies in MentorConnect.",
+      "submittedBefore": "You submitted a request {{when}} from <email>{{email}}</email>. If that email already has an account, sign in and send the request from there."
     },
     "profileSettings": {
       "saved": "Profile saved",

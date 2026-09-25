@@ -289,6 +289,16 @@ describe('request state with Cal.com and programme-managed rows (B7)', () => {
     expect(other).toMatchObject({ kind: 'sent', programmeManaged: false, calStatus: null });
   });
 
+  it('a signed-out browser memory reads "Request submitted", never "Request sent": the server never says whether the email has an account (R1-08)', () => {
+    const memory: RequestState = { kind: 'sent', email: 'sara@example.com', sentAt: base.created_at, source: 'local' };
+    expect(railStopsFor(t, memory, { name: 'Jane' }).stops[0].label).toBe('dashboardV2.rail.submitted');
+    expect(railStopsFor(t, memory, { name: 'Jane', signedIn: false }).stops[0].label).toBe('dashboardV2.rail.submitted');
+    // Signed in, the request is exact: the memory of their own send and a visible row both read "sent".
+    expect(railStopsFor(t, memory, { name: 'Jane', signedIn: true }).stops[0].label).toBe('dashboardV2.rail.sent');
+    expect(railStopsFor(t, sent({ status: 'pending' }), { name: 'Jane', signedIn: true }).stops[0].label).toBe('dashboardV2.rail.sent');
+    expect(railStopsFor(t, sent({ status: 'pending' }), { name: 'Jane' }).stops[0].label).toBe('dashboardV2.rail.sent');
+  });
+
   it('pending and confirmed keep their rails', () => {
     expect(railStatesFor(sent({ status: 'pending' })).states).toEqual(['done', 'current', 'next']);
     expect(railStatesFor(sent({ status: 'confirmed' })).states).toEqual(['done', 'done', 'done']);
