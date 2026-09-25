@@ -2584,7 +2584,15 @@
       "upcomingCount_two": "{{count}} upcoming sessions",
       "upcomingCount_few": "{{count}} upcoming sessions",
       "upcomingCount_many": "{{count}} upcoming sessions",
-      "upcomingCount_other": "{{count}} upcoming sessions"
+      "upcomingCount_other": "{{count}} upcoming sessions",
+      "otherMentors": "Meet other mentors",
+      "otherMentorsSub": "See how other mentors in the programme describe what they help with.",
+      "setOfficeHours": "Set office hours",
+      "referSubject": "Join MentorConnect as a mentor",
+      "referMessage": "I mentor founders through MentorConnect, the Amazon UAE mentorship programme. Amazon colleagues can join too: open the link, choose Sign in with Amazon and set up a mentor profile in a few minutes.",
+      "referCopied": "Invitation copied. Paste it into an email or a chat to a colleague.",
+      "referCopyFailed": "We couldn’t copy the invitation. Use Email a colleague instead.",
+      "referEmail": "Email a colleague"
     },
     "onboarding": {
       "stepsLabel": "Form sections",

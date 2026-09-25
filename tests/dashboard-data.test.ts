@@ -9,8 +9,10 @@ import {
   displayNameFor,
   firstNameOf,
   normalizeBookingTimes,
+  otherMentors,
   ownRows,
   recordedMinutes,
+  referralInvite,
   rowActionsFor,
   selectDashboardRows,
   type DashboardRole,
@@ -268,5 +270,55 @@ describe('upcomingWithin', () => {
       { id: 'untimed', status: 'confirmed' as const },
     ];
     expect(upcomingWithin(rows, now, 14).map((r) => r.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('otherMentors (mentor home, R1-43)', () => {
+  const m = (id: string, extra: Partial<{ source: string; is_available: boolean; photo_url: string | null; created_at: string }> = {}) => ({
+    id,
+    source: 'db',
+    is_available: true,
+    photo_url: null as string | null,
+    created_at: '2026-09-01T00:00:00',
+    ...extra,
+  });
+  it('lists only real database rows that take requests, never the viewer', () => {
+    const rows = [
+      m('me'),
+      m('static', { source: 'featured' }),
+      m('local', { source: 'local' }),
+      m('paused', { is_available: false }),
+      m('real'),
+    ];
+    expect(otherMentors(rows, 'me').map((r) => r.id)).toEqual(['real']);
+  });
+  it('puts mentors with a photo first, then the newest, and keeps at most three', () => {
+    const rows = [
+      m('old-no-photo', { created_at: '2026-01-01T00:00:00' }),
+      m('new-no-photo', { created_at: '2026-09-20T00:00:00' }),
+      m('old-photo', { photo_url: '/a.jpg', created_at: '2026-02-01T00:00:00' }),
+      m('new-photo', { photo_url: '/b.jpg', created_at: '2026-09-10T00:00:00' }),
+    ];
+    expect(otherMentors(rows, null).map((r) => r.id)).toEqual(['new-photo', 'old-photo', 'new-no-photo']);
+    expect(otherMentors(rows, null, 1).map((r) => r.id)).toEqual(['new-photo']);
+  });
+  it('is empty before the directory has loaded', () => {
+    expect(otherMentors(undefined, 'me')).toEqual([]);
+  });
+});
+
+describe('referralInvite (mentor home "Refer now", R1-44)', () => {
+  const invite = referralInvite({ url: 'https://mentor-amazon.vercel.app/login', subject: 'Join as a mentor', message: 'Sign in with Amazon & set up a profile.' });
+  it('hands the share sheet the title, the message and the sign-in URL separately', () => {
+    expect(invite.share).toEqual({ title: 'Join as a mentor', text: 'Sign in with Amazon & set up a profile.', url: 'https://mentor-amazon.vercel.app/login' });
+  });
+  it('copies the message with the URL on its own line', () => {
+    expect(invite.clipboard).toBe('Sign in with Amazon & set up a profile.\nhttps://mentor-amazon.vercel.app/login');
+  });
+  it('drafts an e-mail with the subject and a body that carries the URL, every character encoded', () => {
+    expect(invite.mailto.startsWith('mailto:?subject=')).toBe(true);
+    const params = new URLSearchParams(invite.mailto.slice('mailto:?'.length));
+    expect(params.get('subject')).toBe('Join as a mentor');
+    expect(params.get('body')).toBe('Sign in with Amazon & set up a profile.\n\nhttps://mentor-amazon.vercel.app/login');
   });
 });

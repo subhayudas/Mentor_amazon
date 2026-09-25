@@ -2584,7 +2584,15 @@
       "upcomingCount_two": "جلستان قادمتان",
       "upcomingCount_few": "{{count}} جلسات قادمة",
       "upcomingCount_many": "{{count}} جلسة قادمة",
-      "upcomingCount_other": "{{count}} جلسة قادمة"
+      "upcomingCount_other": "{{count}} جلسة قادمة",
+      "otherMentors": "تعرّف على مرشدين آخرين",
+      "otherMentorsSub": "اطّلع على كيفية تعريف المرشدين الآخرين في البرنامج بما يساعدون فيه.",
+      "setOfficeHours": "حدد ساعاتك المكتبية",
+      "referSubject": "انضم إلى MentorConnect كمرشد",
+      "referMessage": "أرشد روّاد الأعمال عبر MentorConnect، برنامج أمازون للإرشاد في الإمارات. يمكن لزملاء أمازون الانضمام أيضًا: افتح الرابط، واختر «تسجيل الدخول بحساب أمازون»، ثم أنشئ ملف مرشد خلال دقائق.",
+      "referCopied": "تم نسخ الدعوة. الصقها في بريد إلكتروني أو محادثة مع زميل.",
+      "referCopyFailed": "تعذّر نسخ الدعوة. استخدم «راسل زميلًا» بدلًا من ذلك.",
+      "referEmail": "راسل زميلًا"
     },
     "onboarding": {
       "stepsLabel": "أقسام النموذج",
