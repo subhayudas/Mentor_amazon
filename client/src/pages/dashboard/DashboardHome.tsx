@@ -7,6 +7,7 @@ import { ArrowUpRight, Bell, CalendarClock, Check, ChevronDown, ChevronRight, Ch
 import { DASHBOARD_ROUTES, DashboardShell, useDashboardIdentity } from "@/components/dashboard/DashboardShell";
 import { useMentors } from "@/components/discovery/useMentors";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/context/AuthContext";
 import { FEATURED_MENTORS, featuredMentorByAnyId } from "@/data/featuredMentors";
 import { useActivity } from "@/lib/activity";
@@ -76,6 +77,10 @@ function MentorHome() {
   const reminders = React.useMemo(() => (signedIn ? confirmedReminders(bookings) : []), [bookings, signedIn]);
   const directory = useMentors();
   const others = React.useMemo(() => (IS_LOCAL ? [] : otherMentors(directory.data, profileId)), [directory.data, profileId]);
+  // The second column is kept while the directory loads, so the checklist does not jump from full
+  // width to two columns when it arrives (R2-04). The tracks are minmax(0, …): the column's width
+  // never depends on how long a mentor's name is (the rows truncate).
+  const othersLoading = !IS_LOCAL && directory.isLoading;
 
   // Greeting: the mentor row's name, else the account's, else the email's local part (F41).
   const displayName = identity.displayName;
@@ -273,7 +278,7 @@ function MentorHome() {
           </div>
         </section>
 
-        <div className={cn("mt-6 grid grid-cols-1 gap-6", (IS_LOCAL || others.length > 0) && "lg:grid-cols-[1.7fr_1fr]")}>
+        <div className={cn("mt-6 grid grid-cols-1 gap-6", (IS_LOCAL || othersLoading || others.length > 0) && "lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]")}>
           {/* Checklist: computed from the database in database mode; the share step is this browser's tick. */}
           <section className={cn(card, "overflow-hidden")} aria-labelledby="checklist-title" data-testid="checklist">
             <div className="flex items-start justify-between gap-4 p-6">
@@ -355,6 +360,24 @@ function MentorHome() {
                         <span className="block truncate text-[13px] text-[#6c6c84]">{lang === "ar" ? m.headline_ar : m.headline}</span>
                       </span>
                     </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : othersLoading ? (
+            /* The directory is loading: the column keeps its place (R2-04). */
+            <section className="rounded-[12px] bg-[#f7f6f2] p-6" role="status" aria-busy="true" data-testid="section-other-mentors-loading">
+              <span className="sr-only">{t("common.loading")}</span>
+              <Skeleton className="h-6 w-3/5 bg-white" />
+              <Skeleton className="mt-2 h-4 w-4/5 bg-white" />
+              <ul className="mt-5 space-y-4" aria-hidden="true">
+                {[0, 1, 2].map((i) => (
+                  <li key={i} className="flex items-center gap-3">
+                    <Skeleton className="size-12 shrink-0 rounded-full bg-white" />
+                    <span className="min-w-0 flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/5 bg-white" />
+                      <Skeleton className="h-3 w-2/5 bg-white" />
+                    </span>
                   </li>
                 ))}
               </ul>

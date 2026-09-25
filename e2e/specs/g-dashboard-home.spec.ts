@@ -62,6 +62,28 @@ test('R1-43 R1-45 the mentor home lists other real mentors with no claim about t
   await healthy({ screenshotName: 'R1-43-mentor-home' });
 });
 
+test('R2-04 the checklist keeps its width while the directory loads: the other-mentors column holds its place', async ({ page, loginAs, healthy }) => {
+  // Hold the directory list (not single-mentor reads) until the checklist has been measured.
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  await page.route('**/rest/v1/mentors_public?*', async (route) => {
+    if (new URL(route.request().url()).searchParams.has('id')) return route.continue();
+    await gate;
+    await route.continue();
+  });
+  await openMentorHome(page, loginAs);
+  const checklist = page.getByTestId('checklist');
+  const loading = (await checklist.boundingBox())!;
+  await page.screenshot({ path: test.info().outputPath('R2-04-directory-loading.png') });
+  release();
+  await expect(page.getByTestId('section-other-mentors')).toBeVisible();
+  const loaded = (await checklist.boundingBox())!;
+  expect(Math.round(loaded.width), 'no jump from one column to two').toBe(Math.round(loading.width));
+  expect(Math.round(loaded.x)).toBe(Math.round(loading.x));
+  await expect(page.getByTestId('section-other-mentors-loading')).toHaveCount(0);
+  await healthy({ screenshotName: 'R2-04-directory-loaded' });
+});
+
 test('R1-44 "Refer now" hands the share sheet a sign-in invitation and keeps the mentor on the page', async ({ page, loginAs, healthy, lang, baseURL }) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, 'share', {
