@@ -1,9 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import postgres from 'postgres';
 import { afterEach, expect, it } from 'vitest';
 import { describeDb, TEST_DB_URL } from './env.ts';
 import { claims, mkBooking, mkMentee, mkMentor } from './fixtures.ts';
-import { createScratchDb, SCRATCH_TTL_SECONDS, SQL, type ScratchDb } from './scratchDb.ts';
-import { asRole, connect, expectPgFailure, withTx } from './sql.ts';
+import { createScratchDb, readSql, SCRATCH_TTL_SECONDS, SQL, type ScratchDb } from './scratchDb.ts';
+import { asRole, connect, expectPgError, expectPgFailure, withTx } from './sql.ts';
 
 const MANAV = '738d7465-42c6-5550-be9a-6e7ef35f52bc';
 const BASHAR = 'caf1ee67-267d-591f-9842-5ae649ec2a26';
@@ -176,6 +177,143 @@ describeDb('I1 Amazon accounts and passwords (R1-37)', () => {
     // And from now on the database refuses to set one.
     await expect(db.sql`update auth.users set encrypted_password = 'x' where id = ${amazon}`).rejects.toThrow(/sso_account_has_no_password/);
     await db.sql`update auth.users set encrypted_password = extensions.crypt('changed', extensions.gen_salt('bf', 4)) where id = ${email}`;
+  });
+});
+
+/** Apply a repo SQL file on its own connection, returning the WARNING lines it raised. */
+async function applyWithWarnings(db: ScratchDb, file: string): Promise<string[]> {
+  const warnings: string[] = [];
+  const conn = postgres(db.url, { max: 1, onnotice: (n) => { if (n.severity === 'WARNING') warnings.push(String(n.message)); } });
+  try {
+    await conn.unsafe(readSql(file)).simple();
+  } finally {
+    await conn.end({ timeout: 5 });
+  }
+  return warnings;
+}
+
+describeDb('I1 profile links made before the guard (R2-13)', () => {
+  // Production runs the a4f3fbd schema today: any signed-in account can point its own
+  // users.profile_id at any id, and owns_mentor() / my_profile_ids() trust that link. The guard in
+  // 0002 stops new links; the links already made must not survive it, in 0002 or a v2 re-run.
+  async function liveDbWithHijacks() {
+    const db = await scratch();
+    await db.apply(SQL.v2Old);
+    const p = { victim: randomUUID(), programme: randomUUID(), ownMentor: randomUUID(), ownMentee: randomUUID(), adminPick: randomUUID() };
+    const u = { attacker: randomUUID(), squatter: randomUUID(), mentor: randomUUID(), mentee: randomUUID(), sso: randomUUID(), admin: randomUUID() };
+    const email = {
+      attacker: 'a@gmail.com', squatter: 'squatter@gmail.com', mentor: 'own.mentor@gmail.com',
+      mentee: 'own.mentee@gmail.com', sso: 'jdoe@amazon.com', admin: 'admin@mentorconnect.test',
+    };
+    for (const [k, id] of Object.entries(u)) {
+      await db.sql`insert into auth.users (id, email) values (${id}, ${email[k as keyof typeof email]})`;
+    }
+    await mkMentor(db.sql, { id: p.victim, email: 'victim@amazon.com' });
+    await mkMentor(db.sql, { id: p.programme, email: 'programme.copy@mentorconnect.test' });
+    await mkMentor(db.sql, { id: p.ownMentor, email: email.mentor });
+    await mkMentor(db.sql, { id: p.adminPick, email: 'someone.else@mentorconnect.test' });
+    await mkMentee(db.sql, { id: p.ownMentee, email: email.mentee });
+    const row = (id: string, e: string, type: string, profile: string | null, alias: string | null = null) =>
+      db.sql`insert into public.users (id, email, password, user_type, profile_id, amazon_alias, is_verified, created_at)
+             values (${id}, ${e}, 'x', ${type}, ${profile}, ${alias}, ${alias !== null}, now())`;
+    await row(u.attacker, email.attacker, 'mentee', null);
+    await row(u.squatter, email.squatter, 'mentor', null);
+    await row(u.mentor, email.mentor, 'mentor', p.ownMentor);
+    await row(u.mentee, email.mentee, 'mentee', p.ownMentee);
+    await row(u.sso, email.sso, 'mentor', p.programme, 'jdoe');
+    await row(u.admin, email.admin, 'admin', p.adminPick);
+    await db.sql`insert into public.approved_users (id, amazon_alias, email, role, mentor_id, is_active, approved_by, approved_at)
+                 values (${randomUUID()}, 'jdoe', ${email.sso}, 'mentor', ${p.programme}, true, 'admin@mentorconnect.test', now())`;
+    // The hijacks, as a signed-in account through PostgREST, on the schema production runs today.
+    const hijack = (sub: string, e: string, target: string) =>
+      db.sql.begin(async (tx) => {
+        await asRole(tx, 'authenticated', claims(sub, e));
+        expect(await tx`update public.users set profile_id = ${target} where id = ${sub} returning id`).toHaveLength(1);
+      });
+    await hijack(u.attacker, email.attacker, p.victim);
+    await hijack(u.squatter, email.squatter, MANAV); // a featured id: the row appears with 0004
+    return { db, p, u };
+  }
+
+  const links = async (db: ScratchDb, u: Record<string, string>) => {
+    const rows = await db.sql<{ id: string; profile_id: string | null }[]>`select id, profile_id from public.users`;
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r.profile_id]));
+    return Object.fromEntries(Object.entries(u).map(([k, id]) => [k, byId[id]]));
+  };
+
+  it('0002 clears a link a signed-in account made to someone else\'s row, names it in a WARNING, and keeps the legitimate ones', async () => {
+    const { db, p, u } = await liveDbWithHijacks();
+    // Production today: the hijacked link opens the victim's full row.
+    await withTx(db.sql, async (tx) => {
+      await asRole(tx, 'authenticated', claims(u.attacker, 'a@gmail.com'));
+      expect(await tx`select email from public.mentors where id = ${p.victim}`).toEqual([{ email: 'victim@amazon.com' }]);
+    });
+
+    const warnings = await applyWithWarnings(db, SQL.m0002);
+    const cleared = warnings.filter((w) => w.startsWith('users.profile_id links cleared'));
+    expect(cleared).toHaveLength(1);
+    expect(cleared[0]).toContain(`a@gmail.com (users.id ${u.attacker}) had profile_id ${p.victim}`);
+    expect(cleared[0]).toContain(`squatter@gmail.com (users.id ${u.squatter}) had profile_id ${MANAV}`);
+    for (const kept of [u.mentor, u.mentee, u.sso, u.admin]) expect(cleared[0]).not.toContain(kept);
+    expect(await links(db, u)).toEqual({
+      attacker: null, squatter: null, mentor: p.ownMentor, mentee: p.ownMentee, sso: p.programme, admin: p.adminPick,
+    });
+
+    // The finding's repro after 0002 and 0003: the attacker's session opens nothing of the victim.
+    await db.apply(SQL.m0003);
+    await withTx(db.sql, async (tx) => {
+      await tx`insert into public.mentor_cal_webhooks (mentor_id, secret) values (${p.victim}, 'victim-webhook-secret') on conflict do nothing`;
+      await asRole(tx, 'authenticated', claims(u.attacker, 'a@gmail.com'));
+      const [{ ids, owns }] = await tx<{ ids: string[]; owns: boolean }[]>`
+        select public.my_profile_ids() as ids, public.owns_mentor(${p.victim}) as owns`;
+      expect(ids).not.toContain(p.victim);
+      expect(owns).toBe(false);
+      expect(await tx`select email from public.mentors where id = ${p.victim}`).toEqual([]);
+      expect(await tx`update public.mentors set bio = 'hijacked' where id = ${p.victim} returning id`).toEqual([]);
+      await expectPgError(tx, (sp) => sp`select public.get_my_cal_webhook(${p.victim})`, '42501', /not_allowed/);
+      // …and it cannot make the link again.
+      await expectPgFailure(tx, (sp) => sp`update public.users set profile_id = ${p.victim} where id = ${u.attacker}`,
+        { code: '42501', message: /forbidden_column_change/, detail: /profile_id may only name your own profile/ });
+    });
+
+    // A re-run finds nothing more to clear and keeps the legitimate links.
+    const again = await applyWithWarnings(db, SQL.m0002);
+    expect(again.filter((w) => w.startsWith('users.profile_id links cleared'))).toEqual([]);
+    expect(await links(db, u)).toEqual({
+      attacker: null, squatter: null, mentor: p.ownMentor, mentee: p.ownMentee, sso: p.programme, admin: p.adminPick,
+    });
+  });
+
+  it('a re-run of supabase_setup_v2.sql on the live schema clears the same links (the v2 mirror)', async () => {
+    const { db, p, u } = await liveDbWithHijacks();
+    const warnings = await applyWithWarnings(db, SQL.v2);
+    const cleared = warnings.filter((w) => w.startsWith('users.profile_id links cleared'));
+    expect(cleared).toHaveLength(1);
+    expect(cleared[0]).toContain(`a@gmail.com (users.id ${u.attacker}) had profile_id ${p.victim}`);
+    expect(await links(db, u)).toEqual({
+      attacker: null, squatter: null, mentor: p.ownMentor, mentee: p.ownMentee, sso: p.programme, admin: p.adminPick,
+    });
+  });
+});
+
+describeDb('I1 a featured id taken by a mentees row (R2-17)', () => {
+  it('0002 warns about it and the first 0004 run names it (not an unnamed guard error); once deleted, 0004 seeds', async () => {
+    const db = await scratch();
+    await db.apply(SQL.v2Old);
+    // Production today: any signed-in user can insert a mentees row with any id under their address.
+    const GHITA = '6afa7b6d-d098-568a-b629-2b04c6edeef1';
+    await mkMentee(db.sql, { id: GHITA, email: 'a@gmail.com' });
+    const warnings = await applyWithWarnings(db, SQL.m0002);
+    expect(warnings.join('\n')).toContain(`rows already hold a reserved featured-mentor id (delete them before migrations/0004): ${GHITA} (mentees row, a@gmail.com)`);
+    await db.apply(SQL.m0003);
+    await expect(db.apply(SQL.m0004)).rejects.toThrow(
+      /featured-mentor ids are already used by rows this file did not write: 6afa7b6d-d098-568a-b629-2b04c6edeef1 \(mentees row, a@gmail\.com\)/);
+    const [{ n }] = await db.sql<{ n: number }[]>`select count(*)::int as n from public.mentors where managed_by_programme`;
+    expect(n).toBe(0);
+    await db.sql`delete from public.mentees where id = ${GHITA}`;
+    await db.apply(SQL.m0004);
+    const [{ seeded }] = await db.sql<{ seeded: number }[]>`select count(*)::int as seeded from public.mentors where managed_by_programme`;
+    expect(seeded).toBe(5);
   });
 });
 

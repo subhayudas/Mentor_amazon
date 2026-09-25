@@ -84,6 +84,21 @@ describe('mirrored SQL', () => {
     expect(definition(v2, name)).toBe(definition(m0002, name));
   });
 
+  it('supabase_setup_v2.sql and 0002 clear the same profile links made before the guard, and say so (R2-13)', () => {
+    const block = (sql: string) => {
+      const s0 = sql.indexOf('-- Links made before this guard existed (R2-13).');
+      if (s0 < 0) throw new Error('the R2-13 remediation block is missing');
+      return sql.slice(s0, sql.indexOf('END $$;', s0) + 'END $$;'.length);
+    };
+    expect(block(v2)).toBe(block(m0002));
+    expect(block(m0002)).toMatch(/UPDATE public\.users u SET profile_id = NULL/);
+    expect(block(m0002)).toMatch(/RAISE WARNING 'users\.profile_id links cleared/);
+    // It runs right after the guard, so a link can never be made again once it is cleared.
+    const guard = m0002.indexOf('CREATE TRIGGER users_guard_role_columns');
+    expect(guard).toBeGreaterThan(0);
+    expect(m0002.indexOf('-- Links made before this guard existed (R2-13).')).toBeGreaterThan(guard);
+  });
+
   it('the storage policies are identical in supabase_setup_v2.sql and 0002, with no public list policy (R1-11)', () => {
     const policies = (sql: string) => {
       const s0 = sql.indexOf('DROP POLICY IF EXISTS "Authenticated users can upload files" ON storage.objects;');

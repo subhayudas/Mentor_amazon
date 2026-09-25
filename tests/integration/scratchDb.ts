@@ -15,6 +15,8 @@ export const SQL = {
   v2: 'supabase_setup_v2.sql',
   phase2: 'supabase_phase2.sql',
   phase2Old: 'tests/integration/fixtures/supabase_phase2.a4f3fbd.sql',
+  /** supabase_setup_v2.sql as deployed to production today (a4f3fbd): no profile_id guard. */
+  v2Old: 'tests/integration/fixtures/supabase_setup_v2.a4f3fbd.sql',
   m0002: 'migrations/0002_production_readiness.sql',
   m0003: 'migrations/0003_restrict_legacy_writes.sql',
   m0004: 'migrations/0004_seed_featured_mentors.sql',

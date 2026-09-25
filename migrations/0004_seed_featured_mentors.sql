@@ -40,14 +40,18 @@ BEGIN
     RAISE EXCEPTION '0004 preconditions failed: run migrations/0003_restrict_legacy_writes.sql first (after the new client is deployed)';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0004_seed_featured_mentors') THEN
-    SELECT string_agg(format('%s (%s, %s)', m.id, m.email,
-                             CASE WHEN m.managed_by_programme THEN 'programme-managed' ELSE 'not programme-managed' END),
-                      ', ' ORDER BY m.id)
-      INTO v_held
-    FROM public.mentors m JOIN public.reserved_mentor_ids r ON r.id = m.id;
+    -- A mentees row with a featured id (any signed-in user could insert one before 0002) would
+    -- otherwise stop the seed below with an unnamed forbidden_column_change (R2-17).
+    SELECT string_agg(x.line, ', ' ORDER BY x.id) INTO v_held
+    FROM (SELECT m.id, format('%s (%s, %s)', m.id, m.email,
+                              CASE WHEN m.managed_by_programme THEN 'programme-managed' ELSE 'not programme-managed' END) AS line
+          FROM public.mentors m JOIN public.reserved_mentor_ids r ON r.id = m.id
+          UNION ALL
+          SELECT me.id, format('%s (mentees row, %s)', me.id, me.email)
+          FROM public.mentees me JOIN public.reserved_mentor_ids r ON r.id = me.id) x;
     IF v_held IS NOT NULL THEN
       RAISE EXCEPTION '0004 pre-check failed: featured-mentor ids are already used by rows this file did not write: %', v_held
-        USING HINT = 'Someone created them before migrations/0002 reserved the ids. Delete those rows, then run the file again.';
+        USING HINT = 'Someone created them before migrations/0002 reserved the ids. Delete those rows (public.mentors, or public.mentees where it says mentees row), then run the file again.';
     END IF;
   END IF;
   -- Self-check of the id literals below whenever uuid-ossp is installed (Supabase default).

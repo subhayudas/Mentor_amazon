@@ -353,6 +353,49 @@ END $$;
 DROP TRIGGER IF EXISTS users_guard_role_columns ON public.users;
 CREATE TRIGGER users_guard_role_columns BEFORE INSERT OR UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION public.guard_users_role_columns();
+-- Links made before this guard existed (R2-13). Until then any signed-in account could point its
+-- profile_id at any id: another person's mentors or mentees row, or a featured id before 0004
+-- seeds it, and the link keeps opening that row after the guard (owns_mentor, my_profile_ids).
+-- Every link is cleared unless the guard would accept it today (the account's own kind of row
+-- under its own sign-in email, auth.users.email, with no row under another address carrying the
+-- id) or the programme demonstrably made it: the account is an admin, or an approved_users row
+-- for its alias or sign-in email names that mentor row (what the SSO bridge links). The WARNING
+-- names every link cleared; an admin re-links a legitimate one. Identical in
+-- supabase_setup_v2.sql §4 and migrations/0002 §3a (tests/sql-mirror.test.ts).
+DO $$
+DECLARE
+  v_cleared text;
+BEGIN
+  WITH checked AS (
+    SELECT u.id, u.email, u.profile_id,
+           coalesce(u.user_type = 'admin', false)
+           OR EXISTS (SELECT 1 FROM public.approved_users ap
+                      WHERE ap.mentor_id = u.profile_id
+                        AND (lower(ap.amazon_alias) = lower(u.amazon_alias) OR lower(ap.email) = lower(a.email)))
+           OR ((EXISTS (SELECT 1 FROM public.mentors m
+                        WHERE u.user_type = 'mentor' AND m.id = u.profile_id AND lower(m.email) = lower(a.email))
+                OR EXISTS (SELECT 1 FROM public.mentees me
+                           WHERE u.user_type = 'mentee' AND me.id = u.profile_id AND lower(me.email) = lower(a.email)))
+               AND NOT EXISTS (SELECT 1 FROM public.mentors m
+                               WHERE m.id = u.profile_id AND lower(m.email) IS DISTINCT FROM lower(a.email))
+               AND NOT EXISTS (SELECT 1 FROM public.mentees me
+                               WHERE me.id = u.profile_id AND lower(me.email) IS DISTINCT FROM lower(a.email))) AS kept
+    FROM public.users u LEFT JOIN auth.users a ON a.id::text = u.id
+    WHERE u.profile_id IS NOT NULL
+  ), cleared AS (
+    UPDATE public.users u SET profile_id = NULL
+    FROM checked c
+    WHERE u.id = c.id AND NOT c.kept
+    RETURNING c.email, c.id, c.profile_id
+  )
+  SELECT string_agg(format('%s (users.id %s) had profile_id %s', cl.email, cl.id, cl.profile_id), '; ' ORDER BY cl.email, cl.id)
+    INTO v_cleared
+  FROM cleared cl;
+  IF v_cleared IS NOT NULL THEN
+    RAISE WARNING 'users.profile_id links cleared (the profile_id guard refuses them; they were made before it existed): %', v_cleared
+      USING HINT = 'Re-link a legitimate one as an admin. To keep an admin-made link through a re-run of this file, name that mentor row in approved_users.mentor_id for the account''s alias or email.';
+  END IF;
+END $$;
 
 -- An Amazon account has no password (AUTH-02, enforced by the database; supabase_setup_v2.sql §4).
 CREATE OR REPLACE FUNCTION public.block_sso_password_change()
@@ -1993,13 +2036,19 @@ BEGIN
       RAISE WARNING '0002: admin rows whose id is not an auth user id (they are not admins until fixed): %', v_admins_without_auth;
     END IF;
   END IF;
-  -- A featured id taken before this file reserved it (any approved mentor could insert one):
-  -- migrations/0004 refuses to seed until an admin deletes that row.
+  -- A featured id taken before this file reserved it (any approved mentor could insert a mentors
+  -- row, any signed-in user a mentees row, with one): migrations/0004 refuses to seed until an
+  -- admin deletes that row (R2-17).
   IF NOT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0004_seed_featured_mentors') THEN
-    SELECT string_agg(format('%s (%s)', m.id, m.email), ', ' ORDER BY m.id) INTO v_squatted
-    FROM public.mentors m JOIN public.reserved_mentor_ids r ON r.id = m.id;
+    SELECT string_agg(x.line, ', ' ORDER BY x.id) INTO v_squatted
+    FROM (SELECT m.id, format('%s (mentors row, %s)', m.id, m.email) AS line
+          FROM public.mentors m JOIN public.reserved_mentor_ids r ON r.id = m.id
+          UNION ALL
+          SELECT me.id, format('%s (mentees row, %s)', me.id, me.email)
+          FROM public.mentees me JOIN public.reserved_mentor_ids r ON r.id = me.id) x;
     IF v_squatted IS NOT NULL THEN
-      RAISE WARNING '0002: mentors rows already hold a reserved featured-mentor id (delete them before migrations/0004): %', v_squatted;
+      RAISE WARNING '0002: rows already hold a reserved featured-mentor id (delete them before migrations/0004): %', v_squatted
+        USING HINT = 'They were created before 0002 reserved the ids. Delete each named row from public.mentors or public.mentees.';
     END IF;
   END IF;
   RAISE NOTICE '0002 applied: % mentors (% programme-managed), % bookings, legacy client writes %',

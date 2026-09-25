@@ -262,7 +262,7 @@ each one assumes the previous one is done.
    select distinct status from public.bookings;
    select id, public from storage.buckets;  select count(*) from public.mentors;
    ```
-3. **Supabase — expand:** run `migrations/0002_production_readiness.sql` (paste the whole file; one transaction; a failed pre-check names the rows to fix and applies nothing), then its verification queries. It only adds things, so the site that is live keeps working. `0002` also creates the `uploads` bucket (public, 5 MB, images). Do **not** run `0003` yet (step 10).
+3. **Supabase — expand:** run `migrations/0002_production_readiness.sql` (paste the whole file; one transaction; a failed pre-check names the rows to fix and applies nothing), then its verification queries. The site that is live keeps working: what `0002` tightens (listed at the top of the file) is nothing it relies on. `0002` also creates the `uploads` bucket (public, 5 MB, images). Read every `WARNING` it prints and keep them for the PR: `users.profile_id links cleared …` names each account whose profile link pointed at a row that is not its own (such links could be made before `0002`; the link is removed, so check each one and re-link a legitimate one as an admin); `rows already hold a reserved featured-mentor id` and `mentors and mentees rows share these ids` name rows an admin deletes (before step 11). Do **not** run `0003` yet (step 10).
 4. **Supabase — Auth settings:** Authentication → Providers → Email enabled (the SSO bridge issues magic links via `generateLink`); Authentication → URL configuration → Site URL `https://mentor-amazon.vercel.app`; signups allowed (the bridge creates auth users). Leave **Attack Protection → CAPTCHA off** until step 12.
 5. **Vercel — environment variables** (Settings → Environment Variables), then redeploy (they are read at build and cold start):
    - **Remove** `VITE_DEFAULT_CAL_LINK` from every environment. Nothing reads it any more; it pointed at Cal.com's sample account.
@@ -284,7 +284,7 @@ each one assumes the previous one is done.
 
 ### Rollback
 
-Undo in the reverse order of the steps above. `0002` only adds things and stays in place.
+Undo in the reverse order of the steps above. `0002` stays in place (the previous deployment works with it).
 
 - **Supabase Auth CAPTCHA** (step 12): switch it off in Attack Protection. Always do this before rolling the code back: the previous client sends no captcha token, so nobody could sign in with a password.
 - **Featured mentors** (step 11): `update public.mentors set is_available = false where managed_by_programme;` hides them again. Their requests and history stay.
