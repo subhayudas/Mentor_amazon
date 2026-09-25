@@ -258,6 +258,14 @@ describe('RPC', () => {
     expect(res.body).not.toContain('already_pending');
   });
 
+  it('an email that already has an account (nothing created, the owner is told in their bell) looks exactly like a new request (R1-08)', async () => {
+    rpc.mockImplementation(async () => ({ data: { outcome: 'sign_in_required', booking_id: null }, error: null }));
+    const res = await send(VALID);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ ok: true });
+    expect(res.body).not.toContain('sign_in_required');
+  });
+
   it('a request under the mentor\'s own address answers like a normal one (no e-mail oracle)', async () => {
     rpc.mockImplementation(async () => ({
       data: null,
