@@ -100,13 +100,14 @@ export function recoveryAppliesTo(state: RecoveryState, userId: string | null | 
 
 /**
  * An Amazon (SSO) account, judged from the auth session alone, without a
- * database read: the SSO bridge stamps `user_metadata.amazon_alias`, and SSO
- * accounts use the corporate `@amazon.com` address. Such an account never gets a
- * password (D13).
+ * database read: the SSO bridge stamps `user_metadata.amazon_alias`. Such an
+ * account never gets a password (D13). The address is NOT a signal: a mentee
+ * may sign up with email and password using an `@amazon.com` address, and that
+ * account must be able to reset its password (R1-38). The users row's
+ * `amazon_alias`, which every SSO account carries, is the second check.
  */
 export function isAmazonSessionUser(user: { email?: string | null; user_metadata?: Record<string, unknown> | null } | null | undefined): boolean {
   if (!user) return false;
   const alias = user.user_metadata?.amazon_alias;
-  if (typeof alias === "string" && alias.trim() !== "") return true;
-  return typeof user.email === "string" && /@amazon\.com$/i.test(user.email.trim());
+  return typeof alias === "string" && alias.trim() !== "";
 }

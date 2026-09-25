@@ -113,14 +113,23 @@ describe('embed link, event and config', () => {
 
   it('config carries name, email and metadata[mc_booking] only when set', () => {
     expect(calEmbedConfig({ menteeName: ' Sara K. ', menteeEmail: 'sara@example.com', bookingId: 'b-123' })).toEqual({
+      theme: 'light',
+      layout: 'month_view',
       name: 'Sara K.',
       email: 'sara@example.com',
       'metadata[mc_booking]': 'b-123',
     });
-    expect(calEmbedConfig({})).toEqual({});
+    expect(calEmbedConfig({})).toEqual({ theme: 'light', layout: 'month_view' });
     // The metadata key survives URL encoding the way the stub asserts it (metadata%5Bmc_booking%5D).
     const params = new URLSearchParams(calEmbedConfig({ bookingId: 'b-123' }));
-    expect(params.toString()).toBe('metadata%5Bmc_booking%5D=b-123');
+    expect(params.get('metadata[mc_booking]')).toBe('b-123');
+    expect(params.toString()).toContain('metadata%5Bmc_booking%5D=b-123');
+  });
+
+  it('the scheduling dialog is always light and in month view, whatever the mentor set in Cal.com (R1-80)', () => {
+    const config = calEmbedConfig({ menteeName: 'Sara', bookingId: 'b-1' });
+    expect(config.theme).toBe('light');
+    expect(config.layout).toBe('month_view');
   });
 });
 

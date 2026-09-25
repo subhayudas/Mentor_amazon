@@ -94,14 +94,16 @@ test('S4 bot check: no token means no POST; a request the server rejects shows t
     if (r.url().endsWith('/api/requests') && r.method() === 'POST') posts += 1;
   });
   try {
-    // 1. The widget never hands out a token (its script cannot load): the send is refused locally.
+    // 1. The widget never hands out a token (its script cannot load): the check says so, and the
+    //    send is refused locally with a message that points at it (R1-72).
     await page.route('https://challenges.cloudflare.com/**', (route) => route.abort());
     await page.goto(`/mentor/${f.slug}/book`);
+    await expect(page.getByTestId('turnstile-failed')).toBeVisible();
     await fillSessionForm(page, 'Dev B Bot', email);
     await page.getByTestId('button-send-request').click();
     const error = page.getByTestId('booking-error');
     await expect(error).toHaveAttribute('data-kind', 'botCheck');
-    await expect(error).toHaveText(tr(lang, 'bookingRequest.error.botCheck'));
+    await expect(error).toHaveText(tr(lang, 'bookingRequest.captchaNotSent'));
     expect(posts).toBe(0);
     await healthy({ screenshotName: 'S4-no-token' });
     await page.unroute('https://challenges.cloudflare.com/**');
@@ -240,8 +242,11 @@ test('S6b a server outage is not blamed on the connection; a 429 blocks Send onl
   await expect(error).toHaveAttribute('data-kind', 'rateLimited');
   await expect(error).toHaveText(tr(lang, 'bookingRequest.error.rateLimitedSoon'));
   await expect(send).toHaveAttribute('aria-disabled', 'true');
+  // A screen reader tabbing back to the dimmed Send hears why (R1-81), as in the dialog.
+  await expect(send).toHaveAccessibleDescription(tr(lang, 'bookingRequest.error.rateLimitedSoon'));
   // After the Retry-After the person can try again without reloading.
   await expect(send).not.toHaveAttribute('aria-disabled', 'true', { timeout: 12_000 });
+  await expect(send).not.toHaveAttribute('aria-describedby', /.+/);
   await healthy({ screenshotName: 'S6b-rate-limit-cooled', allowStatus: [{ url: /\/api\/requests$/, status: 429 }, { url: /\/api\/requests$/, status: 503 }] });
 });
 

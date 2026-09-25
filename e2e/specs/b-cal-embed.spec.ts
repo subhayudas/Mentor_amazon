@@ -76,6 +76,9 @@ for (const from of ['mentee-dashboard', 'dashboard'] as const) {
       const params = new URL(opened).searchParams;
       expect(params.get('email')).toBe(personaEmail(personaProject, 'mentee'));
       expect(params.get('name')).toBeTruthy();
+      // Always light, month view: a mentor's own (possibly dark) Cal.com theme never shows in the white dialog (R1-80).
+      expect(params.get('theme')).toBe('light');
+      expect(params.get('layout')).toBe('month_view');
       await healthy({ screenshotName: `S10-embed-${from}` });
 
       await cal.post('bookingSuccessfulV2', v2(uid, start));

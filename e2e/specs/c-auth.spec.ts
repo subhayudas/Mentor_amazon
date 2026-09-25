@@ -235,6 +235,39 @@ test('S24 an Amazon account in a recovery session is refused and signed out', as
   }
 });
 
+test('S24 a mentee who signed up with an @amazon.com address (no Amazon alias) can reset their password (R1-38)', async ({ page, healthy, db, personaProject, baseURL }) => {
+  // Password sign-up accepts any address, so an Amazon employee may have a mentee account under
+  // their work email. Only the SSO alias (session metadata or the users row) marks an Amazon
+  // account; the domain alone must not lock this person out of their own password.
+  const email = `e2e.${e2eNamespace() ? `${e2eNamespace()}.` : ''}${personaProject}.mentee-${Date.now().toString(36)}@amazon.com`;
+  try {
+    const admin = adminClient();
+    const { data, error } = await admin.auth.admin.createUser({ email, password: E2E_PASSWORD, email_confirm: true });
+    if (error || !data.user) throw error ?? new Error('no user');
+    await db`
+      insert into public.users (id, email, password, user_type, is_verified, created_at)
+      values (${data.user.id}, ${email}, 'managed-by-supabase-auth', 'mentee', true, timezone('utc', now()))`;
+    const origin = new URL(baseURL!).origin;
+    const { data: link, error: linkError } = await admin.auth.admin.generateLink({ type: 'recovery', email, options: { redirectTo: `${origin}/reset-password` } });
+    if (linkError || !link.properties?.action_link) throw linkError ?? new Error('no recovery link');
+
+    await page.goto(link.properties.action_link);
+    await expect(page.getByTestId('button-reset-password')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('card-reset-amazon')).toHaveCount(0);
+    await healthy({ screenshotName: 'S24-amazon-address-mentee' });
+    await page.getByTestId('input-password').fill(NEW_PASSWORD);
+    await page.getByTestId('input-confirm-password').fill(NEW_PASSWORD);
+    await page.getByTestId('button-reset-password').click();
+    await expect(page.getByTestId('card-reset-success')).toBeVisible();
+
+    const client = anonClient();
+    expect((await client.auth.signInWithPassword({ email, password: NEW_PASSWORD })).error, 'the new password signs in').toBeNull();
+    expect((await client.auth.signInWithPassword({ email, password: E2E_PASSWORD })).error, 'the old password fails').not.toBeNull();
+  } finally {
+    await deleteAccounts(db, [email]);
+  }
+});
+
 /**
  * An account the Amazon SSO bridge would have made (a users row with `amazon_alias`), and a
  * recovery link for it. `stamped` also puts the alias on the auth user's metadata, as the

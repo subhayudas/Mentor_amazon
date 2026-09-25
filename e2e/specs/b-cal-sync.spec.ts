@@ -38,7 +38,36 @@ async function checkPanel(page: Page, db: Sql, mentorId: string, lang: 'en' | 'a
   return secret;
 }
 
-test('S13 the Cal.com sync panel: URL, masked secret, copy, rotate with grace, a signed ping shows up', async ({ page, db, request, clientIp, loginAs, healthy, lang, personaProject }) => {
+/**
+ * Step 1's Cal.com menu path, as laid out on screen: its text (bidi marks and no-break spaces
+ * normalised) and where each menu name sits (R1-73: in Arabic the English path used to run
+ * backwards and split across lines).
+ */
+async function menuPath(page: Page) {
+  return page
+    .getByTestId('cal-sync-steps')
+    .locator('li')
+    .first()
+    .evaluate((li) => {
+      const node = li.firstChild as Text;
+      const box = (word: string) => {
+        const at = node.data.indexOf(word);
+        const range = document.createRange();
+        range.setStart(node, at);
+        range.setEnd(node, at + word.length);
+        const r = range.getBoundingClientRect();
+        return { left: r.left, top: r.top };
+      };
+      return {
+        text: node.data.replace(/[\u2066-\u2069\u200e\u200f]/g, '').replace(/\u00a0/g, ' '),
+        settings: box('Settings'),
+        developer: box('Developer'),
+        webhooks: box('Webhooks'),
+      };
+    });
+}
+
+test('S13 the Cal.com sync panel: URL, masked secret, copy, rotate with grace, a signed ping shows up', async ({ page, db, request, clientIp, loginAs, healthy, lang, personaProject, isMobile }) => {
   const mentorId = ids(personaProject).mentor;
   // Start from no webhook row (earlier specs may have delivered to this mentor): the panel creates it.
   await db`delete from public.mentor_cal_webhooks where mentor_id = ${mentorId}`;
@@ -50,10 +79,31 @@ test('S13 the Cal.com sync panel: URL, masked secret, copy, rotate with grace, a
   await expect(page.getByTestId('cal-sync-preview')).toBeVisible();
   await healthy({ screenshotName: 'S13-panel' });
 
-  // Show and Copy.
-  await page.getByTestId('button-toggle-cal-secret').click();
+  // Step 1's menu path reads Settings → Developer → Webhooks, left to right on one line, in
+  // both languages (R1-73).
+  const path = await menuPath(page);
+  expect(path.text).toContain('Settings → Developer → Webhooks');
+  if (lang === 'ar') {
+    expect(Math.abs(path.settings.top - path.webhooks.top), 'the path stays on one line').toBeLessThan(2);
+    expect(Math.abs(path.developer.top - path.webhooks.top), 'the path stays on one line').toBeLessThan(2);
+    expect(path.settings.left).toBeLessThan(path.developer.left);
+    expect(path.developer.left).toBeLessThan(path.webhooks.left);
+  }
+
+  // The secret is named through its group (naming a <code> is not allowed), and the URL field is
+  // a 44px target on phones (R1-79).
+  await expect(page.getByRole('group', { name: tr(lang, 'calSync.secretLabel') })).toContainText(`•••• ${oldSecret.slice(-4)}`);
+  expect(await page.getByTestId('cal-sync-secret').getAttribute('aria-labelledby')).toBeNull();
+  if (isMobile) expect((await page.getByTestId('cal-sync-url').boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+  // Show and Copy. The toggle's name says what it does next, and it has no aria-pressed: a
+  // toggle whose name changed with its state would announce "Hide secret, pressed" (R1-79).
+  const toggle = page.getByTestId('button-toggle-cal-secret');
+  await expect(toggle).toHaveAccessibleName(tr(lang, 'calSync.showSecret'));
+  await toggle.click();
   await expect(page.getByTestId('cal-sync-secret')).toHaveText(oldSecret);
-  await expect(page.getByTestId('button-toggle-cal-secret')).toHaveAttribute('aria-pressed', 'true');
+  await expect(toggle).toHaveAccessibleName(tr(lang, 'calSync.hideSecret'));
+  expect(await toggle.getAttribute('aria-pressed')).toBeNull();
   await page.getByTestId('button-copy-cal-url').click();
   await expect(page.getByTestId('button-copy-cal-url')).toContainText(tr(lang, 'calSync.copied'));
   const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));

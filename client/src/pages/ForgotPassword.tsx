@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AuthCard, AuthPage, IconInput } from "@/components/auth/AuthCard";
 import { StatusCard, StatusPage } from "@/components/StatusCard";
-import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle, type TurnstileStatus } from "@/components/Turnstile";
 import { authErrorKey, mapAuthError, toAuthFlowError, type AuthErrorKind } from "@/lib/authErrors";
 import { authService } from "@/lib/services";
 import { ROUTES } from "@/lib/routes";
@@ -32,6 +32,12 @@ export default function ForgotPassword() {
   const [formError, setFormError] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = useState<TurnstileStatus>("loading");
+  // A token means the check works now: a message saying it could not run, or was not done, no longer applies.
+  const onCaptchaToken = (token: string | null) => {
+    setCaptchaToken(token);
+    if (token) setFormError((current) => (current === t("auth.captcha.unavailable") || current === t("auth.errors.captchaRequired") ? null : current));
+  };
   const needsCaptcha = turnstileEnabled();
 
   const schema = useMemo(
@@ -113,7 +119,7 @@ export default function ForgotPassword() {
             onSubmit={form.handleSubmit((data) => {
               setFormError(null);
               if (needsCaptcha && !captchaToken) {
-                setFormError(t("auth.errors.captchaRequired"));
+                setFormError(captchaStatus === "failed" ? t("auth.captcha.unavailable") : t("auth.errors.captchaRequired"));
                 return;
               }
               send.mutate(data);
@@ -153,7 +159,7 @@ export default function ForgotPassword() {
               )}
             />
 
-            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} action="recover" />}
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={onCaptchaToken} onStatus={setCaptchaStatus} action="recover" copy="auth" />}
 
             <Button type="submit" variant="primary" size="lg" className="w-full" loading={send.isPending} data-testid="button-send-reset-link">
               {send.isPending ? t("auth.sending") : t("auth.sendResetLink")}

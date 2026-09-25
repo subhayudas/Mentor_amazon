@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CalendarDays, Check, CircleAlert, Clock, Hourglass, Send } from "lucide-react";
 
 import { CAL_NAMESPACE, loadCalApi } from "@/components/CalEmbed";
-import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle, type TurnstileStatus } from "@/components/Turnstile";
 import { GOAL_MAX, GOAL_MIN } from "@/components/booking/BookingRequestDialog";
 import { SHORT_RETRY_SECONDS, classifyBookingError, invalidRequestFields, useSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
 import { sentMemoryForViewer } from "@/components/booking/requestState";
@@ -23,6 +23,7 @@ import type { Booking, Mentee } from "@/lib/database";
 import type { FeaturedPageState } from "@/lib/directory";
 import { bidi, formatNumber, formatRelativeDay } from "@/lib/format";
 import { localStore, newId } from "@/lib/localStore";
+import { PROGRAMME_CONTACT_EMAIL, programmeMailto } from "@/lib/programmeContact";
 import { isBookingRequestError } from "@/lib/requests";
 import { ROUTES, discoveryUrl, loginHref } from "@/lib/routes";
 import { clearSentRequest, getSentRequest, markSent, type SentRequest } from "@/lib/sentRequests";
@@ -232,8 +233,10 @@ function RequestFlow({
   const [serverError, setServerError] = React.useState<BookingErrorKind | null>(null);
   const [retryAfter, setRetryAfter] = React.useState<number | undefined>(undefined);
   const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = React.useState<TurnstileStatus>("loading");
   const turnstileRef = React.useRef<TurnstileHandle>(null);
   const alertRef = React.useRef<HTMLDivElement>(null);
+  const alertId = `${ids}-alert`;
   const successRef = React.useRef<HTMLHeadingElement>(null);
   const needsCaptcha = mode === "db" && !signedIn && turnstileEnabled();
 
@@ -476,6 +479,7 @@ function RequestFlow({
 
   const errors = form.formState.errors;
   const goalLength = form.watch("goal")?.length ?? 0;
+  const nameLength = form.watch("name")?.length ?? 0;
   const errorText =
     serverError === "rateLimited"
       ? retryAfter !== undefined && retryAfter <= SHORT_RETRY_SECONDS
@@ -484,7 +488,9 @@ function RequestFlow({
       : serverError === "captcha"
         ? t("bookingRequest.error.captcha")
         : serverError === "botCheck"
-          ? t("bookingRequest.error.botCheck")
+          ? captchaStatus === "failed"
+            ? t("bookingRequest.captchaNotSent")
+            : t("bookingRequest.error.botCheck")
           : serverError === "invalid"
             ? t("bookingRequest.error.invalid")
             : serverError === "generic"
@@ -506,6 +512,7 @@ function RequestFlow({
       {serverError && serverError !== "invalidEmail" && (
         <div
           ref={alertRef}
+          id={alertId}
           tabIndex={-1}
           role="alert"
           className="rounded-[8px] border border-[#f3c4c4] bg-[#fdf1f1] px-3 py-2 text-[13px] leading-[20px] text-[#9b1c1c]"
@@ -526,7 +533,8 @@ function RequestFlow({
           {...form.register("name")}
           className={inputClass}
           autoComplete="name"
-          dir="auto"
+          // Empty, the field follows the page (RTL in Arabic); typed text sets its own direction.
+          dir={nameLength > 0 ? "auto" : undefined}
           maxLength={120}
           aria-invalid={errors.name ? true : undefined}
           aria-describedby={errors.name ? `${ids}-name-error` : undefined}
@@ -570,7 +578,8 @@ function RequestFlow({
           rows={4}
           {...form.register("goal")}
           className="mt-1 w-full rounded-[6px] border border-[#d9d9d9] bg-white px-3 py-2 text-[14px] text-[var(--sc-ink)] aria-[invalid=true]:border-[#c40000]"
-          dir="auto"
+          // Empty, the placeholder follows the page (RTL in Arabic); typed text sets its own direction.
+          dir={goalLength > 0 ? "auto" : undefined}
           placeholder={t("bookingRequest.goalPlaceholder")}
           aria-invalid={errors.goal ? true : undefined}
           aria-describedby={`${ids}-goal-hint${errors.goal ? ` ${ids}-goal-error` : ""}`}
@@ -586,7 +595,27 @@ function RequestFlow({
           <Turnstile
             ref={turnstileRef}
             action="booking-request"
+            copy="booking"
             className="min-h-[65px]"
+            onStatus={setCaptchaStatus}
+            fallback={
+              PROGRAMME_CONTACT_EMAIL ? (
+                <Trans
+                  i18nKey="bookingRequest.captchaContact"
+                  values={{ email: PROGRAMME_CONTACT_EMAIL }}
+                  components={{
+                    email: (
+                      <a
+                        href={programmeMailto(PROGRAMME_CONTACT_EMAIL, t("bookingRequest.captchaContactSubject", { name }))}
+                        dir="ltr"
+                        className="font-semibold underline underline-offset-4"
+                        data-testid="link-captcha-contact"
+                      />
+                    ),
+                  }}
+                />
+              ) : undefined
+            }
             onToken={(token) => {
               setCaptchaToken(token);
               // "Complete the check" is answered by the token; a server-side rejection stays until the next send.
@@ -600,11 +629,12 @@ function RequestFlow({
         type="submit"
         disabled={mutation.isPending}
         aria-disabled={sendBlocked || undefined}
+        aria-describedby={sendBlocked ? alertId : undefined}
         aria-busy={mutation.isPending || undefined}
         className={cn(primaryButton, sendBlocked && "bg-[#9a9aa5] hover:bg-[#9a9aa5]")}
         data-testid="button-send-request"
       >
-        <Send className="size-4" aria-hidden="true" />
+        <Send className="size-4 rtl:-scale-x-100" aria-hidden="true" />
         {t("showcase.scheduler.send")}
       </button>
     </form>

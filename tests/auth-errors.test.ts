@@ -283,10 +283,13 @@ describe('recovery session binding (D13, F11)', () => {
 });
 
 describe('isAmazonSessionUser (no database read)', () => {
-  it('an alias in the session metadata or an @amazon.com address is Amazon', () => {
+  it('an alias in the session metadata is Amazon', () => {
     expect(isAmazonSessionUser({ email: 'x@example.com', user_metadata: { amazon_alias: 'jdoe' } })).toBe(true);
-    expect(isAmazonSessionUser({ email: 'jdoe@amazon.com' })).toBe(true);
-    expect(isAmazonSessionUser({ email: ' JDoe@Amazon.COM ' })).toBe(true);
+    expect(isAmazonSessionUser({ email: 'jdoe@amazon.com', user_metadata: { amazon_alias: 'jdoe' } })).toBe(true);
+  });
+  it('an @amazon.com address alone is not (R1-38: a password mentee with that address can reset)', () => {
+    expect(isAmazonSessionUser({ email: 'jdoe@amazon.com' })).toBe(false);
+    expect(isAmazonSessionUser({ email: ' JDoe@Amazon.COM ', user_metadata: {} })).toBe(false);
   });
   it('anything else is not', () => {
     expect(isAmazonSessionUser(null)).toBe(false);

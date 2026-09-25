@@ -5,7 +5,7 @@ import { Mail, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { IconInput } from "@/components/auth/AuthCard";
-import { Turnstile, turnstileEnabled, type TurnstileHandle } from "@/components/Turnstile";
+import { Turnstile, turnstileEnabled, type TurnstileHandle, type TurnstileStatus } from "@/components/Turnstile";
 import { auth } from "@/lib/auth";
 import { authErrorKey, cooldownRemaining, mapAuthError, toAuthFlowError } from "@/lib/authErrors";
 import { bidi } from "@/lib/format";
@@ -43,10 +43,16 @@ export function ResendConfirmation({
   const inputId = React.useId();
   const [typedEmail, setTypedEmail] = React.useState("");
   const [token, setToken] = React.useState<string | null>(null);
+  const [tokenStatus, setTokenStatus] = React.useState<TurnstileStatus>("loading");
   const [pending, setPending] = React.useState(false);
   const [sentAt, setSentAt] = React.useState<number | null>(initialSentAt);
   const [now, setNow] = React.useState(() => Date.now());
   const [message, setMessage] = React.useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  // A token means the check works now: a message saying it could not run, or was not done, no longer applies.
+  const onToken = (next: string | null) => {
+    setToken(next);
+    if (next) setMessage((current) => (current && (current.text === t("auth.captcha.unavailable") || current.text === t("auth.errors.captchaRequired")) ? null : current));
+  };
   const turnstileRef = React.useRef<TurnstileHandle>(null);
   const needsToken = turnstileEnabled();
   const remaining = cooldownRemaining(sentAt, now);
@@ -66,7 +72,7 @@ export function ResendConfirmation({
       return;
     }
     if (needsToken && !token) {
-      setMessage({ tone: "error", text: t("auth.errors.captchaRequired") });
+      setMessage({ tone: "error", text: tokenStatus === "failed" ? t("auth.captcha.unavailable") : t("auth.errors.captchaRequired") });
       return;
     }
     setPending(true);
@@ -108,7 +114,7 @@ export function ResendConfirmation({
           />
         </div>
       )}
-      {needsToken && <Turnstile ref={turnstileRef} onToken={setToken} action="resend" />}
+      {needsToken && <Turnstile ref={turnstileRef} onToken={onToken} onStatus={setTokenStatus} action="resend" copy="auth" />}
       <Button
         type="button"
         variant="outline"
