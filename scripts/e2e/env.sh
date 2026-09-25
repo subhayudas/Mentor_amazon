@@ -30,6 +30,12 @@ else
   unset VITE_TURNSTILE_SITE_KEY TURNSTILE_SECRET_KEY
 fi
 
+# The programme team's contact address (client/src/lib/programmeContact.ts). The booking forms
+# offer it when their security check cannot load, so the matrix covers that mailto link
+# (b-turnstile S3t) and proves the account forms never offer it (c-auth-turnstile S23t).
+# An explicitly empty value is kept (no default), to run the checks for the unset case.
+export VITE_PROGRAMME_CONTACT_EMAIL="${VITE_PROGRAMME_CONTACT_EMAIL-programme@mentorconnect.test}"
+
 # Helper servers get ports derived from E2E_PORT, so two checkouts running Playwright at the
 # same time (e.g. 5173 and 5174) never share a mock IdP or a preview built from other code.
 # The defaults for E2E_PORT=5173 are the documented ones: IdP 54399, preview 4173, demo 5176.
