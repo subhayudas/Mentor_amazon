@@ -18,8 +18,8 @@ import type { Page } from '@playwright/test';
 export interface ToastLog {
   /** Every toast text seen since install (or since the last `clear()`), in order of appearance. */
   texts(): Promise<string[]>;
-  /** Whether a toast containing `text` appeared at any moment since install (or the last `clear()`). */
-  seen(text: string): Promise<boolean>;
+  /** Whether a toast containing `text` (or matching the pattern) appeared at any moment since install or the last `clear()`. */
+  seen(text: string | RegExp): Promise<boolean>;
   /** Forget what was recorded so far (toasts already on screen are not recorded again). */
   clear(): Promise<void>;
 }
@@ -70,9 +70,9 @@ export async function recordToasts(page: Page): Promise<ToastLog> {
       await flush();
       return [...log];
     },
-    async seen(text: string) {
+    async seen(text: string | RegExp) {
       await flush();
-      return log.some((entry) => entry.includes(text));
+      return log.some((entry) => (typeof text === 'string' ? entry.includes(text) : text.test(entry)));
     },
     async clear() {
       await flush();
