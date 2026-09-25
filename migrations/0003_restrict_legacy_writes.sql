@@ -63,6 +63,7 @@ COMMIT;
 
 -- =============================================================================
 -- ROLLBACK (only to bring back the pre-release client; run as one block)
+-- mentor_cal_webhooks stays closed to anon: it holds secrets and no client ever read it.
 -- =============================================================================
 -- BEGIN;
 -- GRANT ALL ON public.bookings, public.mentees, public.mentee_favorites, public.activity_events,
@@ -75,4 +76,3 @@ COMMIT;
 -- DELETE FROM public.schema_migrations WHERE version = '0003_restrict_legacy_writes';
 -- NOTIFY pgrst, 'reload schema';
 -- COMMIT;
--- (mentor_cal_webhooks stays closed to anon: it holds secrets and no client ever read it.)
