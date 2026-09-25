@@ -3,8 +3,9 @@
 1. [Automated tests](#automated-tests): unit, database integration, migration idempotency, browser E2E.
 2. [Database apply order](#database-apply-order).
 3. [Manual smoke-test checklist](#manual-smoke-test-checklist) (a)–(i), before and after a deploy.
-4. [Cal.com live test](#calcom-live-test) — required before mentors are told to connect Cal.com.
-5. [Removing test data](#removing-test-data).
+4. [Before merging the PR — order of operations](#before-merging-the-pr--order-of-operations), the full rollout checklist, and its [Rollback](#rollback).
+5. [Cal.com live test](#calcom-live-test) — required before mentors are told to connect Cal.com.
+6. [Removing test data](#removing-test-data).
 
 ---
 
@@ -77,7 +78,7 @@ On a new project or when repairing one, in the Supabase SQL editor, each file wh
 3. `supabase_phase2.sql` — favourites, activity feed, reminder and webhook bookkeeping.
 4. `migrations/0002_production_readiness.sql` — EXPAND. Safe while the previous client is live.
 5. Deploy the new client, smoke-test production.
-6. `migrations/0003_restrict_legacy_writes.sql` — CONTRACT (removes the old client's write paths). Rollback: the block at the bottom of the file.
+6. `migrations/0003_restrict_legacy_writes.sql` — CONTRACT (removes the old client's write paths). Rollback: the block at the bottom of the file, run **before** an older client is redeployed (see [Rollback](#rollback)).
 7. Optional: `migrations/0004_seed_featured_mentors.sql`, once the five featured mentors agree to be requestable.
 
 `supabase_setup.sql` (v1) is superseded — do not run it. After any re-run of step 2 or 3,
@@ -91,12 +92,18 @@ Run this against a **Vercel preview** before merging and again against **product
 deploying. Every item lists the steps and the expected result; anything else is a blocker.
 The automated gates above must be green first.
 
+A preview deployment uses the **production database** (the Supabase variables are set for
+Production and Preview), so everything you create there is real data: use test accounts and
+clean up afterwards. Previews sit behind Vercel Deployment Protection: in a browser sign in to
+Vercel first; for `curl` add the Protection Bypass for Automation header (see
+`api/README.md` → "Verify on a preview").
+
 Base URL below is `https://mentor-amazon.vercel.app`; substitute the preview URL where noted.
 "Fresh browser" means a private/incognito window with no localStorage and no Supabase session.
 
 Test accounts you need: one **mentor** (password login, has a mentors row), a second mentor's id
 (any `/mentor/:id` from the directory), one **mentee** (organisation type preferred), one **admin**
-(`users.user_type = 'admin'`, see "Before merging" step 6).
+(`users.user_type = 'admin'`, see "Before merging" step 7).
 
 ---
 
@@ -223,8 +230,10 @@ curl -si -X POST https://mentor-amazon.vercel.app/api/auth/logout | grep -iE '^(
 
 | # | Steps | Expected |
 | --- | --- | --- |
-| i1 | Fresh browser → a featured mentor's `/mentor/<slug>/book` → submit the form | The Turnstile widget is shown (when the keys are set); "Request sent" only after the server answered; the request is in `/admin/bookings` under "Programme-managed" and every admin's bell has it. No Cal.com calendar is embedded on this page. |
-| i2 | `curl -si -X POST <origin>/api/requests -H 'content-type: application/json' -d '{"mentorId":"<uuid>","name":"x","email":"x@example.com","goal":"at least twenty characters here"}'` with Turnstile configured | `403 {"error":"captcha_failed"}` (no token); nothing is written. |
+| i1a | **Before `0004` has run** (the normal state after the merge). Fresh browser → a featured mentor's `/mentor/<slug>/book` (e.g. from the landing page) | The scheduling card shows "Requests open soon" (`scheduler-opening-soon`) with no request form (`form-session-request` absent), and the profile has no heart (`button-favorite-…`). No Cal.com calendar is embedded. This is the intended state until the programme confirms consent. |
+| i1b | Fresh browser → `/mentors` → an **ordinary** (database) mentor's card → `/mentor/<uuid>` → "Request a session" (`button-request-session`) → fill name, e-mail (your own test address) and a goal of 20+ characters → "Send request" (`button-submit-booking`) | On production the Turnstile widget is shown and must pass before Send works. "Request sent" (`booking-success`) appears only after `POST /api/requests` answered `200` (DevTools → Network). That mentor, signed in, sees a "new booking request" in the bell after a reload. Decline it afterwards (it is real data). |
+| i1c | **Only after `0004` has run** (see "Before merging", step 11). Fresh browser → a featured mentor's `/mentor/<slug>/book` → submit the form | The form is shown (Turnstile included); "Request sent" only after the server answered; the request is in `/admin/bookings` under "Programme-managed" and every admin's bell has it. No Cal.com calendar is embedded on this page. |
+| i2 | `curl -si -X POST <origin>/api/requests -H 'content-type: application/json' -d '{"mentorId":"<uuid>","name":"x","email":"x@example.com","goal":"at least twenty characters here"}'` with Turnstile configured | `403 {"error":"captcha_failed"}` (no token); nothing is written. On production with the Turnstile keys missing the answer is `503 {"error":"captcha_unavailable"}`: set both keys (see "Before merging", step 5). |
 | i3 | Signed-in mentee → request a session from a mentor profile | No captcha; the account's own e-mail is used (read-only); a second request while one is pending says it is already pending. |
 | i4 | Mentor → Profile settings → "Cal.com booking sync" | Subscriber URL with `?mentor=<id>`, masked secret with Show/Copy, the numbered Cal.com steps, Rotate (warns the old secret works for 24 h). |
 | i5 | In Cal.com add the webhook (see `api/README.md`), click **Ping test** | The panel shows "Ping · just now" within 15 s. |
@@ -236,30 +245,62 @@ curl -si -X POST https://mentor-amazon.vercel.app/api/auth/logout | grep -iE '^(
 
 ## Before merging the PR — order of operations
 
-Do these in order; each step assumes the previous one is done.
+This is the complete checklist; the PR description only summarises it. Do the steps in order;
+each one assumes the previous one is done.
 
 1. **CI green** on the PR: `build` (tsc, unit tests, i18n parity, build) and `db-integration` (integration suites and the idempotency check on a fresh local stack). The build uses placeholder Supabase values, so a green build does not prove the runtime config.
-2. **Supabase — database** (SQL editor, as the project owner), following [Database apply order](#database-apply-order): run the read-only checks from the PR first, then `migrations/0002_production_readiness.sql` (one transaction; a failed pre-check names the rows to fix and applies nothing), then its verification queries. `0002` creates the `uploads` bucket (public, 5 MB, images). `0003` runs only **after** the deploy in step 8.
-3. **Supabase — Auth settings**: Authentication → Providers → Email enabled (the SSO bridge issues magic links via `generateLink`); Authentication → URL configuration → Site URL `https://mentor-amazon.vercel.app`. Confirm signups are allowed (the bridge creates auth users for approved aliases).
-4. **Vercel — environment variables** (Settings → Environment Variables, tick **Production and Preview**):
-   - Client (inlined at build time): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`; optional `VITE_PROGRAMME_CONTACT_EMAIL` (mailto shown to rejected organisations).
-   - Server only (never `VITE_`): `AMAZON_OIDC_ISSUER`, `AMAZON_OIDC_CLIENT_ID` (`mentor-amazon.vercel.app`), `AMAZON_OIDC_CLIENT_SECRET`, `AMAZON_OIDC_REDIRECT_URI` (`https://mentor-amazon.vercel.app/api/auth/callback/amazon`, exact), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ORIGIN` (`https://mentor-amazon.vercel.app`), `CRON_SECRET` (also as a GitHub Actions secret). Optional: `AMAZON_OIDC_SCOPES` (default `openid`), `AMAZON_OIDC_DEBUG` (`true` on integ only), `TURNSTILE_SECRET_KEY` + `VITE_TURNSTILE_SITE_KEY` (both or neither), `TURNSTILE_ALLOWED_HOSTNAMES`, `CAL_WEBHOOK_SECRET` (programme Cal.com Team/Org webhook only), `RESEND_API_KEY`, `VITE_PUBLIC_APP_ORIGIN`. Never set `VITE_ALLOW_LOCAL_FALLBACK` in Production.
-   - Redeploy after adding variables (they are read at build/cold start).
-5. **Amazon Federate registration** is done on Amazon's side (see `api/README.md` → "Federate registration"): the client id and secret are issued and the redirect URI above on `mentor-amazon.vercel.app` is registered. Localhost is not registered, so the SSO checks in (d) run on the production domain.
-6. **Bootstrap the first admin** (nobody can self-promote): the admin signs in **once** — via Amazon (lands on `/mentor-onboarding` as a mentor) or with email/password signup — then in the SQL editor edit the two values in section 8 (`v_email`, `v_alias`) of `supabase_setup_v2.sql` and run that `DO` block alone. Sign in again → `/admin`. Put the placeholder back so re-running the whole file stays a no-op.
-7. **Run the preview smoke test**: sections (a)–(c), (e)–(h) on the preview URL; (d) on production after step 5.
-8. **Merge and deploy production**, then re-run (a), (d) d1/d4/d7/d9, (g), (h) and (i) against `https://mentor-amazon.vercel.app`. Then run `migrations/0003_restrict_legacy_writes.sql` and repeat e1 and i1.
-9. **Mentors sign in**: access is open to everyone Amazon lets through Federate (Amazon restricts it by internal group; see `api/README.md` → "Account rules"). There is no approval step: a first Amazon sign-in creates an active mentor, who completes `/mentor-onboarding`. To revoke someone, set `approved_users.is_active = false` (this blocks their next sign-in; it does not end a live session). To make someone an admin, set `approved_users.role = 'admin'` before their first sign-in.
-10. **Debug off**: once the ID-token claims are confirmed via `/api/auth/debug-claims`, remove `AMAZON_OIDC_DEBUG` and redeploy; re-run d7.
+2. **Supabase — read-only checks** (SQL editor, as the project owner). Paste the results into the PR:
+   ```sql
+   select to_regclass('public.mentee_favorites') fav, to_regclass('public.activity_events') ev,
+          to_regclass('public.booking_reminders') rem, to_regclass('public.cal_webhook_events') cal;
+   select table_name, column_name, data_type from information_schema.columns
+     where table_schema='public' and column_name in ('id','mentor_id','mentee_id','booking_id') order by 1,2;
+   select pg_get_functiondef('public.is_admin()'::regprocedure);
+   select u.id, u.email, a.id as auth_id from public.users u left join auth.users a on lower(a.email)=lower(u.email)
+     where u.user_type='admin';                                   -- id must equal auth_id
+   select cal_event_uri, count(*) from public.bookings where cal_event_uri is not null group by 1 having count(*)>1; -- expect 0 rows
+   select distinct status from public.bookings;
+   select id, public from storage.buckets;  select count(*) from public.mentors;
+   ```
+3. **Supabase — expand:** run `migrations/0002_production_readiness.sql` (paste the whole file; one transaction; a failed pre-check names the rows to fix and applies nothing), then its verification queries. It only adds things, so the site that is live keeps working. `0002` also creates the `uploads` bucket (public, 5 MB, images). Do **not** run `0003` yet (step 10).
+4. **Supabase — Auth settings:** Authentication → Providers → Email enabled (the SSO bridge issues magic links via `generateLink`); Authentication → URL configuration → Site URL `https://mentor-amazon.vercel.app`; signups allowed (the bridge creates auth users). Leave **Attack Protection → CAPTCHA off** until step 12.
+5. **Vercel — environment variables** (Settings → Environment Variables), then redeploy (they are read at build and cold start):
+   - **Remove** `VITE_DEFAULT_CAL_LINK` from every environment. Nothing reads it any more; it pointed at Cal.com's sample account.
+   - **Production and Preview.** Client (inlined at build time): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`; optional `VITE_PROGRAMME_CONTACT_EMAIL` (mailto shown to rejected organisations) and `VITE_PUBLIC_APP_ORIGIN` (`https://mentor-amazon.vercel.app`, shown in the Cal.com sync panel). Server only (never `VITE_`): `AMAZON_OIDC_ISSUER`, `AMAZON_OIDC_CLIENT_ID` (`mentor-amazon.vercel.app`), `AMAZON_OIDC_CLIENT_SECRET`, `AMAZON_OIDC_REDIRECT_URI` (`https://mentor-amazon.vercel.app/api/auth/callback/amazon`, exact), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ORIGIN` (`https://mentor-amazon.vercel.app`), `CRON_SECRET` (also as a GitHub Actions secret, so the hourly reminders run). Optional: `AMAZON_OIDC_SCOPES` (default `openid`), `AMAZON_OIDC_DEBUG` (`true` on integ only), `CAL_WEBHOOK_SECRET` (programme Cal.com Team/Org webhook only; `openssl rand -hex 32`, never committed), `RESEND_API_KEY` and `MAIL_FROM`.
+   - **Production only: Turnstile.** `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` (both, from the Cloudflare Turnstile widget for `mentor-amazon.vercel.app`), and `TURNSTILE_ALLOWED_HOSTNAMES=mentor-amazon.vercel.app`. Without both keys production refuses anonymous requests (`503 captcha_unavailable`); `TURNSTILE_DISABLED=1` is the only way to run production without a captcha, and it is logged on every request. **Do not tick Preview** for these three. That widget rejects preview hostnames, and the sign-in, sign-up and reset forms refuse to submit without a token whenever the site key is set, so nobody could sign in on a preview. On Preview leave them unset (no captcha there, and `/api/requests` runs without one), or use Cloudflare's always-pass test pair to see the widget: site key `1x00000000000000000000AA`, secret `1x0000000000000000000000000000000AA`.
+   - **Recommended for Production:** `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (an Upstash Redis REST database). Without them every function instance keeps its own rate-limit counters, so the IP limits on `/api/requests` and the SSO routes only hold per instance.
+   - **Never** set `VITE_ALLOW_LOCAL_FALLBACK` in Production.
+6. **Amazon Federate registration** is done on Amazon's side (see `api/README.md` → "Federate registration"): the client id and secret are issued and the redirect URI above on `mentor-amazon.vercel.app` is registered. Localhost and preview hosts are not registered, so the SSO checks in (d) run on the production domain.
+7. **Bootstrap the first admin** (nobody can self-promote): the admin signs in **once** — via Amazon (lands on `/mentor-onboarding` as a mentor) or with email/password signup — then in the SQL editor edit the two values in section 8 (`v_email`, `v_alias`) of `supabase_setup_v2.sql` and run that `DO` block alone. Sign in again → `/admin`. Put the placeholder back so re-running the whole file stays a no-op.
+8. **Preview checks, before merging**, on the PR's preview URL:
+   - `api/README.md` → "Verify on a preview": one signed Cal.com Ping and one anonymous request must both answer `200`. They prove that request bodies reach the functions on Vercel's runtime. If either fails, do not merge.
+   - Smoke-test sections (a)–(c), (e)–(h), plus i1a and i1b. Section (d) runs on production only (step 9).
+9. **Merge**; Vercel deploys production. Re-run against `https://mentor-amazon.vercel.app`: (a), (d) d1/d4/d7/d9, (g), (h), and (i) i1a, i1b, i2, i4, i6, i7 (i5 once a Cal.com test account is available).
+10. **Supabase — contract:** run `migrations/0003_restrict_legacy_writes.sql`. It removes the old client's direct-write paths. Then repeat e1, i1b and i3. From now on the previous deployment no longer works against the database: read [Rollback](#rollback) before redeploying an older build.
+11. **Optional: featured mentors.** Only after the programme confirms that the five featured mentors agree to receive requests, run `migrations/0004_seed_featured_mentors.sql`, then i1c. Until then they show "Requests open soon" (i1a), which is intended.
+12. **Supabase Auth CAPTCHA**, once the production Turnstile keys are live (step 5) and step 9 passed: Authentication → Attack Protection → enable CAPTCHA protection → provider Turnstile (Cloudflare) → paste the **secret** key (the same value as `TURNSTILE_SECRET_KEY`) → Save. Immediately, in a fresh browser on production: sign up, sign in with a password, request a password reset, and sign in with Amazon (the bridge's magic-link exchange). If any of them fails, switch CAPTCHA off again straight away and report it. CAPTCHA covers the whole Supabase project, previews included. From then on, password sign-in, sign-up and reset on a preview need a token from the production widget, which does not run on preview hostnames. So run preview checks of those forms before this step, or with CAPTCHA briefly off.
+13. **Mentors sign in**: access is open to everyone Amazon lets through Federate (Amazon restricts it by internal group; see `api/README.md` → "Account rules"). There is no approval step: a first Amazon sign-in creates an active mentor, who completes `/mentor-onboarding`. To revoke someone, set `approved_users.is_active = false` (this blocks their next sign-in; it does not end a live session). To make someone an admin, set `approved_users.role = 'admin'` before their first sign-in.
+14. **Debug off**: once the ID-token claims are confirmed via `/api/auth/debug-claims`, remove `AMAZON_OIDC_DEBUG` and redeploy; re-run d7.
+
+### Rollback
+
+Undo in the reverse order of the steps above. `0002` only adds things and stays in place.
+
+- **Supabase Auth CAPTCHA** (step 12): switch it off in Attack Protection. Always do this before rolling the code back: the previous client sends no captcha token, so nobody could sign in with a password.
+- **Featured mentors** (step 11): `update public.mentors set is_available = false where managed_by_programme;` hides them again. Their requests and history stay.
+- **Code, once `0003` has run** (step 10): restore the old client's write paths **first**. Copy the `ROLLBACK` block at the bottom of `migrations/0003_restrict_legacy_writes.sql`, remove the leading `-- ` from each line, and run it as one block in the SQL editor. **Then** roll production back to the previous deployment (Vercel → Deployments → the previous production deployment → Instant Rollback or Promote). In the other order the old client breaks every booking request: it writes `mentees` and `bookings` directly, which `0003` revokes (`42501 permission denied`), and the booking guard refuses its session confirm.
+- **Code, before `0003`** (steps 8–9): roll back to the previous deployment. It keeps working with `0002` applied.
+- **Environment variables:** the previous deployment ignores the new ones; nothing needs removing.
 
 ---
 
 ## Cal.com live test
 
 Required before mentors are told to connect Cal.com (design §6.6); it needs a real (free)
-Cal.com test account and a public URL: production, an unprotected preview (Vercel Deployment
-Protection answers Cal.com with 401), or a tunnel (e.g. `cloudflared`) to the dev server
-running with `MC_LOCAL_API=1`.
+Cal.com test account and a public URL: production; a preview, with
+`&x-vercel-protection-bypass=<token>` appended to the subscriber URL (see `api/README.md` →
+"Verify on a preview"; without it Vercel Deployment Protection answers Cal.com with 401); or a
+tunnel (e.g. `cloudflared`) to the dev server running with `MC_LOCAL_API=1`.
 
 1. Point a webhook at `…/api/webhooks/cal?mentor=<test mentor id>` with that mentor's secret
    (Profile settings → Cal.com booking sync). Leave "Custom payload template" empty.

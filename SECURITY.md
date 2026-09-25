@@ -175,7 +175,9 @@ runtime styles (known, low impact).
   `/api/requests` (token required whenever `TURNSTILE_SECRET_KEY` is set;
   Cloudflare unreachable → refused; Production with no keys → refused unless
   `TURNSTILE_DISABLED=1`), plus an IP limit of 10 requests per 10
-  minutes. Supabase Auth captcha (sign-up, password sign-in, reset) is switched
+  minutes. The IP limits share their counters across function instances only
+  when Upstash Redis is configured (`UPSTASH_REDIS_REST_URL` / `_TOKEN`,
+  recommended for Production); otherwise each instance counts on its own. Supabase Auth captcha (sign-up, password sign-in, reset) is switched
   on in the dashboard only after the client that sends the token is live.
 * In the database (request RPCs and triggers): max 5 booking requests per
   mentee per hour, 20 per mentor per hour, 3 mentee profile creations per email
@@ -281,6 +283,7 @@ DELETE FROM public.users WHERE lower(email) = lower('person@example.com');
       `APP_ORIGIN`, `CRON_SECRET` set for Production and Preview;
       `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` both set for
       Production only (Preview: unset, or Cloudflare's always-pass test keys);
+      `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` set for Production;
       `TURNSTILE_DISABLED`, `AMAZON_OIDC_DEBUG` and `VITE_ALLOW_LOCAL_FALLBACK`
       unset.
 - [ ] Redirect URI registered with Amazon exactly as
