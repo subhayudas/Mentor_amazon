@@ -2401,7 +2401,8 @@
         "completed": "Session marked completed",
         "rescheduled": "Session rescheduled",
         "error": "We couldn't update this session. Nothing changed; please try again.",
-        "withdrawn": "Request withdrawn"
+        "withdrawn": "Request withdrawn",
+        "stale": "This session changed in the meantime (it may have been cancelled, answered or completed elsewhere), so nothing was saved. The list now shows its current status."
       },
       "withdraw": "Withdraw",
       "chooseTime": "Choose a time",

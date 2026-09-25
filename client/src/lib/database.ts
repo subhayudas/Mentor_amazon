@@ -6,6 +6,7 @@
 import { supabase } from './supabase';
 import { isRecordable, toEmbedRecordOutcome, type CalBookingSuccess, type EmbedRecordOutcome } from './calEvents';
 import { mapRpcError } from './requests';
+import { allowedFromStatuses, canTransition } from './bookingTransitions';
 
 // Type definitions based on the database schema
 
@@ -366,6 +367,24 @@ export class BookingNotPendingError extends Error {
 
 export function isBookingNotPendingError(value: unknown): value is BookingNotPendingError {
   return value instanceof BookingNotPendingError || (value as { name?: unknown } | null)?.name === 'BookingNotPendingError';
+}
+
+/**
+ * Cancel / complete on a booking that changed in the meantime (R1-16): another tab, the other
+ * party or Cal.com already moved it to a status this change cannot start from (a session the
+ * mentee cancelled, one already completed). Nothing was written and nobody was notified.
+ */
+export class BookingStateChangedError extends Error {
+  readonly status: Booking['status'];
+  constructor(status: Booking['status']) {
+    super('booking_state_changed');
+    this.name = 'BookingStateChangedError';
+    this.status = status;
+  }
+}
+
+export function isBookingStateChangedError(value: unknown): value is BookingStateChangedError {
+  return value instanceof BookingStateChangedError || (value as { name?: unknown } | null)?.name === 'BookingStateChangedError';
 }
 
 class DatabaseService {
@@ -800,8 +819,13 @@ class DatabaseService {
     return data || [];
   }
 
-  /** Marks a session completed with its real duration (mentor or admin only, enforced by a trigger). */
-  async completeBooking(bookingId: string, options: CompleteBookingOptions): Promise<Booking | null> {
+  /**
+   * Marks a session completed with its real duration (mentor or admin only, enforced by a
+   * trigger). Only an accepted or confirmed session matches (R1-16): a second "Mark completed"
+   * from a stale tab changes nothing and throws `BookingStateChangedError`, so the first
+   * recorded duration stands and nobody is notified twice.
+   */
+  async completeBooking(bookingId: string, options: CompleteBookingOptions): Promise<Booking> {
     const minutes = Math.round(Number(options.sessionDurationMinutes));
     if (!Number.isFinite(minutes) || minutes < 1 || minutes > 600) {
       throw new RangeError('Session duration must be between 1 and 600 minutes');
@@ -814,18 +838,17 @@ class DatabaseService {
     const country = options.country?.trim();
     if (country) update.country = country;
 
-    const { data, error } = await supabase
-      .from('bookings')
-      .update(update)
-      .eq('id', bookingId)
-      .select()
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    return this.updateBookingIfStill(bookingId, 'completed', update);
   }
 
-  async updateBookingStatus(bookingId: string, status: string): Promise<Booking | null> {
+  /**
+   * Change a booking's status. The write is conditional on the statuses the change may start
+   * from (`lib/bookingTransitions.ts`, R1-16): a stale tab cancelling a session the mentee
+   * already cancelled, or completing one already completed, matches no row, writes nothing
+   * (canceled_at, canceled_by and the duration stay as they were) and throws
+   * `BookingStateChangedError`, so the caller never notifies anyone.
+   */
+  async updateBookingStatus(bookingId: string, status: string): Promise<Booking> {
     const now = new Date().toISOString();
     const updateData: Partial<Booking> = { status: status as Booking['status'] };
 
@@ -835,15 +858,26 @@ class DatabaseService {
       updateData.canceled_at = now;
     }
 
-    const { data, error } = await supabase
-      .from('bookings')
-      .update(updateData)
-      .eq('id', bookingId)
-      .select()
-      .single();
+    return this.updateBookingIfStill(bookingId, status, updateData);
+  }
 
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+  /**
+   * One conditional status write: matches the row only while it is in a status `target` may
+   * start from. A write that changed nothing is never reported as success: it throws
+   * `BookingStateChangedError` when the booking moved on, or a plain error when the row could
+   * not be written at all (RLS, missing row).
+   */
+  private async updateBookingIfStill(bookingId: string, target: string, updateData: Partial<Booking>): Promise<Booking> {
+    let query = supabase.from('bookings').update(updateData).eq('id', bookingId);
+    const from = allowedFromStatuses(target);
+    if (from) query = query.in('status', [...from]);
+    const { data, error } = await query.select().maybeSingle();
+
+    if (error) throw error;
+    if (data) return data as Booking;
+    const current = await this.getBooking(bookingId);
+    if (current && !canTransition(current.status, target)) throw new BookingStateChangedError(current.status);
+    throw new Error('booking_update_not_applied');
   }
 
   /**
