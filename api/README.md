@@ -167,9 +167,11 @@ Signed-in callers of `create_my_booking_request` get the `not_allowed` error.
 
 With neither Turnstile key set there is no captcha check on a local machine, in
 development or on a Preview deployment; only the IP and database limits apply.
-Production never runs that way by accident: with `VERCEL_ENV=production` and no
-keys, every anonymous request is refused (`503 captcha_unavailable`, and the
-function log says which variables to set). Set both keys for Production. The only
+Production never runs that way by accident: with `VERCEL_ENV=production` (Vercel
+sets it on every production deployment while "Automatically expose System
+Environment Variables" is on, the default) and no keys, every anonymous request
+is refused (`503 captcha_unavailable`, and the function log says which variables
+to set). Set both keys for Production. The only
 way to run Production without a captcha is the explicit `TURNSTILE_DISABLED=1`,
 which is logged on every request it lets through and has no effect while
 `TURNSTILE_SECRET_KEY` is set.
