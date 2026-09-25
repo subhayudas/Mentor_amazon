@@ -1,6 +1,6 @@
 import { test, expect, turnstile, type Page } from '../fixtures/test';
 import { displayName, ids, personaEmail } from '../fixtures/personas';
-import { devEmail, featuredFor, insertPendingRequest, plain, purgeRequester, tr, useLanguage } from './b-helpers';
+import { devEmail, featuredFor, plain, purgeRequester, tr, useLanguage } from './b-helpers';
 
 /**
  * Session requests (design §6.4 S3–S6, S8; B3/B4, F03/F31/F42): the curated session page's
@@ -198,15 +198,15 @@ test('S5 a curated mentor who is not accepting has no Book button and no form', 
   await expect(page.getByTestId('form-session-request')).toHaveCount(0);
 });
 
-test('S6 the sixth request from one email within an hour is rate limited', async ({ page, db, healthy, lang, personaProject }, testInfo) => {
+test('S6 the sixth request from one email within an hour is rate limited', async ({ page, db, healthy, lang }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop-en', 'S6 runs on desktop-en');
   const f = featuredFor(testInfo.project.name, 3);
   const email = devEmail('s6');
   try {
-    // Five requests in the last hour (closed ones, so the pending dedupe does not apply).
-    for (let i = 0; i < 5; i++) {
-      await insertPendingRequest(db, { mentorId: ids(personaProject).mentor, email, name: 'Dev B Busy', status: 'rejected' });
-    }
+    // Five anonymous requests from this address in the last hour, as the database counts them:
+    // attempts, so the limit answers alike whether or not the address has an account (R2-15).
+    await db`insert into public.booking_request_attempts (requester, created_at)
+             select md5(${email.toLowerCase()}), timezone('utc', now()) from generate_series(1, 5)`;
     await page.goto(`/mentor/${f.slug}/book`);
     await fillSessionForm(page, 'Dev B Busy', email);
     if (turnstile.enabled) await expect(tokenInput(page)).toHaveValue(/.+/, { timeout: 20_000 });

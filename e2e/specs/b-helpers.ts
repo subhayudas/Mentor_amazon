@@ -67,6 +67,7 @@ export const plain = (text: string) => text.replace(/[⁦-⁩‎‏]/g, '');
 
 /** Remove everything a requester address created (bookings and what hangs off them, then the mentee). */
 export async function purgeRequester(db: postgres.Sql, email: string): Promise<void> {
+  await db`delete from public.booking_request_attempts where requester = md5(${email.toLowerCase()})`;
   const mentees = await db<{ id: string }[]>`select id from public.mentees where lower(email) = ${email.toLowerCase()}`;
   const ids = mentees.map((m) => m.id);
   if (ids.length === 0) return;
