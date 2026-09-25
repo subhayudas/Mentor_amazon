@@ -60,17 +60,23 @@ const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render
 /** How long the script may take before the widget says it could not load (it still renders if the script arrives later). */
 export const TURNSTILE_LOAD_TIMEOUT_MS = 15_000;
 let scriptPromise: Promise<TurnstileApi> | null = null;
+let scriptElement: HTMLScriptElement | null = null;
+/** Loads dropped while still pending; each later load uses its own URL (see resetTurnstileLoader). */
+let droppedLoads = 0;
 
 function loadTurnstile(): Promise<TurnstileApi> {
   if (window.turnstile) return Promise.resolve(window.turnstile);
   if (!scriptPromise) {
+    const script = document.createElement("script");
     const attempt: Promise<TurnstileApi> = new Promise<TurnstileApi>((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = SCRIPT_SRC;
+      script.src = droppedLoads > 0 ? `${SCRIPT_SRC}&retry=${droppedLoads}` : SCRIPT_SRC;
       script.async = true;
       const fail = (message: string) => {
         // Forget this attempt, so Retry injects a fresh script.
-        if (scriptPromise === attempt) scriptPromise = null;
+        if (scriptPromise === attempt) {
+          scriptPromise = null;
+          scriptElement = null;
+        }
         script.remove();
         reject(new Error(message));
       };
@@ -79,8 +85,24 @@ function loadTurnstile(): Promise<TurnstileApi> {
       document.head.appendChild(script);
     });
     scriptPromise = attempt;
+    scriptElement = script;
   }
   return scriptPromise;
+}
+
+/**
+ * Drops a load that is still pending (a proxy holding the connection past the load timeout),
+ * so the next `loadTurnstile()` injects a fresh script instead of waiting on the stuck one.
+ * The fresh script gets its own URL: the browser would otherwise attach it to the request
+ * that is still held (one in-flight fetch per URL) and wait on that. Does nothing once the
+ * script has arrived.
+ */
+export function resetTurnstileLoader(): void {
+  if (window.turnstile || !scriptPromise) return;
+  scriptElement?.remove();
+  scriptElement = null;
+  scriptPromise = null;
+  droppedLoads += 1;
 }
 
 type Failure = "load" | "widget";
@@ -200,6 +222,8 @@ export const Turnstile = React.forwardRef<TurnstileHandle, TurnstileProps>(funct
     // reaches the widget, or the Retry button again if the check still cannot run.
     if (wrapper.current?.contains(document.activeElement)) wrapper.current.focus({ preventScroll: true });
     onTokenRef.current(null);
+    // A script that never arrived is still pending: start a fresh load rather than wait on it.
+    if (failure === "load") resetTurnstileLoader();
     setAttempt((n) => n + 1);
   };
 

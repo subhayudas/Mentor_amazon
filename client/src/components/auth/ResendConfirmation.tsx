@@ -48,6 +48,11 @@ export function ResendConfirmation({
   const [sentAt, setSentAt] = React.useState<number | null>(initialSentAt);
   const [now, setNow] = React.useState(() => Date.now());
   const [message, setMessage] = React.useState<{ tone: "ok" | "error"; text: string } | null>(null);
+  // A token means the check works now: a message saying it could not run, or was not done, no longer applies.
+  const onToken = (next: string | null) => {
+    setToken(next);
+    if (next) setMessage((current) => (current && (current.text === t("auth.captcha.unavailable") || current.text === t("auth.errors.captchaRequired")) ? null : current));
+  };
   const turnstileRef = React.useRef<TurnstileHandle>(null);
   const needsToken = turnstileEnabled();
   const remaining = cooldownRemaining(sentAt, now);
@@ -109,7 +114,7 @@ export function ResendConfirmation({
           />
         </div>
       )}
-      {needsToken && <Turnstile ref={turnstileRef} onToken={setToken} onStatus={setTokenStatus} action="resend" copy="auth" />}
+      {needsToken && <Turnstile ref={turnstileRef} onToken={onToken} onStatus={setTokenStatus} action="resend" copy="auth" />}
       <Button
         type="button"
         variant="outline"

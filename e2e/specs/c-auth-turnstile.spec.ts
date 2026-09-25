@@ -132,6 +132,8 @@ test('S23t the bot check cannot load: sign-up says so, submitting explains why, 
   await tokenReady(page);
   await expect(failed).toHaveCount(0);
   await expect(page.getByTestId('turnstile-check')).toHaveAttribute('data-status', 'ready');
+  // The check now works, so the message saying it could not run goes too.
+  await expect(alert).toHaveCount(0);
 });
 
 test('S23t forgot password: a check that cannot load says so, and Retry recovers it (R1-72)', async ({ page, lang }) => {
@@ -145,11 +147,13 @@ test('S23t forgot password: a check that cannot load says so, and Retry recovers
   await expect(failed).toContainText(tr(lang, 'auth.captcha.loadFailed'));
   await page.getByTestId('input-email').fill('e2e.nobody@mentorconnect.test');
   await page.getByTestId('button-send-reset-link').click();
-  await expect(page.getByRole('alert').filter({ hasText: tr(lang, 'auth.captcha.unavailable') })).toBeVisible();
+  const unavailable = page.getByRole('alert').filter({ hasText: tr(lang, 'auth.captcha.unavailable') });
+  await expect(unavailable).toBeVisible();
   expect(recovers).toBe(0);
 
   await page.unroute(CHALLENGES);
   await page.getByTestId('button-turnstile-retry').click();
   await tokenReady(page);
   await expect(failed).toHaveCount(0);
+  await expect(unavailable).toHaveCount(0);
 });

@@ -63,6 +63,11 @@ export default function Login() {
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaStatus, setCaptchaStatus] = useState<TurnstileStatus>("loading");
+  // A token means the check works now: a message saying it could not run, or was not done, no longer applies.
+  const onCaptchaToken = (token: string | null) => {
+    setCaptchaToken(token);
+    if (token) setFormError((current) => (current === t("auth.captcha.unavailable") || current === t("auth.errors.captchaRequired") ? null : current));
+  };
   const needsCaptcha = !IS_LOCAL && turnstileEnabled();
 
   const loginSchema = useMemo(
@@ -289,7 +294,7 @@ export default function Login() {
             />
             )}
 
-            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} onStatus={setCaptchaStatus} action="login" copy="auth" />}
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={onCaptchaToken} onStatus={setCaptchaStatus} action="login" copy="auth" />}
 
             <Button type="submit" variant={menteePath ? "primary" : "secondary"} size="lg" className="w-full" loading={loginMutation.isPending} data-testid="button-login">
               {loginMutation.isPending ? t("auth.loggingIn") : t("auth.loginButton")}

@@ -44,6 +44,11 @@ export default function Signup() {
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaStatus, setCaptchaStatus] = useState<TurnstileStatus>("loading");
+  // A token means the check works now: a message saying it could not run, or was not done, no longer applies.
+  const onCaptchaToken = (token: string | null) => {
+    setCaptchaToken(token);
+    if (token) setFormError((current) => (current === t("auth.captcha.unavailable") || current === t("auth.errors.captchaRequired") ? null : current));
+  };
   const needsCaptcha = turnstileEnabled();
   const nextPath = safeNext(new URLSearchParams(searchString).get("next"), "");
   // The booking success state's "Create one" arrives with ?next=<mentee path>
@@ -262,7 +267,7 @@ export default function Signup() {
               </div>
             </div>
 
-            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} onStatus={setCaptchaStatus} action="signup" copy="auth" />}
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={onCaptchaToken} onStatus={setCaptchaStatus} action="signup" copy="auth" />}
 
             <Button type="submit" variant="primary" size="lg" className="w-full" loading={signupMutation.isPending} data-testid="button-signup">
               {signupMutation.isPending ? t("auth.signingUp") : t("auth.signupButton")}

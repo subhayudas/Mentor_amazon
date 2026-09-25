@@ -33,6 +33,11 @@ export default function ForgotPassword() {
   const turnstileRef = useRef<TurnstileHandle>(null);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [captchaStatus, setCaptchaStatus] = useState<TurnstileStatus>("loading");
+  // A token means the check works now: a message saying it could not run, or was not done, no longer applies.
+  const onCaptchaToken = (token: string | null) => {
+    setCaptchaToken(token);
+    if (token) setFormError((current) => (current === t("auth.captcha.unavailable") || current === t("auth.errors.captchaRequired") ? null : current));
+  };
   const needsCaptcha = turnstileEnabled();
 
   const schema = useMemo(
@@ -154,7 +159,7 @@ export default function ForgotPassword() {
               )}
             />
 
-            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={setCaptchaToken} onStatus={setCaptchaStatus} action="recover" copy="auth" />}
+            {needsCaptcha && <Turnstile ref={turnstileRef} onToken={onCaptchaToken} onStatus={setCaptchaStatus} action="recover" copy="auth" />}
 
             <Button type="submit" variant="primary" size="lg" className="w-full" loading={send.isPending} data-testid="button-send-reset-link">
               {send.isPending ? t("auth.sending") : t("auth.sendResetLink")}

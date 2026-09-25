@@ -230,16 +230,21 @@ test('S3t the check cannot load: the form says so and offers Retry and the progr
   }
 });
 
-test('S3t a check whose script never arrives says so after a while instead of leaving a blank box (R1-72)', async ({ page, lang }, testInfo) => {
+test('S3t a check whose script never arrives says so after a while instead of leaving a blank box, and Retry loads it afresh (R1-72)', async ({ page, lang }, testInfo) => {
   const f = featuredFor(testInfo.project.name, 4);
   // A proxy that holds the connection: the script request never answers.
   const held: Route[] = [];
   await page.route(CHALLENGES, (route) => {
     held.push(route);
   });
+  let scriptRequests = 0;
+  page.on('request', (r) => {
+    if (new URL(r.url()).pathname === '/turnstile/v0/api.js') scriptRequests += 1;
+  });
   await page.clock.install();
   try {
-    await page.goto(`/mentor/${f.slug}/book`);
+    // The held script can hold back the window's load event, so wait only for the document.
+    await page.goto(`/mentor/${f.slug}/book`, { waitUntil: 'domcontentloaded' });
     const check = page.getByTestId('turnstile-check');
     await expect(check).toHaveAttribute('data-status', 'loading');
     await expect(page.getByTestId('turnstile-failed')).toHaveCount(0);
@@ -250,7 +255,17 @@ test('S3t a check whose script never arrives says so after a while instead of le
     await expect(failed).toHaveAttribute('data-reason', 'load');
     await expect(failed).toContainText(tr(lang, 'bookingRequest.captchaLoadFailed'));
     await expect(check).toHaveAttribute('data-status', 'failed');
-    await expect(page.getByTestId('button-turnstile-retry')).toBeVisible();
+    const retry = page.getByTestId('button-turnstile-retry');
+    await expect(retry).toBeVisible();
+    expect(scriptRequests).toBe(1);
+
+    // The network is back, but the first request is still held: Retry must not wait on it.
+    await page.unroute(CHALLENGES);
+    await retry.click();
+    await expect.poll(() => scriptRequests, { message: 'Retry requests the script again' }).toBe(2);
+    await expect(check).toHaveAttribute('data-status', 'ready', { timeout: 20_000 });
+    await expect(failed).toHaveCount(0);
+    await tokenReady(page);
   } finally {
     for (const route of held) await route.abort().catch(() => undefined);
   }
