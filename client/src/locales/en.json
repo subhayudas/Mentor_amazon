@@ -2730,7 +2730,11 @@
         "booking_time_declined": "{{mentor}} declined the proposed time; {{mentee}} can choose another",
         "feedback_left": "{{mentee}} left feedback for {{mentor}}",
         "reminder_sent_1h": "1-hour reminder sent",
-        "reminder_sent_24h": "24-hour reminder sent"
+        "reminder_sent_24h": "24-hour reminder sent",
+        "favoriteAdded": "Saved {{mentor}} as a favourite",
+        "favoriteRemoved": "Removed {{mentor}} from favourites",
+        "favoriteAddedUnnamed": "Saved a mentor as a favourite",
+        "favoriteRemovedUnnamed": "Removed a mentor from favourites"
       },
       "loadError": "We couldn't load the activity feed."
     },

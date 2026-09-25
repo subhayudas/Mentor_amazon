@@ -112,7 +112,7 @@ const serializeWindows = (windows: Window[]) =>
   );
 
 function DatabaseCalendar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { displayName } = useDashboardIdentity();
   const queryClient = useQueryClient();
@@ -192,7 +192,8 @@ function DatabaseCalendar() {
       );
       const fresh = await availabilityQuery.refetch();
       if (fresh.data) setWindows(toWindows(fresh.data));
-      logActivity({ actor_type: "mentor", actor_id: mentorId, actor_name: mentor.name || displayName, type: "calendar_updated", subject_type: "settings", subject_id: mentorId, summary: t("showcase.activity.summaries.calendarUpdated") });
+      // The feed renders this by type in the reader's language; `summary` is only the English fallback (R1-74).
+      logActivity({ actor_type: "mentor", actor_id: mentorId, actor_name: mentor.name || displayName, type: "calendar_updated", subject_type: "settings", subject_id: mentorId, summary: i18n.getFixedT("en")("showcase.activity.summaries.calendarUpdated"), meta: { source: "client" } });
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1600);
       toast.success(t("showcase.calendar.savedToast"));

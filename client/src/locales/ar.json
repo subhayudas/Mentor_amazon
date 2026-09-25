@@ -2730,7 +2730,11 @@
         "booking_time_declined": "رفض {{mentor}} الموعد المقترح، ويمكن أن يختار {{mentee}} موعدًا آخر",
         "feedback_left": "قيّم {{mentee}} الجلسة مع {{mentor}}",
         "reminder_sent_1h": "أُرسل تذكير قبل الجلسة بساعة",
-        "reminder_sent_24h": "أُرسل تذكير قبل الجلسة بـ24 ساعة"
+        "reminder_sent_24h": "أُرسل تذكير قبل الجلسة بـ24 ساعة",
+        "favoriteAdded": "حُفظ {{mentor}} في المفضلة",
+        "favoriteRemoved": "أُزيل {{mentor}} من المفضلة",
+        "favoriteAddedUnnamed": "حُفظ مرشد في المفضلة",
+        "favoriteRemovedUnnamed": "أُزيل مرشد من المفضلة"
       },
       "loadError": "تعذّر تحميل سجل النشاط."
     },

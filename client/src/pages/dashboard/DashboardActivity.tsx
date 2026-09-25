@@ -8,6 +8,7 @@ import { useActivity } from "@/lib/activity";
 import { triggerSummary } from "@/lib/activitySummary";
 import type { ActivityEvent, ActivityType } from "@/lib/database";
 import { cn } from "@/lib/utils";
+import { clientSummary } from "@/pages/dashboard/activityLines";
 import { DashboardError, DashboardLoading } from "@/pages/dashboard/states";
 
 /**
@@ -15,7 +16,9 @@ import { DashboardError, DashboardLoading } from "@/pages/dashboard/states";
  * filtered by kind. A mentor or mentee sees every event they are party to;
  * an admin (or the showcase account) sees everything. Booking events come
  * from the database trigger and are rendered from their `meta` in the
- * reader's language (design C9, F22); other events show their stored line.
+ * reader's language (design C9, F22); the client's own events (registrations,
+ * profile and calendar saves, favourites) are rendered by type in the reader's
+ * language too (R1-46, R1-74). The stored line is only the last resort.
  */
 const ICONS: Record<ActivityType, LucideIcon> = {
   mentor_registered: UserPlus,
@@ -74,7 +77,7 @@ export function ActivityList({ events, lang, compact }: { events: ActivityEvent[
   }
   const fallbacks = { mentor: t("showcase.bookings.mentor"), mentee: t("showcase.bookings.mentee") };
   const line = (e: ActivityEvent) => {
-    const localized = triggerSummary(e, { formatWhen: (iso) => whenFmt.format(new Date(iso)), fallbacks });
+    const localized = triggerSummary(e, { formatWhen: (iso) => whenFmt.format(new Date(iso)), fallbacks }) ?? clientSummary(e);
     return localized ? t(`showcase.activity.summaries.${localized.key}`, localized.params) : e.summary;
   };
   return (

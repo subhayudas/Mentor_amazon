@@ -215,7 +215,7 @@ function useInvalidateProfile() {
 }
 
 function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const ids = React.useId();
   const { saved, flash } = useSavedFlash();
   const invalidate = useInvalidateProfile();
@@ -308,7 +308,8 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
       if (row.photo_url === submitted.current?.photo_url) setPhotoPending(false);
       setForm((current) => (current === submitted.current ? mentorForm(row) : current));
       await invalidate();
-      logActivity({ actor_type: "mentor", actor_id: mentor.id, actor_name: row.name, type: "profile_updated", subject_type: "mentor", subject_id: mentor.id, summary: t("showcase.activity.summaries.profileUpdated", { name: row.name }) });
+      // Rendered by type in the reader's language; `summary` is only the English fallback (R1-74).
+      logActivity({ actor_type: "mentor", actor_id: mentor.id, actor_name: row.name, type: "profile_updated", subject_type: "mentor", subject_id: mentor.id, summary: i18n.getFixedT("en")("showcase.activity.summaries.profileUpdated", { name: row.name }), meta: { source: "client", name: row.name } });
       flash();
     },
     onError: () => setSaveError(t("showcase.profileSettings.saveError")),
@@ -422,7 +423,7 @@ function MentorProfileForm({ mentor, userId }: { mentor: Mentor; userId: string 
 }
 
 function MenteeProfileForm({ mentee }: { mentee: Mentee }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const ids = React.useId();
   const { saved, flash } = useSavedFlash();
   const invalidate = useInvalidateProfile();
@@ -448,7 +449,8 @@ function MenteeProfileForm({ mentee }: { mentee: Mentee }) {
       setSaveError(null);
       setForm((current) => (current === submitted.current ? menteeForm(row) : current));
       await invalidate();
-      logActivity({ actor_type: "mentee", actor_id: mentee.id, actor_name: row.name, type: "profile_updated", subject_type: "mentee", subject_id: mentee.id, summary: t("showcase.activity.summaries.profileUpdated", { name: row.name }) });
+      // Rendered by type in the reader's language; `summary` is only the English fallback (R1-74).
+      logActivity({ actor_type: "mentee", actor_id: mentee.id, actor_name: row.name, type: "profile_updated", subject_type: "mentee", subject_id: mentee.id, summary: i18n.getFixedT("en")("showcase.activity.summaries.profileUpdated", { name: row.name }), meta: { source: "client", name: row.name } });
       flash();
     },
     onError: () => setSaveError(t("showcase.profileSettings.saveError")),

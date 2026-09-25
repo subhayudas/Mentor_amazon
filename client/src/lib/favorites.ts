@@ -29,6 +29,17 @@ export type FavoriteToggleInput = {
 type ToggleVariables = FavoriteToggleInput & { add: boolean };
 
 const NO_FAVOURITES: Favorite[] = [];
+
+/** The mentee's own row name (RLS: a mentee reads their own row), or undefined when it cannot be read. */
+async function ownMenteeName(menteeId: string): Promise<string | undefined> {
+  try {
+    const { data } = await supabase.from("mentees").select("name").eq("id", menteeId).maybeSingle();
+    const name = (data as { name?: unknown } | null)?.name;
+    return typeof name === "string" && name.trim() ? name.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 const noSubscription = () => () => undefined;
 
 /** Demo-mode favourites from this browser; against the database it never touches browser storage. */
@@ -92,15 +103,22 @@ export function useFavorites(menteeId: string | null, menteeName?: string) {
       toast.error(t("showcase.favorites.error"));
     },
     onSuccess: (added, { mentorId, mentorName }) => {
-      logActivity({
-        actor_type: "mentee",
-        actor_id: menteeId ?? undefined,
-        actor_name: menteeName,
-        type: added ? "favorite_added" : "favorite_removed",
-        subject_type: "mentor",
-        subject_id: mentorId,
-        summary: added ? `Saved ${mentorName ?? "a mentor"} as a favourite` : `Removed ${mentorName ?? "a mentor"} from favourites`,
-      });
+      // The feed renders favourites by type in the reader's language from `meta.mentor_name`
+      // (R1-46); `summary` is only the English fallback. The actor is named like every other
+      // line of this mentee: from the mentees row, not the sign-in metadata.
+      void (async () => {
+        const name = (IS_LOCAL || !menteeId ? undefined : await ownMenteeName(menteeId)) ?? menteeName;
+        logActivity({
+          actor_type: "mentee",
+          actor_id: menteeId ?? undefined,
+          actor_name: name,
+          type: added ? "favorite_added" : "favorite_removed",
+          subject_type: "mentor",
+          subject_id: mentorId,
+          summary: added ? `Saved ${mentorName ?? "a mentor"} as a favourite` : `Removed ${mentorName ?? "a mentor"} from favourites`,
+          meta: { source: "client", ...(mentorName ? { mentor_name: mentorName } : {}), ...(name ? { name } : {}) },
+        });
+      })();
     },
     onSettled: () => {
       if (!IS_LOCAL) void qc.invalidateQueries({ queryKey, exact: true });
