@@ -89,7 +89,8 @@ create policy "events: append as self" on public.activity_events
   for insert
   with check ((public.is_admin() or (actor_id = any (public.my_profile_ids()) and visible_to <@ public.my_profile_ids()))
               and length(summary) <= 500 and length(type) <= 64 and length(coalesce(actor_name, '')) <= 200
-              and pg_column_size(meta) <= 8192);
+              and pg_column_size(meta) <= 8192
+              and length(coalesce(subject_id, '')) <= 128 and coalesce(cardinality(visible_to), 0) <= 16);
 
 drop policy if exists "events: read mine" on public.activity_events;
 create policy "events: read mine" on public.activity_events

@@ -443,6 +443,7 @@ function MentorFeedbackDialog({
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder={t("dashboardV2.sessions.feedbackPlaceholder")}
+                    maxLength={5000}
                     className="min-h-24"
                     data-testid="input-feedback-text"
                   />

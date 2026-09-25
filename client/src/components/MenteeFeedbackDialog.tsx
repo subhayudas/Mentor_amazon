@@ -224,6 +224,7 @@ export function MenteeFeedbackDialog({ booking, open, onOpenChange, invalidateKe
                     placeholder={t("dashboardV2.feedback.commentPlaceholder")}
                     value={text}
                     onChange={(e) => setText(e.target.value)}
+                    maxLength={5000}
                     className="min-h-24"
                     data-testid="input-feedback-text"
                   />

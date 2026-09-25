@@ -64,7 +64,9 @@ describe('mirrored SQL', () => {
     expect(policy(phase2)).toBe(policy(m0002));
     const tightened = /with check \(\(public\.is_admin\(\) or \(actor_id = any \(public\.my_profile_ids\(\)\) and visible_to <@ public\.my_profile_ids\(\)\)\)/;
     expect(policy(m0002)).toMatch(tightened);
-    expect(policy(m0002)).toMatch(/and length\(summary\) <= 500 and length\(type\) <= 64 and length\(coalesce\(actor_name, ''\)\) <= 200 and pg_column_size\(meta\) <= 8192\)$/);
+    expect(policy(m0002)).toMatch(/and length\(summary\) <= 500 and length\(type\) <= 64 and length\(coalesce\(actor_name, ''\)\) <= 200 and pg_column_size\(meta\) <= 8192 /);
+    // …and a bounded subject and audience (R2-16).
+    expect(policy(m0002)).toMatch(/and length\(coalesce\(subject_id, ''\)\) <= 128 and coalesce\(cardinality\(visible_to\), 0\) <= 16\)$/);
   });
 
   // Objects both supabase_setup_v2.sql and 0002 define: a v2 re-run must never revert a fix.

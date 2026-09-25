@@ -296,7 +296,8 @@ CREATE POLICY "events: append as self" ON public.activity_events
   FOR INSERT
   WITH CHECK ((public.is_admin() OR (actor_id = ANY (public.my_profile_ids()) AND visible_to <@ public.my_profile_ids()))
               AND length(summary) <= 500 AND length(type) <= 64 AND length(coalesce(actor_name, '')) <= 200
-              AND pg_column_size(meta) <= 8192);
+              AND pg_column_size(meta) <= 8192
+              AND length(coalesce(subject_id, '')) <= 128 AND coalesce(cardinality(visible_to), 0) <= 16);
 CREATE POLICY "events: read mine" ON public.activity_events
   FOR SELECT
   USING (visible_to && public.my_profile_ids() OR public.is_admin());
@@ -2021,7 +2022,12 @@ BEGIN
     SELECT * FROM (VALUES
       ('booking_notes', 'booking_notes_content_length', 'length(content) <= 10000'),
       ('mentor_tasks', 'mentor_tasks_title_length', 'length(title) <= 500'),
-      ('mentor_tasks', 'mentor_tasks_description_length', 'length(description) <= 10000')
+      ('mentor_tasks', 'mentor_tasks_description_length', 'length(description) <= 10000'),
+      -- The request forms cap the goal at 1000 characters (as create_booking_request does); a
+      -- party could otherwise rewrite it, or leave feedback, of any size through PostgREST (R2-16).
+      ('bookings', 'bookings_goal_length', 'length(goal) <= 1000'),
+      ('bookings', 'bookings_mentee_feedback_length', 'length(mentee_feedback) <= 5000'),
+      ('bookings', 'bookings_mentor_feedback_length', 'length(mentor_feedback) <= 5000')
     ) AS t (tbl, con, expr)
   LOOP
     EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I', r.tbl, r.con);

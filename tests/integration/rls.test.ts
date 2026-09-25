@@ -605,4 +605,26 @@ describeDb('I18 RLS matrix', () => {
       await asService(tx);
     });
   });
+
+  it('size limits: no megabytes in a goal, in feedback, or in an activity row\'s subject or audience (R2-16)', async () => {
+    await withTx(sql, async (tx) => {
+      const c = await cast(tx);
+      const completed = await mkBooking(tx, c.mentor.id, c.mentee.id, { status: 'completed', completed_at: new Date().toISOString() });
+      await c.as.mentee();
+      await expectPgError(tx, (sp) => sp`update public.bookings set goal = ${'g'.repeat(1001)} where id = ${c.pending}`, '23514', /bookings_goal_length/);
+      await expectPgError(tx, (sp) => sp`update public.bookings set mentee_rating = 5, mentee_feedback = ${'f'.repeat(5001)} where id = ${completed}`,
+        '23514', /bookings_mentee_feedback_length/);
+      await tx`update public.bookings set mentee_rating = 5, mentee_feedback = ${'f'.repeat(5000)} where id = ${completed}`;
+      await c.as.mentor();
+      await expectPgError(tx, (sp) => sp`update public.bookings set mentor_rating = 5, mentor_feedback = ${'f'.repeat(5001)} where id = ${completed}`,
+        '23514', /bookings_mentor_feedback_length/);
+      const event = (subject: string, audience: string[]) => (sp: Tx) => sp`
+        insert into public.activity_events (actor_type, actor_id, type, subject_type, subject_id, visible_to, summary)
+        values ('mentor', ${c.mentor.id}, 'profile_updated', 'mentor', ${subject}, ${audience}, 'Updated my profile')`;
+      await expectPgError(tx, event('z'.repeat(129), [c.mentor.id]), '42501', /row-level security/);
+      await expectPgError(tx, event(c.mentor.id, Array(17).fill(c.mentor.id)), '42501', /row-level security/);
+      await event(c.mentor.id, [c.mentor.id])(tx);
+      await asService(tx);
+    });
+  });
 });
