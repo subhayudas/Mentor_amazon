@@ -70,7 +70,7 @@ async function tabThroughCheckTo(page: Page, from: string, submit: string): Prom
   await expect(page.getByTestId(submit)).toBeFocused();
 }
 
-test('S31 sign-up: a click into the bot check keeps the page, and the keyboard tabs through it to Create account (R1-71)', async ({ page, healthy, isMobile }) => {
+test('S23t sign-up: a click into the bot check keeps the page, and the keyboard tabs through it to Create account (R1-71)', async ({ page, healthy, isMobile }) => {
   await page.goto('/signup');
   await page.getByTestId('input-email').fill('e2e.nobody@mentorconnect.test');
   await page.getByTestId('input-password').fill(E2E_PASSWORD);
@@ -78,11 +78,11 @@ test('S31 sign-up: a click into the bot check keeps the page, and the keyboard t
   await tokenReady(page);
   await clickIntoCheck(page, isMobile);
   await expectPageStays(page, 'button-signup');
-  await healthy({ screenshotName: 'S31-signup-clicked-into-check' });
+  await healthy({ screenshotName: 'S23t-signup-clicked-into-check' });
   await tabThroughCheckTo(page, 'input-confirm-password', 'button-signup');
 });
 
-test('S31 sign-in and forgot password: a click into the bot check keeps the page, the keyboard reaches the button (R1-71)', async ({ page, healthy, isMobile }) => {
+test('S23t sign-in and forgot password: a click into the bot check keeps the page, the keyboard reaches the button (R1-71)', async ({ page, healthy, isMobile }) => {
   await page.goto('/login');
   await page.getByTestId('button-toggle-password-login').click();
   await page.getByTestId('input-email').fill('e2e.nobody@mentorconnect.test');
@@ -90,7 +90,7 @@ test('S31 sign-in and forgot password: a click into the bot check keeps the page
   await tokenReady(page);
   await clickIntoCheck(page, isMobile);
   await expectPageStays(page, 'button-login');
-  await healthy({ screenshotName: 'S31-login-clicked-into-check' });
+  await healthy({ screenshotName: 'S23t-login-clicked-into-check' });
   await tabThroughCheckTo(page, 'input-password', 'button-login');
 
   await page.goto('/forgot-password');
@@ -98,11 +98,11 @@ test('S31 sign-in and forgot password: a click into the bot check keeps the page
   await tokenReady(page);
   await clickIntoCheck(page, isMobile);
   await expectPageStays(page, 'button-send-reset-link');
-  await healthy({ screenshotName: 'S31-forgot-clicked-into-check' });
+  await healthy({ screenshotName: 'S23t-forgot-clicked-into-check' });
   await tabThroughCheckTo(page, 'input-email', 'button-send-reset-link');
 });
 
-test('S32 the bot check cannot load: sign-up says so, submitting explains why, Retry recovers it (R1-72)', async ({ page, healthy, lang }) => {
+test('S23t the bot check cannot load: sign-up says so, submitting explains why, Retry recovers it (R1-72)', async ({ page, healthy, lang }) => {
   let signups = 0;
   page.on('request', (r) => {
     if (r.method() === 'POST' && new URL(r.url()).pathname === '/auth/v1/signup') signups += 1;
@@ -125,7 +125,7 @@ test('S32 the bot check cannot load: sign-up says so, submitting explains why, R
   const alert = page.getByTestId('alert-signup-error');
   await expect(alert).toContainText(tr(lang, 'auth.captcha.unavailable'));
   expect(signups).toBe(0);
-  await healthy({ screenshotName: 'S32-signup-check-blocked' });
+  await healthy({ screenshotName: 'S23t-signup-check-blocked' });
 
   await page.unroute(CHALLENGES);
   await retry.click();
@@ -134,7 +134,7 @@ test('S32 the bot check cannot load: sign-up says so, submitting explains why, R
   await expect(page.getByTestId('turnstile-check')).toHaveAttribute('data-status', 'ready');
 });
 
-test('S32 forgot password: a check that cannot load says so, and Retry recovers it (R1-72)', async ({ page, lang }) => {
+test('S23t forgot password: a check that cannot load says so, and Retry recovers it (R1-72)', async ({ page, lang }) => {
   let recovers = 0;
   page.on('request', (r) => {
     if (r.method() === 'POST' && new URL(r.url()).pathname === '/auth/v1/recover') recovers += 1;

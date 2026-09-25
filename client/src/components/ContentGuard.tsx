@@ -33,7 +33,7 @@ import { useTranslation } from "react-i18next";
 const EDITABLE = "input, textarea, select, [contenteditable='true'], [data-guard='off']";
 
 /** How often focus is re-checked while the window is blurred (a frame may hold focus). */
-export const GUARD_FOCUS_POLL_MS = 250;
+const GUARD_FOCUS_POLL_MS = 250;
 
 function inEditable(target: EventTarget | null): boolean {
   return target instanceof Element && Boolean(target.closest(EDITABLE));

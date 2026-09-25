@@ -1,4 +1,4 @@
-import type { Frame } from '@playwright/test';
+import type { Frame, Route } from '@playwright/test';
 import { test, expect, turnstile, type Page } from '../fixtures/test';
 import { ids } from '../fixtures/personas';
 import { devEmail, featuredFor, purgeRequester, tr, useLanguage } from './b-helpers';
@@ -62,7 +62,7 @@ async function pendingRows(db: import('postgres').Sql, email: string, mentorId: 
             where lower(me.email) = ${email.toLowerCase()} and b.mentor_id = ${mentorId} and b.status = 'pending'`;
 }
 
-test('S29 clicking into the Turnstile check keeps the booking page on screen (R1-71)', async ({ page, healthy, isMobile }, testInfo) => {
+test('S3t clicking into the Turnstile check keeps the booking page on screen (R1-71)', async ({ page, healthy, isMobile }, testInfo) => {
   const f = featuredFor(testInfo.project.name, 4);
   await page.goto(`/mentor/${f.slug}/book`);
   await tokenReady(page);
@@ -73,10 +73,10 @@ test('S29 clicking into the Turnstile check keeps the booking page on screen (R1
   await expect(page.getByTestId('guard-veil')).toBeHidden();
   await expect(page.getByTestId('textarea-session-goal')).toBeVisible();
   await expect(page.getByTestId('button-send-request')).toBeVisible();
-  await healthy({ screenshotName: 'S29-clicked-into-check' });
+  await healthy({ screenshotName: 'S3t-clicked-into-check' });
 });
 
-test('S29 a keyboard-only visitor tabs through the Turnstile check to Send and sends the request (R1-71)', async ({ page, db, healthy }, testInfo) => {
+test('S3t a keyboard-only visitor tabs through the Turnstile check to Send and sends the request (R1-71)', async ({ page, db, healthy }, testInfo) => {
   const f = featuredFor(testInfo.project.name, 4);
   const email = devEmail('s29k');
   try {
@@ -111,7 +111,7 @@ test('S29 a keyboard-only visitor tabs through the Turnstile check to Send and s
     }
     expect(stopsInCheck, 'the check is in the tab order').toBeGreaterThan(0);
     await expect(page.getByTestId('button-send-request')).toBeFocused();
-    await healthy({ screenshotName: 'S29-keyboard-at-send' });
+    await healthy({ screenshotName: 'S3t-keyboard-at-send' });
 
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('slot-confirmation')).toHaveAttribute('data-outcome', 'sent');
@@ -121,7 +121,7 @@ test('S29 a keyboard-only visitor tabs through the Turnstile check to Send and s
   }
 });
 
-test('S29 the content guard still blanks the page when focus leaves the window, also from inside the check (R1-71)', async ({ page, lang, isMobile }, testInfo) => {
+test('S3t the content guard still blanks the page when focus leaves the window, also from inside the check (R1-71)', async ({ page, lang, isMobile }, testInfo) => {
   const f = featuredFor(testInfo.project.name, 4);
   await page.goto(`/mentor/${f.slug}/book`);
   await tokenReady(page);
@@ -174,7 +174,7 @@ test('S29 the content guard still blanks the page when focus leaves the window, 
   await expect(page.getByTestId('textarea-session-goal')).toBeVisible();
 });
 
-test('S30 the check cannot load: the form says so and offers Retry and the programme email; after Retry the request goes out (R1-72)', async ({ page, db, healthy, lang }, testInfo) => {
+test('S3t the check cannot load: the form says so and offers Retry and the programme email; after Retry the request goes out (R1-72)', async ({ page, db, healthy, lang }, testInfo) => {
   const f = featuredFor(testInfo.project.name, 4);
   const email = devEmail('s30');
   let posts = 0;
@@ -212,7 +212,7 @@ test('S30 the check cannot load: the form says so and offers Retry and the progr
     await expect(error).toHaveAttribute('data-kind', 'botCheck');
     await expect(error).toHaveText(tr(lang, 'bookingRequest.captchaNotSent'));
     expect(posts).toBe(0);
-    await healthy({ screenshotName: 'S30-check-blocked' });
+    await healthy({ screenshotName: 'S3t-check-blocked' });
 
     // The network is back: Retry loads the check, both messages go, and the request is sent.
     await page.unroute(CHALLENGES);
@@ -230,7 +230,33 @@ test('S30 the check cannot load: the form says so and offers Retry and the progr
   }
 });
 
-test('S30 the request dialog: a click into the check keeps the page; a check that cannot load says so and Retry recovers it (R1-71, R1-72)', async ({ page, healthy, lang, isMobile, personaProject }) => {
+test('S3t a check whose script never arrives says so after a while instead of leaving a blank box (R1-72)', async ({ page, lang }, testInfo) => {
+  const f = featuredFor(testInfo.project.name, 4);
+  // A proxy that holds the connection: the script request never answers.
+  const held: Route[] = [];
+  await page.route(CHALLENGES, (route) => {
+    held.push(route);
+  });
+  await page.clock.install();
+  try {
+    await page.goto(`/mentor/${f.slug}/book`);
+    const check = page.getByTestId('turnstile-check');
+    await expect(check).toHaveAttribute('data-status', 'loading');
+    await expect(page.getByTestId('turnstile-failed')).toHaveCount(0);
+    // The component's load timeout (TURNSTILE_LOAD_TIMEOUT_MS, 15 s).
+    await page.clock.fastForward(15_000);
+    const failed = page.getByTestId('turnstile-failed');
+    await expect(failed).toBeVisible();
+    await expect(failed).toHaveAttribute('data-reason', 'load');
+    await expect(failed).toContainText(tr(lang, 'bookingRequest.captchaLoadFailed'));
+    await expect(check).toHaveAttribute('data-status', 'failed');
+    await expect(page.getByTestId('button-turnstile-retry')).toBeVisible();
+  } finally {
+    for (const route of held) await route.abort().catch(() => undefined);
+  }
+});
+
+test('S3t the request dialog: a click into the check keeps the page; a check that cannot load says so and Retry recovers it (R1-71, R1-72)', async ({ page, healthy, lang, isMobile, personaProject }) => {
   const mentorId = ids(personaProject).mentor;
   // The profile has a request button in the desktop rail and one in the phone's sticky bar.
   const requestButton = page.locator('[data-testid="button-request-session"]:visible').first();
@@ -243,7 +269,7 @@ test('S30 the request dialog: a click into the check keeps the page; a check tha
   await page.waitForTimeout(1_000);
   await expect(page.locator('html')).not.toHaveClass(/guard-veiled/);
   await expect(dialog.getByTestId('button-submit-booking')).toBeVisible();
-  await healthy({ screenshotName: 'S30-dialog-clicked-into-check' });
+  await healthy({ screenshotName: 'S3t-dialog-clicked-into-check' });
 
   // A fresh visit with the check's script blocked.
   await page.route(CHALLENGES, (route) => route.abort());
@@ -261,7 +287,7 @@ test('S30 the request dialog: a click into the check keeps the page; a check tha
   const error = dialog.getByTestId('booking-error');
   await expect(error).toHaveAttribute('data-kind', 'botCheck');
   await expect(error).toContainText(tr(lang, 'bookingRequest.captchaNotSent'));
-  await healthy({ screenshotName: 'S30-dialog-check-blocked' });
+  await healthy({ screenshotName: 'S3t-dialog-check-blocked' });
 
   await page.unroute(CHALLENGES);
   await dialog.getByTestId('button-turnstile-retry').click();
