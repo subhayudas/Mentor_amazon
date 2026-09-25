@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { AlertTriangle, CalendarDays, Globe, Inbox, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
+import { AlertTriangle, CalendarDays, Globe, Inbox, Info, LayoutDashboard, Users, type LucideIcon } from "lucide-react";
 
 import { useAuth } from "@/context/AuthContext";
 import { useIsPhone } from "@/hooks/useMediaQuery";
@@ -40,6 +40,7 @@ import { MOCK_BOOKINGS, MOCK_MENTEES, MOCK_MENTORS } from "@/data/mockAnalytics"
 import { bookingStatusLabel, type BookingStatus } from "@/components/StatusBadge";
 import { Container } from "@/components/layout/Container";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { RequireRole } from "@/components/RouteGuard";
 import { IS_LOCAL } from "@/lib/demo";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/EmptyState";
@@ -74,8 +75,11 @@ interface Drill {
   label: string;
 }
 
-/** Below this many real bookings an admin sees the seeded demo set, always behind the banner (TESTING g1). */
-const MOCK_DATA_THRESHOLD = 5;
+/**
+ * Below this many real bookings an admin (database mode) gets a note that the numbers are real
+ * but still few. The page never swaps in sample rows outside demo mode (R1-42, F16).
+ */
+const LOW_DATA_THRESHOLD = 5;
 const BOOKINGS_TAB_LIMIT = 100;
 const CSV_STEM = "mentorconnect-bookings";
 
@@ -92,11 +96,24 @@ const FILTER_LABEL_KEY: Record<FilterKey, string> = {
  * delivering sessions, where, and is it improving? Admins read every row
  * ("Programme analytics"); mentors and mentees read only the rows RLS lets
  * them see, so their page is "Your sessions" in the second person with the
- * trend and outcomes only (P1-26). Demo data appears only after a
- * SUCCESSFUL admin fetch below the threshold; a failed fetch is an error
- * state with retry, never demo numbers (findings C3).
+ * trend and outcomes only (P1-26). Sample data exists only in demo (local)
+ * mode, always behind the banner. In database mode every number is real,
+ * however few rows there are (a young programme has a handful; a note says
+ * so), and a failed fetch is an error state with retry (findings C3, R1-42).
  */
-export default function Analytics() {
+/**
+ * Growth analytics are for the programme (admins) and mentors, like `/analytics` (F14, R1-65):
+ * mentees have no analytics and no link here, so a mentee opening the URL gets the no-access card.
+ */
+export default function AnalyticsReports() {
+  return (
+    <RequireRole role={["admin", "mentor"]}>
+      <GrowthAnalytics />
+    </RequireRole>
+  );
+}
+
+function GrowthAnalytics() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { user } = useAuth();
@@ -129,8 +146,10 @@ export default function Analytics() {
     void menteesQuery.refetch();
   };
 
-  // Demo mode: a successful admin fetch with too few real rows to read anything from (never on error, never for a personal view).
-  const useMockData = IS_LOCAL || (isAdmin && !isLoading && !isError && Array.isArray(bookings) && bookings.length < MOCK_DATA_THRESHOLD);
+  // Sample rows only in demo (local) mode. In database mode the page shows the real rows, however few (R1-42, F16).
+  const useMockData = IS_LOCAL;
+  // An admin reading the whole programme while it is still small: say the numbers are real, and few.
+  const lowDataCount = !IS_LOCAL && scope === "admin" && !isLoading && !isError && Array.isArray(bookings) && bookings.length < LOW_DATA_THRESHOLD ? bookings.length : null;
 
   const sourceBookings = useMemo<Booking[]>(() => (useMockData ? MOCK_BOOKINGS : bookings ?? []), [useMockData, bookings]);
   const sourceMentors = useMemo<Mentor[]>(() => (useMockData ? MOCK_MENTORS : mentorsQuery.data ?? []), [useMockData, mentorsQuery.data]);
@@ -458,7 +477,15 @@ export default function Analytics() {
         <Alert variant="warning" role="status" className="mb-6" data-testid="banner-demo-data">
           <AlertTriangle aria-hidden="true" />
           <AlertTitle>{t("analytics.demoBannerTitle")}</AlertTitle>
-          <AlertDescription>{t("analytics.demoBannerBody", { count: bookings?.length ?? 0, threshold: MOCK_DATA_THRESHOLD })}</AlertDescription>
+          <AlertDescription>{t("analyticsV2.demoLocalBody")}</AlertDescription>
+        </Alert>
+      )}
+
+      {lowDataCount !== null && (
+        <Alert variant="info" role="status" className="mb-6" data-testid="note-low-data">
+          <Info aria-hidden="true" />
+          <AlertTitle>{t("analyticsV2.lowData.title")}</AlertTitle>
+          <AlertDescription>{lowDataCount === 0 ? t("analyticsV2.lowData.none") : t("analyticsV2.lowData.few", { count: lowDataCount })}</AlertDescription>
         </Alert>
       )}
 

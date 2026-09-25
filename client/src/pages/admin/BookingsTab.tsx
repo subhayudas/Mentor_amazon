@@ -1,14 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { BarChart3, Inbox, Mail, Star } from "lucide-react";
-import { formatNumber, UNAVAILABLE } from "@/lib/format";
+import { BarChart3, Clock, ExternalLink, Inbox, Mail, Star, XCircle } from "lucide-react";
+import { bidi, formatNumber, UNAVAILABLE } from "@/lib/format";
 import { localizeCountry } from "@/lib/format";
 import { ChipRadio, ChipRadioGroup, FilterChip } from "@/components/discovery/FilterChip";
 import { adminQueryKeys, adminService, isProgrammeRequest, type AdminBooking } from "@/lib/adminService";
-import { isBookingNotPendingError, type Booking } from "@/lib/database";
+import { allowedFromStatuses } from "@/lib/bookingTransitions";
+import { calCancelUrl } from "@/lib/calLink";
+import { isBookingNotPendingError, isBookingStateChangedError, type Booking } from "@/lib/database";
 import { bookingService } from "@/lib/services";
 import {
   AlertDialog,
@@ -44,6 +46,25 @@ const COLS = 6;
 const STATUSES: Booking["status"][] = ["pending", "accepted", "confirmed", "completed", "rejected", "canceled"];
 type Filter = "all" | Booking["status"];
 type Decision = { booking: AdminBooking; action: "accept" | "decline" };
+/** Bookings an admin may cancel (R1-68): exactly the statuses a cancel may start from. */
+const CANCELLABLE: ReadonlySet<Booking["status"]> = new Set<Booking["status"]>(allowedFromStatuses("canceled") ?? []);
+
+/**
+ * The status badge, except a pending request to a programme-managed mentor reads "Awaiting
+ * programme team": the programme team answers those, not the mentor (R1-83, design D3).
+ */
+function AdminStatusBadge({ booking }: { booking: AdminBooking }) {
+  const { t } = useTranslation();
+  if (booking.status === "pending" && booking.mentor?.managed_by_programme) {
+    return (
+      <Badge tone="warning" data-status="pending" data-testid="badge-awaiting-programme">
+        <Clock aria-hidden="true" strokeWidth={2} />
+        {t("admin.bookings.awaitingProgramme")}
+      </Badge>
+    );
+  }
+  return <BookingStatusBadge status={booking.status} />;
+}
 
 function Rating({ value, lang }: { value?: number | null; lang: string }) {
   const { t } = useTranslation();
@@ -82,7 +103,12 @@ const menteeDetail = (b: AdminBooking) => (b.mentee?.organization_name ? b.mente
  * ones, and Accept / Decline (behind a confirmation) on exactly those rows and
  * in their detail sheet. Accepting notifies the mentee; the programme team
  * then emails them to arrange a time (the sheet shows the address).
- * Non-managed rows have no actions — their mentors answer them.
+ * Non-managed rows have no Accept / Decline — their mentors answer them.
+ * Any pending, accepted or confirmed booking can be cancelled from its detail
+ * sheet (R1-68): the write is conditional (a booking that changed meanwhile is
+ * left alone and the admin is told), the database stamps canceled_by 'admin'
+ * and tells the mentee, and a session also booked on Cal.com links to its
+ * Cal.com cancel page.
  */
 export default function BookingsTab() {
   const { t, i18n } = useTranslation();
@@ -95,6 +121,9 @@ export default function BookingsTab() {
   const [programmeOnly, setProgrammeOnly] = useState(false);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [decision, setDecision] = useState<Decision | null>(null);
+  const [canceling, setCanceling] = useState<AdminBooking | null>(null);
+  // After a cancel the sheet's cancel button goes away; keyboard focus moves to the sheet title instead of the page body.
+  const sheetTitleRef = useRef<HTMLHeadingElement>(null);
   const asTable = useAdminTable();
 
   const bookingsQuery = useQuery({ queryKey: adminQueryKeys.bookings, queryFn: adminService.getBookings });
@@ -137,6 +166,20 @@ export default function BookingsTab() {
     },
   });
   const busyId = decide.isPending ? decide.variables?.booking.id : undefined;
+
+  const cancel = useMutation({
+    mutationFn: (booking: AdminBooking) => bookingService.updateStatus(booking.id, "canceled"),
+    onSuccess: () => {
+      toast.success(t("admin.bookings.canceledToast"));
+      window.requestAnimationFrame(() => sheetTitleRef.current?.focus());
+    },
+    // The booking moved on (cancelled or completed elsewhere): nothing was written, say so.
+    onError: (error) =>
+      toast.error(isBookingStateChangedError(error) || isBookingNotPendingError(error) ? t("admin.bookings.cancelStale") : t("admin.bookings.cancelError")),
+    onSettled: () => {
+      for (const key of [adminQueryKeys.bookings, ["notifications"], ["dashboard"], ["analytics"], ["activity"]]) void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
 
   const chips: Filter[] = ["all", ...STATUSES];
   const emptyText = search || filter !== "all" || programmeOnly ? t("admin.noMatches") : t("admin.bookings.empty");
@@ -214,7 +257,7 @@ export default function BookingsTab() {
         <ChipRadioGroup aria-label={t("admin.bookings.filterLabel")} value={filter} onValueChange={(value) => setFilter(value as Filter)}>
           {chips.map((chip) => (
             <ChipRadio key={chip} value={chip} count={formatNumber(counts[chip], lang)} data-testid={`chip-booking-${chip}`}>
-              {chip === "all" ? t("common.all") : t(`status.${chip}`)}
+              {chip === "all" ? t("common.all") : chip === "pending" && programmeOnly ? t("admin.bookings.awaitingProgramme") : t(`status.${chip}`)}
             </ChipRadio>
           ))}
         </ChipRadioGroup>
@@ -296,7 +339,7 @@ export default function BookingsTab() {
                         <bdi dir={booking.mentee?.organization_name ? undefined : "ltr"}>{menteeDetail(booking)}</bdi>
                       </p>
                     </TableCell>
-                    <TableCell><BookingStatusBadge status={booking.status} /></TableCell>
+                    <TableCell><AdminStatusBadge booking={booking} /></TableCell>
                     <TableCell>
                       <p className="whitespace-nowrap text-body-sm tabular-nums">{formatDateTime(booking.scheduled_at)}</p>
                       <SessionMeta booking={booking} lang={lang} />
@@ -331,7 +374,7 @@ export default function BookingsTab() {
               data-programme={booking.mentor?.managed_by_programme ? "true" : undefined}
             >
               <div className="flex items-center justify-between gap-3">
-                <BookingStatusBadge status={booking.status} />
+                <AdminStatusBadge booking={booking} />
                 <span className="text-caption text-muted-foreground tabular-nums">{formatDate(booking.created_at)}</span>
               </div>
               <CardFields className="mt-3">
@@ -375,12 +418,14 @@ export default function BookingsTab() {
           {detail && (
             <>
               <SheetHeader className="text-start">
-                <SheetTitle>{t("admin.bookings.detailTitle")}</SheetTitle>
+                <SheetTitle ref={sheetTitleRef} tabIndex={-1} className="outline-none">
+                  {t("admin.bookings.detailTitle")}
+                </SheetTitle>
                 <SheetDescription>
                   <bdi>{mentorLabel(detail)}</bdi> · <bdi>{menteeLabel(detail)}</bdi>
                 </SheetDescription>
                 <div className="flex flex-wrap items-center gap-2 pt-2">
-                  <BookingStatusBadge status={detail.status} />
+                  <AdminStatusBadge booking={detail} />
                   {detail.mentor?.managed_by_programme && <Badge tone="info">{t("admin.bookings.programmeBadge")}</Badge>}
                 </div>
               </SheetHeader>
@@ -450,10 +495,73 @@ export default function BookingsTab() {
                   </div>
                 )}
               </div>
+
+              {CANCELLABLE.has(detail.status) && (
+                <div className="mt-8 space-y-2 border-t border-border pt-5" data-testid="section-admin-cancel">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-destructive/40 text-destructive hover:bg-destructive-soft max-md:h-11"
+                    loading={cancel.isPending && cancel.variables?.id === detail.id}
+                    disabled={cancel.isPending}
+                    onClick={() => setCanceling(detail)}
+                    data-testid="button-admin-cancel-booking"
+                  >
+                    <XCircle aria-hidden="true" />
+                    {t("admin.bookings.cancel")}
+                  </Button>
+                  <p className="text-caption text-muted-foreground text-pretty">{t("admin.bookings.cancelHint")}</p>
+                </div>
+              )}
             </>
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={!!canceling} onOpenChange={(open) => !open && setCanceling(null)}>
+        <AlertDialogContent data-testid="dialog-admin-cancel">
+          {canceling && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t("admin.bookings.cancelTitle")}</AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2">
+                    <p>{t("admin.bookings.cancelBody", { mentor: bidi(mentorLabel(canceling)), mentee: bidi(menteeLabel(canceling)) })}</p>
+                    {canceling.cal_event_uri && (
+                      <p data-testid="text-admin-cancel-cal-note">
+                        {t("admin.bookings.cancelCalNote")}{" "}
+                        <a
+                          href={calCancelUrl(canceling.cal_event_uri)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 font-medium text-secondary underline underline-offset-4"
+                          data-testid="link-admin-cancel-on-cal"
+                        >
+                          {t("admin.bookings.cancelCalLink")}
+                          <ExternalLink className="size-3.5 rtl:-scale-x-100" aria-hidden="true" />
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel data-testid="button-admin-cancel-keep">{t("admin.bookings.cancelKeep")}</AlertDialogCancel>
+                <AlertDialogAction
+                  className={buttonVariants({ variant: "destructive" })}
+                  onClick={() => {
+                    cancel.mutate(canceling);
+                    setCanceling(null);
+                  }}
+                  data-testid="button-admin-cancel-confirm"
+                >
+                  {t("admin.bookings.cancelConfirm")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!decision} onOpenChange={(open) => !open && setDecision(null)}>
         <AlertDialogContent data-testid="dialog-confirm-decision">
@@ -465,8 +573,8 @@ export default function BookingsTab() {
                 </AlertDialogTitle>
                 <AlertDialogDescription>
                   {decision.action === "accept"
-                    ? t("admin.bookings.acceptBody", { mentee: menteeLabel(decision.booking), mentor: mentorLabel(decision.booking), email: decision.booking.mentee?.email ?? UNAVAILABLE })
-                    : t("admin.bookings.declineBody", { mentee: menteeLabel(decision.booking), mentor: mentorLabel(decision.booking) })}
+                    ? t("admin.bookings.acceptBody", { mentee: bidi(menteeLabel(decision.booking)), mentor: bidi(mentorLabel(decision.booking)), email: bidi(decision.booking.mentee?.email ?? UNAVAILABLE) })
+                    : t("admin.bookings.declineBody", { mentee: bidi(menteeLabel(decision.booking)), mentor: bidi(mentorLabel(decision.booking)) })}
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>

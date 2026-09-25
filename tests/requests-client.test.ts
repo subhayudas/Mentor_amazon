@@ -218,6 +218,16 @@ describe('the browser memory yields to a signed-in viewer\'s bookings fetched af
     }
   });
 
+  it('a signed-in viewer never inherits a memory another address left in this browser (R1-58)', () => {
+    // Someone sent a request anonymously as sara@ on this browser; omar@ signs in.
+    const theirs = { mentorId: 'm-db', bookings: undefined, viewerEmail: 'omar@example.com', local: memory };
+    expect(resolveRequestState({ ...theirs, isAvailable: true })).toEqual({ kind: 'cta' });
+    expect(resolveRequestState({ ...theirs, isAvailable: false })).toEqual({ kind: 'unavailable' });
+    expect(resolveRequestState({ ...theirs, bookings: [], bookingsAsOf: before, isAvailable: true })).toEqual({ kind: 'cta' });
+    // The same address (case and spaces ignored) keeps it.
+    expect(resolveRequestState({ ...theirs, viewerEmail: ' SARA@example.com', isAvailable: true })).toMatchObject({ kind: 'sent', source: 'local', email: 'sara@example.com' });
+  });
+
   it('a live row still reads as sent (from the row), and anonymous viewers keep the memory', () => {
     expect(state([row('pending')], after)).toMatchObject({ kind: 'sent', source: 'row', status: 'pending' });
     expect(isSentMemoryStale({ mentorId: 'm-db', bookings: [row('accepted')], bookingsAsOf: after, viewerEmail: 'sara@example.com', local: memory })).toBe(false);
@@ -283,5 +293,17 @@ describe('request state with Cal.com and programme-managed rows (B7)', () => {
     expect(railStatesFor(sent({ status: 'pending' })).states).toEqual(['done', 'current', 'next']);
     expect(railStatesFor(sent({ status: 'confirmed' })).states).toEqual(['done', 'done', 'done']);
     expect(railStatesFor({ kind: 'cta' }).states).toEqual(['next', 'next', 'next']);
+  });
+
+  it('only an accepted request with a link lets the mentee choose a time: the whole rail, not just its stops (R1-58)', () => {
+    // The full RailProgress: an extra flag (canChooseTime on a pending row) would put a
+    // "Choose a time" button on a request the mentor has not answered.
+    expect(railStatesFor(sent({ status: 'pending', calLink: 'jane/30min' }))).toEqual({ states: ['done', 'current', 'next'], canChooseTime: false });
+    expect(railStatesFor(sent({ status: 'confirmed', calLink: 'jane/30min' }))).toEqual({ states: ['done', 'done', 'done'], canChooseTime: false });
+    expect(railStatesFor(sent({ status: 'completed', calLink: 'jane/30min' }))).toEqual({ states: ['done', 'done', 'done'], canChooseTime: false });
+    expect(railStatesFor({ kind: 'sent', email: 'sara@example.com', sentAt: base.created_at, source: 'local' })).toEqual({ states: ['done', 'current', 'next'], canChooseTime: false });
+    expect(railStatesFor({ kind: 'cta' })).toEqual({ states: ['next', 'next', 'next'], canChooseTime: false });
+    expect(railStatesFor({ kind: 'unavailable' })).toEqual({ states: ['next', 'next', 'next'], canChooseTime: false });
+    expect(railStatesFor(sent({ status: 'accepted', calLink: 'jane/30min' }))).toEqual({ states: ['done', 'done', 'current'], canChooseTime: true });
   });
 });

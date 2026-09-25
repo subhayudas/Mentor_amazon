@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import type { Booking } from "@/lib/database";
+import { isBookingNotPendingError, isBookingStateChangedError, type Booking } from "@/lib/database";
 import { bookingService } from "@/lib/services";
 import type { DashboardBooking } from "@/pages/dashboard/dataSource";
 
@@ -13,7 +13,9 @@ import type { DashboardBooking } from "@/pages/dashboard/dataSource";
  * changed no row — RLS or the status guard said no — counts as a failure),
  * and every outcome refetches the dashboard, analytics, notifications and the
  * legacy portals' caches. Booking lifecycle events are written by the
- * database trigger, never logged from here (D9).
+ * database trigger, never logged from here (D9). A write that lost a race
+ * (the booking was answered, cancelled or completed elsewhere in the
+ * meantime, R1-16) changes nothing and says so instead of the generic error.
  */
 export type BookingAction = "accept" | "decline" | "cancel" | "withdraw" | "complete";
 
@@ -39,10 +41,11 @@ export function useDashboardBookingActions() {
       await refresh();
       toast.success(t(successKey));
     },
-    onError: async () => {
+    onError: async (error: Error) => {
       // Show the database's truth again (the row may have changed underneath us).
       await refresh();
-      toast.error(t("showcase.bookings.toast.error"));
+      const stale = isBookingStateChangedError(error) || isBookingNotPendingError(error);
+      toast.error(t(stale ? "showcase.bookings.toast.stale" : "showcase.bookings.toast.error"));
     },
   });
 

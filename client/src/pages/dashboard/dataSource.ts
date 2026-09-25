@@ -225,3 +225,36 @@ export function upcomingWithin<T extends Pick<Booking, "status" | "scheduled_at"
     })
     .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime());
 }
+
+/**
+ * "Meet other mentors" on the mentor home (R1-43): up to `limit` real directory rows from the
+ * database (never the curated static entries), taking requests, never the viewer; mentors with
+ * a photo first, then the newest. Nothing shown with them claims anything about their sessions.
+ */
+export function otherMentors<T extends { id: string; source: string; is_available: boolean; photo_url?: string | null; created_at?: string | null }>(
+  rows: readonly T[] | undefined,
+  ownId: string | null | undefined,
+  limit = 3,
+): T[] {
+  return (rows ?? [])
+    .filter((m) => m.source === "db" && m.is_available && m.id !== ownId)
+    .slice()
+    .sort((a, b) => Number(Boolean(b.photo_url)) - Number(Boolean(a.photo_url)) || String(b.created_at ?? "").localeCompare(String(a.created_at ?? "")))
+    .slice(0, limit);
+}
+
+/**
+ * The mentor home's "Refer a colleague" invitation (R1-44): what the share sheet, the clipboard
+ * and the e-mail draft carry. `url` is where a colleague starts (sign-in, then onboarding).
+ */
+export function referralInvite({ url, subject, message }: { url: string; subject: string; message: string }): {
+  share: { title: string; text: string; url: string };
+  clipboard: string;
+  mailto: string;
+} {
+  return {
+    share: { title: subject, text: message, url },
+    clipboard: `${message}\n${url}`,
+    mailto: `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(`${message}\n\n${url}`)}`,
+  };
+}

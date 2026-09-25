@@ -112,7 +112,7 @@ const serializeWindows = (windows: Window[]) =>
   );
 
 function DatabaseCalendar() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { displayName } = useDashboardIdentity();
   const queryClient = useQueryClient();
@@ -192,7 +192,8 @@ function DatabaseCalendar() {
       );
       const fresh = await availabilityQuery.refetch();
       if (fresh.data) setWindows(toWindows(fresh.data));
-      logActivity({ actor_type: "mentor", actor_id: mentorId, actor_name: mentor.name || displayName, type: "calendar_updated", subject_type: "settings", subject_id: mentorId, summary: t("showcase.activity.summaries.calendarUpdated") });
+      // The feed renders this by type in the reader's language; `summary` is only the English fallback (R1-74).
+      logActivity({ actor_type: "mentor", actor_id: mentorId, actor_name: mentor.name || displayName, type: "calendar_updated", subject_type: "settings", subject_id: mentorId, summary: i18n.getFixedT("en")("showcase.activity.summaries.calendarUpdated"), meta: { source: "client" } });
       setSaved(true);
       window.setTimeout(() => setSaved(false), 1600);
       toast.success(t("showcase.calendar.savedToast"));
@@ -334,19 +335,27 @@ function DatabaseCalendar() {
         )}
         {!failed && !loading && (
           <div className="flex flex-wrap items-center gap-3 py-6">
+            {/* Nothing changed: the button stays focusable but says why it does nothing (R1-49). */}
             <button
               type="button"
-              onClick={() => void save()}
+              onClick={() => dirty && void save()}
               disabled={saving}
               aria-busy={saving || undefined}
-              className="inline-flex h-11 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-5 text-[14px] font-bold text-white hover:bg-black disabled:opacity-70"
+              aria-disabled={(!dirty && !saving) || undefined}
+              aria-describedby={`${ids}-calendar-status`}
+              className="inline-flex h-11 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-5 text-[14px] font-bold text-white hover:bg-black disabled:opacity-70 aria-disabled:cursor-not-allowed aria-disabled:bg-[#e6e4de] aria-disabled:text-[#6c6c84] aria-disabled:hover:bg-[#e6e4de]"
               data-testid="button-save-calendar"
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : saved ? <Check className="size-4" aria-hidden="true" /> : null}
               {saved ? t("showcase.calendar.saved") : t("showcase.calendar.save")}
             </button>
-            <p className={cn("text-[13px]", saveError ? "font-medium text-destructive" : "text-[#6c6c84]")} role={saveError ? "alert" : undefined} data-testid="text-calendar-status">
-              {saveError ?? (dirty ? t("showcase.calendar.unsaved") : t("showcase.calendar.saveHintLive"))}
+            <p
+              id={`${ids}-calendar-status`}
+              className={cn("text-[13px]", saveError ? "font-medium text-destructive" : "text-[#6c6c84]")}
+              role={saveError ? "alert" : undefined}
+              data-testid="text-calendar-status"
+            >
+              {saveError ?? (dirty ? t("showcase.calendar.unsaved") : saved ? t("showcase.calendar.saveHintLive") : t("showcase.calendar.noChangesLive"))}
             </p>
           </div>
         )}

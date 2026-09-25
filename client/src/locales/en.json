@@ -969,7 +969,19 @@
       "acceptedToast": "Request accepted. Email the mentee to arrange a time.",
       "declinedToast": "Request declined",
       "decisionError": "Unable to update the request. Check your connection and try again.",
-      "decisionStale": "This request was already answered. The list now shows its current status."
+      "decisionStale": "This request was already answered. The list now shows its current status.",
+      "awaitingProgramme": "Awaiting programme team",
+      "cancel": "Cancel booking",
+      "cancelHint": "The mentee is told the session is cancelled.",
+      "cancelTitle": "Cancel this booking?",
+      "cancelBody": "The session between {{mentor}} and {{mentee}} is cancelled, and {{mentee}} is notified. This can’t be undone.",
+      "cancelCalNote": "This session is also booked on Cal.com. Cancel it there too so the calendar invite is removed.",
+      "cancelCalLink": "Open in Cal.com",
+      "cancelKeep": "Keep booking",
+      "cancelConfirm": "Cancel booking",
+      "canceledToast": "Booking cancelled. The mentee has been notified.",
+      "cancelError": "We couldn’t cancel this booking. Nothing changed; please try again.",
+      "cancelStale": "This booking changed in the meantime, so nothing was cancelled. The list now shows its current status."
     },
     "access": {
       "pendingTitle": "Pending requests",
@@ -2133,6 +2145,17 @@
       "mentorTitle": "No requests yet",
       "mentorBody": "Requests mentees send you appear here, with the sessions that follow.",
       "browse": "Browse mentors"
+    },
+    "demoLocalBody": "Demo mode: every number and chart on this page is illustrative sample data, not programme metrics.",
+    "lowData": {
+      "title": "Real programme data",
+      "none": "No requests yet. Every number on this page is real and fills in as soon as mentees send requests.",
+      "few_zero": "No requests yet. Every number on this page is real and fills in as soon as mentees send requests.",
+      "few_one": "Only {{count}} request so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_two": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_few": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_many": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_other": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded."
     }
   },
   "showcase": {
@@ -2179,7 +2202,10 @@
       "t2dbA": "Every request starts with",
       "t2dbB": "what you want to work on",
       "t4requestBig": "Request, then schedule",
-      "t4requestA": "Send a request. Once it's accepted, pick a time on their calendar and the invite with the video link lands in both calendars."
+      "t4requestA": "Send a request. Once it's accepted, pick a time on their calendar and the invite with the video link lands in both calendars.",
+      "t6dbBig": "Find your mentor",
+      "t6dbA": "Search by what you are working on",
+      "t6dbB": "and filter by expertise, industry and language."
     },
     "rail": {
       "title": "See what the best mentors bring to Amazon",
@@ -2402,7 +2428,8 @@
         "completed": "Session marked completed",
         "rescheduled": "Session rescheduled",
         "error": "We couldn't update this session. Nothing changed; please try again.",
-        "withdrawn": "Request withdrawn"
+        "withdrawn": "Request withdrawn",
+        "stale": "This session changed in the meantime (it may have been cancelled, answered or completed elsewhere), so nothing was saved. The list now shows its current status."
       },
       "withdraw": "Withdraw",
       "chooseTime": "Choose a time",
@@ -2500,7 +2527,8 @@
       "addWindow": "Add hours",
       "endAfterStart": "End after the start time",
       "unsaved": "You have unsaved changes.",
-      "saveHintLive": "Office hours show on your public profile as soon as you save."
+      "saveHintLive": "Office hours show on your public profile as soon as you save.",
+      "noChangesLive": "No changes to save yet. Office hours show on your public profile as soon as you save a change."
     },
     "dashboard": {
       "hi": "Hi, {{name}}",
@@ -2585,7 +2613,15 @@
       "upcomingCount_two": "{{count}} upcoming sessions",
       "upcomingCount_few": "{{count}} upcoming sessions",
       "upcomingCount_many": "{{count}} upcoming sessions",
-      "upcomingCount_other": "{{count}} upcoming sessions"
+      "upcomingCount_other": "{{count}} upcoming sessions",
+      "otherMentors": "Meet other mentors",
+      "otherMentorsSub": "See how other mentors in the programme describe what they help with.",
+      "setOfficeHours": "Set office hours",
+      "referSubject": "Join MentorConnect as a mentor",
+      "referMessage": "I mentor founders through MentorConnect, the Amazon UAE mentorship programme. Amazon colleagues can join too: open the link, choose Sign in with Amazon and set up a mentor profile in a few minutes.",
+      "referCopied": "Invitation copied. Paste it into an email or a chat to a colleague.",
+      "referCopyFailed": "We couldn’t copy the invitation. Use Email a colleague instead.",
+      "referEmail": "Email a colleague"
     },
     "onboarding": {
       "stepsLabel": "Form sections",
@@ -2706,7 +2742,11 @@
         "booking_time_declined": "{{mentor}} declined the proposed time; {{mentee}} can choose another",
         "feedback_left": "{{mentee}} left feedback for {{mentor}}",
         "reminder_sent_1h": "1-hour reminder sent",
-        "reminder_sent_24h": "24-hour reminder sent"
+        "reminder_sent_24h": "24-hour reminder sent",
+        "favoriteAdded": "Saved {{mentor}} as a favourite",
+        "favoriteRemoved": "Removed {{mentor}} from favourites",
+        "favoriteAddedUnnamed": "Saved a mentor as a favourite",
+        "favoriteRemovedUnnamed": "Removed a mentor from favourites"
       },
       "loadError": "We couldn't load the activity feed."
     },

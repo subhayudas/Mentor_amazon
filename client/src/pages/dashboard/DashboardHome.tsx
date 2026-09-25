@@ -1,9 +1,11 @@
 import * as React from "react";
 import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
-import { ArrowUpRight, Bell, Check, ChevronDown, ChevronRight, ChevronUp, Clock3, Copy, Heart, Plus, Share2 } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowUpRight, Bell, CalendarClock, Check, ChevronDown, ChevronRight, ChevronUp, Clock3, Copy, Heart, Mail, Share2 } from "lucide-react";
 
 import { DASHBOARD_ROUTES, DashboardShell, useDashboardIdentity } from "@/components/dashboard/DashboardShell";
+import { useMentors } from "@/components/discovery/useMentors";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
 import { FEATURED_MENTORS, featuredMentorByAnyId } from "@/data/featuredMentors";
@@ -13,12 +15,13 @@ import { isValidCalLink } from "@/lib/calLink";
 import type { Mentor, VerificationStatus } from "@/lib/database";
 import { IS_LOCAL } from "@/lib/demo";
 import { useFavorites } from "@/lib/favorites";
+import { localizedField } from "@/lib/localized";
 import { getLocalValue, setLocalValue } from "@/lib/localStore";
 import { dueReminders } from "@/lib/reminders";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { UPCOMING_STATUSES, useDashboardData, useOwnProfile, type DashboardBooking } from "@/pages/dashboard/data";
-import { CHECKLIST_KEYS, checklistDone, firstNameOf, recordedMinutes, upcomingWithin, type ChecklistKey } from "@/pages/dashboard/dataSource";
+import { CHECKLIST_KEYS, checklistDone, firstNameOf, otherMentors, recordedMinutes, referralInvite, upcomingWithin, type ChecklistKey } from "@/pages/dashboard/dataSource";
 import { formatHours, formatRelativeDay, formatTime } from "@/lib/format";
 import { ActivityList } from "@/pages/dashboard/DashboardActivity";
 import { DashboardError, DashboardLoading, ProfileNeededCard } from "@/pages/dashboard/states";
@@ -26,8 +29,8 @@ import { DashboardError, DashboardLoading, ProfileNeededCard } from "@/pages/das
 /**
  * Dashboard home `/dashboard` (Figma "Dashboard Home", Topmate → Amazon /
  * MentorConnect): greeting card with the public link and the hours summary,
- * the "Make the page yours" checklist, "Get inspired" mentors, the referral
- * banner and the period stats strip.
+ * the "Make the page yours" checklist, other mentors, the referral banner and
+ * the period stats strip.
  *
  * Database mode (design C6; F17, F18, F40, F41): every number comes from the
  * signed-in person's own rows; reminders and "upcoming" count confirmed
@@ -35,6 +38,9 @@ import { DashboardError, DashboardLoading, ProfileNeededCard } from "@/pages/das
  * sessions have none); the checklist is computed from the mentor row,
  * published availability and bookings (only "share" is a per-browser tick);
  * "Your page" is the mentor's own profile — without one, "Finish your profile".
+ * "Meet other mentors" lists real directory rows with no claim about their
+ * sessions (R1-43; the demo keeps the curated "Get inspired" picture), and
+ * "Refer now" shares a real invitation to sign in (R1-44).
  * Mentees see their verification state, favourites and sessions, or
  * "Complete your registration" when they have no mentees row yet.
  */
@@ -42,6 +48,9 @@ const PERIODS = ["today", "yesterday", "3d", "7d", "30d", "3m", "6m"] as const;
 const PERIOD_DAYS: Record<(typeof PERIODS)[number], number> = { today: 1, yesterday: 2, "3d": 3, "7d": 7, "30d": 30, "3m": 90, "6m": 180 };
 /** How far ahead the "upcoming" strip looks (its caption says so). */
 const UPCOMING_DAYS = 14;
+
+/** "Role, Company": Arabic lists take the Arabic comma. */
+const listSeparator = (lang: string) => (lang.startsWith("ar") ? "، " : ", ");
 
 /** Reminders only ever describe confirmed sessions (design C6). */
 function confirmedReminders(bookings: DashboardBooking[]) {
@@ -65,6 +74,8 @@ function MentorHome() {
   const availability = usePublicAvailability();
   const { events } = useActivity(signedIn ? profileId : null, { all: !signedIn, limit: 6 });
   const reminders = React.useMemo(() => (signedIn ? confirmedReminders(bookings) : []), [bookings, signedIn]);
+  const directory = useMentors();
+  const others = React.useMemo(() => (IS_LOCAL ? [] : otherMentors(directory.data, profileId)), [directory.data, profileId]);
 
   // Greeting: the mentor row's name, else the account's, else the email's local part (F41).
   const displayName = identity.displayName;
@@ -116,6 +127,26 @@ function MentorHome() {
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
       /* clipboard unavailable: the link stays visible for manual copy */
+    }
+  };
+
+  // "Refer now" (R1-44): a colleague starts at sign-in (Sign in with Amazon, then onboarding).
+  const invite = referralInvite({ url: `${origin}${ROUTES.login}`, subject: t("showcase.dashboard.referSubject"), message: t("showcase.dashboard.referMessage") });
+  const refer = async () => {
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share(invite.share);
+        return;
+      } catch (error) {
+        // Closing the share sheet is a choice, not a failure; anything else falls back to the clipboard.
+        if ((error as { name?: string } | null)?.name === "AbortError") return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(invite.clipboard);
+      toast.success(t("showcase.dashboard.referCopied"));
+    } catch {
+      toast.error(t("showcase.dashboard.referCopyFailed"));
     }
   };
 
@@ -229,7 +260,8 @@ function MentorHome() {
           </div>
           <div className="mt-5 grid grid-cols-1 gap-3 border-t border-[var(--sc-hairline)] pt-5 sm:grid-cols-3">
             {[
-              { icon: Plus, label: t("showcase.dashboard.addSession"), href: DASHBOARD_ROUTES.calendar },
+              // Session types live on the mentor's Cal.com event type; this page sets office hours (R1-45).
+              { icon: CalendarClock, label: t("showcase.dashboard.setOfficeHours"), href: DASHBOARD_ROUTES.calendar },
               ...(publicPath ? [{ icon: Share2, label: t("showcase.dashboard.shareProfile"), href: publicPath }] : []),
               { icon: Clock3, label: t("showcase.dashboard.logHours"), href: DASHBOARD_ROUTES.bookings },
             ].map((a) => (
@@ -241,7 +273,7 @@ function MentorHome() {
           </div>
         </section>
 
-        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.7fr_1fr]">
+        <div className={cn("mt-6 grid grid-cols-1 gap-6", (IS_LOCAL || others.length > 0) && "lg:grid-cols-[1.7fr_1fr]")}>
           {/* Checklist: computed from the database in database mode; the share step is this browser's tick. */}
           <section className={cn(card, "overflow-hidden")} aria-labelledby="checklist-title" data-testid="checklist">
             <div className="flex items-start justify-between gap-4 p-6">
@@ -306,26 +338,61 @@ function MentorHome() {
             </ul>
           </section>
 
-          {/* Get inspired */}
-          <section className="rounded-[12px] bg-[#f7f6f2] p-6" aria-labelledby="inspired-title">
-            <h2 id="inspired-title" className="text-[20px] font-bold text-[var(--sc-ink)]">
-              {t("showcase.dashboard.inspired")}
-            </h2>
-            <p className="mt-1 text-[14px] text-[#6c6c84]">{t("showcase.dashboard.inspiredSub")}</p>
-            <ul className="mt-5 space-y-4">
-              {FEATURED_MENTORS.slice(1, 4).map((m) => (
-                <li key={m.id}>
-                  <Link href={ROUTES.mentor(m.id)} className="flex items-center gap-3 rounded-[8px] hover:bg-white/70">
-                    <img src={m.photo_url} alt="" className="size-12 rounded-full object-cover" />
-                    <span className="min-w-0">
-                      <span className="block truncate text-[16px] font-semibold text-[var(--sc-ink)]">{lang === "ar" && m.name_ar ? m.name_ar : m.name}</span>
-                      <span className="block truncate text-[13px] text-[#6c6c84]">{lang === "ar" ? m.headline_ar : m.headline}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
+          {IS_LOCAL ? (
+            /* Demo: the curated showcase picture. */
+            <section className="rounded-[12px] bg-[#f7f6f2] p-6" aria-labelledby="inspired-title">
+              <h2 id="inspired-title" className="text-[20px] font-bold text-[var(--sc-ink)]">
+                {t("showcase.dashboard.inspired")}
+              </h2>
+              <p className="mt-1 text-[14px] text-[#6c6c84]">{t("showcase.dashboard.inspiredSub")}</p>
+              <ul className="mt-5 space-y-4">
+                {FEATURED_MENTORS.slice(1, 4).map((m) => (
+                  <li key={m.id}>
+                    <Link href={ROUTES.mentor(m.id)} className="flex items-center gap-3 rounded-[8px] hover:bg-white/70">
+                      <img src={m.photo_url} alt="" className="size-12 rounded-full object-cover" />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[16px] font-semibold text-[var(--sc-ink)]">{lang === "ar" && m.name_ar ? m.name_ar : m.name}</span>
+                        <span className="block truncate text-[13px] text-[#6c6c84]">{lang === "ar" ? m.headline_ar : m.headline}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : others.length > 0 ? (
+            /* Database: other real mentors in the directory, with no claim about their sessions (R1-43). */
+            <section className="rounded-[12px] bg-[#f7f6f2] p-6" aria-labelledby="other-mentors-title" data-testid="section-other-mentors">
+              <h2 id="other-mentors-title" className="text-[20px] font-bold text-[var(--sc-ink)]">
+                {t("showcase.dashboard.otherMentors")}
+              </h2>
+              <p className="mt-1 text-[14px] text-[#6c6c84]">{t("showcase.dashboard.otherMentorsSub")}</p>
+              <ul className="mt-5 space-y-4">
+                {others.map((m) => {
+                  const name = localizedField(m, "name", lang) || m.name;
+                  const role = [localizedField(m, "position", lang), localizedField(m, "company", lang)].filter(Boolean).join(listSeparator(lang));
+                  return (
+                    <li key={m.id}>
+                      <Link href={ROUTES.mentor(m.slug ?? m.id)} className="flex items-center gap-3 rounded-[8px] hover:bg-white/70" data-testid={`link-other-mentor-${m.id}`}>
+                        {m.photo_url ? (
+                          <img src={m.photo_url} alt="" className="size-12 shrink-0 rounded-full object-cover" />
+                        ) : (
+                          <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-white text-[16px] font-bold text-[var(--sc-ink)]" aria-hidden="true">
+                            {name.slice(0, 1)}
+                          </span>
+                        )}
+                        <span className="min-w-0">
+                          <span className="block truncate text-[16px] font-semibold text-[var(--sc-ink)]">
+                            <bdi>{name}</bdi>
+                          </span>
+                          {role && <span className="block truncate text-[13px] text-[#6c6c84]">{role}</span>}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          ) : null}
         </div>
 
         {signedIn && (
@@ -361,10 +428,24 @@ function MentorHome() {
           <h2 id="refer-title" className="mt-2 max-w-[560px] text-[30px] font-bold leading-[1.15] md:text-[40px]">
             {t("showcase.dashboard.referTitle")}
           </h2>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href={ROUTES.mentorOnboarding} className="inline-flex h-12 items-center rounded-[8px] bg-white px-5 text-[15px] font-bold text-[var(--sc-ink)] hover:bg-[var(--sc-peach)]">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={refer}
+              className="inline-flex h-12 items-center gap-2 rounded-[8px] bg-white px-5 text-[15px] font-bold text-[var(--sc-ink)] hover:bg-[var(--sc-peach)]"
+              data-testid="button-refer-share"
+            >
+              <Share2 className="size-4" aria-hidden="true" />
               {t("showcase.dashboard.referNow")}
-            </Link>
+            </button>
+            <a
+              href={invite.mailto}
+              className="inline-flex h-12 items-center gap-2 rounded-[8px] border border-white/70 px-5 text-[15px] font-semibold text-white hover:bg-white/10"
+              data-testid="link-refer-email"
+            >
+              <Mail className="size-4" aria-hidden="true" />
+              {t("showcase.dashboard.referEmail")}
+            </a>
           </div>
         </section>
 
@@ -535,7 +616,7 @@ function MenteeHome() {
                         )}
                         <span className="min-w-0">
                           <span className="block truncate text-[15px] font-semibold text-[var(--sc-ink)]">{lang === "ar" && m.name_ar ? m.name_ar : m.name}</span>
-                          <span className="block truncate text-[13px] text-[#6c6c84]">{[m.position, m.company].filter(Boolean).join(", ")}</span>
+                          <span className="block truncate text-[13px] text-[#6c6c84]">{[m.position, m.company].filter(Boolean).join(listSeparator(lang))}</span>
                         </span>
                       </Link>
                     </li>

@@ -229,6 +229,10 @@ export default function Analytics() {
   const traffic = React.useMemo(() => (demo ? demoTraffic(stats.requests, days) : null), [demo, stats.requests, days]);
   const nf = React.useMemo(() => new Intl.NumberFormat(i18n.language), [i18n.language]);
   const hours = Math.round((stats.minutes / 60) * 10) / 10;
+  // Charts follow the reading direction (R1-78): in Arabic the categories and time run right to
+  // left, like the value legend under the funnel, and the value axis sits on the right.
+  const rtl = i18n.dir(i18n.language) === "rtl";
+  const chartMargin = rtl ? { top: 8, right: -18, left: 8, bottom: 0 } : { top: 8, right: 8, left: -18, bottom: 0 };
 
   const mentorById = React.useMemo(() => new Map<string, Pick<Mentor, "name" | "name_ar">>(data.mentors.map((m) => [m.id, m])), [data.mentors]);
   const mentorLabel = (id: string) => {
@@ -330,17 +334,17 @@ export default function Analytics() {
         </div>
 
         <Card title={t("showcase.analytics.trendRequests")} className="mt-4">
-          <div className="chart-container mt-4 h-[260px]" aria-hidden="true">
+          <div className="chart-container mt-4 h-[260px]" aria-hidden="true" data-testid="chart-requests">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.series} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+              <AreaChart data={stats.series} margin={chartMargin}>
                 <defs>
                   <linearGradient id="requests-fill" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={NAVY} stopOpacity={0.22} />
                     <stop offset="100%" stopColor={NAVY} stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-                <YAxis tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} interval="preserveStartEnd" reversed={rtl} />
+                <YAxis tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} allowDecimals={false} orientation={rtl ? "right" : "left"} />
                 <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #f0efef", fontSize: 12 }} />
                 <Area isAnimationActive={false} type="monotone" dataKey="requests" stroke={NAVY} strokeWidth={2} fill="url(#requests-fill)" name={t("showcase.analytics.funnel.requests")} />
               </AreaChart>
@@ -361,11 +365,11 @@ export default function Analytics() {
             </Card>
           )}
           <Card title={t("showcase.analytics.funnelTitle")}>
-            <div className="chart-container mt-4 h-[240px]" aria-hidden="true">
+            <div className="chart-container mt-4 h-[240px]" aria-hidden="true" data-testid="chart-funnel">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={funnel} margin={{ top: 8, right: 8, left: -18, bottom: 0 }} barCategoryGap={18}>
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <BarChart data={funnel} margin={chartMargin} barCategoryGap={18}>
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} reversed={rtl} />
+                  <YAxis tick={{ fontSize: 11, fill: "#6c6c84" }} axisLine={false} tickLine={false} allowDecimals={false} orientation={rtl ? "right" : "left"} />
                   <Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #f0efef", fontSize: 12 }} cursor={{ fill: "rgba(35,47,62,0.06)" }} />
                   <Bar isAnimationActive={false} dataKey="value" radius={[8, 8, 0, 0]}>
                     {funnel.map((_, i) => (
@@ -375,7 +379,8 @@ export default function Analytics() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <ul className={cn("mt-2 grid grid-cols-2 gap-x-4 text-[12px] text-[#6c6c84]", traffic ? "sm:grid-cols-4" : "sm:grid-cols-3")} data-testid="analytics-funnel">
+            {/* One column per bar at every width, centred, so each value sits under its own bar (R1-78). */}
+            <ul className={cn("mt-2 grid gap-x-2 text-center text-[12px] text-[#6c6c84] sm:gap-x-4", traffic ? "grid-cols-4" : "grid-cols-3")} data-testid="analytics-funnel">
               {funnel.map((f) => (
                 <li key={f.name}>
                   <span className="block font-semibold text-[var(--sc-ink)]">{nf.format(f.value)}</span>

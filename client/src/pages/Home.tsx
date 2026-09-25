@@ -251,7 +251,7 @@ function Bento() {
             </div>
           </div>
 
-          {/* 6 — matched */}
+          {/* 6 — matched (demo) / find your mentor (database: there is search and filters, no matching, R1-48) */}
           <div className={cn(tile, "bg-[var(--sc-tile-teal)] md:col-span-4")}>
             <div className="flex flex-col items-center gap-1 text-[14px] text-[var(--sc-ink)]" aria-hidden="true">
               <span className="rounded-[12px] bg-white px-4 py-2 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">{t("showcase.bento.you")}</span>
@@ -264,10 +264,10 @@ function Bento() {
                 <span className="rounded-[12px] bg-white px-4 py-2 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">{t("showcase.bento.yourSession")}</span>
               </div>
             </div>
-            <div className="mt-auto text-end">
-              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t6big")}</p>
+            <div className="mt-auto text-end" data-testid="bento-find">
+              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t(IS_LOCAL ? "showcase.bento.t6big" : "showcase.bento.t6dbBig")}</p>
               <p className="mt-3 text-[18px] leading-[26px] text-[var(--sc-ink)]">
-                <strong className="font-bold">{t("showcase.bento.t6a")}</strong> {t("showcase.bento.t6b")}
+                <strong className="font-bold">{t(IS_LOCAL ? "showcase.bento.t6a" : "showcase.bento.t6dbA")}</strong> {t(IS_LOCAL ? "showcase.bento.t6b" : "showcase.bento.t6dbB")}
               </p>
             </div>
           </div>

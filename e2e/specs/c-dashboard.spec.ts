@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '../fixtures/test';
 import { tr } from '../fixtures/i18n';
 import { bookingId, displayName, ids, mentorCalLink } from '../fixtures/personas';
+import { recordToasts } from '../fixtures/toasts';
 import { TINY_PNG, expectNoDemo, plain, reseed, runsOn, toast, tokenSettle } from './c-helpers';
 
 /**
@@ -99,6 +100,9 @@ test('S9 mentor accepts, declines, cancels and completes on /dashboard/bookings;
 
   await loginAs('mentor');
   await tokenSettle(page);
+  // Every toast is recorded as it appears, so the negative checks below can see one that
+  // already disappeared (an auto-retrying toHaveCount(0) would wait a 6 s toast out, R1-54).
+  const toasts = await recordToasts(page);
   await page.goto('/dashboard/bookings');
   await expect(page.getByTestId(`booking-row-${pending1}`)).toBeVisible();
 
@@ -111,7 +115,7 @@ test('S9 mentor accepts, declines, cancels and completes on /dashboard/bookings;
   });
   await page.getByTestId(`button-accept-${pending1}`).click();
   await page.waitForTimeout(1_000);
-  await expect(toast(page, tr(lang, 'showcase.bookings.toast.accepted'))).toHaveCount(0);
+  expect(await toasts.seen(tr(lang, 'showcase.bookings.toast.accepted')), 'no success toast while the write is still pending').toBe(false);
   expect((await bookingRow(db, pending1)).status).toBe('pending');
   release();
   await expect(toast(page, tr(lang, 'showcase.bookings.toast.accepted'))).toBeVisible();
@@ -135,12 +139,13 @@ test('S9 mentor accepts, declines, cancels and completes on /dashboard/bookings;
   await expect.poll(async () => (await bookingRow(db, pending2)).status).toBe('rejected');
   expect((await activityFor(db, pending2)).map((e) => e.type)).toEqual(['request_declined']);
 
-  // An aborted PATCH: the error toast, the row unchanged, no activity.
+  // An aborted PATCH: the error toast, the row unchanged, no activity, and never a success toast.
   await page.getByTestId('tab-requests').click();
   await page.route('**/rest/v1/bookings?**', (route) => (route.request().method() === 'PATCH' ? route.abort() : route.continue()));
+  await toasts.clear();
   await page.getByTestId(`button-accept-${pending3}`).click();
   await expect(toast(page, tr(lang, 'showcase.bookings.toast.error'))).toBeVisible();
-  await expect(toast(page, tr(lang, 'showcase.bookings.toast.accepted'))).toHaveCount(0);
+  expect(await toasts.seen(tr(lang, 'showcase.bookings.toast.accepted')), 'no success toast for a failed write').toBe(false);
   await page.unroute('**/rest/v1/bookings?**');
   expect((await bookingRow(db, pending3)).status).toBe('pending');
   expect(await activityFor(db, pending3)).toEqual([]);
