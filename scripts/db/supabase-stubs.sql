@@ -6,7 +6,7 @@
 -- none of the per-database Supabase schemas. This file installs the parts the
 -- repo's SQL relies on, with the same behaviour as the real ones:
 --   auth.uid() / auth.jwt() / auth.role() / auth.email()   (copied verbatim)
---   auth.users (id, email)                                  (shape subset)
+--   auth.users (id, email, encrypted_password)              (shape subset)
 --   storage.buckets / storage.objects                      (columns v2 uses)
 --   extensions schema with pgcrypto and uuid-ossp
 --   the public-schema default privileges Supabase ships with
@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS auth.users (
   id    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text
 );
+-- Supabase's column type; migrations/0002 guards it with a trigger (an Amazon account has no password).
+ALTER TABLE auth.users ADD COLUMN IF NOT EXISTS encrypted_password varchar(255);
 
 CREATE SCHEMA IF NOT EXISTS storage;
 GRANT USAGE ON SCHEMA storage TO anon, authenticated, service_role;

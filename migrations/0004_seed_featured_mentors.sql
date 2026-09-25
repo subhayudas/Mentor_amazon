@@ -12,9 +12,14 @@
 -- client/src/data/featuredMentors.ts (dbId), and tests/featured-ids.test.ts checks both.
 -- Values are copied verbatim from featuredMentors.ts.
 --
--- Prerequisite: migrations/0002_production_readiness.sql. Safe any time after it, idempotent:
--- ON CONFLICT (id) DO NOTHING, so a re-run never overwrites an admin's later edits
--- (for example is_available = false). One transaction.
+-- Prerequisites: migrations/0002_production_readiness.sql AND migrations/0003_restrict_legacy_writes.sql,
+-- so run it only after the new client is deployed (PR step 4 or later). With the pre-release
+-- client still live, its anonymous request path would address the .invalid placeholder and no
+-- admin would hear of the request; the new path (/api/requests) notifies every admin. The file
+-- refuses to run before 0003. Idempotent: ON CONFLICT (id) DO NOTHING, so a re-run never
+-- overwrites an admin's later edits (for example is_available = false). One transaction.
+-- Its first run refuses to seed while any row already holds one of these ids: such a row was not
+-- written by the programme (0002 reserves the ids; before 0002 any approved mentor could take one).
 --
 -- To hand a profile to the real person later (with their consent), update that row's email
 -- to their sign-in address, set managed_by_programme = false and let them add a Cal.com link.
@@ -23,11 +28,27 @@
 BEGIN;
 
 DO $$
+DECLARE
+  v_held text;
 BEGIN
-  IF to_regclass('public.mc_settings') IS NULL OR NOT EXISTS (
+  IF to_regclass('public.mc_settings') IS NULL OR to_regclass('public.reserved_mentor_ids') IS NULL OR NOT EXISTS (
        SELECT 1 FROM information_schema.columns
        WHERE table_schema = 'public' AND table_name = 'mentors' AND column_name = 'managed_by_programme') THEN
     RAISE EXCEPTION '0004 preconditions failed: run migrations/0002_production_readiness.sql first';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0003_restrict_legacy_writes') THEN
+    RAISE EXCEPTION '0004 preconditions failed: run migrations/0003_restrict_legacy_writes.sql first (after the new client is deployed)';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0004_seed_featured_mentors') THEN
+    SELECT string_agg(format('%s (%s, %s)', m.id, m.email,
+                             CASE WHEN m.managed_by_programme THEN 'programme-managed' ELSE 'not programme-managed' END),
+                      ', ' ORDER BY m.id)
+      INTO v_held
+    FROM public.mentors m JOIN public.reserved_mentor_ids r ON r.id = m.id;
+    IF v_held IS NOT NULL THEN
+      RAISE EXCEPTION '0004 pre-check failed: featured-mentor ids are already used by rows this file did not write: %', v_held
+        USING HINT = 'Someone created them before migrations/0002 reserved the ids. Delete those rows, then run the file again.';
+    END IF;
   END IF;
   -- Self-check of the id literals below whenever uuid-ossp is installed (Supabase default).
   IF to_regprocedure('extensions.uuid_generate_v5(uuid,text)') IS NOT NULL THEN

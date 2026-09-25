@@ -35,14 +35,36 @@ export interface ScratchDb {
   drop(): Promise<void>;
 }
 
+/** Scratch databases are named mc_scratch_<unix seconds>_<random>; older than this, one is debris. */
+export const SCRATCH_TTL_SECONDS = 2 * 60 * 60;
+const SCRATCH_NAME = /^mc_scratch_(\d{10})_[0-9a-f]+$/;
+
+/**
+ * Drop scratch databases that a crashed or killed run left behind (afterEach/afterAll never ran).
+ * Only timestamped names older than SCRATCH_TTL_SECONDS: a younger one may belong to a run still
+ * in progress in another checkout. Returns the names dropped.
+ */
+export async function sweepStaleScratchDbs(admin: Sql, nowSeconds = Math.floor(Date.now() / 1000)): Promise<string[]> {
+  const rows = await admin<{ datname: string }[]>`select datname from pg_database where datname ~ '^mc_scratch_'`;
+  const stale = rows
+    .map((r) => r.datname)
+    .filter((name) => {
+      const m = SCRATCH_NAME.exec(name);
+      return m !== null && nowSeconds - Number(m[1]) > SCRATCH_TTL_SECONDS;
+    });
+  for (const name of stale) await admin.unsafe(`drop database if exists ${name} with (force)`);
+  return stale;
+}
+
 /**
  * A throwaway database on the local server with Supabase's auth/storage/extensions stand-ins
  * (scripts/db/supabase-stubs.sql) and, unless `push: false`, the drizzle base schema, so the
- * migration suites never touch the shared database.
+ * migration suites never touch the shared database. Creating one first sweeps stale ones.
  */
 export async function createScratchDb(opts: { push?: boolean } = {}): Promise<ScratchDb> {
-  const name = `mc_scratch_${randomBytes(5).toString('hex')}`;
+  const name = `mc_scratch_${Math.floor(Date.now() / 1000)}_${randomBytes(5).toString('hex')}`;
   const admin = connect(TEST_DB_URL, 1);
+  await sweepStaleScratchDbs(admin);
   await admin.unsafe(`create database ${name}`);
   await admin.end();
   const url = new URL(TEST_DB_URL);

@@ -56,9 +56,64 @@ describe('mirrored SQL', () => {
     expect(m0003).toMatch(/REVOKE INSERT ON public\.bookings FROM authenticated/);
   });
 
-  it('the 0002 events insert policy is the tightened one in both files', () => {
-    const tightened = /with check \(public\.is_admin\(\) or \(actor_id = any \(public\.my_profile_ids\(\)\) and visible_to <@ public\.my_profile_ids\(\)\)\)/i;
-    expect(phase2).toMatch(tightened);
-    expect(m0002).toMatch(tightened);
+  it('the 0002 events insert policy is the tightened one in both files: own feed only, with size limits (R1-12)', () => {
+    const policy = (sql: string) => {
+      const start = sql.search(/create policy "events: append as self"/i);
+      return sql.slice(start, sql.indexOf(';', start)).replace(/\s+/g, ' ').toLowerCase();
+    };
+    expect(policy(phase2)).toBe(policy(m0002));
+    const tightened = /with check \(\(public\.is_admin\(\) or \(actor_id = any \(public\.my_profile_ids\(\)\) and visible_to <@ public\.my_profile_ids\(\)\)\)/;
+    expect(policy(m0002)).toMatch(tightened);
+    expect(policy(m0002)).toMatch(/and length\(summary\) <= 500 and length\(type\) <= 64 and length\(coalesce\(actor_name, ''\)\) <= 200 and pg_column_size\(meta\) <= 8192\)$/);
+  });
+
+  // Objects both supabase_setup_v2.sql and 0002 define: a v2 re-run must never revert a fix.
+  const definition = (sql: string, name: string) => {
+    const s0 = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}(`);
+    if (s0 < 0) throw new Error(`public.${name} not found`);
+    return sql.slice(s0, sql.indexOf('END $$;', s0) + 'END $$;'.length);
+  };
+  it.each([
+    ['guard_users_role_columns', 'profile_id may only name your own profile (R1-07)'],
+    ['block_sso_password_change', 'an Amazon account cannot set a password (R1-37)'],
+    ['guard_mentor_derived_columns', 'reserved ids and admin-only identity columns (R1-09)'],
+    ['guard_profile_id_namespace', 'mentor and mentee ids never collide (R1-07)'],
+    ['notify_booking_event', 'programme-managed fan-out, dashboard link (R1-19, R1-23)'],
+    ['get_or_create_mentee', 'a registered address stays with its account (R1-08)'],
+  ])('supabase_setup_v2.sql and 0002 carry the same %s (%s)', (name) => {
+    expect(definition(v2, name)).toBe(definition(m0002, name));
+  });
+
+  it('the storage policies are identical in supabase_setup_v2.sql and 0002, with no public list policy (R1-11)', () => {
+    const policies = (sql: string) => {
+      const s0 = sql.indexOf('DROP POLICY IF EXISTS "Authenticated users can upload files" ON storage.objects;');
+      const end = sql.indexOf(';', sql.indexOf('CREATE POLICY "Users can delete their own files"', s0)) + 1;
+      return sql.slice(s0, end);
+    };
+    expect(policies(m0002)).toBe(policies(v2));
+    expect(policies(v2)).not.toMatch(/FOR SELECT TO public/);
+    expect(policies(v2)).toMatch(/split_part\(name, '\/', 2\) = auth\.uid\(\)::text/);
+  });
+
+  it('the reserved mentor ids are the five featured ids of 0004, in both v2 and 0002 (R1-09)', () => {
+    const uuids = (text: string) => (text.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/g) ?? []).sort();
+    const reserved = (sql: string) => {
+      const s0 = sql.indexOf('INSERT INTO public.reserved_mentor_ids');
+      return sql.slice(s0, sql.indexOf(';', s0));
+    };
+    const seed = read('migrations/0004_seed_featured_mentors.sql');
+    const seeded = [...new Set(uuids(seed.slice(seed.indexOf('INSERT INTO public.mentors'))))];
+    expect(seeded).toHaveLength(5);
+    expect(uuids(reserved(v2))).toEqual(seeded);
+    expect(uuids(reserved(m0002))).toEqual(seeded);
+  });
+
+  it('0002 says what it tightens and lists its preconditions readably (R1-32, R1-27)', () => {
+    const header = m0002.slice(0, m0002.indexOf('BEGIN;'));
+    expect(header).not.toMatch(/only ADDS/);
+    expect(header).toMatch(/It is not purely additive/);
+    expect(header).toMatch(/image\/heic/);
+    expect(header).toMatch(/Keep the time between this file and 0003 short/);
+    expect(m0002).not.toMatch(/v_problems := v_problems \|\|/);
   });
 });

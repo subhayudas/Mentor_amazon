@@ -13,12 +13,32 @@
 --   * The `uploads` storage bucket with size and MIME limits.
 --
 -- Expand / contract
---   This file only ADDS. After it runs, the client that is live today (origin/main a4f3fbd) keeps
---   working unchanged: anonymous get_or_create_mentee + direct bookings insert +
+--   Expand-safe for the client that is live today (origin/main a4f3fbd): after this file it keeps
+--   working: anonymous get_or_create_mentee + direct bookings insert +
 --   notify_booking_event('booking_request'), the client-side confirm that writes scheduled_at /
 --   cal_event_uri / status, rating on past sessions, and every other path. The restrictions
 --   that would break it live in migrations/0003_restrict_legacy_writes.sql, which runs only
---   AFTER the new client is deployed.
+--   AFTER the new client is deployed. Keep the time between this file and 0003 short (the same
+--   day): until 0003 the legacy anonymous write paths stay open.
+--   It is not purely additive. For the live client it also tightens, without breaking a path it
+--   uses:
+--     * the `uploads` bucket: 5 MB and image/jpeg, png, webp, gif only (an image/heic or
+--       image/avif upload from the live client now fails); no public list API; profiles/<uid>/
+--       uploads only into the uploader's own folder;
+--     * users rows: profile_id may only name a profile under the caller's own email, is_verified
+--       is set by the SSO bridge or an admin (§3a); an Amazon account cannot set a password, and
+--       any password one set before is replaced by a random one nobody knows (§3a);
+--     * mentors rows: the five featured ids are reserved, and id, email and managed_by_programme
+--       are set by an admin (§6);
+--     * bookings: parties cannot write cal_status, cal_requested_start, canceled_by or
+--       cal_verified_uid; ratings need a confirmed or completed session (§7); status, rating,
+--       cal_status and canceled_by CHECKs and a unique Cal.com uid (§5);
+--     * get_or_create_mentee no longer returns the profile of an address that has an account to
+--       anyone but that account (§9);
+--     * activity_events inserts: only into the caller's own feed, with size limits (§3);
+--       booking_notes and mentor_tasks get size limits; notification rows are read-only for
+--       their recipient except is_read (§13);
+--     * mentors_public and mentor_scheduling_links are read-only views (§6).
 --
 -- Prerequisites
 --   supabase_setup_v2.sql (and supabase_phase2.sql, although this file repairs or creates the
@@ -43,22 +63,31 @@ DO $$
 DECLARE
   v_problems text[] := '{}';
 BEGIN
+  -- array_append, not `||`: text[] || 'literal' reads the literal as an array and fails with
+  -- "malformed array literal" instead of printing the message.
   IF to_regprocedure('public.is_privileged()') IS NULL THEN
-    v_problems := v_problems || 'public.is_privileged() is missing: run supabase_setup_v2.sql first';
+    v_problems := array_append(v_problems, 'public.is_privileged() is missing: run supabase_setup_v2.sql first');
   END IF;
   IF to_regclass('public.approved_users') IS NULL THEN
-    v_problems := v_problems || 'public.approved_users is missing: run supabase_setup_v2.sql first';
+    v_problems := array_append(v_problems, 'public.approved_users is missing: run supabase_setup_v2.sql first');
   END IF;
   IF (SELECT data_type FROM information_schema.columns
       WHERE table_schema = 'public' AND table_name = 'mentors' AND column_name = 'id') IS DISTINCT FROM 'character varying' THEN
-    v_problems := v_problems || 'public.mentors.id must be character varying (the drizzle schema in shared/schema.ts)';
+    v_problems := array_append(v_problems, 'public.mentors.id must be character varying (the drizzle schema in shared/schema.ts)');
   END IF;
   IF to_regnamespace('extensions') IS NULL
      OR NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto' AND extnamespace = 'extensions'::regnamespace) THEN
-    v_problems := v_problems || 'the pgcrypto extension must be installed in schema "extensions" (Supabase default)';
+    v_problems := array_append(v_problems, 'the pgcrypto extension must be installed in schema "extensions" (Supabase default)');
   END IF;
   IF to_regclass('storage.buckets') IS NULL THEN
-    v_problems := v_problems || 'storage.buckets is missing: this file targets a Supabase database';
+    v_problems := array_append(v_problems, 'storage.buckets is missing: this file targets a Supabase database');
+  END IF;
+  IF to_regclass('auth.users') IS NULL
+     OR NOT EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_schema = 'auth' AND table_name = 'users' AND column_name = 'encrypted_password') THEN
+    v_problems := array_append(v_problems, 'auth.users.encrypted_password is missing: this file targets a Supabase database');
+  ELSIF NOT (has_table_privilege('auth.users', 'TRIGGER') AND has_table_privilege('auth.users', 'UPDATE')) THEN
+    v_problems := array_append(v_problems, 'the role running this file needs the TRIGGER and UPDATE privileges on auth.users (run it as postgres in the SQL editor)');
   END IF;
   IF cardinality(v_problems) > 0 THEN
     RAISE EXCEPTION '0002 preconditions failed: %', array_to_string(v_problems, '; ');
@@ -210,6 +239,10 @@ ALTER TABLE public.cal_webhook_events ADD COLUMN IF NOT EXISTS mentor_id varchar
 ALTER TABLE public.cal_webhook_events ADD COLUMN IF NOT EXISTS payload_sha256 text;
 ALTER TABLE public.cal_webhook_events ADD COLUMN IF NOT EXISTS booking_id varchar;
 ALTER TABLE public.cal_webhook_events ADD COLUMN IF NOT EXISTS processed_at timestamptz DEFAULT now();
+-- A RESCHEDULED, CANCELLED or REJECTED delivery that matched nothing because it overtook the
+-- delivery it follows is parked here (its arguments) and replayed by cal_apply_event (§11) once a
+-- booking takes the uid it names.
+ALTER TABLE public.cal_webhook_events ADD COLUMN IF NOT EXISTS parked jsonb;
 CREATE INDEX IF NOT EXISTS cal_webhook_events_mentor_idx ON public.cal_webhook_events (mentor_id, received_at DESC);
 
 
@@ -226,16 +259,22 @@ $$;
 GRANT EXECUTE ON FUNCTION public.is_admin() TO anon, authenticated, service_role;
 
 -- Mentor and mentee rows under the caller's email, plus the profile an admin linked to the
--- account (users.profile_id). Same body as supabase_phase2.sql.
+-- account (users.profile_id). Same body as supabase_phase2.sql. An own-address row whose id the
+-- other table also holds under another address counts for nobody (fails closed): the id cannot say
+-- which of the two it names, and guard_profile_id_namespace (§6) stops new collisions (R1-07).
 CREATE OR REPLACE FUNCTION public.my_profile_ids()
 RETURNS text[] LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   select coalesce(array_agg(distinct p.id), '{}'::text[])
   from (
     select m.id::text as id from public.mentors m
       where public.current_email() is not null and lower(m.email) = public.current_email()
+        and not exists (select 1 from public.mentees x
+                        where x.id = m.id and lower(x.email) is distinct from public.current_email())
     union all
     select me.id::text from public.mentees me
       where public.current_email() is not null and lower(me.email) = public.current_email()
+        and not exists (select 1 from public.mentors x
+                        where x.id = me.id and lower(x.email) is distinct from public.current_email())
     union all
     select u.profile_id::text from public.users u
       where auth.uid() is not null and u.id = auth.uid()::text and u.profile_id is not null
@@ -247,17 +286,96 @@ REVOKE ALL ON FUNCTION public.my_profile_ids() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.my_profile_ids() TO anon, authenticated, service_role;
 
 -- Phase-2 policies (favourites unchanged; the events insert policy is tightened: a user can
--- only post into their own feed, visible only to themselves).
+-- only post into their own feed, visible only to themselves, with bounded text; the booking
+-- trigger in §8 writes its rows past RLS). Same policies as supabase_phase2.sql.
 CREATE POLICY "favorites: own rows" ON public.mentee_favorites
   FOR ALL
   USING (mentee_id IN (SELECT id FROM public.mentees WHERE lower(email) = lower(auth.jwt() ->> 'email')))
   WITH CHECK (mentee_id IN (SELECT id FROM public.mentees WHERE lower(email) = lower(auth.jwt() ->> 'email')));
 CREATE POLICY "events: append as self" ON public.activity_events
   FOR INSERT
-  WITH CHECK (public.is_admin() OR (actor_id = ANY (public.my_profile_ids()) AND visible_to <@ public.my_profile_ids()));
+  WITH CHECK ((public.is_admin() OR (actor_id = ANY (public.my_profile_ids()) AND visible_to <@ public.my_profile_ids()))
+              AND length(summary) <= 500 AND length(type) <= 64 AND length(coalesce(actor_name, '')) <= 200
+              AND pg_column_size(meta) <= 8192);
 CREATE POLICY "events: read mine" ON public.activity_events
   FOR SELECT
   USING (visible_to && public.my_profile_ids() OR public.is_admin());
+
+
+-- =============================================================================
+-- §3a ACCOUNTS: profile links, verification, passwords (mirrored in supabase_setup_v2.sql §4)
+-- =============================================================================
+-- Identical, character for character, to supabase_setup_v2.sql §4
+-- (tests/sql-mirror.test.ts compares them).
+CREATE OR REPLACE FUNCTION public.guard_users_role_columns()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF public.is_privileged() THEN RETURN NEW; END IF;
+  IF TG_OP = 'INSERT' AND (NEW.user_type = 'admin' OR NEW.amazon_alias IS NOT NULL) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'user_type/amazon_alias are set by an admin or the SSO bridge';
+  END IF;
+  IF TG_OP = 'UPDATE' AND (NEW.user_type IS DISTINCT FROM OLD.user_type OR NEW.amazon_alias IS DISTINCT FROM OLD.amazon_alias) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'user_type/amazon_alias may only be changed by an admin';
+  END IF;
+  -- email is the ownership key everywhere (RLS, first-admin bootstrap, SSO
+  -- linking); letting a user rewrite it would let them claim someone else's
+  -- promotion. Only admins / the service role may change it.
+  IF TG_OP = 'UPDATE' AND lower(NEW.email) IS DISTINCT FROM lower(OLD.email) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'email may only be changed by an admin';
+  END IF;
+  -- profile_id is an ownership key too: owns_profile(), owns_mentor() and my_profile_ids() trust it,
+  -- so it opens that profile's full row, its bookings and its Cal.com webhook secret. An account may
+  -- point it only at its own kind of row (a mentor at a mentors row, a mentee at a mentees row) under
+  -- its own verified email (the onboarding and registration link), or clear it; and never at an id
+  -- that any row under another address also carries (ids are one namespace across both tables, so a
+  -- self-made row reusing a mentor's public id must not open that mentor). Links to any other row are
+  -- made by an admin or the SSO bridge.
+  IF NEW.profile_id IS NOT NULL
+     AND (TG_OP = 'INSERT' OR NEW.profile_id IS DISTINCT FROM OLD.profile_id)
+     AND ((NOT EXISTS (SELECT 1 FROM public.mentors m
+                       WHERE NEW.user_type = 'mentor' AND m.id = NEW.profile_id AND lower(m.email) = public.current_email())
+           AND NOT EXISTS (SELECT 1 FROM public.mentees me
+                           WHERE NEW.user_type = 'mentee' AND me.id = NEW.profile_id AND lower(me.email) = public.current_email()))
+          OR EXISTS (SELECT 1 FROM public.mentors m
+                     WHERE m.id = NEW.profile_id AND lower(m.email) IS DISTINCT FROM public.current_email())
+          OR EXISTS (SELECT 1 FROM public.mentees me
+                     WHERE me.id = NEW.profile_id AND lower(me.email) IS DISTINCT FROM public.current_email())) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'profile_id may only name your own profile';
+  END IF;
+  -- is_verified records that the SSO bridge or an admin vouched for the account.
+  IF TG_OP = 'INSERT' THEN
+    NEW.is_verified := false;
+  ELSIF NEW.is_verified IS DISTINCT FROM OLD.is_verified THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'is_verified is set by the SSO bridge or an admin';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS users_guard_role_columns ON public.users;
+CREATE TRIGGER users_guard_role_columns BEFORE INSERT OR UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.guard_users_role_columns();
+
+-- An Amazon account has no password (AUTH-02, enforced by the database; supabase_setup_v2.sql §4).
+CREATE OR REPLACE FUNCTION public.block_sso_password_change()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NEW.encrypted_password IS DISTINCT FROM OLD.encrypted_password
+     AND EXISTS (SELECT 1 FROM public.users u WHERE u.id = NEW.id::text AND u.amazon_alias IS NOT NULL) THEN
+    RAISE EXCEPTION 'sso_account_has_no_password' USING ERRCODE = '42501',
+      DETAIL = 'an account that signs in with Amazon cannot set a password';
+  END IF;
+  RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION public.block_sso_password_change() FROM PUBLIC, anon, authenticated, service_role;
+DROP TRIGGER IF EXISTS auth_users_block_sso_password ON auth.users;
+-- Until this trigger existed any Amazon session could give itself a password (updateUser). Every
+-- Amazon account gets a new random password nobody knows, as the SSO bridge's rotateAuthPassword
+-- does when it links a legacy account, so a password set that way stops working too. (A random
+-- 256-bit secret: the bcrypt cost adds nothing but time inside this transaction.)
+UPDATE auth.users a
+SET encrypted_password = extensions.crypt(encode(extensions.gen_random_bytes(32), 'hex'), extensions.gen_salt('bf'))
+WHERE EXISTS (SELECT 1 FROM public.users u WHERE u.id = a.id::text AND u.amazon_alias IS NOT NULL);
+CREATE TRIGGER auth_users_block_sso_password BEFORE UPDATE OF encrypted_password ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.block_sso_password_change();
 
 
 -- =============================================================================
@@ -373,6 +491,102 @@ CREATE UNIQUE INDEX IF NOT EXISTS bookings_cal_event_uri_unique ON public.bookin
 -- §6 MENTORS: programme-managed rows (the featured five, migrations/0004)
 -- =============================================================================
 ALTER TABLE public.mentors ADD COLUMN IF NOT EXISTS managed_by_programme boolean NOT NULL DEFAULT false;
+-- Mentor ids only the programme may create (the five featured mentors, design §3.1: UUIDv5 of
+-- https://mentor-amazon.vercel.app/mentor/<slug>). Their public URLs exist before
+-- migrations/0004 seeds the rows, so nobody else may take them first (guard below). Same rows
+-- as supabase_setup_v2.sql §1; RLS on, no policies, no client privileges.
+CREATE TABLE IF NOT EXISTS public.reserved_mentor_ids (
+  id   varchar PRIMARY KEY,
+  note text NOT NULL
+);
+ALTER TABLE public.reserved_mentor_ids ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.reserved_mentor_ids FROM PUBLIC, anon, authenticated;
+INSERT INTO public.reserved_mentor_ids (id, note) VALUES
+  ('738d7465-42c6-5550-be9a-6e7ef35f52bc', 'featured: manav-gupta'),
+  ('caf1ee67-267d-591f-9842-5ae649ec2a26', 'featured: bashar-aboudaoud'),
+  ('20b28010-7bf8-5b6b-a1cc-d9435478d131', 'featured: nick-ramil'),
+  ('ec758eba-8efc-5c32-a3ee-768badd8c9c9', 'featured: levi-lewandowski'),
+  ('6afa7b6d-d098-568a-b629-2b04c6edeef1', 'featured: ghita-elidrissi')
+ON CONFLICT (id) DO NOTHING;
+
+-- average_rating / total_ratings are derived by recompute_mentor_rating();
+-- a mentor must not be able to type their own score. The row's identity is the
+-- programme's: a mentor cannot take a reserved (featured) id, rename their row,
+-- move it to another address or mark it programme-managed, and a programme-managed
+-- row is edited by admins only. Identical to supabase_setup_v2.sql §4.
+CREATE OR REPLACE FUNCTION public.guard_mentor_derived_columns()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF public.is_privileged() OR current_setting('mc.internal_write', true) = 'on' THEN RETURN NEW; END IF;
+  IF TG_OP = 'INSERT' THEN
+    IF EXISTS (SELECT 1 FROM public.reserved_mentor_ids r WHERE r.id = NEW.id) THEN
+      RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'this mentor id is reserved for the programme';
+    END IF;
+    IF NEW.managed_by_programme THEN
+      RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'managed_by_programme is set by an admin';
+    END IF;
+    NEW.average_rating := 0;
+    NEW.total_ratings := 0;
+    RETURN NEW;
+  END IF;
+  IF OLD.managed_by_programme THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'a programme-managed mentor is edited by an admin';
+  END IF;
+  IF NEW.id IS DISTINCT FROM OLD.id OR lower(NEW.email) IS DISTINCT FROM lower(OLD.email)
+     OR NEW.managed_by_programme IS DISTINCT FROM OLD.managed_by_programme THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'id, email and managed_by_programme are set by an admin';
+  END IF;
+  IF NEW.average_rating IS DISTINCT FROM OLD.average_rating OR NEW.total_ratings IS DISTINCT FROM OLD.total_ratings THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'ratings are computed from mentee feedback';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS mentors_guard_derived ON public.mentors;
+CREATE TRIGGER mentors_guard_derived BEFORE INSERT OR UPDATE ON public.mentors
+  FOR EACH ROW EXECUTE FUNCTION public.guard_mentor_derived_columns();
+-- Mentor and mentee ids are one namespace: users.profile_id, my_profile_ids() and
+-- activity_events.visible_to name a profile by id alone, without its table. So no writer (the
+-- client, anon, an admin, the service role or a trusted RPC) may give a row an id that the other
+-- table or the programme's reserved list already holds, and only an admin or the service role
+-- renames a mentees row (a mentors row's id is guarded above). Otherwise a mentees row under the
+-- caller's own address with a mentor's public id would open that mentor (R1-07).
+-- Identical to supabase_setup_v2.sql §4.
+CREATE OR REPLACE FUNCTION public.guard_profile_id_namespace()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND NEW.id IS NOT DISTINCT FROM OLD.id THEN RETURN NEW; END IF;
+  IF TG_OP = 'UPDATE' AND TG_TABLE_NAME = 'mentees' AND NOT public.is_privileged() THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'a mentee profile id is set when it is created';
+  END IF;
+  -- Two concurrent writers of the same id in different tables would each miss the other's row.
+  PERFORM pg_advisory_xact_lock(hashtext('mc_profile_id:' || NEW.id));
+  IF TG_TABLE_NAME = 'mentees'
+     AND (EXISTS (SELECT 1 FROM public.mentors m WHERE m.id = NEW.id)
+          OR EXISTS (SELECT 1 FROM public.reserved_mentor_ids r WHERE r.id = NEW.id)) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'this id belongs to a mentor profile';
+  END IF;
+  IF TG_TABLE_NAME = 'mentors' AND EXISTS (SELECT 1 FROM public.mentees me WHERE me.id = NEW.id) THEN
+    RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'this id belongs to a mentee profile';
+  END IF;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS mentees_guard_profile_id ON public.mentees;
+CREATE TRIGGER mentees_guard_profile_id BEFORE INSERT OR UPDATE OF id ON public.mentees
+  FOR EACH ROW EXECUTE FUNCTION public.guard_profile_id_namespace();
+DROP TRIGGER IF EXISTS mentors_guard_profile_id ON public.mentors;
+CREATE TRIGGER mentors_guard_profile_id BEFORE INSERT OR UPDATE OF id ON public.mentors
+  FOR EACH ROW EXECUTE FUNCTION public.guard_profile_id_namespace();
+-- Rows that collided before the guard existed count for nobody in my_profile_ids(); name them so
+-- an admin can remove the stray one (tests/integration/rls.test.ts 'profile ids').
+DO $$
+DECLARE v_ids text;
+BEGIN
+  SELECT string_agg(m.id, ', ' ORDER BY m.id) INTO v_ids
+  FROM public.mentors m JOIN public.mentees me ON me.id = m.id;
+  IF v_ids IS NOT NULL THEN
+    RAISE WARNING 'mentors and mentees rows share these ids (remove the stray row): %', v_ids;
+  END IF;
+END $$;
 -- The public directory needs the flag: handing a featured profile to the real person
 -- (managed_by_programme = false) must switch the client from the programme copy to the row.
 -- Same definition as supabase_setup_v2.sql §3, with the column appended (so REPLACE works).
@@ -400,9 +614,10 @@ GRANT SELECT ON public.mentor_scheduling_links TO authenticated, service_role;
 --   * may never write cal_status, cal_requested_start, canceled_by or cal_verified_uid (the
 --     scheduler's columns);
 --   * once mc_settings.legacy_booking_writes = 'blocked' (migrations/0003): may not write
---     scheduled_at or cal_event_uri, a mentee may not move accepted → confirmed (scheduling
+--     scheduled_at or cal_event_uri, neither party may move accepted → confirmed (scheduling
 --     goes through record_cal_booking_from_embed / the Cal.com webhook), and ratings and
---     feedback can only be left once the booking is completed.
+--     feedback can only be left once the booking is completed; before that (legacy writes
+--     allowed) they need a confirmed or completed booking.
 -- Admins, the service role and trusted RPCs (mc.internal_write = 'on', never settable through
 -- PostgREST) skip the checks. A client cancel is stamped with canceled_by; a completed session
 -- without a country takes the mentor's.
@@ -437,12 +652,14 @@ BEGIN
     END IF;
     -- Status transitions are role-bound. A mentee may only cancel (and, while legacy writes
     -- are allowed, confirm an accepted request after scheduling); accepting, rejecting and
-    -- completing is the mentor's call.
+    -- completing is the mentor's call. Once legacy writes are blocked only Cal.com sync (the
+    -- webhook and record_cal_booking_from_embed) makes a booking 'confirmed', for either side.
     IF NEW.status IS DISTINCT FROM OLD.status THEN
       IF v_mentor THEN
         IF NOT (
           (OLD.status = 'pending'   AND NEW.status IN ('accepted', 'rejected', 'canceled')) OR
-          (OLD.status = 'accepted'  AND NEW.status IN ('confirmed', 'completed', 'canceled')) OR
+          (OLD.status = 'accepted'  AND NEW.status IN ('completed', 'canceled')) OR
+          (v_legacy AND OLD.status = 'accepted' AND NEW.status = 'confirmed') OR
           (OLD.status = 'confirmed' AND NEW.status IN ('completed', 'canceled'))
         ) THEN
           RAISE EXCEPTION 'forbidden_status_transition' USING ERRCODE = '42501',
@@ -476,11 +693,17 @@ BEGIN
                              OR NEW.cal_event_uri IS DISTINCT FROM OLD.cal_event_uri)) THEN
       RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'scheduling columns are written by Cal.com sync only';
     END IF;
-    -- Ratings and feedback describe a session that took place.
-    IF NOT v_legacy AND OLD.status IS DISTINCT FROM 'completed'
-       AND (NEW.mentee_rating IS DISTINCT FROM OLD.mentee_rating OR NEW.mentee_feedback IS DISTINCT FROM OLD.mentee_feedback
-            OR NEW.mentor_rating IS DISTINCT FROM OLD.mentor_rating OR NEW.mentor_feedback IS DISTINCT FROM OLD.mentor_feedback) THEN
-      RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'ratings and feedback can be left once the session is completed';
+    -- Ratings and feedback describe a session that took place. While legacy writes are allowed
+    -- the pre-release client rates confirmed sessions whose time has passed, so a confirmed
+    -- booking still qualifies then; a pending, accepted, rejected or canceled one never does.
+    IF (NEW.mentee_rating IS DISTINCT FROM OLD.mentee_rating OR NEW.mentee_feedback IS DISTINCT FROM OLD.mentee_feedback
+        OR NEW.mentor_rating IS DISTINCT FROM OLD.mentor_rating OR NEW.mentor_feedback IS DISTINCT FROM OLD.mentor_feedback) THEN
+      IF NOT v_legacy AND OLD.status IS DISTINCT FROM 'completed' THEN
+        RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'ratings and feedback can be left once the session is completed';
+      END IF;
+      IF v_legacy AND coalesce(OLD.status, '') NOT IN ('confirmed', 'completed') THEN
+        RAISE EXCEPTION 'forbidden_column_change' USING ERRCODE = '42501', DETAIL = 'ratings and feedback need a confirmed or completed session';
+      END IF;
     END IF;
   END IF;
   IF NEW.status = 'canceled' AND OLD.status IS DISTINCT FROM 'canceled' AND NEW.canceled_by IS NULL
@@ -650,6 +873,24 @@ BEGIN
      OR EXISTS (SELECT 1 FROM public.users u WHERE u.profile_id = p_mentor_id AND lower(u.email) = v_email) THEN
     RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501', DETAIL = 'self_request';
   END IF;
+  -- An address with an account belongs to someone who can sign in. A request made for it by
+  -- anyone else (the anonymous path: the server calls this with no session) never attaches to
+  -- that person's profile, which the mentor would then read, and never creates one. The outcome
+  -- is neutral (/api/requests answers as for a created request, so it is no account oracle) and
+  -- the owner is told in their bell, at most once a day.
+  IF public.current_email() IS DISTINCT FROM v_email
+     AND EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = v_email) THEN
+    INSERT INTO public.notifications (id, recipient_email, recipient_type, type, title, message, booking_id, is_read, created_at)
+    SELECT gen_random_uuid()::text, v_email, 'mentee', 'booking_request', 'Request not sent: please sign in',
+           'A session with ' || v_mentor.name || ' was requested with your email address while signed out, so it was not sent. '
+             || 'If it was you, sign in and send the request from your account.',
+           NULL, false, v_now
+    WHERE v_email NOT LIKE '%.invalid'
+      AND NOT EXISTS (SELECT 1 FROM public.notifications n
+                      WHERE n.recipient_email = v_email AND n.booking_id IS NULL
+                        AND n.title = 'Request not sent: please sign in' AND n.created_at > v_now - interval '1 day');
+    RETURN jsonb_build_object('booking_id', NULL, 'outcome', 'sign_in_required');
+  END IF;
 
   -- One request at a time per requester: serialises mentee creation, the pending dedupe and
   -- the per-mentee limit across concurrent submissions.
@@ -737,6 +978,142 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.create_my_booking_request(text, text, text) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.create_my_booking_request(text, text, text) TO authenticated;
+
+
+-- The v2 notification writer, redefined here so a project that already ran v2 gets it (a
+-- programme-managed mentor's notices go to every admin, never to the .invalid placeholder; the
+-- accepted notice points to the dashboard, not to a raw cal.com link). CREATE OR REPLACE keeps
+-- the grants: anon keeps EXECUTE until migrations/0003. Identical to supabase_setup_v2.sql §4.
+CREATE OR REPLACE FUNCTION public.notify_booking_event(p_booking_id text, p_event text)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_b        public.bookings%ROWTYPE;
+  v_m        public.mentors%ROWTYPE;
+  v_me       public.mentees%ROWTYPE;
+  v_is_mentor boolean; v_is_mentee boolean;
+  v_to text; v_to_type text; v_type text; v_title text; v_msg text; v_id text;
+BEGIN
+  IF p_event IS NULL OR p_event NOT IN ('booking_request', 'booking_accepted', 'booking_rejected', 'booking_confirmed',
+      'booking_completed', 'booking_canceled', 'feedback_received_by_mentor', 'feedback_received_by_mentee') THEN
+    RAISE EXCEPTION 'invalid_event' USING ERRCODE = '22023';
+  END IF;
+  SELECT * INTO v_b FROM public.bookings WHERE id = p_booking_id;
+  IF NOT FOUND THEN RAISE EXCEPTION 'booking_not_found' USING ERRCODE = 'P0002'; END IF;
+  SELECT * INTO v_m FROM public.mentors WHERE id = v_b.mentor_id;
+  SELECT * INTO v_me FROM public.mentees WHERE id = v_b.mentee_id;
+  IF v_m.id IS NULL OR v_me.id IS NULL THEN RAISE EXCEPTION 'booking_parties_missing' USING ERRCODE = 'P0002'; END IF;
+
+  v_is_mentor := public.owns_mentor(v_b.mentor_id);
+  v_is_mentee := public.owns_mentee(v_b.mentee_id);
+  -- Anonymous (and unrelated signed-in) callers may only announce a request they just created.
+  IF NOT public.is_privileged() AND NOT (v_is_mentor OR v_is_mentee) THEN
+    IF p_event <> 'booking_request' OR v_b.created_at < timezone('utc', now()) - interval '10 minutes' THEN
+      RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
+    END IF;
+  END IF;
+  IF (p_event = 'booking_request'  AND v_b.status <> 'pending')
+  OR (p_event = 'booking_accepted' AND v_b.status <> 'accepted')
+  OR (p_event = 'booking_rejected' AND v_b.status <> 'rejected')
+  OR (p_event = 'booking_confirmed' AND v_b.status <> 'confirmed')
+  OR (p_event = 'booking_completed' AND v_b.status <> 'completed')
+  OR (p_event = 'booking_canceled' AND v_b.status <> 'canceled')
+  OR (p_event = 'feedback_received_by_mentor' AND v_b.mentee_rating IS NULL)
+  OR (p_event = 'feedback_received_by_mentee' AND v_b.mentor_rating IS NULL) THEN
+    RAISE EXCEPTION 'event_state_mismatch' USING ERRCODE = '22023';
+  END IF;
+
+  CASE p_event
+    WHEN 'booking_request' THEN
+      v_to := v_m.email; v_to_type := 'mentor'; v_type := 'booking_request'; v_title := 'New booking request';
+      v_msg := v_me.name || ' has requested a mentorship session with you.' || coalesce(' Goal: ' || v_b.goal, '');
+    WHEN 'booking_accepted' THEN
+      -- Scheduling happens only through the tagged embed on the dashboard (design D4): a raw
+      -- cal.com link would book without metadata[mc_booking] and bypass the embed confirm.
+      v_to := v_me.email; v_to_type := 'mentee'; v_type := 'booking_accepted'; v_title := 'Booking request accepted';
+      v_msg := v_m.name || ' has accepted your mentorship request.'
+            || CASE WHEN v_m.managed_by_programme THEN ' The programme team will email you to arrange a time.'
+                    WHEN coalesce(v_m.cal_link, '') <> '' THEN ' Choose a time from your MentorConnect dashboard.'
+                    ELSE '' END;
+    WHEN 'booking_rejected' THEN
+      v_to := v_me.email; v_to_type := 'mentee'; v_type := 'booking_rejected'; v_title := 'Booking request declined';
+      v_msg := v_m.name || ' was unable to accept your mentorship request at this time.';
+    WHEN 'booking_confirmed' THEN
+      v_to := v_m.email; v_to_type := 'mentor'; v_type := 'booking_confirmed'; v_title := 'Session scheduled';
+      v_msg := v_me.name || ' has scheduled a session with you' || coalesce(' for ' || to_char(v_b.scheduled_at, 'YYYY-MM-DD HH24:MI') || ' UTC', '') || '.';
+    WHEN 'booking_completed' THEN
+      v_to := v_me.email; v_to_type := 'mentee'; v_type := 'booking_completed'; v_title := 'Session completed';
+      v_msg := 'Your session with ' || v_m.name || ' has been marked completed. You can now leave feedback.';
+    WHEN 'booking_canceled' THEN
+      -- The other party is told: the mentee when the mentor (or an admin, for the programme) canceled.
+      IF v_is_mentor OR (NOT v_is_mentee AND v_b.canceled_by IN ('mentor', 'admin')) THEN
+        v_to := v_me.email; v_to_type := 'mentee'; v_msg := v_m.name || ' has canceled your session.';
+      ELSE
+        v_to := v_m.email; v_to_type := 'mentor'; v_msg := v_me.name || ' has canceled the session.';
+      END IF;
+      v_type := 'booking_canceled'; v_title := 'Session canceled';
+    WHEN 'feedback_received_by_mentor' THEN
+      v_to := v_m.email; v_to_type := 'mentor'; v_type := 'feedback_received'; v_title := 'New feedback received';
+      v_msg := v_me.name || ' has left you feedback and rated your session ' || v_b.mentee_rating || '/5 stars.'
+            || coalesce(' Their feedback: "' || nullif(v_b.mentee_feedback, '') || '"', '');
+    WHEN 'feedback_received_by_mentee' THEN
+      v_to := v_me.email; v_to_type := 'mentee'; v_type := 'feedback_received'; v_title := 'New feedback from your mentor';
+      v_msg := v_m.name || ' has left you feedback and rated your session ' || v_b.mentor_rating || '/5 stars.'
+            || coalesce(' Their feedback: "' || nullif(v_b.mentor_feedback, '') || '"', '');
+  END CASE;
+
+  IF v_to_type = 'mentor' AND v_m.managed_by_programme THEN
+    -- Every admin answers for a programme-managed mentor (as for the request itself).
+    WITH sent AS (
+      INSERT INTO public.notifications (id, recipient_email, recipient_type, type, title, message, booking_id, is_read, created_at)
+      SELECT gen_random_uuid()::text, lower(u.email), 'mentor', v_type,
+             v_title || ' for ' || v_m.name || ' (programme-managed)', v_msg, v_b.id, false, timezone('utc', now())
+      FROM public.users u
+      WHERE u.user_type = 'admin' AND nullif(trim(u.email), '') IS NOT NULL AND lower(u.email) NOT LIKE '%.invalid'
+        AND NOT EXISTS (SELECT 1 FROM public.notifications n
+                        WHERE n.booking_id = v_b.id AND n.type = v_type AND n.recipient_email = lower(u.email)
+                          AND n.created_at > timezone('utc', now()) - interval '5 minutes')
+      RETURNING id)
+    SELECT min(id) INTO v_id FROM sent;
+    RETURN v_id;
+  END IF;
+
+  v_to := lower(v_to);  -- session emails are lowercase; the bell filters by equality
+  IF nullif(trim(coalesce(v_to, '')), '') IS NULL OR v_to LIKE '%.invalid' THEN
+    RETURN NULL;
+  END IF;
+  SELECT id INTO v_id FROM public.notifications
+  WHERE booking_id = v_b.id AND type = v_type AND recipient_email = v_to
+    AND created_at > timezone('utc', now()) - interval '5 minutes' LIMIT 1;
+  IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+
+  v_id := gen_random_uuid()::text;
+  INSERT INTO public.notifications (id, recipient_email, recipient_type, type, title, message, booking_id, is_read, created_at)
+  VALUES (v_id, v_to, v_to_type, v_type, v_title, v_msg, v_b.id, false, timezone('utc', now()));
+  RETURN v_id;
+END $$;
+
+-- The v2 mentee lookup of the pre-release client, redefined for the same reason: the profile of
+-- an address that has an account is reached only by that account or the server (grants kept, see
+-- above). Identical to supabase_setup_v2.sql §5.
+CREATE OR REPLACE FUNCTION public.get_or_create_mentee(p_email text, p_name text)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_email text := trim(coalesce(p_email, '')); v_id text;
+BEGIN
+  IF v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' OR length(v_email) > 254 THEN
+    RAISE EXCEPTION 'invalid_email' USING ERRCODE = '22023';
+  END IF;
+  IF NOT public.is_privileged() AND lower(v_email) IS DISTINCT FROM public.current_email()
+     AND EXISTS (SELECT 1 FROM public.users u WHERE lower(u.email) = lower(v_email)) THEN
+    RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501', DETAIL = 'sign_in_required';
+  END IF;
+  SELECT id INTO v_id FROM public.mentees WHERE lower(email) = lower(v_email) LIMIT 1;
+  IF v_id IS NOT NULL THEN RETURN v_id; END IF;
+  v_id := gen_random_uuid()::text;
+  INSERT INTO public.mentees (id, name, email, user_type, timezone, languages_spoken, areas_exploring, verification_status, created_at)
+  VALUES (v_id, left(coalesce(nullif(trim(p_name), ''), split_part(v_email, '@', 1)), 120), v_email, 'individual', 'UTC',
+          ARRAY['English'], ARRAY['Career Development'], 'unverified', timezone('utc', now()));
+  RETURN v_id;
+END $$;
 
 
 -- =============================================================================
@@ -930,6 +1307,10 @@ GRANT EXECUTE ON FUNCTION public.cal_record_delivery(text, text, text, text, tex
 -- The signed delivery is authoritative: it records the uid it vouched for (cal_verified_uid),
 -- and it corrects a uid, start or status that only the mentee's browser reported through
 -- record_cal_booking_from_embed (found through metadata.mc_booking, cross-checked as usual).
+-- Deliveries can overtake each other (RESCHEDULED B→C before A→B, CANCELLED(B) before the
+-- reschedule to B, REJECTED(A) before REQUESTED(A)): a cancellation, rejection or reschedule that
+-- matches nothing is parked on its cal_webhook_events row and replayed once a booking of that
+-- mentor holds the uid it names (7 days). Parked rows end as 'replayed' or 'replay_failed'.
 CREATE OR REPLACE FUNCTION public.cal_apply_event(
   p_delivery_id text, p_mentor_id text, p_trigger text, p_uid text, p_reschedule_uid text,
   p_start timestamptz, p_end timestamptz, p_status text, p_attendee_emails text[], p_mc_booking text,
@@ -952,7 +1333,12 @@ DECLARE
   v_unverified boolean;  -- the booking's Cal.com uid came only from the browser (or is missing)
   v_outcome   text;
   v_changed   boolean := false;
-  v_notify    text;   -- 'cancelled' | 'moved' | 'time_declined'
+  v_notify    text;   -- 'cancelled' | 'moved' | 'time_declined' | 'time_confirmed' | 'time_waiting'
+  v_when      text;
+  v_replaying boolean := coalesce(current_setting('mc.cal_replay_depth', true), '') <> '';
+  v_uid_now   text;
+  v_parked    public.cal_webhook_events%ROWTYPE;
+  v_replays   int := 0;
 BEGIN
   IF NOT public.is_service_context() THEN
     RAISE EXCEPTION 'not_allowed' USING ERRCODE = '42501';
@@ -1152,7 +1538,7 @@ BEGIN
               cal_requested_start = NULL, responded_at = coalesce(responded_at, v_now)
           WHERE id = v_b.id;
           PERFORM public.notify_booking_event(v_b.id, 'booking_confirmed');
-          v_outcome := 'confirmed'; v_changed := true;
+          v_outcome := 'confirmed'; v_changed := true; v_notify := 'time_confirmed';
         END IF;
       ELSIF v_b.status = 'canceled' AND v_b.canceled_by = 'cal' AND p_reschedule_uid IS NOT NULL
             AND v_b.cal_event_uri = p_reschedule_uid AND v_b.canceled_at >= v_now - interval '7 days' THEN
@@ -1162,6 +1548,7 @@ BEGIN
           SET status = 'accepted', cal_status = 'requested', cal_requested_start = v_start, scheduled_at = NULL,
               cal_event_uri = p_uid, canceled_at = NULL, canceled_by = NULL
           WHERE id = v_b.id;
+          v_notify := 'time_waiting';   -- both were told it was cancelled; it waits for the mentor now
         ELSE
           UPDATE public.bookings
           SET status = 'confirmed', scheduled_at = v_start, cal_event_uri = p_uid, cal_status = 'accepted',
@@ -1209,6 +1596,8 @@ BEGIN
           WHERE id = v_b.id;
           PERFORM public.notify_booking_event(v_b.id, 'booking_confirmed');
           v_outcome := 'confirmed'; v_changed := true;
+          -- The mentor confirmed on Cal.com a time the mentee picked earlier: the mentee is waiting.
+          IF v_b.cal_status = 'requested' THEN v_notify := 'time_confirmed'; END IF;
         ELSIF v_b.status = 'confirmed' AND v_b.cal_event_uri = p_uid THEN
           IF v_b.scheduled_at IS DISTINCT FROM v_start THEN
             UPDATE public.bookings SET scheduled_at = v_start WHERE id = v_b.id;
@@ -1253,43 +1642,100 @@ BEGIN
     WHERE id = v_b.id AND cal_verified_uid IS DISTINCT FROM (CASE WHEN cal_event_uri = p_uid THEN p_uid END);
   END IF;
 
-  -- Neutral notifications to both parties (programme-managed placeholder addresses skipped).
+  -- Notifications to the parties (programme-managed placeholder addresses skipped): both for a
+  -- cancellation, a move or a revived session that waits for the mentor, the mentee alone for a
+  -- declined or a confirmed pick. A party whose title is NULL is not told.
   IF v_notify IS NOT NULL THEN
     SELECT * INTO v_mentee FROM public.mentees WHERE id = v_b.mentee_id;
+    v_when := to_char(v_start, 'YYYY-MM-DD HH24:MI') || ' UTC';
     INSERT INTO public.notifications (id, recipient_email, recipient_type, type, title, message, booking_id, is_read, created_at)
     SELECT gen_random_uuid()::text, lower(r.email), r.kind, r.ntype, r.title, r.message, v_b.id, false, v_now
     FROM (VALUES
       ('mentor', v_mentor.email,
-       CASE v_notify WHEN 'cancelled' THEN 'booking_canceled' ELSE 'booking_confirmed' END,
-       CASE v_notify WHEN 'cancelled' THEN 'Session cancelled on Cal.com' ELSE 'Session moved' END,
+       CASE v_notify WHEN 'cancelled' THEN 'booking_canceled' WHEN 'time_waiting' THEN 'booking_accepted' ELSE 'booking_confirmed' END,
+       CASE v_notify WHEN 'cancelled' THEN 'Session cancelled on Cal.com' WHEN 'moved' THEN 'Session moved'
+                     WHEN 'time_waiting' THEN 'New time to confirm' END,
        CASE v_notify
          WHEN 'cancelled' THEN 'Your session with ' || coalesce(v_mentee.name, 'your mentee') || ' was cancelled on Cal.com.'
                                || coalesce(' Reason: ' || v_reason, '')
-         ELSE 'Your session with ' || coalesce(v_mentee.name, 'your mentee') || ' moved to '
-              || to_char(v_start, 'YYYY-MM-DD HH24:MI') || ' UTC.' END),
+         WHEN 'moved' THEN 'Your session with ' || coalesce(v_mentee.name, 'your mentee') || ' moved to ' || v_when || '.'
+         WHEN 'time_waiting' THEN 'Your session with ' || coalesce(v_mentee.name, 'your mentee') || ' was not cancelled: it moved to '
+                                  || v_when || ' and waits for you to confirm it on Cal.com.' END),
       ('mentee', v_mentee.email,
-       CASE v_notify WHEN 'cancelled' THEN 'booking_canceled' WHEN 'moved' THEN 'booking_confirmed' ELSE 'booking_accepted' END,
+       CASE v_notify WHEN 'cancelled' THEN 'booking_canceled' WHEN 'moved' THEN 'booking_confirmed'
+                     WHEN 'time_confirmed' THEN 'booking_confirmed' ELSE 'booking_accepted' END,
        CASE v_notify WHEN 'cancelled' THEN 'Session cancelled on Cal.com' WHEN 'moved' THEN 'Session moved'
-                     ELSE 'Choose another time' END,
+                     WHEN 'time_declined' THEN 'Choose another time' WHEN 'time_confirmed' THEN 'Session confirmed'
+                     WHEN 'time_waiting' THEN 'New time waiting for confirmation' END,
        CASE v_notify
          WHEN 'cancelled' THEN 'Your session with ' || v_mentor.name || ' was cancelled on Cal.com.'
                                || coalesce(' Reason: ' || v_reason, '')
-         WHEN 'moved' THEN 'Your session with ' || v_mentor.name || ' moved to ' || to_char(v_start, 'YYYY-MM-DD HH24:MI') || ' UTC.'
-         ELSE v_mentor.name || ' could not confirm the time you picked on Cal.com. Please choose another time.' END)
+         WHEN 'moved' THEN 'Your session with ' || v_mentor.name || ' moved to ' || v_when || '.'
+         WHEN 'time_declined' THEN v_mentor.name || ' could not confirm the time you picked on Cal.com. Please choose another time.'
+         WHEN 'time_confirmed' THEN v_mentor.name || ' confirmed your session for ' || v_when || '.'
+         WHEN 'time_waiting' THEN 'Your session with ' || v_mentor.name || ' was not cancelled: it moved to ' || v_when
+                                  || ' and waits for ' || v_mentor.name || ' to confirm it on Cal.com.' END)
     ) AS r (kind, email, ntype, title, message)
-    WHERE nullif(trim(coalesce(r.email, '')), '') IS NOT NULL
-      AND lower(r.email) NOT LIKE '%.invalid'
-      AND (v_notify <> 'time_declined' OR r.kind = 'mentee');
+    WHERE r.title IS NOT NULL
+      AND nullif(trim(coalesce(r.email, '')), '') IS NOT NULL
+      AND lower(r.email) NOT LIKE '%.invalid';
   END IF;
 
   UPDATE public.cal_webhook_events
-  SET outcome = v_outcome, booking_id = v_b.id, mentor_id = coalesce(p_mentor_id, v_mentor.id), processed_at = now()
+  SET outcome = v_outcome, booking_id = v_b.id, mentor_id = coalesce(p_mentor_id, v_mentor.id), processed_at = now(),
+      -- A cancellation, rejection or reschedule that matched nothing may have overtaken the delivery
+      -- it follows: park its arguments for the replay below.
+      parked = CASE WHEN v_outcome = 'unmatched' AND NOT v_replaying AND coalesce(p_mentor_id, v_mentor.id) IS NOT NULL
+                         AND (v_trigger IN ('BOOKING_CANCELLED', 'BOOKING_REJECTED') OR p_reschedule_uid IS NOT NULL)
+                    THEN jsonb_build_object('mentor_id', p_mentor_id, 'reschedule_uid', p_reschedule_uid,
+                                            'start', p_start, 'end', p_end, 'status', p_status,
+                                            'emails', to_jsonb(coalesce(p_attendee_emails, '{}'::text[])),
+                                            'mc_booking', p_mc_booking, 'organizer', p_organizer_username,
+                                            'reason', p_reason) END
   WHERE id = p_delivery_id;
-  IF p_mentor_id IS NOT NULL THEN
+  IF p_mentor_id IS NOT NULL AND NOT v_replaying THEN
     UPDATE public.mentor_cal_webhooks
     SET last_delivery_at = now(), last_trigger = v_trigger, last_outcome = v_outcome,
         deliveries_total = deliveries_total + 1
     WHERE mentor_id = p_mentor_id;
+  END IF;
+
+  -- Replay of parked deliveries: once this booking holds a uid that a parked CANCELLED or REJECTED
+  -- names, or that a parked reschedule moved away from, those deliveries are applied in arrival
+  -- order, each as its own delivery '<id>:replay' through the same transition table, and the parked
+  -- row becomes 'replayed' ('replay_failed' if applying it raised; the delivery at hand still
+  -- stands). A replay can give the booking a new uid, so the lookup repeats, at most 5 times.
+  IF v_b.id IS NOT NULL AND NOT v_replaying THEN
+    PERFORM set_config('mc.cal_replay_depth', '1', true);
+    LOOP
+      SELECT b.cal_event_uri INTO v_uid_now FROM public.bookings b WHERE b.id = v_b.id;
+      EXIT WHEN v_uid_now IS NULL OR v_replays >= 5;
+      UPDATE public.cal_webhook_events e
+      SET outcome = 'replayed', processed_at = now()
+      WHERE e.id = (SELECT p.id FROM public.cal_webhook_events p
+                    WHERE p.outcome = 'unmatched' AND p.parked IS NOT NULL AND p.mentor_id = v_b.mentor_id
+                      AND p.received_at > now() - interval '7 days'
+                      AND ((p.trigger IN ('BOOKING_CANCELLED', 'BOOKING_REJECTED') AND p.booking_uid = v_uid_now)
+                           OR p.parked ->> 'reschedule_uid' = v_uid_now)
+                    ORDER BY p.received_at, p.id
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED)
+      RETURNING e.* INTO v_parked;
+      EXIT WHEN v_parked.id IS NULL;
+      v_replays := v_replays + 1;
+      BEGIN
+        PERFORM public.cal_apply_event(v_parked.id || ':replay', v_parked.parked ->> 'mentor_id', v_parked.trigger,
+          v_parked.booking_uid, v_parked.parked ->> 'reschedule_uid', (v_parked.parked ->> 'start')::timestamptz,
+          (v_parked.parked ->> 'end')::timestamptz, v_parked.parked ->> 'status',
+          ARRAY(SELECT jsonb_array_elements_text(coalesce(v_parked.parked -> 'emails', '[]'::jsonb))),
+          v_parked.parked ->> 'mc_booking', v_parked.parked ->> 'organizer', v_parked.parked ->> 'reason',
+          v_parked.payload_sha256);
+      EXCEPTION WHEN OTHERS THEN
+        UPDATE public.cal_webhook_events SET outcome = 'replay_failed', processed_at = now() WHERE id = v_parked.id;
+        RAISE WARNING 'cal_apply_event: replaying % failed: %', v_parked.id, SQLERRM;
+      END;
+    END LOOP;
+    PERFORM set_config('mc.cal_replay_depth', '', true);
   END IF;
   PERFORM set_config('mc.change_source', '', true);
   RETURN jsonb_build_object('outcome', v_outcome, 'booking_id', v_b.id, 'changed', v_changed);
@@ -1446,10 +1892,62 @@ SET public = EXCLUDED.public,
     file_size_limit = EXCLUDED.file_size_limit,
     allowed_mime_types = EXCLUDED.allowed_mime_types;
 
+-- Policies (identical to supabase_setup_v2.sql §6): the bucket is public, so object URLs need no
+-- policy and a SELECT policy would only open the list API (every file name, and the account ids in
+-- profiles/<uid>/ paths). Signed-in users list their own objects, admins all; profiles/ uploads
+-- go only into the uploader's own folder. The live client's flat mentors/ and mentees/ uploads
+-- (random file names) and its public URLs keep working.
+DROP POLICY IF EXISTS "Authenticated users can upload files" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view uploaded files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can view their own files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update their own files" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete their own files" ON storage.objects;
+CREATE POLICY "Authenticated users can upload files" ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'uploads'
+              AND (split_part(name, '/', 1) <> 'profiles' OR split_part(name, '/', 2) = auth.uid()::text));
+CREATE POLICY "Users can view their own files" ON storage.objects FOR SELECT TO authenticated
+  USING (bucket_id = 'uploads' AND (owner_id = auth.uid()::text OR public.is_admin()));
+CREATE POLICY "Users can update their own files" ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'uploads' AND (owner_id = auth.uid()::text OR public.is_admin()));
+CREATE POLICY "Users can delete their own files" ON storage.objects FOR DELETE TO authenticated
+  USING (bucket_id = 'uploads' AND (owner_id = auth.uid()::text OR public.is_admin()));
+
 
 -- =============================================================================
--- §13 (the featured-mentor seed is migrations/0004_seed_featured_mentors.sql, run separately)
+-- §13 SIZE LIMITS, READ-ONLY NOTIFICATIONS
 -- =============================================================================
+-- (The featured-mentor seed is migrations/0004_seed_featured_mentors.sql, run separately.)
+-- Free text the parties write is bounded far above what anyone types (the forms set no limit),
+-- so a signed-in user cannot store megabytes per row. A limit that existing rows already exceed
+-- applies to new writes only (NOT VALID) and is reported. activity_events inserts are bounded by
+-- their policy (§3).
+DO $$
+DECLARE
+  r record;
+  v_over bigint;
+BEGIN
+  FOR r IN
+    SELECT * FROM (VALUES
+      ('booking_notes', 'booking_notes_content_length', 'length(content) <= 10000'),
+      ('mentor_tasks', 'mentor_tasks_title_length', 'length(title) <= 500'),
+      ('mentor_tasks', 'mentor_tasks_description_length', 'length(description) <= 10000')
+    ) AS t (tbl, con, expr)
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I', r.tbl, r.con);
+    EXECUTE format('ALTER TABLE public.%I ADD CONSTRAINT %I CHECK (%s) NOT VALID', r.tbl, r.con, r.expr);
+    EXECUTE format('SELECT count(*) FROM public.%I WHERE NOT (%s)', r.tbl, r.expr) INTO v_over;
+    IF v_over = 0 THEN
+      EXECUTE format('ALTER TABLE public.%I VALIDATE CONSTRAINT %I', r.tbl, r.con);
+    ELSE
+      RAISE WARNING '0002: % rows of public.% break "%"; the limit applies to new writes only', v_over, r.tbl, r.expr;
+    END IF;
+  END LOOP;
+END $$;
+
+-- A recipient marks a notification read; the rest of the row (title, message, recipient, booking)
+-- is written by the database only. Same lines as supabase_setup_v2.sql §3.
+REVOKE UPDATE ON public.notifications FROM authenticated;
+GRANT UPDATE (is_read) ON public.notifications TO authenticated;
 
 
 -- =============================================================================
@@ -1469,6 +1967,7 @@ ON CONFLICT (version) DO UPDATE SET applied_at = now();
 DO $$
 DECLARE
   v_admins_without_auth text;
+  v_squatted text;
 BEGIN
   -- is_admin() is uid-based: an admin whose users.id is not their auth user id loses admin rights.
   IF to_regclass('auth.users') IS NOT NULL THEN
@@ -1477,6 +1976,15 @@ BEGIN
     WHERE u.user_type = 'admin' AND NOT EXISTS (SELECT 1 FROM auth.users a WHERE a.id::text = u.id);
     IF v_admins_without_auth IS NOT NULL THEN
       RAISE WARNING '0002: admin rows whose id is not an auth user id (they are not admins until fixed): %', v_admins_without_auth;
+    END IF;
+  END IF;
+  -- A featured id taken before this file reserved it (any approved mentor could insert one):
+  -- migrations/0004 refuses to seed until an admin deletes that row.
+  IF NOT EXISTS (SELECT 1 FROM public.schema_migrations WHERE version = '0004_seed_featured_mentors') THEN
+    SELECT string_agg(format('%s (%s)', m.id, m.email), ', ' ORDER BY m.id) INTO v_squatted
+    FROM public.mentors m JOIN public.reserved_mentor_ids r ON r.id = m.id;
+    IF v_squatted IS NOT NULL THEN
+      RAISE WARNING '0002: mentors rows already hold a reserved featured-mentor id (delete them before migrations/0004): %', v_squatted;
     END IF;
   END IF;
   RAISE NOTICE '0002 applied: % mentors (% programme-managed), % bookings, legacy client writes %',

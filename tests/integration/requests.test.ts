@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { describeDb, describeOnline } from './env.ts';
-import { Accounts, GOAL, anonClient, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, lazyClient, serviceClient } from './fixtures.ts';
+import { Accounts, GOAL, anonClient, claims, itEmail, mkBooking, mkMentee, mkMentor, mkUser, lazyClient, rand, serviceClient } from './fixtures.ts';
 import { useStackEnv } from './http.ts';
-import { asRole, asService, connect, expectPgError, withTx } from './sql.ts';
+import { asRole, asService, connect, expectPgError, withTx, type Tx } from './sql.ts';
 import { invoke, nextIp } from '../helpers/vercel.ts';
 
 /** I7 (request RPCs and privileges) and I12 (/api/requests end to end with Turnstile). */
@@ -186,6 +186,179 @@ describeDb('I7 booking request RPCs', () => {
     expect(again.data).toMatchObject({ outcome: 'already_pending' });
     const { data: mine } = await mentee.client.from('bookings').select('id, status');
     expect(mine).toEqual([{ id: (viaRpc.data as { booking_id: string }).booking_id, status: 'pending' }]);
+  });
+});
+
+describeDb('I7 requests under an address that has an account (R1-08)', () => {
+  it('the anonymous path attaches nothing to a registered account: no booking, no mentee row, a neutral outcome, one notice to the owner', async () => {
+    await withTx(sql, async (tx) => {
+      const mentor = await mkMentor(tx, { name: 'Mentor Two' });
+      const mentorSub = randomUUID();
+      await mkUser(tx, { id: mentorSub, email: mentor.email, user_type: 'mentor' });
+      const registered = await mkMentee(tx, { name: 'Private Person', linkedin_url: 'https://linkedin.com/in/private', goals: 'private goals', organization_name: 'Secret NGO' });
+      const registeredSub = randomUUID();
+      await mkUser(tx, { id: registeredSub, email: registered.email, user_type: 'mentee' });
+      // An Amazon account with no mentees row at all: no row may be created in its name either.
+      const amazonEmail = `it${rand()}@amazon.com`;
+      await mkUser(tx, { email: amazonEmail, user_type: 'mentor' });
+
+      const [{ r }] = await tx`select public.create_booking_request(${mentor.id}, ${registered.email.toUpperCase()}, 'Anyone', ${GOAL}) as r`;
+      expect(r).toEqual({ outcome: 'sign_in_required', booking_id: null });
+      const [{ r: again }] = await tx`select public.create_booking_request(${mentor.id}, ${registered.email}, 'Anyone', ${GOAL}) as r`;
+      expect(again).toEqual({ outcome: 'sign_in_required', booking_id: null });
+      const [{ r: amazon }] = await tx`select public.create_booking_request(${mentor.id}, ${amazonEmail}, 'Anyone', ${GOAL}) as r`;
+      expect(amazon).toEqual({ outcome: 'sign_in_required', booking_id: null });
+
+      const [{ n: bookings }] = await tx`select count(*)::int as n from public.bookings where mentor_id = ${mentor.id}`;
+      expect(bookings).toBe(0);
+      const [{ n: rows }] = await tx`select count(*)::int as n from public.mentees where lower(email) = ${amazonEmail}`;
+      expect(rows).toBe(0);
+      // The mentor learns nothing about the registered person; the person sees no request they never made.
+      await asRole(tx, 'authenticated', claims(mentorSub, mentor.email));
+      expect(await tx`select id from public.mentees where id = ${registered.id}`).toEqual([]);
+      await asRole(tx, 'authenticated', claims(registeredSub, registered.email));
+      expect(await tx`select id from public.bookings`).toEqual([]);
+      // The owner is told once (twice asked, one notice), in their own bell.
+      const notes = await tx<{ recipient_type: string; title: string; booking_id: string | null }[]>`
+        select recipient_type, title, booking_id from public.notifications`;
+      expect(notes).toEqual([{ recipient_type: 'mentee', title: 'Request not sent: please sign in', booking_id: null }]);
+      // Signed in, the owner sends it.
+      const [{ r: mine }] = await tx`select public.create_my_booking_request(${mentor.id}, ${GOAL}) as r`;
+      expect(mine).toMatchObject({ outcome: 'created' });
+      await asService(tx);
+      const [b] = await tx`select mentee_id from public.bookings where id = ${mine.booking_id}`;
+      expect(b.mentee_id).toBe(registered.id);
+    });
+  });
+
+  it('while the pre-release client is live, get_or_create_mentee hands a registered account\'s profile only to that account', async () => {
+    await withTx(sql, async (tx) => {
+      // The expand state (0002 without 0003): anon and signed-in callers can execute it.
+      await tx`grant execute on function public.get_or_create_mentee(text, text) to anon, authenticated`;
+      const registered = await mkMentee(tx);
+      const registeredSub = randomUUID();
+      await mkUser(tx, { id: registeredSub, email: registered.email, user_type: 'mentee' });
+      const mentor = await mkMentor(tx);
+      const mentorSub = randomUUID();
+      await mkUser(tx, { id: mentorSub, email: mentor.email, user_type: 'mentor' });
+      await asRole(tx, 'anon');
+      await expectPgError(tx, (sp) => sp`select public.get_or_create_mentee(${registered.email}, 'x')`, '42501', /not_allowed/);
+      await asRole(tx, 'authenticated', claims(mentorSub, mentor.email));
+      await expectPgError(tx, (sp) => sp`select public.get_or_create_mentee(${registered.email.toUpperCase()}, 'x')`, '42501', /not_allowed/);
+      // Unregistered addresses keep the old behaviour (design D16), and the owner gets their own id.
+      const fresh = itEmail('legacy-visitor');
+      const [{ id: freshId }] = await tx`select public.get_or_create_mentee(${fresh}, 'Visitor') as id`;
+      expect(freshId).toMatch(/^[0-9a-f-]{36}$/);
+      await asRole(tx, 'authenticated', claims(registeredSub, registered.email));
+      const [{ id: own }] = await tx`select public.get_or_create_mentee(${registered.email}, 'x') as id`;
+      expect(own).toBe(registered.id);
+      await asService(tx);
+    });
+  });
+});
+
+describeDb('I7 limits and programme-managed notices (R1-57)', () => {
+  it('the 21st request to one mentor within an hour is P0001 rate_limited, whoever sends it', async () => {
+    await withTx(sql, async (tx) => {
+      const mentor = await mkMentor(tx);
+      for (let i = 0; i < 20; i++) {
+        const [{ r }] = await tx`select public.create_booking_request(${mentor.id}, ${itEmail(`crowd${i}`)}, 'x', ${GOAL}) as r`;
+        expect(r.outcome).toBe('created');
+      }
+      await expectPgError(tx, (sp) => sp`select public.create_booking_request(${mentor.id}, ${itEmail('crowd20')}, 'x', ${GOAL})`, 'P0001', /rate_limited/);
+      const [{ n }] = await tx`select count(*)::int as n from public.bookings where mentor_id = ${mentor.id}`;
+      expect(n).toBe(20);
+    });
+  });
+
+  it('a programme-managed request never notifies an admin account whose address is a reserved .invalid one', async () => {
+    await withTx(sql, async (tx) => {
+      const mentor = await mkMentor(tx, { email: `featured.it-${randomUUID()}@mentorconnect.invalid`, managed_by_programme: true, cal_link: '' });
+      const realAdmin = `admin.real.${randomUUID()}@mentorconnect.test`;
+      const placeholderAdmin = `admin.${randomUUID()}@programme.invalid`;
+      await mkUser(tx, { email: realAdmin, user_type: 'admin' });
+      await mkUser(tx, { email: placeholderAdmin, user_type: 'admin' });
+      const [{ r }] = await tx`select public.create_booking_request(${mentor.id}, ${itEmail('featured-invalid')}, 'Lina', ${GOAL}) as r`;
+      const notes = await tx<{ recipient_email: string }[]>`select recipient_email from public.notifications where booking_id = ${r.booking_id}`;
+      expect(notes.map((x) => x.recipient_email)).toContain(realAdmin);
+      expect(notes.map((x) => x.recipient_email)).not.toContain(placeholderAdmin);
+      expect(notes.every((x) => !x.recipient_email.endsWith('.invalid'))).toBe(true);
+    });
+  });
+});
+
+describeDb('notify_booking_event routing (R1-19, R1-23)', () => {
+  async function setup(tx: Tx, mentorOver: Record<string, unknown> = {}) {
+    const mentor = await mkMentor(tx, { name: 'Mentor Mona', cal_link: 'mona/30min', ...mentorOver });
+    const mentee = await mkMentee(tx, { name: 'Omar' });
+    const mentorSub = randomUUID();
+    const menteeSub = randomUUID();
+    const adminSub = randomUUID();
+    const adminEmail = `admin.${randomUUID()}@mentorconnect.test`;
+    await mkUser(tx, { id: mentorSub, email: mentor.email, user_type: 'mentor' });
+    await mkUser(tx, { id: menteeSub, email: mentee.email, user_type: 'mentee' });
+    await mkUser(tx, { id: adminSub, email: adminEmail, user_type: 'admin' });
+    return {
+      mentor, mentee, adminEmail,
+      asMentor: () => asRole(tx, 'authenticated', claims(mentorSub, mentor.email)),
+      asMentee: () => asRole(tx, 'authenticated', claims(menteeSub, mentee.email)),
+      asAdmin: () => asRole(tx, 'authenticated', claims(adminSub, adminEmail)),
+    };
+  }
+  const notes = (tx: Tx, id: string) => tx<{ recipient_email: string; recipient_type: string; type: string; title: string; message: string }[]>`
+    select recipient_email, recipient_type, type, title, message from public.notifications where booking_id = ${id} order by recipient_email`;
+
+  it('the accepted notice sends the mentee to the dashboard, never to a raw cal.com link', async () => {
+    await withTx(sql, async (tx) => {
+      const w = await setup(tx);
+      const id = await mkBooking(tx, w.mentor.id, w.mentee.id, { status: 'accepted' });
+      await w.asMentor();
+      await tx`select public.notify_booking_event(${id}, 'booking_accepted')`;
+      await asService(tx);
+      const [n] = await notes(tx, id);
+      expect(n).toMatchObject({ recipient_email: w.mentee.email, type: 'booking_accepted' });
+      expect(n.message).toBe('Mentor Mona has accepted your mentorship request. Choose a time from your MentorConnect dashboard.');
+      expect(n.message).not.toMatch(/cal\.com/i);
+    });
+  });
+
+  it('a programme-managed mentor\'s notices go to every admin (never the placeholder); the mentee hears the programme will write', async () => {
+    await withTx(sql, async (tx) => {
+      const w = await setup(tx, { email: `featured.it-${randomUUID()}@mentorconnect.invalid`, managed_by_programme: true, cal_link: '' });
+      const withdrawn = await mkBooking(tx, w.mentor.id, w.mentee.id, { status: 'pending' });
+      await w.asMentee();
+      await tx`update public.bookings set status = 'canceled', canceled_at = now() where id = ${withdrawn}`;
+      await tx`select public.notify_booking_event(${withdrawn}, 'booking_canceled')`;
+      await asService(tx);
+      const toAdmins = await notes(tx, withdrawn);
+      const admins = await tx<{ email: string }[]>`
+        select lower(email) as email from public.users where user_type = 'admin' and lower(email) not like '%.invalid'`;
+      expect(toAdmins.map((n) => n.recipient_email).sort()).toEqual(admins.map((a) => a.email).sort());
+      expect(toAdmins.every((n) => n.title === 'Session canceled for Mentor Mona (programme-managed)' && n.recipient_type === 'mentor')).toBe(true);
+      // The admin accepts a request for the programme: the mentee hears who will arrange the time.
+      const accepted = await mkBooking(tx, w.mentor.id, w.mentee.id, { status: 'pending' });
+      await w.asAdmin();
+      await tx`update public.bookings set status = 'accepted', responded_at = now() where id = ${accepted}`;
+      await tx`select public.notify_booking_event(${accepted}, 'booking_accepted')`;
+      await asService(tx);
+      expect((await notes(tx, accepted)).map((n) => [n.recipient_email, n.message])).toEqual([
+        [w.mentee.email, 'Mentor Mona has accepted your mentorship request. The programme team will email you to arrange a time.'],
+      ]);
+    });
+  });
+
+  it('an admin cancel is announced to the mentee, not to the mentor as if the mentee had cancelled', async () => {
+    await withTx(sql, async (tx) => {
+      const w = await setup(tx);
+      const id = await mkBooking(tx, w.mentor.id, w.mentee.id, { status: 'confirmed', scheduled_at: '2026-10-20 10:00:00' });
+      await w.asAdmin();
+      await tx`update public.bookings set status = 'canceled', canceled_at = now() where id = ${id}`;
+      await tx`select public.notify_booking_event(${id}, 'booking_canceled')`;
+      await asService(tx);
+      expect((await notes(tx, id)).map((n) => [n.recipient_email, n.type, n.message])).toEqual([
+        [w.mentee.email, 'booking_canceled', 'Mentor Mona has canceled your session.'],
+      ]);
+    });
   });
 });
 

@@ -341,6 +341,143 @@ describeDb('I9 matching and safety', () => {
   });
 });
 
+describeDb('I9 deliveries out of order are parked and replayed (R1-14)', () => {
+  it('(a) RESCHEDULED B→C before RESCHEDULED A→B: the booking ends on C, as on Cal.com', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'accepted' });
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CREATED', uid: 'oooA000001', start: '2026-10-10T10:00:00Z', emails: [mentee.email], mc: id })).outcome).toBe('confirmed');
+      const early = randomUUID();
+      const bc = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'oooC000001', reschedule: 'oooB000001', start: '2026-10-12T10:00:00Z', emails: [mentee.email], mc: id, delivery: early });
+      expect(bc).toEqual({ outcome: 'unmatched', booking_id: null, changed: false });
+      const ab = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'oooB000001', reschedule: 'oooA000001', start: '2026-10-11T10:00:00Z', emails: [mentee.email], mc: id });
+      expect(ab).toEqual({ outcome: 'rescheduled', booking_id: id, changed: true });
+      expect(await booking(tx, id)).toMatchObject({ status: 'confirmed', cal_event_uri: 'oooC000001', scheduled_at: '2026-10-12 10:00:00' });
+      const events = await tx`select id, outcome, booking_id from public.cal_webhook_events where id in (${early}, ${early + ':replay'}) order by id`;
+      expect(events).toEqual([{ id: early, outcome: 'replayed', booking_id: null }, { id: `${early}:replay`, outcome: 'rescheduled', booking_id: id }]);
+      // Cal.com resending the early delivery changes nothing more.
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'oooC000001', reschedule: 'oooB000001', start: '2026-10-12T10:00:00Z', emails: [mentee.email], mc: id, delivery: early })).outcome).toBe('duplicate');
+      expect(await booking(tx, id)).toMatchObject({ cal_event_uri: 'oooC000001', scheduled_at: '2026-10-12 10:00:00' });
+    });
+  });
+
+  it('(b) CANCELLED(B) before RESCHEDULED A→B: the session ends cancelled, as on Cal.com, and nobody is left believing it moved', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: 'oooA000002', scheduled_at: '2026-10-10 10:00:00' });
+      await tx`insert into public.booking_reminders (booking_id, kind) values (${id}, '24h')`;
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CANCELLED', uid: 'oooB000002', status: 'CANCELLED', reason: 'Changed plans' })).outcome).toBe('unmatched');
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'oooB000002', reschedule: 'oooA000002', start: '2026-10-11T10:00:00Z' })).outcome).toBe('rescheduled');
+      expect(await booking(tx, id)).toMatchObject({ status: 'canceled', canceled_by: 'cal', cal_status: 'cancelled', cal_event_uri: 'oooB000002' });
+      expect(await reminders(tx, id)).toBe(0);
+      const titles = (await notes(tx, id)).map((n) => `${n.recipient_email === mentor.email ? 'mentor' : 'mentee'}: ${n.title}`).sort();
+      expect(titles).toEqual(['mentee: Session cancelled on Cal.com', 'mentee: Session moved', 'mentor: Session cancelled on Cal.com', 'mentor: Session moved']);
+    });
+  });
+
+  it('(c) REJECTED(A) before REQUESTED(A): the picked time ends rejected and the mentee is asked to choose another', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'accepted' });
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_REJECTED', uid: 'oooA000003', status: 'REJECTED' })).outcome).toBe('unmatched');
+      const req = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_REQUESTED', uid: 'oooA000003', status: 'PENDING', start: '2026-10-13T10:00:00Z', emails: [mentee.email], mc: id });
+      expect(req).toEqual({ outcome: 'requested', booking_id: id, changed: true });
+      expect(await booking(tx, id)).toMatchObject({ status: 'accepted', cal_status: 'rejected', cal_event_uri: null, cal_requested_start: null });
+      expect((await notes(tx, id)).map((n) => [n.recipient_email, n.title])).toEqual([[mentee.email, 'Choose another time']]);
+    });
+  });
+
+  it('a parked delivery is replayed once, only for the same mentor, and never after 7 days', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const other = await mkMentor(tx, { cal_link: 'other.host/30min' });
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: 'oooA000004', scheduled_at: '2026-10-10 10:00:00' });
+      // A cancellation for this uid delivered on another mentor's webhook, and a stale one.
+      const foreign = randomUUID();
+      const stale = randomUUID();
+      expect((await apply(tx, { mentor: other.id, trigger: 'BOOKING_CANCELLED', uid: 'oooB000004', status: 'CANCELLED', org: 'other.host', delivery: foreign })).outcome).toBe('unmatched');
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CANCELLED', uid: 'oooB000004', status: 'CANCELLED', delivery: stale })).outcome).toBe('unmatched');
+      await tx`update public.cal_webhook_events set received_at = now() - interval '8 days' where id = ${stale}`;
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'oooB000004', reschedule: 'oooA000004', start: '2026-10-11T10:00:00Z' })).outcome).toBe('rescheduled');
+      expect(await booking(tx, id)).toMatchObject({ status: 'confirmed', cal_event_uri: 'oooB000004' });
+      const left = await tx`select id, outcome from public.cal_webhook_events where id in (${foreign}, ${stale}) order by id`;
+      expect(left.map((e) => e.outcome)).toEqual(['unmatched', 'unmatched']);
+    });
+  });
+});
+
+describeDb('I9 notices for the mentee (R1-19) and a programme-managed mentor (R1-57)', () => {
+  it('the mentor confirming on Cal.com a time the mentee picked tells the mentee (not only the mentor)', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'accepted' });
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_REQUESTED', uid: 'ntcUid0001', status: 'PENDING', start: '2026-10-14T09:00:00Z', emails: [mentee.email], mc: id })).outcome).toBe('requested');
+      expect(await notes(tx, id)).toEqual([]);
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CREATED', uid: 'ntcUid0001', start: '2026-10-14T09:00:00Z', emails: [mentee.email] })).outcome).toBe('confirmed');
+      const got = await tx<{ recipient_email: string; type: string; title: string; message: string }[]>`
+        select recipient_email, type, title, message from public.notifications where booking_id = ${id} order by recipient_email`;
+      expect(got.map((n) => [n.recipient_email === mentor.email ? 'mentor' : 'mentee', n.type, n.title]).sort()).toEqual([
+        ['mentee', 'booking_confirmed', 'Session confirmed'],
+        ['mentor', 'booking_confirmed', 'Session scheduled'],
+      ]);
+      expect(got.find((n) => n.recipient_email === mentee.email)?.message).toBe('Jane Doe confirmed your session for 2026-10-14 09:00 UTC.');
+    });
+  });
+
+  it('a session revived as a new time that waits for the mentor tells both parties it was not cancelled', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: 'rvvOld0001', scheduled_at: '2026-10-10 10:00:00' });
+      expect((await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CANCELLED', uid: 'rvvOld0001', status: 'CANCELLED' })).outcome).toBe('canceled');
+      const r = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'rvvNew0001', reschedule: 'rvvOld0001', status: 'PENDING', start: '2026-10-15T10:00:00Z' });
+      expect(r).toEqual({ outcome: 'rescheduled_revived', booking_id: id, changed: true });
+      expect(await booking(tx, id)).toMatchObject({ status: 'accepted', cal_status: 'requested', cal_event_uri: 'rvvNew0001' });
+      const titles = (await notes(tx, id)).map((n) => `${n.recipient_email === mentor.email ? 'mentor' : 'mentee'}: ${n.title}`).sort();
+      expect(titles).toEqual([
+        'mentee: New time waiting for confirmation', 'mentee: Session cancelled on Cal.com',
+        'mentor: New time to confirm', 'mentor: Session cancelled on Cal.com',
+      ]);
+    });
+  });
+
+  it('CANCELLED on a programme-managed mentor\'s confirmed session notifies the mentee only (never the .invalid placeholder)', async () => {
+    await withTx(sql, async (tx) => {
+      const mentor = await mkMentor(tx, { email: `featured.it-${randomUUID()}@mentorconnect.invalid`, managed_by_programme: true, cal_link: '', name: 'Featured Mentor' });
+      const mentee = await mkMentee(tx);
+      const id = await mkBooking(tx, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: 'mgdUid0001', scheduled_at: '2026-10-10 10:00:00' });
+      const r = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CANCELLED', uid: 'mgdUid0001', status: 'CANCELLED', org: null });
+      expect(r.outcome).toBe('canceled');
+      expect((await notes(tx, id)).map((n) => [n.recipient_email, n.title])).toEqual([[mentee.email, 'Session cancelled on Cal.com']]);
+    });
+  });
+});
+
+describeDb('I9 uid collisions and the reschedule match order (R1-56)', () => {
+  it('a delivery whose uid another mentor\'s booking already holds is ambiguous: no exception, nothing written', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const other = await mkMentor(tx, { cal_link: 'someone.else/30min' });
+      const taken = await mkBooking(tx, other.id, mentee.id, { status: 'confirmed', cal_event_uri: 'colUidA001', scheduled_at: '2026-10-10 10:00:00' });
+      const b2 = await mkBooking(tx, mentor.id, mentee.id, { status: 'accepted' });
+      const r = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_CREATED', uid: 'colUidA001', emails: [mentee.email], mc: b2 });
+      expect(r).toEqual({ outcome: 'ambiguous', booking_id: b2, changed: false });
+      expect(await booking(tx, b2)).toMatchObject({ status: 'accepted', cal_event_uri: null });
+      expect(await booking(tx, taken)).toMatchObject({ status: 'confirmed', cal_event_uri: 'colUidA001' });
+    });
+  });
+
+  it('a replayed RESCHEDULED where one booking holds the old uid and another the new one picks the holder of the new uid', async () => {
+    await withTx(sql, async (tx) => {
+      const { mentor, mentee } = await world(tx);
+      const holdsOld = await mkBooking(tx, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: 'ordOld0001', scheduled_at: '2026-10-10 10:00:00' });
+      const holdsNew = await mkBooking(tx, mentor.id, mentee.id, { status: 'confirmed', cal_event_uri: 'ordNew0001', scheduled_at: '2026-10-11 10:00:00' });
+      const r = await apply(tx, { mentor: mentor.id, trigger: 'BOOKING_RESCHEDULED', uid: 'ordNew0001', reschedule: 'ordOld0001', start: '2026-10-11T10:00:00Z' });
+      expect(r).toEqual({ outcome: 'no_change', booking_id: holdsNew, changed: false });
+      expect(await booking(tx, holdsOld)).toMatchObject({ cal_event_uri: 'ordOld0001', scheduled_at: '2026-10-10 10:00:00' });
+    });
+  });
+});
+
 /**
  * Provenance (design §3.2/§3.3, extended): the uid and start of record_cal_booking_from_embed come
  * from the mentee's browser; the HMAC-verified webhook is the authority. It records the uid it
