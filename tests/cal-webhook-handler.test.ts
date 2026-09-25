@@ -247,6 +247,46 @@ describe('fail limiter', () => {
   });
 });
 
+// R1-02: Cal.com delivers every mentor's webhooks from shared egress IPs and never retries, so a
+// limit that counts deliveries before their signature is checked lets anyone with a Cal.com
+// account (a webhook pointed at any mentor id, wrong secret) get real deliveries refused.
+describe('a delivery whose signature verifies is never answered 429', () => {
+  const OTHER_MENTOR = '00000000-0000-4000-8000-000000000000';
+
+  it('even after hundreds of unverified deliveries from the same IP, for another mentor or the same one', async () => {
+    const ip = nextIp();
+    const body = created();
+    const wrong = calHeaders(body, 'd'.repeat(64));
+    for (let i = 0; i < 650; i++) {
+      const target = i % 2 === 0 ? OTHER_MENTOR : MENTOR;
+      const res = await post(`/api/webhooks/cal?mentor=${target}`, body, wrong, ip);
+      expect([401, 429]).toContain(res.statusCode);
+    }
+    const good = await post(`/api/webhooks/cal?mentor=${MENTOR}`, body, calHeaders(body, SECRET), ip);
+    expect(good.statusCode).toBe(200);
+    expect(good.json()).toEqual({ ok: true, outcome: 'confirmed' });
+  });
+
+  it('a burst of verified deliveries from one IP is never limited', async () => {
+    const ip = nextIp();
+    const statuses = new Set<number>();
+    for (let i = 0; i < 650; i++) {
+      const body = JSON.stringify(calEvent('BOOKING_CREATED', { uid: `burst-${i}`, attendees: ['mentee@example.com'] }));
+      statuses.add((await post(`/api/webhooks/cal?mentor=${MENTOR}`, body, calHeaders(body, SECRET), ip)).statusCode);
+    }
+    expect([...statuses]).toEqual([200]);
+  });
+
+  it('the global path (no ?mentor=) behaves the same', async () => {
+    process.env.CAL_WEBHOOK_SECRET = GLOBAL_SECRET;
+    const ip = nextIp();
+    const body = created();
+    for (let i = 0; i < 620; i++) await post('/api/webhooks/cal', body, calHeaders(body, 'wrong-secret-at-least-16'), ip);
+    const good = await post('/api/webhooks/cal', body, calHeaders(body, GLOBAL_SECRET), ip);
+    expect(good.statusCode).toBe(200);
+  });
+});
+
 describe('env', () => {
   it('CAL_WEBHOOK_SECRET is optional, and a set value under 16 characters is rejected', () => {
     delete process.env.CAL_WEBHOOK_SECRET;

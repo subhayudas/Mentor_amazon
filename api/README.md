@@ -199,11 +199,17 @@ the optional global secret `CAL_WEBHOOK_SECRET` (at least 16 characters;
 
 Handling, in order: `405` for anything but POST → `413` over 256 KiB → a
 malformed `?mentor=` or `x-cal-signature-256` header is `401` without touching
-the database → IP pre-limit → `503` without server env → HMAC-SHA256 of the raw
+the database → `503` without server env → HMAC-SHA256 of the raw
 body against the mentor's secret (and the previous one within its grace), or
 the global secret → the same `401 {"error":"invalid_signature"}` for an unknown
 mentor, a missing secret, `no-secret-provided` or a wrong secret (30 failures a
 minute from one IP → `429`) → `400` for invalid JSON → `200` with the outcome.
+
+Only deliveries that fail the signature check are rate-limited. Cal.com sends
+every mentor's webhooks from the same few egress IPs and never retries, so a
+limit counted before the check would let anyone with a Cal.com account (a
+webhook aimed at any mentor id, with a wrong secret) get real deliveries
+refused. A delivery whose signature verifies is never answered `429`.
 
 Every booking event is applied by the `cal_apply_event` RPC in one
 transaction: the delivery is recorded first (a replay answers `duplicate`),

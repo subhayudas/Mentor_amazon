@@ -183,8 +183,11 @@ runtime styles (known, low impact).
 * Bookings are created only `pending`, for an available mentor; `created_at`
   is stamped server-side so windows cannot be dodged.
 * Cal.com webhook: requests with a malformed signature header or mentor id are
-  refused before any database call; 600 deliveries a minute per IP, and 30
-  failed signatures a minute per IP before `429`.
+  refused before any database call; after 30 failed signatures a minute from
+  one IP, further failures get `429`. A delivery whose signature verifies is
+  never rate-limited: Cal.com shares egress IPs across all its customers and
+  does not retry, so counting deliveries before the check would let anyone's
+  failing webhooks block real ones.
 * Supabase's own API rate limits and Vercel's edge protection apply in front.
 
 ## 8. Logging
