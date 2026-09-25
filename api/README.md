@@ -268,9 +268,20 @@ secret and on Vercel). For each **confirmed** session starting within 24 hours
 (`24h`) or 1 hour (`1h`) it first claims the reminder
 (`booking_reminders`, unique per booking and kind — concurrent runs send once),
 then writes an in-app notification per party and, with `RESEND_API_KEY`, sends
-an e-mail with escaped HTML. If nothing reached anyone the claim is released
-and the next run retries. Programme-managed mentors (placeholder `.invalid`
-addresses) receive nothing. Response: `{"ok":true,"reminders":n,"emails":n,"failures":n}`.
+an e-mail with escaped HTML, all parts at once and up to five reminders at a
+time (`vercel.json` gives the function `maxDuration: 60`). If nothing reached
+anyone the claim is released and the next run retries. Programme-managed
+mentors (placeholder `.invalid` addresses) receive nothing. Response:
+`{"ok":true,"reminders":n,"emails":n,"failures":n}`.
+
+`booking_reminders.channels` holds the channel names (`{in_app,email}`) once
+every part went out. While a part is missing it holds the parts that did, e.g.
+`{mentor:in_app,mentor:email,mentee:email}`. A claim that is still empty or
+partial 15 minutes after it was made (`sent_at`) belongs to a run that died or
+to a part that failed. The next run takes it over (one run wins, through a
+conditional update on `sent_at`) and sends only what is missing. On a take-over,
+a reminder notification that is already in `notifications` counts as sent. An
+e-mail sent just before a crash can still go out twice; nothing else does.
 
 ---
 
