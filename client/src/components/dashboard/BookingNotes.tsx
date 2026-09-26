@@ -216,7 +216,8 @@ export function BookingNotes({ bookingId, authorType, authorEmail, extended = fa
                           <span aria-hidden="true">·</span>
                           <span className="inline-flex items-center gap-1">
                             <CheckSquare className="size-3.5" aria-hidden="true" />
-                            {t("dashboardV2.notes.dueOn", { date: formatDate(note.due_date, i18n.language) })}
+                            {/* A due date is a calendar day, saved as its UTC midnight: show that day in every zone. */}
+                            {t("dashboardV2.notes.dueOn", { date: formatDate(note.due_date, i18n.language, "UTC") })}
                           </span>
                         </>
                       )}

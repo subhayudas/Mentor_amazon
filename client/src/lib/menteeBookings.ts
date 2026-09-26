@@ -15,6 +15,7 @@
  * rail beside the group and the group heading never disagree.
  */
 import type { Booking, Mentor } from "@/lib/database";
+import { timestampMs } from "@/lib/timestamps";
 import { railStatesFor, type RailProgress } from "@/components/booking/requestState";
 
 export type BookingWithMentor = Booking & { mentor?: Mentor };
@@ -40,9 +41,9 @@ export interface GroupedBookings<T extends Booking> {
   past: T[];
 }
 
+/** Whether a stored timestamp (UTC wall-clock, lib/timestamps.ts) is after `now`. */
 export function isFuture(iso: string | null | undefined, now: Date = new Date()): boolean {
-  if (!iso) return false;
-  const t = new Date(iso).getTime();
+  const t = timestampMs(iso);
   return !Number.isNaN(t) && t > now.getTime();
 }
 

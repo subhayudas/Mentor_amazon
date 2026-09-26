@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MentorCard, MentorCardSkeleton } from "@/components/MentorCard";
 import { Button } from "@/components/ui/button";
 import type { PublicMentor } from "@/lib/database";
+import { directoryFields } from "@/lib/directory";
 import { cn } from "@/lib/utils";
 
 /**
@@ -15,12 +16,16 @@ import { cn } from "@/lib/utils";
  * `zeroResults` slot. Data mounts without an entrance animation — the grid
  * re-renders on every filter change, so it is a high-frequency surface (P2-5).
  *
- * Columns: the landing preview (`GRID_CLASS`) is 3-up from `xl` at the full
- * 1200px content width (≈378px cards). Next to the 256px rail the results
- * column is at most 904px, where 3-up would give 290px cards — too narrow
- * for avatar · name · status badge on one row (names clipped). So the
- * results grid (`RESULTS_GRID_CLASS`) stays 2-up from `md` (≈436px cards at
- * 1440, ≈324px at 1024). Documented deviation from the spec's `xl:grid-cols-3`.
+ * Columns: next to the 256px rail the results column is at most 904px, where
+ * 3-up would give 290px cards — too narrow for avatar · name · status badge
+ * on one row (names clipped). So the results grid (`RESULTS_GRID_CLASS`)
+ * stays 2-up from `md` (≈436px cards at 1440, ≈324px at 1024). Documented
+ * deviation from the spec's `xl:grid-cols-3`.
+ *
+ * When the directory could not be read, `useMentors` still hands over the
+ * programme's curated mentors (flagged `availabilityUnknown`, design D2): the
+ * grid then shows the error notice with its retry above those cards, so the
+ * page is never emptier than the landing and never pretends all is well.
  */
 export interface MentorGridProps {
   mentors: PublicMentor[];
@@ -35,7 +40,6 @@ export interface MentorGridProps {
   className?: string;
 }
 
-export const GRID_CLASS = "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3";
 export const RESULTS_GRID_CLASS = "grid grid-cols-1 gap-4 md:grid-cols-2";
 
 export function MentorGridSkeleton({ count = 6, className }: { count?: number; className?: string }) {
@@ -96,15 +100,36 @@ export function MentorGrid({
     );
   }
 
+  const degraded = mentors.some((mentor) => directoryFields(mentor).availabilityUnknown);
+  const notice = degraded ? (
+    <EmptyState
+      role="alert"
+      icon={CloudOff}
+      titleAs="h3"
+      title={t("discovery.error.title")}
+      description={`${t("discovery.error.body")} ${t("discovery.error.fallback")}`}
+      action={
+        <Button type="button" variant="outline" onClick={onRetry} loading={isFetching}>
+          {t("common.tryAgain")}
+        </Button>
+      }
+      className="max-w-md py-6"
+      data-testid="mentors-error"
+    />
+  ) : null;
+
   if (mentors.length === 0) return <>{zeroResults}</>;
 
   return (
-    <ul className={cn(RESULTS_GRID_CLASS, className)} aria-busy={isFetching || undefined} data-testid="mentor-grid">
-      {mentors.map((mentor) => (
-        <li key={mentor.id} className="min-w-0">
-          <MentorCard mentor={mentor} />
-        </li>
-      ))}
-    </ul>
+    <>
+      {notice}
+      <ul className={cn(RESULTS_GRID_CLASS, className)} aria-busy={isFetching || undefined} data-testid="mentor-grid">
+        {mentors.map((mentor) => (
+          <li key={mentor.id} className="min-w-0">
+            <MentorCard mentor={mentor} />
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

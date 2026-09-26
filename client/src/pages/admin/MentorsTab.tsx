@@ -40,17 +40,22 @@ import { cn } from "@/lib/utils";
 import { bidi, UNAVAILABLE } from "@/lib/format";
 import {
   ActiveBadge,
+  AdminCard,
+  AdminCardList,
+  CardField,
+  CardFields,
   DetailField,
   EmptyRow,
   LoadingRows,
   QueueError,
   SearchBox,
   errorMessage,
+  useAdminTable,
   useFormatters,
   useRowHighlight,
 } from "@/pages/admin/shared";
 
-const COLS = 7;
+const COLS = 6;
 
 function approvalFor(mentor: Mentor, approved: ApprovedUser[]): ApprovedUser | undefined {
   const email = (mentor.email ?? '').toLowerCase();
@@ -69,6 +74,7 @@ export default function MentorsTab() {
   const [deactivating, setDeactivating] = useState<Mentor | null>(null);
   const [approving, setApproving] = useState<Mentor | null>(null);
   const [alias, setAlias] = useState("");
+  const asTable = useAdminTable();
 
   const mentorsQuery = useQuery({ queryKey: adminQueryKeys.mentors, queryFn: adminService.getMentors });
   const approvedQuery = useQuery({ queryKey: adminQueryKeys.approvedUsers, queryFn: adminService.getApprovedUsers });
@@ -123,6 +129,50 @@ export default function MentorsTab() {
   const displayName = (m: Mentor) => localizedField(m, "name", i18n.language) || m.name;
   const displayPosition = (m: Mentor) => localizedField(m, "position", i18n.language) || m.position;
 
+  const identity = (mentor: Mentor) => (
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar className="size-9 shrink-0">
+        <AvatarImage src={mentor.photo_url || undefined} alt="" />
+        <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(mentor.name)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <p className="truncate font-medium text-foreground">
+          <bdi>{displayName(mentor)}</bdi>
+        </p>
+        <p className="truncate text-caption text-muted-foreground">{displayPosition(mentor) || mentor.company || UNAVAILABLE}</p>
+        <p className="truncate text-caption text-muted-foreground">
+          <bdi dir="ltr">{mentor.email}</bdi>
+        </p>
+      </div>
+    </div>
+  );
+
+  // The alias sits under the badges, truncated, so a long one never widens the column.
+  const availability = (mentor: Mentor, approval: ApprovedUser | undefined) => (
+    <div className="min-w-0 space-y-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <ActiveBadge active={mentor.is_available} activeLabel={t("admin.mentors.available")} inactiveLabel={t("admin.mentors.inactive")} />
+        {approval?.is_active && <Badge tone="info">{t("admin.mentors.ssoApproved")}</Badge>}
+      </div>
+      {approval?.is_active && (
+        <p className="max-w-[14rem] truncate font-mono text-caption text-muted-foreground" dir="ltr" title={approval.amazon_alias}>
+          {approval.amazon_alias}
+        </p>
+      )}
+    </div>
+  );
+
+  const ratingValue = (mentor: Mentor) =>
+    mentor.total_ratings ? (
+      <span className="inline-flex items-center gap-1 tabular-nums" dir="ltr">
+        <Star className="size-3.5 fill-brand-orange text-brand-orange" aria-hidden="true" />
+        {formatNumber(Number(mentor.average_rating ?? 0), i18n.language, { maximumFractionDigits: 1 })}
+        <span className="text-muted-foreground">({formatNumber(mentor.total_ratings, i18n.language)})</span>
+      </span>
+    ) : (
+      <span className="text-muted-foreground">{UNAVAILABLE}</span>
+    );
+
   const renderActions = (mentor: Mentor) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -169,17 +219,17 @@ export default function MentorsTab() {
 
       {mentorsQuery.isError ? (
         <QueueError queue={t("admin.queues.mentors")} onRetry={() => mentorsQuery.refetch()} />
-      ) : (
-      <Card className="overflow-x-auto" aria-busy={mentorsQuery.isLoading || undefined}>
+      ) : asTable ? (
+      <Card aria-busy={mentorsQuery.isLoading || undefined}>
+        {/* The email sits under the name; "Joined" shows from 1280 px so nothing is clipped at 1024. */}
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="text-start">{t("admin.mentors.colMentor")}</TableHead>
-              <TableHead className="text-start">{t("admin.colEmail")}</TableHead>
               <TableHead className="text-start">{t("admin.colCountry")}</TableHead>
               <TableHead className="text-start">{t("admin.mentors.colAvailability")}</TableHead>
               <TableHead className="text-start">{t("admin.mentors.colRating")}</TableHead>
-              <TableHead className="text-start">{t("admin.mentors.colJoined")}</TableHead>
+              <TableHead className="hidden text-start xl:table-cell">{t("admin.mentors.colJoined")}</TableHead>
               <TableHead className="w-12"><span className="sr-only">{t("admin.actions")}</span></TableHead>
             </TableRow>
           </TableHeader>
@@ -191,7 +241,6 @@ export default function MentorsTab() {
             ) : (
               mentors.map((mentor) => {
                 const approval = approvalFor(mentor, approved);
-                const rating = Number(mentor.average_rating ?? 0);
                 const rp = rowProps(mentor.id);
                 return (
                   <TableRow
@@ -202,46 +251,13 @@ export default function MentorsTab() {
                     data-testid={`row-mentor-${mentor.id}`}
                   >
                     <TableCell>
-                      <div className="flex min-w-[12rem] items-center gap-3">
-                        <Avatar className="size-9">
-                          <AvatarImage src={mentor.photo_url || undefined} alt="" />
-                          <AvatarFallback className="text-body-sm font-medium text-foreground">{initialsOf(mentor.name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-foreground">
-                            <bdi>{displayName(mentor)}</bdi>
-                          </p>
-                          <p className="truncate text-caption text-muted-foreground">{displayPosition(mentor) || mentor.company || UNAVAILABLE}</p>
-                        </div>
-                      </div>
+                      {/* Browsers ignore max-width on table cells; the inner block carries it. */}
+                      <div className="max-w-[20rem]">{identity(mentor)}</div>
                     </TableCell>
-                    <TableCell className="text-body-sm text-muted-foreground">
-                      <bdi dir="ltr">{mentor.email}</bdi>
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-body-sm">{mentor.country ? localizeCountry(mentor.country, i18n.language) : UNAVAILABLE}</TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <ActiveBadge active={mentor.is_available} activeLabel={t("admin.mentors.available")} inactiveLabel={t("admin.mentors.inactive")} />
-                        {approval?.is_active && (
-                          <Badge tone="info">
-                            {t("admin.mentors.ssoApproved")}
-                            <span dir="ltr" className="font-mono">({approval.amazon_alias})</span>
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-body-sm">
-                      {mentor.total_ratings ? (
-                        <span className="inline-flex items-center gap-1 tabular-nums" dir="ltr">
-                          <Star className="size-3.5 fill-brand-orange text-brand-orange" aria-hidden="true" />
-                          {formatNumber(rating, i18n.language, { maximumFractionDigits: 1 })}
-                          <span className="text-muted-foreground">({formatNumber(mentor.total_ratings, i18n.language)})</span>
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">{UNAVAILABLE}</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDate(mentor.created_at)}</TableCell>
+                    <TableCell className="text-body-sm">{mentor.country ? localizeCountry(mentor.country, i18n.language) : UNAVAILABLE}</TableCell>
+                    <TableCell>{availability(mentor, approval)}</TableCell>
+                    <TableCell className="text-body-sm">{ratingValue(mentor)}</TableCell>
+                    <TableCell className="hidden whitespace-nowrap text-body-sm text-muted-foreground tabular-nums xl:table-cell">{formatDate(mentor.created_at)}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{renderActions(mentor)}</TableCell>
                   </TableRow>
                 );
@@ -250,6 +266,38 @@ export default function MentorsTab() {
           </TableBody>
         </Table>
       </Card>
+      ) : (
+        <AdminCardList loading={mentorsQuery.isLoading} emptyText={search ? t("admin.noMatches") : t("admin.mentors.empty")} count={mentors.length} testId="list-mentors">
+          {mentors.map((mentor) => {
+            const approval = approvalFor(mentor, approved);
+            const rp = rowProps(mentor.id);
+            return (
+              <AdminCard key={mentor.id} {...rp} className={rp.className} data-testid={`row-mentor-${mentor.id}`}>
+                <div className="flex items-start justify-between gap-3">
+                  {identity(mentor)}
+                  {renderActions(mentor)}
+                </div>
+                <div className="mt-3">{availability(mentor, approval)}</div>
+                <CardFields className="mt-3">
+                  <CardField label={t("admin.colCountry")}>{mentor.country ? localizeCountry(mentor.country, i18n.language) : undefined}</CardField>
+                  <CardField label={t("admin.mentors.colRating")}>{ratingValue(mentor)}</CardField>
+                  <CardField label={t("admin.mentors.colJoined")}>{formatDate(mentor.created_at)}</CardField>
+                </CardFields>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-4 h-11"
+                  onClick={() => setDetail(mentor)}
+                  aria-label={t("admin.mentors.viewA11y", { name: displayName(mentor) })}
+                  data-testid={`button-view-mentor-${mentor.id}`}
+                >
+                  <Eye aria-hidden="true" />
+                  {t("admin.viewDetails")}
+                </Button>
+              </AdminCard>
+            );
+          })}
+        </AdminCardList>
       )}
 
       {/* Detail sheet */}

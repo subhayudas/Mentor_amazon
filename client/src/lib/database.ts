@@ -4,6 +4,9 @@
  */
 
 import { supabase } from './supabase';
+import { isRecordable, toEmbedRecordOutcome, type CalBookingSuccess, type EmbedRecordOutcome } from './calEvents';
+import { mapRpcError } from './requests';
+import { allowedFromStatuses, canTransition } from './bookingTransitions';
 
 // Type definitions based on the database schema
 
@@ -49,6 +52,8 @@ export interface Mentor {
   is_available: boolean;
   average_rating?: string;
   total_ratings?: number;
+  /** Curated mentor whose requests the programme admins answer (no owner account). */
+  managed_by_programme?: boolean;
   created_at: string;
   updated_at?: string;
 }
@@ -141,6 +146,12 @@ export interface Booking {
   session_duration_minutes?: number;
   /** Country the session is attributed to for reporting (defaults to the mentor's country). */
   country?: string;
+  /** State of the linked Cal.com booking, written only by the scheduler RPCs and the webhook. */
+  cal_status?: 'requested' | 'accepted' | 'rejected' | 'cancelled' | null;
+  /** Start time of a Cal.com booking awaiting the mentor's confirmation (UTC). */
+  cal_requested_start?: string | null;
+  /** Who cancelled the session. */
+  canceled_by?: 'mentor' | 'mentee' | 'admin' | 'cal' | null;
   created_at: string;
 }
 
@@ -280,7 +291,9 @@ export type ActivityType =
   | 'mentor_listed'
   | 'mentor_unlisted'
   | 'mentee_verified'
-  | 'mentee_rejected';
+  | 'mentee_rejected'
+  | 'booking_time_requested'
+  | 'booking_time_declined';
 
 /**
  * Append-only audit event (`activity_events`). Written by the app at every
@@ -342,6 +355,38 @@ function escapeLikePattern(value: string): string {
 }
 
 // Database Service Class
+/** Accept / Decline on a request someone already answered (the status is no longer `pending`). */
+export class BookingNotPendingError extends Error {
+  readonly status: Booking['status'];
+  constructor(status: Booking['status']) {
+    super('booking_not_pending');
+    this.name = 'BookingNotPendingError';
+    this.status = status;
+  }
+}
+
+export function isBookingNotPendingError(value: unknown): value is BookingNotPendingError {
+  return value instanceof BookingNotPendingError || (value as { name?: unknown } | null)?.name === 'BookingNotPendingError';
+}
+
+/**
+ * Cancel / complete on a booking that changed in the meantime (R1-16): another tab, the other
+ * party or Cal.com already moved it to a status this change cannot start from (a session the
+ * mentee cancelled, one already completed). Nothing was written and nobody was notified.
+ */
+export class BookingStateChangedError extends Error {
+  readonly status: Booking['status'];
+  constructor(status: Booking['status']) {
+    super('booking_state_changed');
+    this.name = 'BookingStateChangedError';
+    this.status = status;
+  }
+}
+
+export function isBookingStateChangedError(value: unknown): value is BookingStateChangedError {
+  return value instanceof BookingStateChangedError || (value as { name?: unknown } | null)?.name === 'BookingStateChangedError';
+}
+
 class DatabaseService {
   // ==================== MENTORS ====================
   
@@ -582,19 +627,6 @@ class DatabaseService {
     return row;
   }
 
-  /**
-   * Resolves (or creates) the mentee row for a booking request and returns only
-   * its id, via a SECURITY DEFINER RPC. Needed when the caller cannot read the
-   * row: anonymous returning requesters, or a mentor recording a session with a
-   * mentee they have no booking with yet.
-   */
-  async resolveMenteeIdForBooking(email: string, name: string): Promise<string> {
-    const { data, error } = await supabase.rpc('get_or_create_mentee', { p_email: email.trim(), p_name: name.trim() });
-    if (error) throw error;
-    if (typeof data !== 'string' || !data) throw new Error('Could not resolve mentee');
-    return data;
-  }
-
   async updateMentee(id: string, updates: Partial<Mentee>): Promise<Mentee | null> {
     const { data, error } = await supabase
       .from('mentees')
@@ -649,33 +681,43 @@ class DatabaseService {
   }
 
   /**
-   * Inserts a booking and echoes the row we sent. No RETURNING: the caller may
-   * not be a party that can SELECT it (anonymous requester, or a signed-in user
-   * requesting for another email). The database stamps created_at itself and
-   * enforces status/mentor availability/rate limits.
+   * A signed-in user's request (design §3.2 `create_my_booking_request`). The
+   * RPC always uses the caller's JWT email, never a typed one, validates the
+   * goal (20..1000) and name, applies the rate limits, dedupes a pending
+   * request from the last 7 days (`already_pending`, nothing written) and
+   * notifies the mentor, or every admin for a programme-managed mentor.
+   * Anonymous visitors go through `POST /api/requests` instead (`lib/requests.ts`).
+   * Throws a `BookingRequestError`.
    */
-  private async insertBooking(row: Booking): Promise<Booking> {
-    const { error } = await supabase.from('bookings').insert(row);
-    if (error) throw error;
-    return row;
-  }
-
-  async createBooking(booking: Omit<Booking, 'id' | 'created_at'>): Promise<Booking> {
-    const now = new Date().toISOString();
-    return this.insertBooking({ ...booking, id: generateId(), clicked_at: now, created_at: now });
-  }
-
-  async createBookingRequest(mentorId: string, menteeId: string, goal: string): Promise<Booking> {
-    const now = new Date().toISOString();
-    return this.insertBooking({
-      id: generateId(),
-      mentor_id: mentorId,
-      mentee_id: menteeId,
-      goal,
-      status: 'pending',
-      clicked_at: now,
-      created_at: now,
+  async createMyBookingRequest(mentorId: string, goal: string, name?: string): Promise<{ outcome: 'created' | 'already_pending' }> {
+    const { data, error } = await supabase.rpc('create_my_booking_request', {
+      p_mentor_id: mentorId,
+      p_goal: goal.trim(),
+      p_name: name?.trim() || null,
     });
+    if (error) throw mapRpcError(error);
+    const row = (Array.isArray(data) ? data[0] : data) as { outcome?: unknown } | null;
+    return { outcome: row?.outcome === 'already_pending' ? 'already_pending' : 'created' };
+  }
+
+  /**
+   * The mentee booked (or rescheduled) through the Cal.com embed: record it
+   * with `record_cal_booking_from_embed` (design §3.2), which locks the row,
+   * respects requires-confirmation (`PENDING` → `cal_status` requested) and
+   * writes nothing a webhook delivery already wrote (`already_recorded`).
+   * Times are UTC ISO strings (F45). Throws when Cal.com gave no uid/start.
+   */
+  async recordCalBookingFromEmbed(bookingId: string, detail: CalBookingSuccess): Promise<EmbedRecordOutcome | null> {
+    if (!isRecordable(detail)) throw new Error('cal_detail_incomplete');
+    const { data, error } = await supabase.rpc('record_cal_booking_from_embed', {
+      p_booking_id: bookingId,
+      p_uid: detail.uid,
+      p_start: detail.startTime,
+      p_status: detail.status ?? 'ACCEPTED',
+      p_reschedule_uid: detail.rescheduleUid ?? null,
+    });
+    if (error) throw error;
+    return toEmbedRecordOutcome(data);
   }
 
   async getMentorBookings(mentorId: string): Promise<Booking[]> {
@@ -777,8 +819,13 @@ class DatabaseService {
     return data || [];
   }
 
-  /** Marks a session completed with its real duration (mentor or admin only, enforced by a trigger). */
-  async completeBooking(bookingId: string, options: CompleteBookingOptions): Promise<Booking | null> {
+  /**
+   * Marks a session completed with its real duration (mentor or admin only, enforced by a
+   * trigger). Only an accepted or confirmed session matches (R1-16): a second "Mark completed"
+   * from a stale tab changes nothing and throws `BookingStateChangedError`, so the first
+   * recorded duration stands and nobody is notified twice.
+   */
+  async completeBooking(bookingId: string, options: CompleteBookingOptions): Promise<Booking> {
     const minutes = Math.round(Number(options.sessionDurationMinutes));
     if (!Number.isFinite(minutes) || minutes < 1 || minutes > 600) {
       throw new RangeError('Session duration must be between 1 and 600 minutes');
@@ -791,39 +838,17 @@ class DatabaseService {
     const country = options.country?.trim();
     if (country) update.country = country;
 
-    const { data, error } = await supabase
-      .from('bookings')
-      .update(update)
-      .eq('id', bookingId)
-      .select()
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    return this.updateBookingIfStill(bookingId, 'completed', update);
   }
 
-  /** Mentee scheduled the accepted request through Cal.com: accepted -> confirmed. */
-  async confirmBooking(bookingId: string, details: { scheduledAt?: string; calEventUri?: string } = {}): Promise<Booking | null> {
-    const updateData: Partial<Booking> = {
-      status: 'confirmed',
-      responded_at: new Date().toISOString(),
-    };
-    if (details.scheduledAt) updateData.scheduled_at = details.scheduledAt;
-    if (details.calEventUri) updateData.cal_event_uri = details.calEventUri;
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update(updateData)
-      .eq('id', bookingId)
-      .eq('status', 'accepted')
-      .select()
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
-  }
-
-  async updateBookingStatus(bookingId: string, status: string): Promise<Booking | null> {
+  /**
+   * Change a booking's status. The write is conditional on the statuses the change may start
+   * from (`lib/bookingTransitions.ts`, R1-16): a stale tab cancelling a session the mentee
+   * already cancelled, or completing one already completed, matches no row, writes nothing
+   * (canceled_at, canceled_by and the duration stay as they were) and throws
+   * `BookingStateChangedError`, so the caller never notifies anyone.
+   */
+  async updateBookingStatus(bookingId: string, status: string): Promise<Booking> {
     const now = new Date().toISOString();
     const updateData: Partial<Booking> = { status: status as Booking['status'] };
 
@@ -833,47 +858,57 @@ class DatabaseService {
       updateData.canceled_at = now;
     }
 
-    const { data, error } = await supabase
-      .from('bookings')
-      .update(updateData)
-      .eq('id', bookingId)
-      .select()
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    return this.updateBookingIfStill(bookingId, status, updateData);
   }
 
-  async acceptBooking(bookingId: string): Promise<Booking | null> {
-    const now = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('bookings')
-      .update({
-        status: 'accepted',
-        responded_at: now,
-      })
-      .eq('id', bookingId)
-      .select()
-      .single();
+  /**
+   * One conditional status write: matches the row only while it is in a status `target` may
+   * start from. A write that changed nothing is never reported as success: it throws
+   * `BookingStateChangedError` when the booking moved on, or a plain error when the row could
+   * not be written at all (RLS, missing row).
+   */
+  private async updateBookingIfStill(bookingId: string, target: string, updateData: Partial<Booking>): Promise<Booking> {
+    let query = supabase.from('bookings').update(updateData).eq('id', bookingId);
+    const from = allowedFromStatuses(target);
+    if (from) query = query.in('status', [...from]);
+    const { data, error } = await query.select().maybeSingle();
 
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    if (error) throw error;
+    if (data) return data as Booking;
+    const current = await this.getBooking(bookingId);
+    if (current && !canTransition(current.status, target)) throw new BookingStateChangedError(current.status);
+    throw new Error('booking_update_not_applied');
   }
 
-  async declineBooking(bookingId: string): Promise<Booking | null> {
-    const now = new Date().toISOString();
+  /**
+   * Answer a pending request. The write is guarded by `status = 'pending'`, so
+   * two people answering at once cannot both win: the second update matches
+   * no row. A write that changed nothing is never reported as success — it
+   * throws `BookingNotPendingError` when the request was already answered,
+   * or a plain error when the row could not be written (RLS, missing row).
+   */
+  async respondToBooking(bookingId: string, status: 'accepted' | 'rejected'): Promise<Booking> {
     const { data, error } = await supabase
       .from('bookings')
-      .update({
-        status: 'rejected',
-        responded_at: now,
-      })
+      .update({ status, responded_at: new Date().toISOString() })
       .eq('id', bookingId)
+      .eq('status', 'pending')
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') throw error;
-    return data;
+    if (error) throw error;
+    if (data) return data as Booking;
+    const current = await this.getBooking(bookingId);
+    if (current && current.status !== 'pending') throw new BookingNotPendingError(current.status);
+    throw new Error('booking_update_not_applied');
+  }
+
+  async acceptBooking(bookingId: string): Promise<Booking> {
+    return this.respondToBooking(bookingId, 'accepted');
+  }
+
+  async declineBooking(bookingId: string): Promise<Booking> {
+    return this.respondToBooking(bookingId, 'rejected');
   }
 
   async submitMenteeFeedback(bookingId: string, rating: number, feedback: string): Promise<Booking | null> {
@@ -923,45 +958,6 @@ class DatabaseService {
 
     if (error) throw error;
     return this.attachMentorsForMentee((data || []) as unknown as (Booking & { mentor?: Mentor | null })[]);
-  }
-
-  async findAndConfirmAcceptedBooking(
-    mentorId: string,
-    menteeEmail: string,
-    calEventUri?: string,
-    scheduledAt?: string
-  ): Promise<Booking | null> {
-    const mentee = await this.getMenteeByEmail(menteeEmail);
-    if (!mentee) return null;
-
-    const { data: bookings } = await supabase
-      .from('bookings')
-      .select('*')
-      .eq('mentor_id', mentorId)
-      .eq('mentee_id', mentee.id)
-      .eq('status', 'accepted')
-      .order('created_at', { ascending: false })
-      .limit(1);
-
-    if (!bookings || bookings.length === 0) return null;
-
-    const booking = bookings[0];
-    const now = new Date().toISOString();
-
-    const { data, error } = await supabase
-      .from('bookings')
-      .update({
-        status: 'confirmed',
-        cal_event_uri: calEventUri,
-        scheduled_at: scheduledAt,
-        responded_at: now,
-      })
-      .eq('id', booking.id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
   }
 
   // ==================== BOOKING NOTES ====================
@@ -1225,30 +1221,28 @@ class DatabaseService {
     return data || [];
   }
 
+  /**
+   * Replaces all of a mentor's weekly windows in ONE transaction through
+   * `set_my_availability` (design §3.2, F13): owner or admin only, at most 28
+   * slots, `start < end`, `HH:MM`. A rejected slot (22023 `invalid_slot`)
+   * leaves the previous rows intact, where the old delete-then-insert could
+   * lose every window on a failed insert.
+   */
   async setMentorAvailability(mentorId: string, slots: Omit<MentorAvailability, 'id' | 'created_at' | 'mentor_id'>[]): Promise<MentorAvailability[]> {
-    // Delete existing availability
-    await supabase
-      .from('mentor_availability')
-      .delete()
-      .eq('mentor_id', mentorId);
-
-    if (slots.length === 0) return [];
-
-    const now = new Date().toISOString();
-    const slotsWithIds = slots.map(slot => ({
-      ...slot,
-      id: generateId(),
-      mentor_id: mentorId,
-      created_at: now,
+    // The RPC accepts exactly `HH:MM` (24 h, zero-padded): "9:00" and "09:00:00" both become "09:00".
+    const hhmm = (value: string) => {
+      const [h = '', m = '00'] = String(value).trim().split(':');
+      return `${h.padStart(2, '0')}:${m.padStart(2, '0').slice(0, 2)}`;
+    };
+    const p_slots = slots.map((slot) => ({
+      day_of_week: slot.day_of_week,
+      start_time: hhmm(slot.start_time),
+      end_time: hhmm(slot.end_time),
+      is_active: slot.is_active !== false,
     }));
-
-    const { data, error } = await supabase
-      .from('mentor_availability')
-      .insert(slotsWithIds)
-      .select();
-
+    const { data, error } = await supabase.rpc('set_my_availability', { p_mentor_id: mentorId, p_slots });
     if (error) throw error;
-    return data || [];
+    return (Array.isArray(data) ? data : []) as MentorAvailability[];
   }
 
   // ==================== MENTOR EARNINGS ====================

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type LiHTMLAttributes, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { RefreshCw, Search, TriangleAlert } from "lucide-react";
@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { EmptyState } from "@/components/EmptyState";
+import { useIsDesktop } from "@/hooks/useMediaQuery";
+import { cn } from "@/lib/utils";
 import { formatDate as formatDateIntl, formatDateTime as formatDateTimeIntl, UNAVAILABLE } from "@/lib/format";
 import type { VerificationStatus } from "@/lib/database";
 
@@ -87,6 +89,76 @@ export function RoleBadge({ role }: { role: "mentor" | "admin" }) {
 }
 
 // ==================== LAYOUT PIECES ====================
+
+/**
+ * Admin lists are tables from Tailwind `lg` (1024px) up and cards below it: a phone or tablet
+ * gets every field and action of a row without scrolling a table sideways. One composition is
+ * mounted at a time (useMediaQuery), so rows keep one set of test ids and tab stops.
+ */
+export const useAdminTable = useIsDesktop;
+
+/** The card list below `lg`: loading skeletons, an empty line, or the cards. */
+export function AdminCardList({
+  loading,
+  emptyText,
+  count,
+  children,
+  testId,
+}: {
+  loading: boolean;
+  emptyText: string;
+  count: number;
+  children: ReactNode;
+  testId?: string;
+}) {
+  const { t } = useTranslation();
+  if (loading) {
+    return (
+      <div role="status" aria-busy="true" className="space-y-3">
+        <span className="sr-only">{t("common.loading")}</span>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full rounded-lg" />
+        ))}
+      </div>
+    );
+  }
+  if (count === 0) {
+    return (
+      <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-body-sm text-muted-foreground text-pretty" data-testid={testId ? `${testId}-empty` : undefined}>
+        {emptyText}
+      </p>
+    );
+  }
+  return (
+    <ul className="space-y-3" data-testid={testId}>
+      {children}
+    </ul>
+  );
+}
+
+/** One row of an admin list as a card (a list item; its controls are real buttons). */
+export function AdminCard({ className, children, ...rest }: LiHTMLAttributes<HTMLLIElement> & { [dataAttr: `data-${string}`]: string | undefined }) {
+  return (
+    <li className={cn("rounded-lg border border-border bg-card p-4 text-card-foreground", className)} {...rest}>
+      {children}
+    </li>
+  );
+}
+
+/** Label/value pairs inside an admin card: a two-column list, so every value starts on one line. */
+export function CardFields({ children, className }: { children: ReactNode; className?: string }) {
+  return <dl className={cn("grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-body-sm", className)}>{children}</dl>;
+}
+
+/** One pair of a `CardFields` list. */
+export function CardField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-foreground">{children || UNAVAILABLE}</dd>
+    </>
+  );
+}
 
 /**
  * Search input. `dir="auto"` only once there is a value (as SearchIntent

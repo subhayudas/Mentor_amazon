@@ -1,24 +1,74 @@
-import { Link, useParams } from "wouter";
+import { Link, Redirect, useParams } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, CalendarDays, CheckSquare } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckSquare, CircleAlert, UserX } from "lucide-react";
 
 import { SessionScheduler } from "@/components/booking/SessionScheduler";
-import { FEATURED_MENTORS, resolveShowcaseMentor } from "@/data/featuredMentors";
-import { TestimonialRail, pickLang } from "@/pages/FeaturedMentorProfile";
+import { ProfileSkeleton } from "@/components/profile/ProfileSkeleton";
+import { Button } from "@/components/ui/button";
+import type { PublicMentor } from "@/lib/database";
+import { IS_LOCAL } from "@/lib/demo";
+import { ROUTES } from "@/lib/routes";
+import { mentorService } from "@/lib/services";
+import { TestimonialRail, pickLang, useFeaturedPageMentor } from "@/pages/FeaturedMentorProfile";
+import { ProfileState } from "@/pages/MentorProfile";
 
 /**
- * Session page `/mentor/:id/book` (Figma "Dubai Job Hunt" page): red canvas,
- * the offer card on the inline-start (tinted header, free + duration row,
- * who it is for, what you learn, testimonials) and the design's own
- * scheduling card — day chips, time slots, timezone, Continue — filled with
- * the mentor's details. Continue records the request locally and shows the
- * confirmation; once the mentor has a Cal.com link the same slot opens it.
+ * Session page `/mentor/:id/book` (Figma "Dubai Job Hunt" page; design B3,
+ * F03/F23): red canvas, the offer card on the inline-start (tinted header,
+ * free + duration row, who it is for, what you learn) and the scheduling card.
+ *
+ * Resolver (never another mentor's page for an unknown id):
+ * - a curated mentor, by slug or database id → this page;
+ * - against the database, any other id that is a mentor → their profile
+ *   (`/mentor/:id`, which has the request dialog); unknown → not found;
+ * - in demo mode, a mentor onboarded in this browser → this page; unknown →
+ *   not found.
+ * The scheduling card is the request form against the database (see
+ * `SessionScheduler`); Cal.com's sample account is never embedded.
  */
 export default function FeaturedMentorSession() {
+  const params = useParams<{ id?: string }>();
+  const id = params.id ?? "";
+  const { base, state, retry, isFetching } = useFeaturedPageMentor(id);
+  if (!base || !state) return <NonFeaturedSession id={id} />;
+  return <SessionPage state={state} retry={retry} retrying={isFetching} />;
+}
+
+/** `/mentor/<id>/book` for an id that is not a curated mentor. */
+function NonFeaturedSession({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const isLocal = IS_LOCAL;
+  const query = useQuery<PublicMentor | null>({
+    queryKey: ["mentor", id],
+    queryFn: () => mentorService.getById(id),
+    enabled: !isLocal && id.length > 0,
+    staleTime: 5 * 60_000,
+  });
+  if (!isLocal && query.data) return <Redirect to={ROUTES.mentor(query.data.id)} replace />;
+  if (!isLocal && id && query.isError) {
+    return (
+      <ProfileState
+        icon={CircleAlert}
+        title={t("mentorProfile.loadError.title")}
+        description={t("mentorProfile.loadError.body")}
+        testId="mentor-load-error"
+        action={
+          <Button variant="secondary" className="max-md:h-11 max-md:text-base" onClick={() => void query.refetch()} data-testid="button-retry-mentor">
+            {t("common.tryAgain")}
+          </Button>
+        }
+      />
+    );
+  }
+  if (!isLocal && id && query.isPending) return <ProfileSkeleton reserveAvailability={false} />;
+  return <ProfileState icon={UserX} title={t("mentorProfile.notFound.title")} description={t("mentorProfile.notFound.body")} testId="mentor-not-found" notFound />;
+}
+
+function SessionPage({ state, retry, retrying }: { state: NonNullable<ReturnType<typeof useFeaturedPageMentor>["state"]>; retry: () => void; retrying: boolean }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
-  const params = useParams<{ id?: string }>();
-  const mentor = resolveShowcaseMentor(params.id) ?? FEATURED_MENTORS[0];
+  const mentor = state.mentor;
   const s = mentor.session;
   const name = pickLang(lang, mentor.name, mentor.name_ar);
   const firstName = name.split(" ")[0];
@@ -29,16 +79,16 @@ export default function FeaturedMentorSession() {
   const learn = pickLang(lang, s.learn, s.learn_ar);
 
   return (
-    <div className="bg-[var(--sc-red)] px-4 py-6 sm:px-6 lg:px-[105px] lg:py-12">
+    <div className="bg-[var(--sc-red)] px-4 py-6 sm:px-6 lg:px-[105px] lg:py-12" data-page-state={state.kind}>
       <div className="mx-auto grid max-w-[1210px] gap-6 lg:grid-cols-[605fr_505fr] lg:items-start lg:gap-8">
         {/* Offer card */}
         <article className="overflow-hidden rounded-[24px] bg-white lg:rounded-[40px]">
           <header className="bg-[rgba(213,83,77,0.2)] px-6 pb-6 pt-6 lg:px-9 lg:pt-8">
-            <Link href={`/mentor/${mentor.id}`} className="inline-flex items-center gap-4 text-[16px] text-[var(--sc-ink)]" data-testid="link-back">
+            <Link href={`/mentor/${mentor.id}`} className="inline-flex min-h-11 items-center gap-4 text-[16px] text-[var(--sc-ink)]" data-testid="link-back">
               <ArrowLeft className="size-5 rtl:-scale-x-100" aria-hidden="true" />
-              {name}
+              <bdi>{name}</bdi>
             </Link>
-            <div className="mt-8 flex items-start justify-between gap-6">
+            <div className="mt-6 flex items-start justify-between gap-6">
               <h1 id="page-title" tabIndex={-1} className="max-w-[420px] text-[26px] font-bold leading-[1.25] text-[var(--sc-ink)] lg:text-[32px]">
                 {title}
               </h1>
@@ -92,13 +142,15 @@ export default function FeaturedMentorSession() {
               ))}
             </ul>
 
-            {/* One real control: on phones the picker sits below the card, so this jumps to it. */}
-            <a href="#when-title" className="mt-9 inline-flex h-12 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-5 text-[15px] font-bold text-white hover:bg-black lg:hidden">
-              <CalendarDays className="size-4" aria-hidden="true" />
-              {t("showcase.session.bookNow")}
-            </a>
+            {/* One real control: on phones the scheduling card sits below the offer, so this jumps to it. */}
+            {state.bookable && (
+              <a href="#when-title" className="mt-9 inline-flex h-12 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-5 text-[15px] font-bold text-white hover:bg-black lg:hidden">
+                <CalendarDays className="size-4" aria-hidden="true" />
+                {t("showcase.session.bookNow")}
+              </a>
+            )}
 
-            {mentor.testimonials.length > 0 && (
+            {state.showShowcaseProof && mentor.testimonials.length > 0 && (
               <>
                 <h2 className="mt-12 text-[24px] font-bold text-[var(--sc-ink)]">{t("showcase.session.testimonials")}</h2>
                 <TestimonialRail items={mentor.testimonials} className="mt-5" />
@@ -117,9 +169,9 @@ export default function FeaturedMentorSession() {
           </div>
         </article>
 
-        {/* Scheduling card: the mentor's details + their Cal.com calendar inline (light) */}
+        {/* Scheduling card: the request form (the mentor's calendar opens after they accept). */}
         <aside className="rounded-[24px] bg-white p-5 lg:sticky lg:top-24 lg:rounded-[40px] lg:p-8" aria-labelledby="when-title">
-          <SessionScheduler mentor={mentor} sessionTitle={title} name={name} />
+          <SessionScheduler mentor={mentor} sessionTitle={title} name={name} state={state} onRetry={retry} retrying={retrying} />
         </aside>
       </div>
     </div>

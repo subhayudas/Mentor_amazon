@@ -19,7 +19,11 @@ import { MenteeFeedbackDialog } from "@/components/MenteeFeedbackDialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { BookingNotes } from "@/components/dashboard/BookingNotes";
 import { toast } from "sonner";
-import type { Mentee } from "@/lib/database";
+import { ExternalLink } from "lucide-react";
+import { textLinkClass } from "@/components/profile/styles";
+import { calCancelUrl } from "@/lib/calLink";
+import { isCalUid } from "@/lib/calEvents";
+import { isBookingNotPendingError, isBookingStateChangedError, type Mentee } from "@/lib/database";
 import { bidi } from "@/lib/format";
 import { credentialLine, localizedField } from "@/lib/localized";
 import type { BookingWithMentor } from "@/lib/menteeBookings";
@@ -31,14 +35,19 @@ import type { BookingRowActions } from "@/pages/mentee/BookingRow";
 
 type ConfirmKind = "withdraw" | "cancelRequest" | "cancelSession";
 type Confirm = { kind: ConfirmKind; booking: BookingWithMentor };
+/** The Cal.com dialog: a first booking for an accepted request, or moving a confirmed one. */
+type Scheduling = { booking: BookingWithMentor; rescheduleUid?: string };
 
 const HIGHLIGHT_MS = 2500;
 
 /**
  * Every mentee-side booking action and the dialogs behind them, shared by the
  * Overview and Bookings panels so the two never drift:
- * - withdraw / cancel → AlertDialog (opens on the safe choice) → updateStatus('canceled')
- * - choose a time → the Cal.com embed in a stock dialog, only ever on click
+ * - withdraw / cancel → AlertDialog (opens on the safe choice) → updateStatus('canceled');
+ *   cancelling a session booked on Cal.com also links to Cal.com's own cancel page
+ * - choose a time → the Cal.com embed in a stock dialog, only ever on click,
+ *   tagged with the booking id; the result is recorded by `useConfirmOnCalBooking`
+ * - reschedule → the same dialog on Cal.com's reschedule page for the booking's uid
  * - view request → goal + notes/tasks dialog (moved here from /my-bookings)
  * - rate → MenteeFeedbackDialog; afterwards the rated row scrolls into view
  *   and rings for 2.5 s (anchored feedback, TESTING e8)
@@ -48,7 +57,7 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
   const onCalBooked = useConfirmOnCalBooking(menteeId);
   const [confirm, setConfirm] = useState<Confirm | null>(null);
   const [viewing, setViewing] = useState<BookingWithMentor | null>(null);
-  const [scheduling, setScheduling] = useState<BookingWithMentor | null>(null);
+  const [scheduling, setScheduling] = useState<Scheduling | null>(null);
   const [calOpen, setCalOpen] = useState(false);
   const [rating, setRating] = useState<BookingWithMentor | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -64,6 +73,8 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
     queryClient.invalidateQueries({ queryKey: ["mentee", menteeId, "bookings"] });
     queryClient.invalidateQueries({ queryKey: ["mentee", menteeId, "stats"] });
     queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["analytics"] });
   };
 
   const cancelMutation = useMutation({
@@ -77,8 +88,12 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
       toast.success(kind === "cancelSession" ? t("dashboardV2.confirm.sessionCancelled") : t("dashboardV2.confirm.requestWithdrawn"));
       highlight(booking.id);
     },
-    onError: () => {
-      toast.error(t("dashboardV2.confirm.error"));
+    onError: (error) => {
+      // Show the database's truth again: the mentor may have cancelled or declined it meanwhile, and
+      // then nothing was written (R1-16). Say so, not "check your connection" (R2-02).
+      invalidate();
+      const stale = isBookingStateChangedError(error) || isBookingNotPendingError(error);
+      toast.error(stale ? t("showcase.bookings.toast.stale") : t("dashboardV2.confirm.error"));
     },
     onSettled: (_row, _error, { booking }) => {
       setPendingIds((ids) => {
@@ -102,7 +117,12 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
 
   const actions: BookingRowActions = {
     onChooseTime: (booking) => {
-      setScheduling(booking);
+      setScheduling({ booking });
+      setCalOpen(true);
+    },
+    onReschedule: (booking) => {
+      if (!isCalUid(booking.cal_event_uri)) return;
+      setScheduling({ booking, rescheduleUid: booking.cal_event_uri });
       setCalOpen(true);
     },
     onWithdraw: (booking) => setConfirm({ kind: "withdraw", booking }),
@@ -137,12 +157,15 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
         },
         cancelSession: {
           title: t("dashboardV2.confirm.cancelSessionTitle"),
-          body: t("dashboardV2.confirm.cancelSessionBody"),
+          body: isCalUid(confirm.booking.cal_event_uri)
+            ? t("dashboardV2.confirm.cancelSessionCalBody")
+            : t("dashboardV2.confirm.cancelSessionBody"),
           action: t("dashboardV2.confirm.cancelSessionAction"),
           keep: t("dashboardV2.confirm.cancelSessionKeep"),
         },
       }[confirm.kind]
     : null;
+  const calCancelUid = confirm?.kind === "cancelSession" && isCalUid(confirm.booking.cal_event_uri) ? confirm.booking.cal_event_uri : null;
 
   const dialogs = (
     <>
@@ -151,6 +174,18 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
           <AlertDialogHeader>
             <AlertDialogTitle>{copy?.title}</AlertDialogTitle>
             <AlertDialogDescription>{copy?.body}</AlertDialogDescription>
+            {calCancelUid && (
+              <a
+                href={calCancelUrl(calCancelUid)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${textLinkClass} inline-flex items-center gap-1.5 self-start`}
+                data-testid="link-cancel-in-cal"
+              >
+                {t("dashboardV2.confirm.cancelInCal")}
+                <ExternalLink className="size-4 rtl:-scale-x-100" aria-hidden="true" />
+              </a>
+            )}
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel data-testid="button-confirm-keep">{copy?.keep}</AlertDialogCancel>
@@ -199,16 +234,17 @@ export function useBookingActions(menteeId: string, mentee: Mentee) {
         </DialogContent>
       </Dialog>
 
-      {scheduling?.mentor?.cal_link && (
+      {scheduling && (scheduling.rescheduleUid || scheduling.booking.mentor?.cal_link) && (
         <CalEmbed
-          calLink={scheduling.mentor.cal_link}
-          mentorName={mentorName(scheduling)}
+          calLink={scheduling.booking.mentor?.cal_link ?? ""}
+          mentorName={mentorName(scheduling.booking)}
           menteeName={mentee.name}
           menteeEmail={mentee.email}
-          bookingId={scheduling.id}
+          bookingId={scheduling.booking.id}
+          rescheduleUid={scheduling.rescheduleUid}
           open={calOpen}
           onOpenChange={setCalOpen}
-          onBookingSuccessful={onCalBooked(scheduling.id)}
+          onBookingSuccessful={onCalBooked(scheduling.booking.id, mentorName(scheduling.booking))}
         />
       )}
 

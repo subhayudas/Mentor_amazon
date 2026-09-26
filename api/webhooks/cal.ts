@@ -1,70 +1,52 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  normalizeCalEvent,
+  parseMentorParam,
+  parseSignatureHeader,
+  recordId,
+  deliveryId,
+  sha256Hex,
+  verifyHmac,
+} from '../_lib/calWebhook.js';
 import { readEnv } from '../_lib/env.js';
-import { noStore, sendJson, sendMethodNotAllowed, sendMisconfigured } from '../_lib/http.js';
-import { RULES, enforceRateLimit } from '../_lib/ratelimit.js';
+import { noStore, queryParam, readRawBody, sendJson, sendMethodNotAllowed, sendUnavailable } from '../_lib/http.js';
+import { enforceRateLimit, type RateLimitRule } from '../_lib/ratelimit.js';
 import { createAdminClient } from '../_lib/supabaseAdmin.js';
 
 /**
- * POST /api/webhooks/cal — Cal.com booking webhooks.
+ * POST /api/webhooks/cal[?mentor=<uuid>] — Cal.com booking webhooks (design §3.3, §3.4).
  *
- * Cal.com signs every delivery with HMAC-SHA256 of the raw body under the
- * webhook's secret (`X-Cal-Signature-256`). The signature is verified in
- * constant time before anything is parsed; a bad or missing signature is a
- * 401 and nothing is stored.
+ * Each mentor connects their own Cal.com account from the "Cal.com booking sync" panel:
+ * subscriber URL `https://<app>/api/webhooks/cal?mentor=<their mentor id>` and the secret the
+ * panel shows (mentor_cal_webhooks; the previous secret keeps working for 24 h after a
+ * rotation). Without `?mentor=`, the optional global CAL_WEBHOOK_SECRET verifies a programme
+ * Cal.com Team/Org webhook. Leave Cal.com's "Custom payload template" empty.
  *
- * Handles BOOKING_CREATED, BOOKING_RESCHEDULED and BOOKING_CANCELLED:
- *   - the matching MentorConnect booking is found by Cal's booking uid
- *     (`bookings.cal_event_uri`), else by mentor (the organizer's Cal.com
- *     username matches `mentors.cal_link`) + attendee email on the newest
- *     open request; if none exists a confirmed booking is created, so a
- *     session booked directly on cal.com still reaches the app;
- *   - the booking becomes confirmed with the slot (created / rescheduled)
- *     or canceled;
- *   - an activity event is appended for both parties.
- *
- * Idempotent: each delivery id (trigger + uid + payload updated-at) is
- * recorded in `cal_webhook_events`; a replay answers 200 without touching
- * the booking again.
- *
- * Configure in Cal.com: Settings → Developer → Webhooks → subscriber URL
- * `https://<app>/api/webhooks/cal`, secret = `CAL_WEBHOOK_SECRET`.
+ * Checks, in order: method (405) → body ≤ 256 KiB (413) → `?mentor=` shape and signature
+ * header shape (401, no database call) → server env (503) → HMAC-SHA256 of the raw body
+ * against the candidate secrets in constant time (401, the same answer for an unknown mentor,
+ * a missing secret or a wrong one; repeated failures from one IP → 429) → JSON (400).
+ * Only deliveries that fail the signature check are ever rate-limited: Cal.com sends every
+ * mentor's webhooks from shared egress IPs and does not retry, so a limit counted before the
+ * check would let anyone's failing webhooks get real deliveries refused. A delivery whose
+ * signature verifies is never answered 429.
+ * Deliveries that change no booking (PING, unsupported trigger, unreadable payload) are logged
+ * with cal_record_delivery and answered 200. Booking events go to cal_apply_event, which
+ * applies the whole change in one transaction: exact matching (Cal uid, reschedule uid,
+ * cross-checked metadata.mc_booking, then a unique attendee email), the transition table,
+ * reminders reset and notifications. A booking made directly on Cal.com is recorded as
+ * `unmatched_direct_booking`; nothing is ever inserted into bookings here. Replays answer
+ * `duplicate`. Logs carry the mentor id, trigger and outcome only (never secrets or emails).
+ * `req.body` is never read, so the raw bytes stay exactly as Cal.com signed them.
  */
-type CalPayload = {
-  triggerEvent?: string;
-  createdAt?: string;
-  payload?: {
-    uid?: string;
-    startTime?: string;
-    endTime?: string;
-    title?: string;
-    organizer?: { username?: string; email?: string; name?: string };
-    attendees?: { email?: string; name?: string }[];
-    responses?: { email?: { value?: string } | string; name?: { value?: string } | string };
-    metadata?: Record<string, unknown>;
-    updatedAt?: string;
-    cancellationReason?: string;
-  };
-};
+export const MAX_BODY_BYTES = 256 * 1024;
+/** Failed signature checks per IP per minute before those failures are answered 429. */
+export const FAIL_LIMIT: RateLimitRule = { name: 'cal-webhook-fail', limit: 30, windowSeconds: 60 };
 
-// @vercel/node reads the body for `req.body` and then restores the stream, so the raw bytes are still readable here.
-async function rawBody(req: VercelRequest): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
-  return Buffer.concat(chunks).toString('utf8');
-}
+type SecretRow = { secret: string; previous_secret: string | null; previous_valid_until: string | null };
 
-export function verifySignature(body: string, header: string | undefined, secret: string): boolean {
-  if (!header) return false;
-  const expected = createHmac('sha256', secret).update(body).digest('hex');
-  const given = header.trim().toLowerCase().replace(/^sha256=/, '');
-  if (given.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(given, 'utf8'), Buffer.from(expected, 'utf8'));
-}
-
-function responseValue(v: { value?: string } | string | undefined): string | undefined {
-  if (!v) return undefined;
-  return typeof v === 'string' ? v : v.value;
+function logOutcome(mentorId: string | null, trigger: string, outcome: string): void {
+  console.log(`[cal-webhook] mentor=${mentorId ?? 'global'} trigger=${trigger || 'none'} outcome=${outcome}`);
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
@@ -73,122 +55,112 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     sendMethodNotAllowed(res, ['POST']);
     return;
   }
-  if (!(await enforceRateLimit(req, res, RULES.calWebhook))) return;
 
-  const envResult = readEnv(['calWebhookSecret', 'supabaseUrl', 'supabaseServiceRoleKey'] as const);
-  if (!envResult.ok) {
-    sendMisconfigured(res, envResult.missing);
+  const raw = await readRawBody(req, MAX_BODY_BYTES);
+  if (!raw.ok) {
+    sendJson(res, 413, { error: 'payload_too_large' });
     return;
   }
-  const { calWebhookSecret } = envResult.env;
 
-  const body = await rawBody(req);
-  const signature = req.headers['x-cal-signature-256'];
-  if (!verifySignature(body, Array.isArray(signature) ? signature[0] : signature, calWebhookSecret)) {
+  const mentorId = parseMentorParam(queryParam(req, 'mentor'));
+  const signature = parseSignatureHeader(req.headers['x-cal-signature-256']);
+  if (mentorId === false || !signature) {
     sendJson(res, 401, { error: 'invalid_signature' });
     return;
   }
 
-  let event: CalPayload;
+  const env = readEnv(['supabaseUrl', 'supabaseServiceRoleKey'] as const);
+  if (!env.ok) {
+    console.error('[cal-webhook] server env missing:', env.missing.join(', '));
+    sendUnavailable(res);
+    return;
+  }
+  const admin = createAdminClient(env.env.supabaseUrl, env.env.supabaseServiceRoleKey);
+
+  const secrets: string[] = [];
+  if (mentorId) {
+    const { data, error } = await admin
+      .from('mentor_cal_webhooks')
+      .select('secret, previous_secret, previous_valid_until')
+      .eq('mentor_id', mentorId)
+      .maybeSingle();
+    if (error) {
+      // A failed lookup is never treated as "no such webhook".
+      console.error('[cal-webhook] secret lookup failed', { mentor: mentorId, code: error.code });
+      if (error.code === 'PGRST205' || error.code === '42P01') sendUnavailable(res);
+      else sendJson(res, 500, { error: 'server_error' });
+      return;
+    }
+    const row = data as SecretRow | null;
+    if (row?.secret) secrets.push(row.secret);
+    if (row?.previous_secret && row.previous_valid_until && new Date(row.previous_valid_until).getTime() > Date.now()) {
+      secrets.push(row.previous_secret);
+    }
+  } else {
+    const global = readEnv(['calWebhookSecret'] as const);
+    if (!global.ok) console.error('[cal-webhook] CAL_WEBHOOK_SECRET is set but invalid (at least 16 characters); global deliveries are refused');
+    else if (global.env.calWebhookSecret) secrets.push(global.env.calWebhookSecret);
+  }
+
+  if (!verifyHmac(raw.body, signature, secrets)) {
+    if (!(await enforceRateLimit(req, res, FAIL_LIMIT))) return;
+    sendJson(res, 401, { error: 'invalid_signature' });
+    return;
+  }
+
+  let json: unknown;
   try {
-    event = JSON.parse(body) as CalPayload;
+    json = JSON.parse(raw.body.toString('utf8'));
   } catch {
     sendJson(res, 400, { error: 'invalid_json' });
     return;
   }
-  const trigger = event.triggerEvent ?? '';
-  const p = event.payload ?? {};
-  if (trigger === 'PING') {
-    sendJson(res, 200, { ok: true, ping: true });
-    return;
-  }
-  if (!['BOOKING_CREATED', 'BOOKING_RESCHEDULED', 'BOOKING_CANCELLED'].includes(trigger) || !p.uid) {
-    sendJson(res, 200, { ok: true, ignored: trigger || 'unknown' });
-    return;
-  }
 
-  const admin = createAdminClient(envResult.env.supabaseUrl, envResult.env.supabaseServiceRoleKey);
-  const deliveryId = `${trigger}:${p.uid}:${p.updatedAt ?? event.createdAt ?? ''}`;
-
-  // Idempotency: the primary key makes a replay a no-op.
-  const { error: dupError } = await admin.from('cal_webhook_events').insert({ id: deliveryId, trigger, booking_uid: p.uid, outcome: 'processing' });
-  if (dupError) {
-    if (dupError.code === '23505') {
-      sendJson(res, 200, { ok: true, duplicate: true });
+  const payloadSha256 = sha256Hex(raw.body);
+  const normalized = normalizeCalEvent(json);
+  if (normalized.kind !== 'event') {
+    const outcome =
+      normalized.kind === 'ping' ? 'ping' : normalized.kind === 'ignored' ? 'ignored' : normalized.kind === 'invalid' ? 'invalid_payload' : 'unrecognised_payload';
+    const { data, error } = await admin.rpc('cal_record_delivery', {
+      p_delivery_id: recordId(mentorId, normalized.trigger, payloadSha256),
+      p_mentor_id: mentorId,
+      p_trigger: normalized.trigger,
+      p_outcome: outcome,
+      p_payload_sha256: payloadSha256,
+    });
+    if (error) {
+      console.error('[cal-webhook] cal_record_delivery failed', { mentor: mentorId, trigger: normalized.trigger, code: error.code });
+      sendJson(res, 500, { error: 'server_error' });
       return;
     }
-    console.error('[cal-webhook] could not record delivery', dupError.message);
-    sendJson(res, 500, { error: 'store_unavailable' });
+    const recorded = (data as { outcome?: string } | null)?.outcome ?? outcome;
+    logOutcome(mentorId, normalized.trigger, recorded);
+    sendJson(res, 200, { ok: true, outcome: recorded });
     return;
   }
 
-  const attendeeEmail = (p.attendees?.[0]?.email ?? responseValue(p.responses?.email) ?? '').toLowerCase();
-  const attendeeName = p.attendees?.[0]?.name ?? responseValue(p.responses?.name) ?? attendeeEmail;
-  const organizerUser = (p.organizer?.username ?? '').toLowerCase();
-
-  type BookingRow = { id: string; mentor_id: string; mentee_id: string; status: string };
-  // 1. By Cal uid.
-  let booking = ((await admin.from('bookings').select('id, mentor_id, mentee_id, status').eq('cal_event_uri', p.uid).maybeSingle()).data as BookingRow | null) ?? null;
-
-  // 2. By mentor (organizer's Cal username ↔ mentors.cal_link) + attendee email, newest open request.
-  let mentorId: string | null = booking?.mentor_id ?? null;
-  if (!booking && organizerUser) {
-    const { data: mentors } = await admin.from('mentors').select('id, cal_link, name').ilike('cal_link', `${organizerUser}%`).limit(5);
-    mentorId = mentors?.[0]?.id ?? null;
-    if (mentorId && attendeeEmail) {
-      const { data: mentee } = await admin.from('mentees').select('id').ilike('email', attendeeEmail).maybeSingle();
-      if (mentee?.id) {
-        const { data: open } = await admin
-          .from('bookings')
-          .select('id, mentor_id, mentee_id, status')
-          .eq('mentor_id', mentorId)
-          .eq('mentee_id', mentee.id)
-          .in('status', ['pending', 'accepted'])
-          .order('created_at', { ascending: false })
-          .limit(1);
-        booking = ((open?.[0] as BookingRow | undefined) ?? null);
-        // 3. No open request: the session was booked straight on cal.com — create it.
-        if (!booking && trigger !== 'BOOKING_CANCELLED') {
-          const { data: created } = await admin
-            .from('bookings')
-            .insert({ mentor_id: mentorId, mentee_id: mentee.id, status: 'confirmed', scheduled_at: p.startTime, cal_event_uri: p.uid, goal: p.title ?? 'Mentoring session' })
-            .select('id, mentor_id, mentee_id, status')
-            .single();
-          booking = ((created as BookingRow | null) ?? null);
-        }
-      }
-    }
+  const e = normalized.event;
+  const { data, error } = await admin.rpc('cal_apply_event', {
+    p_delivery_id: deliveryId(mentorId, e),
+    p_mentor_id: mentorId,
+    p_trigger: e.trigger,
+    p_uid: e.uid,
+    p_reschedule_uid: e.rescheduleUid,
+    p_start: e.startIso,
+    p_end: e.endIso,
+    p_status: e.status,
+    p_attendee_emails: e.attendeeEmails,
+    p_mc_booking: e.mcBooking,
+    p_organizer_username: e.organizerUsername,
+    p_reason: e.reason,
+    p_payload_sha256: payloadSha256,
+  });
+  if (error) {
+    console.error('[cal-webhook] cal_apply_event failed', { mentor: mentorId, trigger: e.trigger, code: error.code });
+    sendJson(res, 500, { error: 'server_error' });
+    return;
   }
-
-  let outcome = 'unmatched';
-  if (booking) {
-    const patch =
-      trigger === 'BOOKING_CANCELLED'
-        ? { status: 'canceled', canceled_at: new Date().toISOString(), cal_event_uri: p.uid }
-        : { status: 'confirmed', scheduled_at: p.startTime, cal_event_uri: p.uid };
-    const { error } = await admin.from('bookings').update(patch).eq('id', booking.id);
-    outcome = error ? `update_failed:${error.message}` : trigger.toLowerCase();
-    if (!error) {
-      const type = trigger === 'BOOKING_CANCELLED' ? 'booking_canceled' : trigger === 'BOOKING_RESCHEDULED' ? 'booking_rescheduled' : 'booking_confirmed';
-      const when = p.startTime ? new Date(p.startTime).toISOString() : '';
-      await admin.from('activity_events').insert({
-        actor_type: 'system',
-        actor_name: attendeeName,
-        type,
-        subject_type: 'booking',
-        subject_id: booking.id,
-        visible_to: [booking.mentor_id, booking.mentee_id],
-        summary:
-          type === 'booking_canceled'
-            ? `Session cancelled on Cal.com${p.cancellationReason ? ` — ${p.cancellationReason}` : ''}`
-            : `${type === 'booking_rescheduled' ? 'Rescheduled' : 'Confirmed'} on Cal.com for ${when}`,
-        meta: { cal_uid: p.uid, trigger },
-      });
-    }
-  } else {
-    console.warn('[cal-webhook] no matching booking', { trigger, uid: p.uid, organizerUser, attendeeEmail: attendeeEmail ? 'present' : 'absent' });
-  }
-
-  await admin.from('cal_webhook_events').update({ outcome }).eq('id', deliveryId);
+  const outcome = (data as { outcome?: string } | null)?.outcome ?? 'unknown';
+  logOutcome(mentorId, e.trigger, outcome);
   sendJson(res, 200, { ok: true, outcome });
 }

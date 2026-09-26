@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 /**
@@ -70,21 +71,52 @@ export function nextIp(): string {
   return `10.0.${Math.floor(ipCounter / 250)}.${ipCounter % 250}`;
 }
 
-export async function invoke(
-  handler: Handler,
-  path: string,
-  opts: { method?: string; jar?: CookieJar; ip?: string; cookie?: string } = {},
-): Promise<FakeResponse> {
+export interface InvokeOptions {
+  method?: string;
+  jar?: CookieJar;
+  ip?: string;
+  cookie?: string;
+  /** Raw request body. An object is sent as JSON; a string is sent as-is. */
+  body?: string | object;
+  /** Extra request headers (lower-case names, as Node delivers them). */
+  headers?: Record<string, string>;
+}
+
+/**
+ * Calls a handler with a request that is a real readable stream carrying the
+ * body bytes (so handlers that read the raw stream work), plus the parsed
+ * `body` and `query` helpers @vercel/node would add.
+ */
+export async function invoke(handler: Handler, path: string, opts: InvokeOptions = {}): Promise<FakeResponse> {
   const cookie = opts.cookie ?? opts.jar?.header();
-  const req = {
+  const raw = opts.body === undefined ? undefined : typeof opts.body === 'string' ? opts.body : JSON.stringify(opts.body);
+  let parsed: unknown;
+  if (opts.body !== undefined && typeof opts.body !== 'string') parsed = opts.body;
+  else if (raw !== undefined) {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      parsed = undefined;
+    }
+  }
+  const url = new URL(path, 'http://localhost');
+  const query: Record<string, string | string[]> = {};
+  for (const [key, value] of url.searchParams) {
+    const prev = query[key];
+    query[key] = prev === undefined ? value : Array.isArray(prev) ? [...prev, value] : [prev, value];
+  }
+  const req = Object.assign(Readable.from(raw ? [Buffer.from(raw)] : []), {
     method: opts.method ?? 'GET',
     url: path,
     headers: {
       'x-forwarded-for': opts.ip ?? nextIp(),
       ...(cookie ? { cookie } : {}),
+      ...(opts.headers ?? {}),
     },
     socket: {},
-  } as unknown as VercelRequest;
+    body: parsed,
+    query,
+  }) as unknown as VercelRequest;
   const res = new FakeResponse();
   await handler(req, res as unknown as VercelResponse);
   opts.jar?.apply(res.setCookies);

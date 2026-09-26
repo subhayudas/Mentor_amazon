@@ -7,10 +7,13 @@ import { supabase } from "@/lib/supabase";
 
 /**
  * Activity audit feed: an append-only event per state change. Local mode
- * keeps the events in the browser store; against a live project they go to
- * `activity_events` (see supabase_phase2.sql — insert-only for users, admins
- * read everything). Logging never throws: an audit write failing must not
- * break the action it describes.
+ * keeps the events in the browser store; against a live project they live in
+ * `activity_events` (supabase_phase2.sql + migration 0002). Booking lifecycle
+ * events are written ONLY by the database trigger `bookings_activity_events`
+ * (design D9); the client logs just its own settings, profile and favourite
+ * writes, after they succeeded, and the insert policy only accepts events
+ * about the caller's own profiles. Logging never throws: an audit write
+ * failing must not break the action it describes (failures are logged in dev).
  */
 export interface LogInput {
   actor_type: ActivityEvent["actor_type"];
@@ -54,13 +57,27 @@ export function logActivity(input: LogInput): ActivityEvent {
   return event;
 }
 
-/** Events visible to one profile (or every event for admins / the showcase), newest first. */
-export function useActivity(profileId: string | null, opts: { all?: boolean; limit?: number } = {}) {
-  const local = useLocalCollection("events");
+export interface ActivityFeed {
+  events: ActivityEvent[];
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+}
+
+/**
+ * Events visible to one profile (or every event for admins / the showcase),
+ * newest first. Database mode reads `activity_events` only (RLS scopes it to
+ * the caller); local mode reads this browser's store. `IS_LOCAL` never changes
+ * after boot, so the branch always calls the same hooks.
+ */
+export function useActivity(profileId: string | null, opts: { all?: boolean; limit?: number } = {}): ActivityFeed {
+  return IS_LOCAL ? useLocalActivity(profileId, opts) : useLiveActivity(profileId, opts);
+}
+
+function useLiveActivity(profileId: string | null, opts: { all?: boolean; limit?: number }): ActivityFeed {
   const limit = opts.limit ?? 200;
   const live = useQuery<ActivityEvent[]>({
     queryKey: ["activity", profileId, opts.all ? "all" : "own", limit],
-    enabled: !IS_LOCAL,
     staleTime: 15_000,
     refetchInterval: 15_000,
     queryFn: async () => {
@@ -71,9 +88,12 @@ export function useActivity(profileId: string | null, opts: { all?: boolean; lim
       return (data ?? []) as ActivityEvent[];
     },
   });
-  if (IS_LOCAL) {
-    const rows = opts.all || !profileId ? local : local.filter((e) => e.visible_to.includes(profileId));
-    return { events: rows.slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit), isLoading: false, isError: false };
-  }
-  return { events: live.data ?? [], isLoading: live.isLoading, isError: live.isError };
+  return { events: live.data ?? [], isLoading: live.isLoading, isError: live.isError, refetch: () => void live.refetch() };
+}
+
+function useLocalActivity(profileId: string | null, opts: { all?: boolean; limit?: number }): ActivityFeed {
+  const local = useLocalCollection("events");
+  const limit = opts.limit ?? 200;
+  const rows = opts.all || !profileId ? local : local.filter((e) => e.visible_to.includes(profileId));
+  return { events: rows.slice().sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, limit), isLoading: false, isError: false, refetch: () => undefined };
 }

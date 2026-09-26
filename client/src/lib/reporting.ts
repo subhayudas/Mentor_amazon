@@ -2,14 +2,15 @@
  * Reporting helpers for the programme analytics (volunteer hours, country cut,
  * flattened booking rows for tables/CSV) and the "complete session" write.
  *
- * Everything except completeSession() is pure. The write talks to Supabase
- * directly because database.ts belongs to another slice.
+ * Everything except completeSession() is pure. The write goes through
+ * database.ts completeBooking, the conditional write every completion shares (R1-16).
  */
 
 import { supabase } from "@/lib/supabase";
 import { intlLocale } from "@/lib/format";
+import { parseTimestamp, timestampMs } from "@/lib/timestamps";
 import { localizedField } from "@/lib/localized";
-import type { Booking, Mentor, Mentee } from "@/lib/database";
+import { db, type Booking, type Mentor, type Mentee } from "@/lib/database";
 
 // Display helpers shared with forms, cards and admin tables live in
 // lib/format.ts (F-04); they are re-exported here so the analytics chunk keeps
@@ -252,30 +253,20 @@ export interface CompleteSessionInput {
 /**
  * Marks a booking completed and records how long the session ran. This is the
  * only write path that feeds volunteer hours, so the duration is mandatory.
+ *
+ * The write is database.ts completeBooking (R1-16): it matches only an accepted or
+ * confirmed booking, so a second "Mark completed" from a stale tab changes nothing,
+ * keeps the duration recorded first and throws `BookingStateChangedError`. The mentee
+ * is notified only after a write that really happened.
  */
-export async function completeSession(bookingId: string, input: CompleteSessionInput): Promise<Booking | null> {
+export async function completeSession(bookingId: string, input: CompleteSessionInput): Promise<Booking> {
   const minutes = Math.round(Number(input.minutes));
   if (!Number.isFinite(minutes) || minutes < MIN_SESSION_MINUTES || minutes > MAX_SESSION_MINUTES) {
     throw new RangeError(`Session duration must be between ${MIN_SESSION_MINUTES} and ${MAX_SESSION_MINUTES} minutes`);
   }
 
   const country = input.country?.trim() || (await resolveCountryForBooking(bookingId));
-
-  const update: Partial<Booking> = {
-    status: "completed",
-    completed_at: new Date().toISOString(),
-    session_duration_minutes: minutes,
-  };
-  if (country) update.country = country;
-
-  const { data, error } = await supabase
-    .from("bookings")
-    .update(update)
-    .eq("id", bookingId)
-    .select()
-    .single();
-
-  if (error && error.code !== "PGRST116") throw error;
+  const completed = await db.completeBooking(bookingId, { sessionDurationMinutes: minutes, country });
 
   // Notifications are created server-side; a missing RPC must never block completion.
   try {
@@ -284,7 +275,7 @@ export async function completeSession(bookingId: string, input: CompleteSessionI
     // ignore
   }
 
-  return data as Booking | null;
+  return completed;
 }
 
 /** booking.country if already set, otherwise the mentor's country. Never throws. */
@@ -385,8 +376,8 @@ export function periodWindow(
   if (period === "all") {
     let oldest = now;
     bookings.forEach((booking) => {
-      const at = new Date(requestedAt(booking));
-      if (!Number.isNaN(at.getTime()) && at < oldest) oldest = at;
+      const at = parseTimestamp(requestedAt(booking));
+      if (at && at < oldest) oldest = at;
     });
     return { start: startOfMonth(oldest), end };
   }
@@ -400,9 +391,9 @@ export function previousWindow(period: Period, window: DateWindow): DateWindow |
   return { start: new Date(window.start.getTime() - length), end: window.start };
 }
 
+/** Whether a stored timestamp (UTC wall-clock, lib/timestamps.ts) falls in the window. */
 export function inWindow(iso: string | undefined, window: DateWindow): boolean {
-  if (!iso) return false;
-  const at = new Date(iso).getTime();
+  const at = timestampMs(iso);
   return !Number.isNaN(at) && at >= window.start.getTime() && at < window.end.getTime();
 }
 
@@ -460,12 +451,13 @@ export function timeSeries(
     points.set(bucketKey(start, bucket), { key: bucketKey(start, bucket), start, requests: 0, completed: 0 });
   });
   requestRows.forEach((booking) => {
-    const point = points.get(bucketKey(new Date(requestedAt(booking)), bucket));
+    const at = parseTimestamp(requestedAt(booking));
+    const point = at ? points.get(bucketKey(at, bucket)) : undefined;
     if (point) point.requests += 1;
   });
   completedRows.forEach((booking) => {
-    const at = completionDate(booking);
-    const point = at ? points.get(bucketKey(new Date(at), bucket)) : undefined;
+    const at = parseTimestamp(completionDate(booking));
+    const point = at ? points.get(bucketKey(at, bucket)) : undefined;
     if (point) point.completed += 1;
   });
   return Array.from(points.values());

@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { Container } from "@/components/layout/Container";
 import { FEATURED_MENTORS, type FeaturedMentor } from "@/data/featuredMentors";
+import { IS_LOCAL } from "@/lib/demo";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,12 @@ import { cn } from "@/lib/utils";
  * six-tile bento on grey, the orange "meet the mentors" rail of dark cards,
  * then the app footer. Every person shown is a curated featured mentor
  * (`data/featuredMentors.ts`); the wall and the rail link to their profiles.
+ *
+ * Against the database the sample social proof is not shown (design D14):
+ * the hero's "4.9 average rating" / "1,000+ sessions booked" chips, the
+ * bento's "2X" and "96%" figures with their 5/5 review pills, and the rail's
+ * per-mentor session counts are demo-mode content only. The scheduling tile
+ * says a request comes first and the time is picked once it is accepted (D4).
  */
 
 function localizedHeadline(m: FeaturedMentor, lang: string) {
@@ -94,7 +101,8 @@ function Hero() {
                 <ArrowRight className="size-5 rtl:-scale-x-100" aria-hidden="true" />
               </span>
             </Link>
-            <div className="flex flex-col gap-3">
+            {IS_LOCAL && (
+            <div className="flex flex-col gap-3" data-testid="hero-demo-proof">
               <div className="inline-flex h-[46px] items-center gap-2 rounded-[8px] border border-[#d9d9d9] bg-white/40 px-4 text-[16px] font-medium text-[var(--sc-ink)]">
                 <span>{t("showcase.hero.rating")}</span>
                 <span className="inline-flex items-center gap-0.5 text-[#f5a623]" aria-hidden="true">
@@ -108,6 +116,7 @@ function Hero() {
                 {t("showcase.hero.sessions")}
               </div>
             </div>
+            )}
           </div>
         </div>
 
@@ -147,36 +156,53 @@ function Bento() {
         </h2>
 
         <div className="mt-12 grid gap-5 md:mt-[64px] md:grid-cols-12">
-          {/* 1 — dedicated mentor */}
-          <div className={cn(tile, "bg-[var(--sc-tile-peach)] md:col-span-3")}>
+          {/* 1 — dedicated mentor ("2X" is sample showcase copy: demo mode only, D14) */}
+          <div className={cn(tile, "bg-[var(--sc-tile-peach)] md:col-span-3")} data-testid="bento-dedicated">
             <ShoppingBag className="size-14 text-[var(--sc-ink)]" strokeWidth={1.5} aria-hidden="true" />
             <div className="mt-auto text-end">
-              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">2X</p>
+              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]" dir="ltr">{IS_LOCAL ? "2X" : "1:1"}</p>
               <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
-                {t("showcase.bento.t1a")}
+                {t(IS_LOCAL ? "showcase.bento.t1a" : "showcase.bento.t1dbA")}
                 <br />
-                <strong className="font-bold">{t("showcase.bento.t1b")}</strong>
+                <strong className="font-bold">{t(IS_LOCAL ? "showcase.bento.t1b" : "showcase.bento.t1dbB")}</strong>
               </p>
             </div>
           </div>
 
-          {/* 2 — rated sessions */}
-          <div className={cn(tile, "bg-[var(--sc-tile-lavender)] md:col-span-5")}>
+          {/* 2 — rated sessions in demo mode; against the database there are no
+              invented ratings or reviews (D14), so the tile says every request
+              starts with the mentee's goal, with sample goals as decoration. */}
+          <div className={cn(tile, "bg-[var(--sc-tile-lavender)] md:col-span-5")} data-testid="bento-proof">
             <div className="pointer-events-none absolute inset-x-6 top-8 space-y-4" aria-hidden="true">
               <div className="w-fit -rotate-6 rounded-full bg-white/60 py-2 pe-6 ps-3 text-[13px] text-[var(--sc-ink-soft)]">
-                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-peach)] align-middle" /> 5/5 “{t("showcase.bento.review1")}”
+                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-peach)] align-middle" />{" "}
+                {IS_LOCAL ? <>5/5 “{t("showcase.bento.review1")}”</> : t("showcase.bento.goal1")}
               </div>
               <div className="ms-10 w-fit -rotate-6 rounded-full bg-white/60 py-2 pe-6 ps-3 text-[13px] text-[var(--sc-ink-soft)]">
-                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-green)] align-middle" /> 5/5 “{t("showcase.bento.review2")}”
+                <span className="me-2 inline-block size-6 rounded-full bg-[var(--sc-tile-green)] align-middle" />{" "}
+                {IS_LOCAL ? <>5/5 “{t("showcase.bento.review2")}”</> : t("showcase.bento.goal2")}
               </div>
             </div>
             <div className="mt-auto text-end">
-              <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">96%</p>
-              <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
-                {t("showcase.bento.t2a")}
-                <br />
-                <strong className="font-bold">{t("showcase.bento.t2b")}</strong>
-              </p>
+              {IS_LOCAL ? (
+                <>
+                  <p className="text-[56px] font-black leading-none text-[var(--sc-ink)]">96%</p>
+                  <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                    {t("showcase.bento.t2a")}
+                    <br />
+                    <strong className="font-bold">{t("showcase.bento.t2b")}</strong>
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[44px] font-black leading-none text-[var(--sc-ink)] md:text-[52px]">{t("showcase.bento.t2dbBig")}</p>
+                  <p className="mt-2 text-[18px] leading-[26px] text-[var(--sc-ink)]">
+                    {t("showcase.bento.t2dbA")}
+                    <br />
+                    <strong className="font-bold">{t("showcase.bento.t2dbB")}</strong>
+                  </p>
+                </>
+              )}
             </div>
           </div>
 
@@ -196,8 +222,8 @@ function Bento() {
             </div>
           </div>
 
-          {/* 4 — instant scheduling */}
-          <div className={cn(tile, "bg-[var(--sc-tile-blue)] md:col-span-5")}>
+          {/* 4 — scheduling: a request comes first, the time after it is accepted (D4) */}
+          <div className={cn(tile, "bg-[var(--sc-tile-blue)] md:col-span-5")} data-testid="bento-scheduling">
             <div className="flex flex-col items-start gap-3">
               <Pill>
                 <Video className="size-4" aria-hidden="true" /> {t("showcase.bento.meet")}
@@ -206,9 +232,9 @@ function Bento() {
                 <CalendarPlus className="size-4" aria-hidden="true" /> {t("showcase.bento.invite")}
               </Pill>
             </div>
-            <div className="mt-auto">
-              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t4big")}</p>
-              <p className="mt-3 max-w-[360px] text-[18px] leading-[26px] text-[var(--sc-ink)]">{t("showcase.bento.t4a")}</p>
+            <div className="mt-auto pt-6">
+              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t4requestBig")}</p>
+              <p className="mt-3 max-w-[360px] text-[18px] leading-[26px] text-[var(--sc-ink)]">{t("showcase.bento.t4requestA")}</p>
             </div>
           </div>
 
@@ -225,7 +251,7 @@ function Bento() {
             </div>
           </div>
 
-          {/* 6 — matched */}
+          {/* 6 — matched (demo) / find your mentor (database: there is search and filters, no matching, R1-48) */}
           <div className={cn(tile, "bg-[var(--sc-tile-teal)] md:col-span-4")}>
             <div className="flex flex-col items-center gap-1 text-[14px] text-[var(--sc-ink)]" aria-hidden="true">
               <span className="rounded-[12px] bg-white px-4 py-2 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">{t("showcase.bento.you")}</span>
@@ -238,10 +264,10 @@ function Bento() {
                 <span className="rounded-[12px] bg-white px-4 py-2 shadow-[0_2px_4px_rgba(0,0,0,0.08)]">{t("showcase.bento.yourSession")}</span>
               </div>
             </div>
-            <div className="mt-auto text-end">
-              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t("showcase.bento.t6big")}</p>
+            <div className="mt-auto text-end" data-testid="bento-find">
+              <p className="text-[36px] font-black leading-none text-[var(--sc-ink)] md:text-[44px]">{t(IS_LOCAL ? "showcase.bento.t6big" : "showcase.bento.t6dbBig")}</p>
               <p className="mt-3 text-[18px] leading-[26px] text-[var(--sc-ink)]">
-                <strong className="font-bold">{t("showcase.bento.t6a")}</strong> {t("showcase.bento.t6b")}
+                <strong className="font-bold">{t(IS_LOCAL ? "showcase.bento.t6a" : "showcase.bento.t6dbA")}</strong> {t(IS_LOCAL ? "showcase.bento.t6b" : "showcase.bento.t6dbB")}
               </p>
             </div>
           </div>
@@ -263,9 +289,11 @@ function RailCard({ mentor, lang }: { mentor: FeaturedMentor; lang: string }) {
       <p className="mt-3 text-[15.5px] leading-[23px] text-white/70">{subtitle}</p>
       <div className="mt-auto flex items-end justify-between gap-4 pt-10">
         <div className="flex flex-col items-start gap-2.5">
-          <span className="rounded-[4px] bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold">
-            {t("showcase.rail.mentored", { total: mentor.bookings })}
-          </span>
+          {IS_LOCAL && (
+            <span className="rounded-[4px] bg-white/10 px-3 py-1.5 text-[12.5px] font-semibold">
+              {t("showcase.rail.mentored", { total: mentor.bookings })}
+            </span>
+          )}
           <span className="rounded-[4px] border border-white/25 px-3 py-1.5 text-[12.5px] font-semibold">
             {t("showcase.rail.minutes", { minutes: mentor.session.minutes })}
           </span>

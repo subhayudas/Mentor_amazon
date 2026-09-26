@@ -14,6 +14,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { CalSyncPanel } from "@/components/cal/CalSyncPanel";
+import { isValidCalLink, normalizeCalLink } from "@/lib/calLink";
 import type { Mentor } from "@/lib/database";
 import { useLeaveGuard } from "@/lib/leaveGuard";
 import { queryClient } from "@/lib/queryClient";
@@ -28,8 +30,6 @@ interface ProfileSettingsProps {
   mentorEmail: string;
 }
 
-const CAL_PATTERN = /^[a-z0-9._-]+\/[a-z0-9_-]+$/i;
-const normalizeCalLink = (value: string) => value.trim().replace(/^https?:\/\/(www\.)?cal\.com\//i, "");
 const splitList = (value: string) => value.split(",").map((s) => s.trim()).filter(Boolean);
 
 /**
@@ -39,6 +39,11 @@ const splitList = (value: string) => value.split(",").map((s) => s.trim()).filte
  * visible label), time zone and country as stored keys with localized
  * labels — plus the bilingual profile fields. Zod messages come from `t`;
  * unsaved edits are guarded.
+ *
+ * The Cal.com link goes through the one shared normaliser (`lib/calLink.ts`:
+ * `https://cal.com/…`, `app.cal.com/…`, query, hash and edge slashes all
+ * reduce to `username/event`), and clearing the field stores `''` so the link
+ * really goes away (F12). The Cal.com booking sync panel sits right under it.
  */
 export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettingsProps) {
   const { t, i18n } = useTranslation();
@@ -70,7 +75,7 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
         cal_link: z
           .string()
           .trim()
-          .refine((v) => v === "" || CAL_PATTERN.test(normalizeCalLink(v)), { message: t("dashboardV2.mentorProfile.validation.calLink") }),
+          .refine((v) => v === "" || isValidCalLink(v), { message: t("dashboardV2.mentorProfile.validation.calLink") }),
         mentorship_preference: z.enum(["ongoing", "rotating", "either"]).optional(),
         why_joined: z.string().optional(),
       }),
@@ -146,15 +151,19 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
         industries_ar: data.industries_ar ? splitList(data.industries_ar) : undefined,
         country: data.country || undefined,
         timezone: data.timezone,
-        cal_link: data.cal_link ? normalizeCalLink(data.cal_link) : undefined,
+        // '' clears the link (the column is NOT NULL); undefined would leave the old one in place.
+        cal_link: normalizeCalLink(data.cal_link),
         mentorship_preference: data.mentorship_preference || undefined,
         why_joined: data.why_joined?.trim() || undefined,
       }),
     onSuccess: (_row, data) => {
       queryClient.invalidateQueries({ queryKey: ["mentor", "email", mentorEmail] });
       queryClient.invalidateQueries({ queryKey: ["mentor", "own"] });
+      queryClient.invalidateQueries({ queryKey: ["mentor", mentorId] });
       queryClient.invalidateQueries({ queryKey: ["mentors"] });
-      form.reset(data);
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
+      form.reset({ ...data, cal_link: normalizeCalLink(data.cal_link) });
       toast.success(t("dashboardV2.mentorProfile.saved"));
     },
     onError: () => toast.error(t("dashboardV2.mentorProfile.saveError")),
@@ -171,6 +180,7 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
     onSuccess: (row) => {
       queryClient.invalidateQueries({ queryKey: ["mentor", "email", mentorEmail] });
       queryClient.invalidateQueries({ queryKey: ["mentor", "own"] });
+      queryClient.invalidateQueries({ queryKey: ["mentor", mentorId] });
       queryClient.invalidateQueries({ queryKey: ["mentors"] });
       toast.success(row?.is_available ? t("dashboardV2.mentorProfile.acceptingOn") : t("dashboardV2.mentorProfile.acceptingOff"));
     },
@@ -313,6 +323,8 @@ export default function ProfileSettings({ mentorId, mentorEmail }: ProfileSettin
                 )}
               />
             </div>
+            {/* Sync status and setup for the saved link (not the unsaved field value), after the fields it depends on. */}
+            <CalSyncPanel mentorId={mentorId} calLink={mentor.cal_link} />
           </div>
         </PanelSection>
 

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Cal.com stub</title>
+  <style>
+    body { font: 14px/1.4 system-ui, sans-serif; margin: 0; padding: 16px; color: #1f2933; background: #f7f7f5; }
+    h1 { font-size: 16px; margin: 0 0 8px; }
+    code { word-break: break-all; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <!-- Served by e2e/fixtures/cal.ts for every https://app.cal.com/** page request. It stands in for
+       the booking page inside the Cal.com embed iframe: it records the URL it was opened with and
+       tells the embed it is ready. Specs then post booking events with postCalEvent(). -->
+  <h1>Cal.com booking page (E2E stub)</h1>
+  <p>Opened with:</p>
+  <code id="href"></code>
+  <script>
+    (function () {
+      var href = window.location.href;
+      document.getElementById("href").textContent = href;
+      var params = new URLSearchParams(window.location.search);
+      var ns = params.get("embed") || "";
+      window.__calStub = { href: href, namespace: ns };
+      function post(type, data) {
+        window.parent.postMessage({ originator: "CAL", fullType: "CAL:" + ns + ":" + type, data: data || {} }, "*");
+      }
+      window.__calStubPost = post;
+      post("__iframeReady", {});
+      post("linkReady", {});
+      post("__dimensionChanged", { iframeHeight: 600, iframeWidth: 400, isFirstTime: true });
+    })();
+  </script>
+</body>
+</html>

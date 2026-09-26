@@ -1,16 +1,110 @@
-# MentorConnect — smoke-test checklist
+# MentorConnect — testing
+
+1. [Automated tests](#automated-tests): unit, database integration, migration idempotency, browser E2E.
+2. [Database apply order](#database-apply-order).
+3. [Manual smoke-test checklist](#manual-smoke-test-checklist) (a)–(i), before and after a deploy.
+4. [Before merging the PR — order of operations](#before-merging-the-pr--order-of-operations), the full rollout checklist, and its [Rollback](#rollback).
+5. [Cal.com live test](#calcom-live-test) — required before mentors are told to connect Cal.com.
+6. [Removing test data](#removing-test-data).
+
+---
+
+## Automated tests
+
+| Layer | Command | Needs | Proves |
+| --- | --- | --- | --- |
+| Unit | `npm test` | nothing (no network, no database) | request / webhook / Turnstile / reminder handlers with fakes, the SQL mirror check, the 77 SSO tests, client logic |
+| Database integration | `bash scripts/db/test-integration.sh` (or `npm run test:integration` with the `SUPABASE_TEST_*` env set) | the local Supabase stack | SQL, RLS, grants, RPCs, triggers and the real handlers against real Postgres, PostgREST and GoTrue (suites I0–I19) |
+| Migration idempotency | `bash scripts/db/verify-idempotency.sh` | the local Postgres | every SQL file re-runs as a no-op; `v2` alone and the whole chain run twice leave the catalog identical |
+| Browser E2E | `npx playwright test` (or `--project=desktop-en e2e/specs/…`) | the local stack; Chromium (`npx playwright install chromium`) | every route × persona × EN/AR × desktop/mobile, flows through the UI to the database |
+
+CI (`.github/workflows/ci.yml`) runs type-check, unit tests, i18n parity, the build and
+`npm run check:entry-i18n` (the entry chunk bundles only the English namespaces its own
+modules use, see `client/src/lib/i18n.ts`; the check fails naming any namespace an
+entry-chunk module uses but the eager import leaves out) on every push, and the
+integration suites plus the idempotency check on a fresh
+`supabase start` (job `db-integration`). The E2E suite runs locally (it needs a browser and
+internet for Turnstile); attach its report to the PR.
+
+The unit suite runs in `Asia/Dubai` (`env.TZ` in `vitest.config.ts`), not the machine's zone.
+Base-table timestamps are UTC wall-clock with no offset, and a client that reads one as local
+time is only wrong away from UTC; `tests/timestamps.test.ts` fails on such a misread even on a
+UTC CI runner. Parse stored timestamps with `client/src/lib/timestamps.ts` (the shared
+formatters in `client/src/lib/format.ts` already do).
+
+### The local stack
+
+```bash
+supabase start                          # uses supabase/config.toml (API 54321, DB 54322, Mailpit 54324)
+bash scripts/db/reset-local.sh          # drizzle push → v2 → phase2 → 0002 → 0003 → 0004; refuses non-local hosts
+source scripts/e2e/env.sh && npx tsx scripts/e2e/seed.ts   # E2E personas (Playwright also reseeds before each run)
+```
+
+`reset-local.sh --no-contract` stops after 0002 (the state production is in between the
+migration and the deploy) and `--no-seed` skips 0004 (featured mentors static, "opening soon").
+The integration suites never reset anything: row tests run in transactions that are rolled
+back, migration tests build throwaway databases, and PostgREST tests create
+`it.<random>@mentorconnect.test` rows and delete them. `SUPABASE_TEST_OFFLINE=1` skips the
+suite that calls Cloudflare; `SUPABASE_TEST_CAPTCHA=on` (with `[auth.captcha]` enabled in
+`supabase/config.toml` and the stack restarted) runs I17.
+
+### Browser E2E
+
+`playwright.config.ts` loads `scripts/e2e/env.sh`, starts the dev server on `E2E_PORT`
+(default 5173 — the only port GoTrue accepts in e-mail links) with `MC_LOCAL_API=1`, starts the
+mock Amazon IdP (`scripts/e2e/mock-idp.ts`, port 54399), and reseeds the personas of the
+selected projects (`E2E_SKIP_SEED=1` skips that). Another `E2E_PORT` (e.g. 5174) gets its own
+mock-IdP, preview and demo ports, so two checkouts can run Playwright side by side. Projects: `desktop-en`, `desktop-ar`,
+`mobile-en`, `mobile-ar`, plus `prod-csp` (production build behind the `vercel.json`
+headers, tests tagged `@prod-csp`) and `demo-local` / `demo-local-ar` (`VITE_LOCAL=1`, tests
+tagged `@demo-local`). Specs import `test` from `e2e/fixtures/test.ts`: `loginAs(persona)`,
+`healthy()` (the per-page checks), `cal` (Cal.com iframe stub), `db`, `mailpit`,
+`signedCalPost`. Every `healthy()` visit also runs an axe scan (`@axe-core/playwright`): all
+violations are attached to the test as `<screenshot>-axe.json`; only a critical one fails the
+visit (pre-existing critical findings would be listed, with evidence, in
+`PREEXISTING_CRITICAL` in `e2e/fixtures/health.ts`; there are none). `E2E_AXE=off` skips the
+scan. Personas are `e2e.<project>.<persona>@mentorconnect.test` (password in
+`e2e/fixtures/personas.ts`); `E2E_NS=<x>` namespaces them so two people can run the same
+project against one stack. `e2e/specs/a-infra.spec.ts` checks the harness itself.
+
+---
+
+## Database apply order
+
+On a new project or when repairing one, in the Supabase SQL editor, each file whole:
+
+1. Tables: `npm run db:push` (drizzle, from `shared/schema.ts`). Never run `drizzle-kit generate` into `./migrations`.
+2. `supabase_setup_v2.sql` — policies, helpers, triggers.
+3. `supabase_phase2.sql` — favourites, activity feed, reminder and webhook bookkeeping.
+4. `migrations/0002_production_readiness.sql` — EXPAND. Safe while the previous client is live.
+5. Deploy the new client, smoke-test production.
+6. `migrations/0003_restrict_legacy_writes.sql` — CONTRACT (removes the old client's write paths). Rollback: the block at the bottom of the file, run **before** an older client is redeployed (see [Rollback](#rollback)).
+7. Optional: `migrations/0004_seed_featured_mentors.sql`, once the five featured mentors agree to be requestable.
+
+`supabase_setup.sql` (v1) is superseded — do not run it. After any re-run of step 2 or 3,
+re-run step 4 (and 6 if it had been applied); every file is idempotent.
+
+---
+
+## Manual smoke-test checklist
 
 Run this against a **Vercel preview** before merging and again against **production** after
 deploying. Every item lists the steps and the expected result; anything else is a blocker.
-Automated gates (`npm run check`, `npm run check:i18n`, `npm run build`) run in CI on every push
-and pull request (`.github/workflows/ci.yml`) and must be green first.
+The automated gates above must be green first.
+
+A preview deployment uses the **production database** (the Supabase variables are set for
+Production and Preview), so everything you create there is real data: use test accounts and
+clean up afterwards. For the same reason a preview has no captcha keys and refuses signed-out
+requests (`503 captcha_unavailable`); those steps run on production. Previews sit behind Vercel Deployment Protection: in a browser sign in to
+Vercel first; for `curl` add the Protection Bypass for Automation header (see
+`api/README.md` → "Verify on a preview").
 
 Base URL below is `https://mentor-amazon.vercel.app`; substitute the preview URL where noted.
 "Fresh browser" means a private/incognito window with no localStorage and no Supabase session.
 
 Test accounts you need: one **mentor** (password login, has a mentors row), a second mentor's id
 (any `/mentor/:id` from the directory), one **mentee** (organisation type preferred), one **admin**
-(`users.user_type = 'admin'`, see "Before merging" step 6).
+(`users.user_type = 'admin'`, see "Before merging" step 7).
 
 ---
 
@@ -80,7 +174,7 @@ Use a mentee (org type) and a mentor whose profile has a Cal.com link.
 
 | # | Steps | Expected |
 | --- | --- | --- |
-| e1 | Mentee: `/mentors` → open a mentor card (`link-mentor-<id>`) → "Request a session" (`button-request-session`) → fill the goal (≥ 20 characters) → "Send request" | The dialog itself becomes the success state (`[data-testid=booking-success]`: the title reads "Request sent to <name>", the rail shows stop 1 done; no toast fires) and the profile's request card becomes the anchored "Request sent" block with stop 1 done. Anonymous visitors get one "Sign in" button (`/login?next=%2Fmentee-dashboard%2Fbookings`) plus a "Back to mentors" link and an inline "Create one" account link in the success state, never a redirect before the request; both `/login?next=…` and `/signup?next=…` open with the email field prefilled with the address the request was sent from (editable). Escape after success closes the dialog. Signed in, `/mentee-dashboard` lists the request under "Waiting for a reply" as **Awaiting mentor**. Mentor: reload any page → the bell (`button-notification-bell`) shows +1 with a "new booking request" notification (the bell refreshes on reload/navigation, it does not poll). |
+| e1 | Mentee: `/mentors` → open a mentor card (`link-mentor-<id>`) → "Request a session" (`button-request-session`) → fill the goal (≥ 20 characters) → "Send request" | The dialog itself becomes the success state (`[data-testid=booking-success]`: signed in, the title reads "Request sent to <name>"; signed out it reads "Request submitted", because the server never says whether a signed-out address has an account; the rail shows stop 1 done; no toast fires) and the profile's request card becomes the anchored "Request sent" block (signed out: "Request submitted") with stop 1 done. Signed out, use an address with no MentorConnect account: for one that has an account nothing is created, the mentor hears nothing, and that account's bell says "Request not sent: please sign in". Anonymous visitors get one "Sign in" button (`/login?next=%2Fmentee-dashboard%2Fbookings`) plus a "Back to mentors" link and an inline "Create one" account link in the success state, never a redirect before the request; both `/login?next=…` and `/signup?next=…` open with the email field prefilled with the address the request was sent from (editable). Escape after success closes the dialog. Signed in, `/mentee-dashboard` lists the request under "Waiting for a reply" as **Awaiting mentor**. Mentor: reload any page → the bell (`button-notification-bell`) shows +1 with a "new booking request" notification (the bell refreshes on reload/navigation, it does not poll). |
 | e2 | Mentee (org, pending verification): dashboard header | Org name with the amber "Verification pending" badge and the "Verification in review" banner; browsing/requesting still works. |
 | e3 | Mentor: `/mentor-portal/requests` | The request row shows the mentee name, the org name and an amber "Verification pending" badge with the muted "not verified yet" note. |
 | e4 | Mentor: click **Accept** | Row highlights, turns green with an "Accepted" pill for ~2.5 s, then leaves the pending list; toast fires. |
@@ -88,7 +182,7 @@ Use a mentee (org type) and a mentor whose profile has a Cal.com link.
 | e6 | Mentee: reload → bell | "Booking accepted" notification present; mark read → unread count drops immediately. |
 | e7 | Mentor: `/mentor-portal/sessions` → **Mark complete** on the accepted session → dialog (`dialog-complete-session`) → choose 45 min → confirm (`button-confirm-complete`) | Toast "…45 minutes"; the card moves to the Completed tab, is scrolled into view and rings for 2 s, shows "45 min". Dashboard "Volunteer hours" tile increases by 0.8. |
 | e8 | Mentee: `/mentee-dashboard/bookings` → **Give feedback** on the completed session (`button-give-feedback-<id>`) → rate → submit (`button-submit-feedback`) | Dialog closes, toast, the rated card scrolls into view and rings orange for ~2 s and now shows the rating; mentor (after reload) sees a "feedback received" notification; mentor's average rating on `/` updates (trigger-recomputed). Same dialog on `/my-bookings`. |
-| e8b | Mentee: in the Cal.com dialog (e5) actually book a slot | On Cal.com's success screen the app toasts "Session confirmed" and, after closing, the booking shows as **confirmed** with the slot time (no webhook involved). If Cal.com is blocked, the mentor can still complete the *accepted* session from `/mentor-portal/sessions`. |
+| e8b | Mentee: in the Cal.com dialog (e5) actually book a slot | On Cal.com's success screen the app toasts "Session confirmed" and, after closing, the booking shows as **confirmed** with the slot time (recorded by `record_cal_booking_from_embed`; the webhook, when connected, reaches the same state and reports `no_change`). With "Requires confirmation" on the Cal.com event the booking waits as "Waiting for <mentor> to confirm the time" instead. If Cal.com is blocked, the mentor can still complete the *accepted* session from `/mentor-portal/sessions`. |
 | e9 | Mentor: `/mentor-portal/feedback` → leave feedback for the mentee | Toast; mentee (after reload) sees a "feedback received" notification and the mentor's feedback on their dashboard. |
 | e10 | Mentor: Decline a second request | Row turns muted red with "Declined" pill; mentee (after reload) sees **rejected** and a notification. |
 | e11 | Repeat e1 six times quickly with the same mentee email | The 6th request fails with the inline `booking-error` alert (`role="alert"`, `data-kind="rateLimited"`): "You've reached the limit of requests for now. Try again in an hour." Input is preserved (DB trigger: 5 per mentee per hour). |
@@ -110,12 +204,12 @@ Toggle with the text button in the header (`button-language-toggle`; it reads "�
 | f9 | `/admin`, `/admin/mentees`, `/admin/bookings`, `/admin/access` | Stat strip, tables scroll horizontally *inside* the table only, detail Sheets open from the trailing side, dialogs usable at 375. |
 | f10 | Reload any page while in Arabic | Language persists (localStorage `language`), direction applied before first paint (no LTR flash). |
 
-## (g) Analytics demo banner
+## (g) Analytics shows real data only
 
 | # | Steps | Expected |
 | --- | --- | --- |
-| g1 | On a project with **fewer than 5** bookings, sign in and open `/analytics` | Amber "demo data" banner (`banner-demo-data`) at the top naming the real count and the threshold (5), plus a "Demo" badge (`badge-demo-data`) in the header; charts show the seeded demo rows; CSV downloads are prefixed `DEMO-` and start with a `# DEMO DATA` row. |
-| g2 | Same page after 5 or more real bookings exist | Banner and badge gone; KPIs, Countries, Mentors and Bookings tabs show the real rows; "Volunteer hours" equals sum(completed minutes)/60. |
+| g1 | Sign in as a mentor or an admin and open `/analytics` | Only real bookings: no demo banner, no page-view, traffic-source or device panels; top mentors are the mentors with the most real requests; sessions without a recorded duration are counted as "not recorded" rather than guessed. A mentee gets the "No access" card. |
+| g2 | Admin: `/analytics/report` | The impact report renders; a mentor gets "No access". |
 | g3 | Click any bar, bar segment, legend chip or ranked-table name (there are no pie/donut charts) | "Showing: <segment> · Clear" chip and a details table appear under the chart; Clear restores. |
 
 ## (h) Security headers
@@ -131,24 +225,141 @@ curl -si -X POST https://mentor-amazon.vercel.app/api/auth/logout | grep -iE '^(
 | h2 | `x-content-type-options: nosniff`, `referrer-policy: strict-origin-when-cross-origin`, `permissions-policy: camera=(), microphone=(), geolocation=(), payment=()`, `strict-transport-security: max-age=63072000; includeSubDomains; preload`. |
 | h3 | Every `/api/*` response carries `cache-control: no-store`. |
 | h4 | Browser console on `/`, `/login`, `/mentee-dashboard` (with the Cal dialog open) and `/analytics` shows **no** CSP violation reports. |
-| h5 | View-source of `index.html` and search the JS chunks: no `SUPABASE_SERVICE_ROLE_KEY`, no `AMAZON_OIDC_CLIENT_SECRET` (only `VITE_`-prefixed values are ever inlined). |
+| h5 | View-source of `index.html` and search the JS chunks: no `SUPABASE_SERVICE_ROLE_KEY`, no `AMAZON_OIDC_CLIENT_SECRET`, no `TURNSTILE_SECRET_KEY` (only `VITE_`-prefixed values are ever inlined). |
+
+## (i) Booking requests, Turnstile and Cal.com sync
+
+| # | Steps | Expected |
+| --- | --- | --- |
+| i1a | **Before `0004` has run** (the normal state after the merge). Fresh browser → a featured mentor's `/mentor/<slug>/book` (e.g. from the landing page) | The scheduling card shows "Requests open soon" (`scheduler-opening-soon`) with no request form (`form-session-request` absent), and the profile has no heart (`button-favorite-…`). No Cal.com calendar is embedded. This is the intended state until the programme confirms consent. |
+| i1b | Fresh browser → `/mentors` → an **ordinary** (database) mentor's card → `/mentor/<uuid>` → "Request a session" (`button-request-session`) → fill name, an e-mail address that has **no** MentorConnect account (a fresh plus-address, e.g. `you+i1b-<date>@…`) and a goal of 20+ characters → "Send request" (`button-submit-booking`) | On production the Turnstile widget is shown and must pass before Send works. "Request submitted" (`booking-success`) appears only after `POST /api/requests` answered `200` (DevTools → Network); signed out, the page never claims the request reached the mentor. That mentor, signed in, sees a "new booking request" in the bell after a reload. Decline it afterwards (it is real data). With an address that has an account the answer is the same, but nothing is created: the mentor's bell stays empty and that account's bell gets "Request not sent: please sign in". On a preview the POST answers `503 captcha_unavailable` (no captcha keys there), so i1b runs on production. |
+| i1c | **Only after `0004` has run** (see "Before merging", step 11). Fresh browser → a featured mentor's `/mentor/<slug>/book` → submit the form | Use an address with no account, as in i1b. The form is shown (Turnstile included); "Request submitted" only after the server answered; the request is in `/admin/bookings` under "Programme-managed" and every admin's bell has it. No Cal.com calendar is embedded on this page. |
+| i2 | `curl -si -X POST <origin>/api/requests -H 'content-type: application/json' -d '{"mentorId":"<uuid>","name":"x","email":"x@example.com","goal":"at least twenty characters here"}'` with Turnstile configured | `403 {"error":"captcha_failed"}` (no token); nothing is written. On production with the Turnstile keys missing the answer is `503 {"error":"captcha_unavailable"}`: set both keys (see "Before merging", step 5). |
+| i3 | Signed-in mentee → request a session from a mentor profile | No captcha; the account's own e-mail is used (read-only); a second request while one is pending says it is already pending. |
+| i4 | Mentor → Profile settings → "Cal.com booking sync" | Subscriber URL with `?mentor=<id>`, masked secret with Show/Copy, the numbered Cal.com steps, Rotate (warns the old secret works for 24 h). |
+| i5 | In Cal.com add the webhook (see `api/README.md`), click **Ping test** | The panel shows "Ping · just now" within 15 s. |
+| i6 | `curl -si -X POST '<origin>/api/webhooks/cal?mentor=<id>' -H 'x-cal-signature-256: no-secret-provided' -d '{}'` | `401 {"error":"invalid_signature"}`. |
+| i7 | Cron: `curl -si <origin>/api/cron/reminders -H "Authorization: Bearer $CRON_SECRET"` | `200 {"ok":true,"reminders":n,"emails":n,"failures":0}`; without the header `401`. |
+| i8 | Local only, with Cloudflare's failing test keys: start the dev server with `VITE_TURNSTILE_SITE_KEY=2x00000000000000000000AB` (the widget always fails), then separately with the passing site key and `TURNSTILE_SECRET_KEY=2x0000000000000000000000000000000AA` (the server always refuses), and submit a featured `/book` form each time | Always-failing widget: the widget shows "Verification failed" and Send says "Complete the security check to send your request." without any POST. Always-refusing secret: the POST answers `403 captcha_failed` and the form says "The security check didn't pass. Try it again, then send." No booking row either way. |
 
 ---
 
 ## Before merging the PR — order of operations
 
-Do these in order; each step assumes the previous one is done.
+This is the complete checklist; the PR description only summarises it. Do the steps in order;
+each one assumes the previous one is done.
 
-1. **CI green** on the PR: `npm run check` (tsc), `npm run check:i18n` (EN/AR parity + every `t('…')` key defined), `npm run build`. The build uses placeholder Supabase values, so a green build does not prove the runtime config.
-2. **Supabase — run the schema/RLS script once** (SQL editor, as the project owner): paste `supabase_setup_v2.sql` and run it. It is idempotent (safe to re-run) and prints only NOTICEs. Then run the checks in its section 9 ("VERIFICATION QUERIES"): `mentors_public` has no `email` column, RLS is enabled on all 13 tables, the `mentees_guard_verification` trigger fires `BEFORE INSERT OR UPDATE`. Make sure the `uploads` storage bucket exists (Storage → New bucket, public read).
-3. **Supabase — Auth settings**: Authentication → Providers → Email enabled (the SSO bridge issues magic links via `generateLink`); Authentication → URL configuration → Site URL `https://mentor-amazon.vercel.app`. Confirm signups are allowed (the bridge creates auth users for approved aliases).
-4. **Vercel — environment variables** (Settings → Environment Variables, tick **Production and Preview**):
-   - Client (inlined at build time): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`; optional `VITE_PROGRAMME_CONTACT_EMAIL` (mailto shown to rejected organisations).
-   - Server only (never `VITE_`): `AMAZON_OIDC_ISSUER`, `AMAZON_OIDC_CLIENT_ID` (`mentor-amazon.vercel.app`), `AMAZON_OIDC_CLIENT_SECRET`, `AMAZON_OIDC_REDIRECT_URI` (`https://mentor-amazon.vercel.app/api/auth/callback/amazon`, exact), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ORIGIN` (`https://mentor-amazon.vercel.app`). Optional: `AMAZON_OIDC_SCOPES` (default `openid`), `AMAZON_OIDC_DEBUG` (`true` on integ only).
-   - Redeploy after adding variables (they are read at build/cold start).
-5. **Amazon Federate registration** (see `api/README.md` → "What to send Amazon's identity team"): redirect URI above, client id, request `sub=amazonAlias`. Until Amazon confirms, only password login is testable; SSO checks in (d) need the production domain.
-6. **Bootstrap the first admin** (nobody can self-promote): the admin signs in **once** — via Amazon (lands on `/mentor-onboarding` as a mentor) or with email/password signup — then in the SQL editor edit the two values in section 8 (`v_email`, `v_alias`) of `supabase_setup_v2.sql` and run that `DO` block alone. Sign in again → `/admin`. Put the placeholder back so re-running the whole file stays a no-op.
-7. **Run the preview smoke test**: sections (a)–(c), (e)–(h) on the preview URL; (d) on production after step 5.
-8. **Merge and deploy production**, then re-run (a), (d) d1/d4/d7/d9, (g) and (h) against `https://mentor-amazon.vercel.app`.
-9. **Approve mentors**: `/admin/access` → "Add alias" (or Mentors tab → "Approve access") for each Amazon mentor; they sign in with Amazon and complete `/mentor-onboarding`.
-10. **Debug off**: once the ID-token claims are confirmed via `/api/auth/debug-claims`, remove `AMAZON_OIDC_DEBUG` and redeploy; re-run d7.
+1. **CI green** on the PR: `build` (tsc, unit tests, i18n parity, build) and `db-integration` (integration suites and the idempotency check on a fresh local stack). The build uses placeholder Supabase values, so a green build does not prove the runtime config.
+2. **Supabase — read-only checks** (SQL editor, as the project owner). Paste the results into the PR:
+   ```sql
+   select to_regclass('public.mentee_favorites') fav, to_regclass('public.activity_events') ev,
+          to_regclass('public.booking_reminders') rem, to_regclass('public.cal_webhook_events') cal;
+   select table_name, column_name, data_type from information_schema.columns
+     where table_schema='public' and column_name in ('id','mentor_id','mentee_id','booking_id') order by 1,2;
+   select pg_get_functiondef('public.is_admin()'::regprocedure);
+   select u.id, u.email, a.id as auth_id from public.users u left join auth.users a on lower(a.email)=lower(u.email)
+     where u.user_type='admin';                                   -- id must equal auth_id
+   select cal_event_uri, count(*) from public.bookings where cal_event_uri is not null group by 1 having count(*)>1; -- expect 0 rows
+   select distinct status from public.bookings;
+   select id, public from storage.buckets;  select count(*) from public.mentors;
+   ```
+3. **Supabase — expand:** run `migrations/0002_production_readiness.sql` (paste the whole file; one transaction; a failed pre-check names the rows to fix and applies nothing), then its verification queries. The site that is live keeps working: what `0002` tightens (listed at the top of the file) is nothing it relies on. `0002` also creates the `uploads` bucket (public, 5 MB, images). Read every `WARNING` it prints and keep them for the PR: `users.profile_id links cleared …` names each account whose profile link pointed at a row that is not its own (such links could be made before `0002`; the link is removed, so check each one and re-link a legitimate one as an admin); `rows already hold a reserved featured-mentor id` and `mentors and mentees rows share these ids` name rows an admin deletes (before step 11). Do **not** run `0003` yet (step 10).
+4. **Supabase — Auth settings:** Authentication → Providers → Email enabled (the SSO bridge issues magic links via `generateLink`); Authentication → URL configuration → Site URL `https://mentor-amazon.vercel.app`; signups allowed (the bridge creates auth users). Leave **Attack Protection → CAPTCHA off** until step 12.
+5. **Vercel — environment variables** (Settings → Environment Variables), then redeploy (they are read at build and cold start):
+   - **Remove** `VITE_DEFAULT_CAL_LINK` from every environment. Nothing reads it any more; it pointed at Cal.com's sample account.
+   - **Production and Preview.** Client (inlined at build time): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`; optional `VITE_PROGRAMME_CONTACT_EMAIL` (mailto shown to rejected organisations) and `VITE_PUBLIC_APP_ORIGIN` (`https://mentor-amazon.vercel.app`, shown in the Cal.com sync panel). Server only (never `VITE_`): `AMAZON_OIDC_ISSUER`, `AMAZON_OIDC_CLIENT_ID` (`mentor-amazon.vercel.app`), `AMAZON_OIDC_CLIENT_SECRET`, `AMAZON_OIDC_REDIRECT_URI` (`https://mentor-amazon.vercel.app/api/auth/callback/amazon`, exact), `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `APP_ORIGIN` (`https://mentor-amazon.vercel.app`), `CRON_SECRET` (also as a GitHub Actions secret, so the hourly reminders run). Optional: `AMAZON_OIDC_SCOPES` (default `openid`), `AMAZON_OIDC_DEBUG` (`true` on integ only), `CAL_WEBHOOK_SECRET` (programme Cal.com Team/Org webhook only; `openssl rand -hex 32`, never committed), `RESEND_API_KEY` and `MAIL_FROM`.
+   - **Production only: Turnstile.** `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` (both, from the Cloudflare Turnstile widget for `mentor-amazon.vercel.app`), and `TURNSTILE_ALLOWED_HOSTNAMES=mentor-amazon.vercel.app`. Without both keys production refuses anonymous requests (`503 captcha_unavailable`); `TURNSTILE_DISABLED=1` is the only way to run production without a captcha, and it is logged on every request. **Do not tick Preview** for these three. That widget rejects preview hostnames, and the sign-in, sign-up and reset forms refuse to submit without a token whenever the site key is set, so nobody could sign in on a preview. On Preview leave all Turnstile variables unset, `TURNSTILE_DISABLED` included: previews use the production database, so without a captcha `/api/requests` refuses anonymous requests there too (`503 captcha_unavailable`); signed-in requests work. If Preview has Cloudflare's always-pass test pair (`1x00000000000000000000AA` / `1x0000000000000000000000000000000AA`) from earlier instructions, remove it: it passes every request, so it is no protection.
+   - **Recommended for Production:** `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (an Upstash Redis REST database). Without them every function instance keeps its own rate-limit counters, so the IP limits on `/api/requests` and the SSO routes only hold per instance.
+   - **Never** set `VITE_ALLOW_LOCAL_FALLBACK` in Production.
+6. **Amazon Federate registration** is done on Amazon's side (see `api/README.md` → "Federate registration"): the client id and secret are issued and the redirect URI above on `mentor-amazon.vercel.app` is registered. Localhost and preview hosts are not registered, so the SSO checks in (d) run on the production domain.
+7. **Bootstrap the first admin** (nobody can self-promote): the admin signs in **once** — via Amazon (lands on `/mentor-onboarding` as a mentor) or with email/password signup — then in the SQL editor edit the values in section 8 of `supabase_setup_v2.sql` and run that `DO` block alone. `v_email` is their sign-in email. `v_alias` is **only for an admin who signs in with Amazon** (their alias). Leave it `''` for an email/password admin: the block only sets the role and never marks the account as an Amazon one, so their password, password changes and resets keep working, including after any re-run of 0002. Sign in again → `/admin`. Put the placeholder back so re-running the whole file stays a no-op. If an earlier copy of this block was already run for an email/password admin, clear the Amazon marker it wrote: `update public.users set amazon_alias = null where lower(email) = lower('<their email>') and password <> 'managed-by-amazon-sso';`. A password change or reset then works again; if 0002 was re-run in the meantime, their old password was replaced, so use the reset.
+8. **Preview checks, before merging**, on the PR's preview URL:
+   - `api/README.md` → "Verify on a preview": one signed Cal.com Ping must answer `200`, and one anonymous request `503 {"error":"captcha_unavailable"}` (a preview has no captcha keys, so it refuses anonymous requests; that answer comes only after the body arrived and passed validation). They prove that request bodies reach the functions on Vercel's runtime. If either answers anything else, do not merge.
+   - Smoke-test sections (a)–(c), (e)–(h), plus i1a. Signed-out requests (e1's signed-out branch, i1b) are refused on a preview by design and run on production (step 9). Section (d) runs on production only (step 9).
+9. **Merge**; Vercel deploys production. Re-run against `https://mentor-amazon.vercel.app`: (a), (d) d1/d4/d7/d9, (g), (h), and (i) i1a, i1b, i2, i4, i6, i7 (i5 once a Cal.com test account is available).
+10. **Supabase — contract:** run `migrations/0003_restrict_legacy_writes.sql`. It removes the old client's direct-write paths. Then repeat e1, i1b and i3. From now on the previous deployment no longer works against the database: read [Rollback](#rollback) before redeploying an older build.
+11. **Optional: featured mentors.** Only after the programme confirms that the five featured mentors agree to receive requests, run `migrations/0004_seed_featured_mentors.sql`, then i1c. Until then they show "Requests open soon" (i1a), which is intended.
+12. **Supabase Auth CAPTCHA**, once the production Turnstile keys are live (step 5) and step 9 passed: Authentication → Attack Protection → enable CAPTCHA protection → provider Turnstile (Cloudflare) → paste the **secret** key (the same value as `TURNSTILE_SECRET_KEY`) → Save. Immediately, in a fresh browser on production: sign up, sign in with a password, request a password reset, and sign in with Amazon (the bridge's magic-link exchange). If any of them fails, switch CAPTCHA off again straight away and report it. CAPTCHA covers the whole Supabase project, previews included. From then on, password sign-in, sign-up and reset on a preview need a token from the production widget, which does not run on preview hostnames. So run preview checks of those forms before this step, or with CAPTCHA briefly off.
+13. **Mentors sign in**: access is open to everyone Amazon lets through Federate (Amazon restricts it by internal group; see `api/README.md` → "Account rules"). There is no approval step: a first Amazon sign-in creates an active mentor, who completes `/mentor-onboarding`. To revoke someone, set `approved_users.is_active = false` (this blocks their next sign-in; it does not end a live session). To make someone an admin, set `approved_users.role = 'admin'` before their first sign-in.
+14. **Debug off**: once the ID-token claims are confirmed via `/api/auth/debug-claims`, remove `AMAZON_OIDC_DEBUG` and redeploy; re-run d7.
+
+### Rollback
+
+Undo in the reverse order of the steps above. `0002` stays in place (the previous deployment works with it).
+
+- **Supabase Auth CAPTCHA** (step 12): switch it off in Attack Protection. Always do this before rolling the code back: the previous client sends no captcha token, so nobody could sign in with a password.
+- **Featured mentors** (step 11): `update public.mentors set is_available = false where managed_by_programme;` hides them again. Their requests and history stay.
+- **Code, once `0003` has run** (step 10): restore the old client's write paths **first**. In the `ROLLBACK` block at the bottom of `migrations/0003_restrict_legacy_writes.sql`, copy the lines from `-- BEGIN;` through `-- COMMIT;` (nothing above or below: the header and the note after `COMMIT` are not SQL), remove the leading `-- ` from each line, and run them as one block in the SQL editor. **Then** roll production back to the previous deployment (Vercel → Deployments → the previous production deployment → Instant Rollback or Promote). In the other order the old client breaks every booking request: it writes `mentees` and `bookings` directly, which `0003` revokes (`42501 permission denied`), and the booking guard refuses its session confirm.
+- **Code, before `0003`** (steps 8–9): roll back to the previous deployment. It keeps working with `0002` applied.
+- **Environment variables:** the previous deployment ignores the new ones; nothing needs removing.
+
+---
+
+## Cal.com live test
+
+Required before mentors are told to connect Cal.com (design §6.6); it needs a real (free)
+Cal.com test account and a public URL: production; a preview, with
+`&x-vercel-protection-bypass=<token>` appended to the subscriber URL (see `api/README.md` →
+"Verify on a preview"; without it Vercel Deployment Protection answers Cal.com with 401); or a
+tunnel (e.g. `cloudflared`) to the dev server running with `MC_LOCAL_API=1`.
+
+1. Point a webhook at `…/api/webhooks/cal?mentor=<test mentor id>` with that mentor's secret
+   (Profile settings → Cal.com booking sync). Leave "Custom payload template" empty.
+2. **Ping test** → the panel shows "Ping".
+3. Book through our embed ("Choose a time") and capture the payload: `metadata.mc_booking` is
+   present, `organizer.username` equals the username in the mentor's `cal_link`, `status` is
+   `ACCEPTED`; the booking is confirmed once (the embed and the webhook agree: one
+   `booking_confirmed` activity row).
+4. Turn on **Requires confirmation** on the event type: capture BOOKING_REQUESTED (`PENDING`,
+   the booking waits), accept it in Cal.com (BOOKING_CREATED → confirmed), and reject another
+   (BOOKING_REJECTED → the mentee is asked to choose another time).
+5. Reschedule from the attendee e-mail and record whether a BOOKING_CANCELLED for the old uid
+   is also sent and in which order (the handler revives a session cancelled by Cal.com within
+   7 days either way). Also reschedule through our `reschedule/<uid>` embed.
+6. Cancel from the Cal.com dashboard → the booking is canceled by `cal`, both parties notified.
+7. An unsigned POST gets `401`; re-sending a captured body answers `duplicate`.
+8. Save the payloads (secrets and e-mails redacted) under `tests/fixtures/cal/` and adjust the
+   transition table in `migrations/0002` §11 and its tests if Cal.com behaves differently.
+
+---
+
+## Removing test data
+
+Testers' rows on a real project, in delete order (SQL editor as the owner). Replace the
+condition with the testers' addresses, e.g. `lower(email) like '%@example.test'`. It covers
+every foreign key into `mentors`, `mentees`, `bookings` and `users` (checked against the
+catalog); run it in one transaction (`begin; … commit;`) so a surprise leaves nothing half-done:
+
+```sql
+-- the people and their rows
+create temp table t_mentors as select id from public.mentors where lower(email) like '%@example.test';
+create temp table t_mentees as select id from public.mentees where lower(email) like '%@example.test';
+create temp table t_bookings as select id from public.bookings
+  where mentor_id in (select id from t_mentors) or mentee_id in (select id from t_mentees);
+
+delete from public.activity_events where subject_id in (select id from t_bookings)
+  or visible_to && array(select id::text from t_mentors union all select id::text from t_mentees);
+delete from public.booking_reminders where booking_id in (select id from t_bookings);
+delete from public.mentee_favorites where mentee_id in (select id from t_mentees) or mentor_id in (select id from t_mentors);
+delete from public.mentor_cal_webhooks where mentor_id in (select id from t_mentors);
+delete from public.notifications where booking_id in (select id from t_bookings) or lower(recipient_email) like '%@example.test';
+delete from public.booking_notes where booking_id in (select id from t_bookings);
+delete from public.mentor_tasks where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors)
+  or mentee_id in (select id from t_mentees);
+delete from public.mentor_earnings where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors);
+delete from public.mentor_activity_log where booking_id in (select id from t_bookings) or mentor_id in (select id from t_mentors)
+  or mentee_id in (select id from t_mentees);
+delete from public.mentor_availability where mentor_id in (select id from t_mentors);
+delete from public.bookings where id in (select id from t_bookings);
+update public.approved_users set mentor_id = null where mentor_id in (select id from t_mentors);
+update public.users set profile_id = null where profile_id in (select id from t_mentors union all select id from t_mentees);
+delete from public.mentors where id in (select id from t_mentors);
+delete from public.mentees where id in (select id from t_mentees);
+delete from public.user_identifiers where user_id in (select id from public.users where lower(email) like '%@example.test');
+delete from public.users where lower(email) like '%@example.test';
+delete from public.approved_users where lower(email) like '%@example.test';
+```
+
+Then delete the auth users in Dashboard → Authentication → Users (and their photos in
+Storage → uploads). The `cal_webhook_events` log keeps only ids, triggers and outcomes; it can
+be left or trimmed by `received_at`.

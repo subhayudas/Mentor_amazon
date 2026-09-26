@@ -5,25 +5,29 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { z } from "zod";
-import { KeyRound, ShieldAlert, Upload, X } from "lucide-react";
+import { KeyRound, LogIn, ShieldAlert, Upload, X } from "lucide-react";
 
 import { mentorService, uploadService } from "@/lib/services";
 import { queryClient } from "@/lib/queryClient";
 import { supabase } from "@/lib/supabase";
 import { useRequireRole } from "@/components/RouteGuard";
+import { useAuth } from "@/context/AuthContext";
+import { syncRoleStorage } from "@/lib/auth";
+import { CAL_PATTERN, normalizeCalLink } from "@/lib/calLink";
+import { ssoLoginHref } from "@/lib/ssoClient";
 import type { Mentor } from "@/lib/database";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { OnboardingShell, onboardingSectionClass } from "@/components/onboarding/OnboardingShell";
-import { IS_LOCAL, normalizeCalLink } from "@/lib/demo";
+import { IS_LOCAL } from "@/lib/demo";
 import { localStore, slugFor } from "@/lib/localStore";
 import { sessionFromMentor, setLocalSession } from "@/lib/localAuth";
 import { logActivity } from "@/lib/activity";
@@ -43,21 +47,30 @@ function quoteFilterValue(value: string): string {
 interface OnboardingApproval {
   /** An active approved_users row exists for this alias or email. */
   approved: boolean;
-  /** A mentors row already belongs to this email; onboarding must not create a second one. */
+  /**
+   * A mentors row this account can already open (its own email, or the
+   * `users.profile_id` link): onboarding must not create a second one (F25).
+   */
   existingMentorId: string | null;
+  /**
+   * The programme linked a mentors row to this alias (`approved_users.mentor_id`)
+   * that this session cannot open yet — it becomes the account's profile at the
+   * next Amazon sign-in. Also never a reason to create a second profile.
+   */
+  linkedMentorId: string | null;
 }
 
 /**
  * Gate card shown instead of the form when the session cannot onboard.
  * Explains why instead of redirecting silently; the heading takes focus (D7).
  */
-function OnboardingGateCard({ title, body, requestAccessHref }: { title: string; body: string; requestAccessHref?: string }) {
+function OnboardingGateCard({ title, body, requestAccessHref, signInAgain }: { title: string; body: string; requestAccessHref?: string; signInAgain?: boolean }) {
   const { t } = useTranslation();
   return (
     <StatusPage>
       <StatusCard
         titleAs="h1"
-        tone="danger"
+        tone={signInAgain ? "warning" : "danger"}
         icon={ShieldAlert}
         title={title}
         description={body}
@@ -68,6 +81,12 @@ function OnboardingGateCard({ title, body, requestAccessHref }: { title: string;
             <Button asChild variant="outline" data-testid="link-gate-home">
               <Link href={ROUTES.home}>{t("mentorOnboarding.gate.backHome")}</Link>
             </Button>
+            {signInAgain && (
+              <a href={ssoLoginHref(ROUTES.mentorPortal)} className={buttonVariants({ variant: "secondary" })} data-testid="link-gate-sign-in-again">
+                <LogIn className="rtl:-scale-x-100" aria-hidden="true" />
+                {t("access.signInAgain")}
+              </a>
+            )}
             {requestAccessHref && (
               <Button asChild variant="secondary" data-testid="link-gate-request-access">
                 <Link href={requestAccessHref}>
@@ -193,7 +212,6 @@ const LANGUAGE_OPTIONS = [
   "Turkish",
 ];
 
-const CAL_PATTERN = /^[a-z0-9._-]+\/[a-z0-9_-]+$/i;
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 export default function MentorOnboarding() {
@@ -202,20 +220,23 @@ export default function MentorOnboarding() {
   const ids = useId();
   // Anonymous visitors are sent to /login?next=/mentor-onboarding by the guard hook.
   const { status: authStatus, user } = useRequireRole();
+  const { refresh } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Onboarding is for approved Amazon mentors only. Identity comes from the
-  // session; the approval check reads the caller's own approved_users row
-  // (alias or email) and looks for a mentors row that already belongs to
-  // this email, in which case the portal is the right destination.
+  // Onboarding is for Amazon mentors whose access is active. Identity comes
+  // from the session; the check reads the caller's own approved_users row
+  // (alias or email) and the mentors row this account already owns (by email
+  // or the users.profile_id link, as RLS does) — or the one the programme
+  // linked to the alias. Any of those means no second profile (F25).
   const isMentorSession = authStatus === "ok" && !!user && user.user_type === "mentor";
   const sessionEmail = user?.email ?? "";
   const sessionAlias = user?.amazon_alias ?? "";
 
+  const sessionProfileId = user?.profile_id;
   const approvalQuery = useQuery<OnboardingApproval>({
-    queryKey: ["mentor-onboarding", "approval", sessionEmail, sessionAlias],
+    queryKey: ["mentor-onboarding", "approval", sessionEmail, sessionAlias, sessionProfileId ?? null],
     enabled: isMentorSession && !IS_LOCAL,
     // Always re-check on entry: the answer changes the moment a profile is created or an alias is approved.
     staleTime: 0,
@@ -229,9 +250,10 @@ export default function MentorOnboarding() {
         .select("id, role, is_active, mentor_id")
         .or(filters.join(","));
       if (error) throw error;
-      const approved = (approvedRows ?? []).some((row: { is_active: boolean }) => row.is_active);
-      const existing = await mentorService.getByEmail(sessionEmail);
-      return { approved: approved || !!existing, existingMentorId: existing?.id ?? null };
+      const active = (approvedRows ?? []).filter((row: { is_active: boolean }) => row.is_active) as { mentor_id?: string | null }[];
+      const existing = await mentorService.getOwn({ email: sessionEmail, profileId: sessionProfileId });
+      const linkedMentorId = existing ? null : active.find((row) => row.mentor_id)?.mentor_id ?? null;
+      return { approved: active.length > 0 || !!existing, existingMentorId: existing?.id ?? null, linkedMentorId };
     },
   });
 
@@ -240,6 +262,7 @@ export default function MentorOnboarding() {
       setLocation(ROUTES.mentorPortal, { replace: true });
     }
   }, [approvalQuery.data?.existingMentorId, setLocation]);
+  // (A linked-but-unreadable profile shows its own card below; redirecting would bounce between the portal and here.)
 
   const schema = useMemo(
     () =>
@@ -340,24 +363,33 @@ export default function MentorOnboarding() {
         why_joined: data.why_joined?.trim() || undefined,
         is_available: true,
       }),
-    onSuccess: (newMentor) => {
+    onSuccess: async (newMentor) => {
       queryClient.invalidateQueries({ queryKey: ["mentors"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       if (!newMentor?.id) {
         toast.error(t("mentorOnboarding.saveError"));
         return;
       }
       toast.success(t("mentorOnboarding.successTitle"), { description: t("mentorOnboarding.successMessage") });
-      localStorage.setItem("mentorId", newMentor.id);
-      localStorage.setItem("mentorEmail", newMentor.email ?? "");
-      localStorage.setItem("mentorName", newMentor.name);
-      window.dispatchEvent(new Event("userRegistered"));
       logActivity({ actor_type: "mentor", actor_id: newMentor.id, actor_name: newMentor.name, type: "mentor_registered", subject_type: "mentor", subject_id: newMentor.id, summary: t("showcase.activity.summaries.mentorRegistered", { name: newMentor.name }) });
       if (IS_LOCAL) {
+        try {
+          localStorage.setItem("mentorId", newMentor.id);
+          localStorage.setItem("mentorEmail", newMentor.email ?? "");
+          localStorage.setItem("mentorName", newMentor.name);
+        } catch {
+          /* storage blocked: the local session below still carries the profile */
+        }
+        window.dispatchEvent(new Event("userRegistered"));
         // The new profile is the signed-in account from here on; the dashboard opens in the mentor view.
         setLocalSession(sessionFromMentor(newMentor));
         setLocation("/dashboard");
         return;
       }
+      // Database mode: re-read the identity so the portal sees the new profile id at once (no
+      // bounce back here), then land on the database-backed mentor portal (C12, AM3).
+      const refreshed = await refresh();
+      if (refreshed) syncRoleStorage(refreshed);
       setLocation(ROUTES.mentorPortal);
     },
     onError: () => {
@@ -417,15 +449,14 @@ export default function MentorOnboarding() {
     return <OnboardingGateCard title={t("mentorOnboarding.gate.checkFailedTitle")} body={t("mentorOnboarding.gate.checkFailedBody")} />;
   }
 
+  if (!IS_LOCAL && approvalQuery.data?.linkedMentorId) {
+    return <OnboardingGateCard title={t("mentorOnboarding.gate.linkedTitle")} body={t("mentorOnboarding.gate.linkedBody")} signInAgain />;
+  }
+
   if (!IS_LOCAL && !approvalQuery.data?.approved) {
+    // Access is open to every Amazon employee; an inactive row means the programme team turned it off (F49).
     const alias = user?.amazon_alias || user?.email || "";
-    return (
-      <OnboardingGateCard
-        title={t("mentorOnboarding.gate.notApprovedTitle")}
-        body={t("mentorOnboarding.gate.notApprovedBody", { alias: bidi(alias) })}
-        requestAccessHref={`${ROUTES.requestAccess}?alias=${encodeURIComponent(alias)}`}
-      />
-    );
+    return <OnboardingGateCard title={t("mentorOnboarding.gate.inactiveTitle")} body={t("mentorOnboarding.gate.inactiveBody", { alias: bidi(alias) })} />;
   }
 
   const sectionClass = onboardingSectionClass;

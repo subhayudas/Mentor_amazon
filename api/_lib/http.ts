@@ -33,6 +33,66 @@ export function sendMethodNotAllowed(res: VercelResponse, allow: string[]): void
   sendJson(res, 405, { error: 'method_not_allowed' });
 }
 
+/**
+ * 503 for a route that cannot serve right now (missing server env, migration not applied).
+ * Deliberately names nothing: the caller logs the details with console.error.
+ */
+export function sendUnavailable(res: VercelResponse): void {
+  sendJson(res, 503, { error: 'unavailable' });
+}
+
+export type RawBody = { ok: true; body: Buffer } | { ok: false; reason: 'too_large' };
+
+/**
+ * Read the raw request body from the stream, refusing more than `limitBytes` (checked on the
+ * declared content-length first, then on the bytes actually received). `req.body` is never
+ * touched, so signature checks see exactly the bytes that were sent.
+ *
+ * The bytes are collected with `data` / `end` listeners, never `for await (… of req)`. On
+ * Vercel, @vercel/node's helpers read the whole stream before the handler runs (whenever the
+ * request has a Content-Type) and then replay it through a shim that re-emits only `data`,
+ * `end` and `read`. An async iterator runs against the original, already-consumed stream and
+ * yields nothing, so every body arrived empty (tests/api-vercel-runtime.test.ts drives the
+ * handlers through Vercel's own dev-server to prove this). Listeners work with the shim, with a
+ * plain IncomingMessage and with the Readable the tests and the vite adapter pass.
+ */
+export function readRawBody(req: VercelRequest, limitBytes: number): Promise<RawBody> {
+  const declared = Number(req.headers['content-length'] ?? '');
+  if (Number.isFinite(declared) && declared > limitBytes) return Promise.resolve({ ok: false, reason: 'too_large' });
+  // A stream that already ended and is not being replayed (the shim installs its own `on`) will
+  // never emit again: answer with what arrived, nothing, instead of waiting for the timeout.
+  if (req.readableEnded && !Object.prototype.hasOwnProperty.call(req, 'on')) {
+    return Promise.resolve({ ok: true, body: Buffer.alloc(0) });
+  }
+  return new Promise<RawBody>((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    let settled = false;
+    req.on('data', (chunk: Buffer | string) => {
+      if (settled) return;
+      const buf = typeof chunk === 'string' ? Buffer.from(chunk) : chunk;
+      size += buf.length;
+      if (size > limitBytes) {
+        // Stop collecting; the rest of the upload drains unread while the 413 goes out.
+        settled = true;
+        resolve({ ok: false, reason: 'too_large' });
+        return;
+      }
+      chunks.push(buf);
+    });
+    req.on('end', () => {
+      if (settled) return;
+      settled = true;
+      resolve({ ok: true, body: Buffer.concat(chunks) });
+    });
+    req.on('error', (err: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(err);
+    });
+  });
+}
+
 /** Parse the request URL once; Vercel's `req.query` helper is not relied on. */
 export function requestUrl(req: VercelRequest): URL {
   return new URL(req.url ?? '/', 'http://localhost');

@@ -176,7 +176,47 @@
     "showPassword": "Show password",
     "hidePassword": "Hide password",
     "confirmEmailTitle": "Check your email",
-    "confirmEmailBody": "We sent a confirmation link to {{email}}. Open it, then sign in to continue."
+    "confirmEmailBody": "We sent a confirmation link to {{email}}. Open it, then sign in to continue.",
+    "errors": {
+      "email_not_confirmed": "Open the confirmation link we emailed you, then sign in. Didn't get it? Send it again below.",
+      "confirmFirstTitle": "Confirm your email first",
+      "email_rate_limited": "Too many emails were sent to this address. Wait a few minutes, then try again.",
+      "request_rate_limited": "Too many attempts. Wait a minute, then try again.",
+      "send_failed": "We couldn't send the email. Contact the programme team.",
+      "weak_password": "Choose a stronger password: at least 8 characters with upper- and lower-case letters and a number.",
+      "same_password": "Choose a password you haven't used on this account before.",
+      "captcha_failed": "The bot check didn't pass. Complete it again, then retry.",
+      "link_expired": "This link has expired or was already used.",
+      "network": "We couldn't reach MentorConnect. Check your connection and try again.",
+      "captchaRequired": "Complete the bot check first."
+    },
+    "resend": {
+      "button": "Resend email",
+      "wait": "Resend in {{seconds}} s",
+      "sent": "Sent. Check {{email}} for a new link.",
+      "failed": "We couldn't resend the email. Try again in a moment.",
+      "prompt": "Didn't get it? Check your spam folder, or send it again."
+    },
+    "confirm": {
+      "checkingTitle": "Confirming your email",
+      "checkingBody": "One moment while we sign you in…",
+      "expiredTitle": "This link has expired or was already used",
+      "expiredBody": "Confirmation links work once and expire. Enter your email and we'll send you a new one.",
+      "alreadyConfirmed": "Already confirmed? Sign in",
+      "checkEmailBody": "We sent a confirmation link to {{email}}. Open it on this device to finish creating your account."
+    },
+    "reset": {
+      "amazonTitle": "Amazon accounts sign in with Amazon",
+      "amazonBody": "This account uses Amazon sign-in, so it has no MentorConnect password to reset. We signed you out of this link; use Sign in with Amazon instead.",
+      "checkFailedTitle": "We couldn't check this reset link",
+      "checkFailedBody": "We could not confirm which account this link is for, so the password form stays closed. Check your connection and try again."
+    },
+    "captcha": {
+      "loadFailed": "The bot check couldn't load. Check your connection, or allow challenges.cloudflare.com if a content blocker, VPN or company network is stopping it, then retry.",
+      "error": "The bot check ran into a problem. Retry it. If it keeps failing, try another browser or network.",
+      "retry": "Retry the check",
+      "unavailable": "The bot check couldn't run. Retry the check, then try again."
+    }
   },
   "nav": {
     "home": "Home",
@@ -234,7 +274,8 @@
       "dashboardProfile": "Profile settings",
       "dashboardActivity": "Activity",
       "analyticsReport": "Impact report",
-      "dashboardAdmin": "Programme admin"
+      "dashboardAdmin": "Programme admin",
+      "authConfirm": "Confirming your email"
     }
   },
   "hero": {
@@ -346,7 +387,11 @@
       "notApprovedTitle": "Your alias is not approved yet",
       "notApprovedBody": "{{alias}} is not on the approved mentor list yet. Request access and the programme team will review it; you can come back here once approved.",
       "checkFailedTitle": "We couldn't check your approval",
-      "checkFailedBody": "Unable to check your approval status. Refresh the page to try again."
+      "checkFailedBody": "Unable to check your approval status. Refresh the page to try again.",
+      "inactiveTitle": "Your Amazon access isn't active",
+      "inactiveBody": "Mentor access for {{alias}} isn't active. Contact the programme team.",
+      "linkedTitle": "Your mentor profile is already set up",
+      "linkedBody": "The programme team linked a mentor profile to your Amazon account. Sign in with Amazon again to open it; there is no need to create another one."
     },
     "eyebrow": "Mentor onboarding",
     "namePlaceholder": "Your full name",
@@ -696,6 +741,31 @@
       "usePassword": "Use email and password"
     }
   },
+  "backend": {
+    "demo": {
+      "body": "Demo mode: nothing you enter here is saved to MentorConnect."
+    },
+    "degraded": {
+      "body": "We can't reach MentorConnect right now. You can keep browsing; anything you submit may fail.",
+      "retry": "Retry"
+    }
+  },
+  "legacyData": {
+    "title": "Saved in this browser only",
+    "body": "This browser holds requests or registrations saved during the preview period. They never reached MentorConnect; please send them again.",
+    "count": "Saved items: {{count}}",
+    "show": "Show what they were",
+    "hide": "Hide the list",
+    "clear": "Clear and dismiss",
+    "unknownMentor": "a mentor",
+    "item": {
+      "request": "Request to {{mentor}}: “{{goal}}”",
+      "requestNoGoal": "Request to {{mentor}}",
+      "registration": "Mentee registration: {{name}}",
+      "mentorProfile": "Mentor profile: {{name}}",
+      "favorite": "Saved mentor: {{mentor}}"
+    }
+  },
   "guard": {
     "noAccessTitle": "You don't have access to this page",
     "noAccessBody": "This page is only for {{role}} accounts. You are signed in as {{email}}.",
@@ -722,11 +792,11 @@
       "approved": "Approved",
       "rejected": "Not approved"
     },
-    "recorded": "Your request has been recorded and the programme team will review it. You will be able to sign in once it is approved.",
+    "recorded": "Every Amazon employee can use MentorConnect: sign in with Amazon again and your mentor access is set up automatically.",
     "approvedBody": "Your access has been approved. Sign in with Amazon again to continue.",
     "rejectedBody": "This request was not approved. If you believe this is a mistake, contact the programme team.",
-    "noAliasBody": "To request access, sign in with Amazon. Your alias is recorded automatically and the programme team reviews it.",
-    "whatNext": "Approval usually happens within a few working days. There is nothing else you need to do right now.",
+    "noAliasBody": "Sign in with Amazon to use MentorConnect as a mentor. Your access is set up automatically the first time you sign in.",
+    "whatNext": "If Amazon sign-in still doesn't let you in, contact the programme team.",
     "backHome": "Back to home",
     "signInAgain": "Sign in with Amazon again"
   },
@@ -820,7 +890,8 @@
       "industries": "Industries",
       "bio": "Bio",
       "whyJoined": "Why they joined",
-      "assistantWithEmail": "Assistant: {{email}}"
+      "assistantWithEmail": "Assistant: {{email}}",
+      "viewA11y": "View details for {{name}}"
     },
     "mentees": {
       "viewA11y": "View details for {{name}}",
@@ -870,7 +941,47 @@
       "mentorRating": "Mentor rating",
       "menteeFeedback": "Mentee feedback",
       "mentorFeedback": "Mentor feedback",
-      "ratingOf": "{{value}}/5"
+      "ratingOf": "{{value}}/5",
+      "programmeFilter": "Programme-managed",
+      "programmeBadge": "Programme-managed",
+      "programmeCallout_zero": "No pending requests to programme-managed mentors",
+      "programmeCallout_one": "{{count}} pending request to a programme-managed mentor",
+      "programmeCallout_two": "{{count}} pending requests to programme-managed mentors",
+      "programmeCallout_few": "{{count}} pending requests to programme-managed mentors",
+      "programmeCallout_many": "{{count}} pending requests to programme-managed mentors",
+      "programmeCallout_other": "{{count}} pending requests to programme-managed mentors",
+      "programmeCalloutBody": "The programme team answers these. Accept or decline, then email the mentee to arrange a time.",
+      "programmeShow": "Show pending",
+      "programmeExplain": "Requests to programme-managed mentors are answered by the programme team. After accepting, email the mentee to arrange a time.",
+      "menteeEmail": "Mentee email",
+      "emailMentee": "Email the mentee",
+      "accept": "Accept",
+      "decline": "Decline",
+      "acceptA11y": "Accept the request from {{mentee}} to {{mentor}}",
+      "declineA11y": "Decline the request from {{mentee}} to {{mentor}}",
+      "acceptTitle": "Accept this request?",
+      "acceptBody": "{{mentee}} is told the request to {{mentor}} was accepted. Then email them at {{email}} to arrange a time.",
+      "acceptConfirm": "Accept request",
+      "declineTitle": "Decline this request?",
+      "declineBody": "{{mentee}} is told the request to {{mentor}} was declined.",
+      "declineConfirm": "Decline request",
+      "keepPending": "Keep it pending",
+      "acceptedToast": "Request accepted. Email the mentee to arrange a time.",
+      "declinedToast": "Request declined",
+      "decisionError": "Unable to update the request. Check your connection and try again.",
+      "decisionStale": "This request was already answered. The list now shows its current status.",
+      "awaitingProgramme": "Awaiting programme team",
+      "cancel": "Cancel booking",
+      "cancelHint": "The mentee and the mentor are told the programme team cancelled it.",
+      "cancelTitle": "Cancel this booking?",
+      "cancelBody": "The session between {{mentor}} and {{mentee}} is cancelled, and both are told the programme team cancelled it. This can’t be undone.",
+      "cancelCalNote": "This session is also booked on Cal.com. Cancel it there too so the calendar invite is removed.",
+      "cancelCalLink": "Open in Cal.com",
+      "cancelKeep": "Keep booking",
+      "cancelConfirm": "Cancel booking",
+      "canceledToast": "Booking cancelled. The mentee has been notified.",
+      "cancelError": "We couldn’t cancel this booking. Nothing changed; please try again.",
+      "cancelStale": "This booking changed in the meantime, so nothing was cancelled. The list now shows its current status."
     },
     "access": {
       "pendingTitle": "Pending requests",
@@ -1154,11 +1265,81 @@
     },
     "error": {
       "title": "Unable to load mentors",
-      "body": "Check your connection and try again."
+      "body": "Check your connection and try again.",
+      "fallback": "Showing the programme's featured mentors in the meantime."
     },
     "empty": {
       "title": "No mentors yet",
       "body": "Mentors appear here once the programme team approves them."
+    }
+  },
+  "calSync": {
+    "title": "Cal.com booking sync",
+    "intro": "Connect Cal.com so sessions booked, moved or cancelled there update here automatically.",
+    "statusLabel": "Sync status",
+    "notConnected": "Not connected yet",
+    "notConnectedHint": "Nothing has arrived from Cal.com yet. Follow the steps below, then send a ping test.",
+    "connected": "Connected",
+    "needsAttention": "Needs attention",
+    "lastDelivery": "Last delivery: {{trigger}} · {{when}}",
+    "justNow": "just now",
+    "loading": "Loading sync settings…",
+    "loadError": "Unable to load your sync settings. Check your connection and try again.",
+    "unavailable": "Sync is not available yet. The programme team is finishing the setup.",
+    "noCalLink": "Add your Cal.com link first. Sync only tracks the event your link points to.",
+    "previewHost": "This is a preview site, which Cal.com can't reach. Copy the URL from the production site instead.",
+    "urlLabel": "Subscriber URL",
+    "secretLabel": "Secret",
+    "copyUrl": "Copy URL",
+    "copySecret": "Copy secret",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy. Select the text and copy it yourself.",
+    "showSecret": "Show secret",
+    "hideSecret": "Hide secret",
+    "stepsTitle": "Set it up in Cal.com",
+    "step1": "In Cal.com, open Settings → Developer → Webhooks and choose New.",
+    "step2": "Paste the Subscriber URL.",
+    "step3": "Paste the secret.",
+    "step4": "Tick Booking Created, Booking Rescheduled, Booking Cancelled, Booking Requested and Booking Rejected.",
+    "step5": "Leave “Custom payload template” empty.",
+    "step6": "Save, then choose “Ping test”. This panel shows the ping within a few seconds.",
+    "rotate": "Rotate secret",
+    "rotateTitle": "Rotate the webhook secret?",
+    "rotateBody": "The old secret keeps working for 24 hours. Paste the new one into Cal.com before then.",
+    "rotateConfirm": "Rotate secret",
+    "rotateCancel": "Keep current secret",
+    "rotated": "New secret created. Paste it into Cal.com now.",
+    "rotateError": "Unable to rotate the secret. Try again.",
+    "newSecretNote": "This is your new secret. The previous one stops working {{when}}.",
+    "outcomes": {
+      "ping": "Ping received",
+      "confirmed": "Session confirmed",
+      "requested": "A time is waiting for your confirmation in Cal.com",
+      "rejected": "You declined the requested time",
+      "canceled": "Session cancelled",
+      "cal_booking_released": "The Cal.com booking was cancelled; the request stays accepted",
+      "rescheduled": "Session moved",
+      "reschedule_requested": "A new time is waiting for your confirmation",
+      "rescheduled_revived": "Session moved to a new time",
+      "no_change": "Already up to date",
+      "duplicate": "Repeat delivery ignored",
+      "unmatched": "Couldn't match this booking to a MentorConnect request",
+      "unmatched_direct_booking": "Someone booked your Cal.com page directly. Only sessions requested in MentorConnect are tracked here.",
+      "ambiguous": "More than one request matched, so nothing was changed",
+      "organizer_mismatch": "The booking belongs to a different Cal.com user than your link",
+      "stale_state": "The request was no longer open, so nothing was changed",
+      "ignored": "An event MentorConnect doesn't use. You can untick it in Cal.com.",
+      "unrecognised_payload": "Cal.com sent an unexpected format. Leave “Custom payload template” empty.",
+      "invalid_payload": "The booking details were incomplete",
+      "unknown": "Delivery received"
+    },
+    "triggers": {
+      "PING": "Ping",
+      "BOOKING_CREATED": "Booking created",
+      "BOOKING_RESCHEDULED": "Booking rescheduled",
+      "BOOKING_CANCELLED": "Booking cancelled",
+      "BOOKING_REQUESTED": "Booking requested",
+      "BOOKING_REJECTED": "Booking rejected"
     }
   },
   "mentorCard": {
@@ -1180,7 +1361,9 @@
     "ratingA11y_many": "Rated {{rating}} out of 5 from {{count}} ratings",
     "ratingA11y_other": "Rated {{rating}} out of 5 from {{count}} ratings",
     "listSeparator": ", ",
-    "requestSent": "Request sent"
+    "requestSent": "Request sent",
+    "openingSoon": "Opening soon",
+    "requestSubmitted": "Request submitted"
   },
   "mentorProfile": {
     "backToMentors": "Back to mentors",
@@ -1262,7 +1445,12 @@
       "invalidEmail": "Enter an email like name@example.com",
       "generic": "Unable to send your request. Check your connection and try again.",
       "tryAgain": "Try again",
-      "findSimilar": "Find similar mentors"
+      "findSimilar": "Find similar mentors",
+      "captcha": "The security check didn't pass. Try it again, then send.",
+      "botCheck": "Complete the security check to send your request.",
+      "invalid": "Some details weren't accepted. Check the highlighted fields and try again.",
+      "rateLimitedSoon": "You've sent several requests in a short time. Try again in a few minutes.",
+      "service": "Requests can't be sent right now. Try again in a few minutes."
     },
     "discard": {
       "title": "Discard request?",
@@ -1273,21 +1461,33 @@
     "success": {
       "title": "Request sent to <name>{{name}}</name>",
       "signedIn": "You'll see <name>{{name}}</name>'s reply under Bookings.",
-      "anonymous": "Sign in with <email>{{email}}</email> to see <name>{{name}}</name>'s reply. Use exactly this email — it's how we match the request to you.",
+      "anonymous": "If <email>{{email}}</email> already has an account, sign in and send the request from there. Otherwise, sign in with exactly this email to see <name>{{name}}</name>'s reply.",
       "viewBookings": "View bookings",
       "signIn": "Sign in",
       "backToMentors": "Back to mentors",
-      "createAccountInline": "No account yet? <signup>Create one</signup> with the same email."
+      "createAccountInline": "No account yet? <signup>Create one</signup> with the same email.",
+      "pendingTitle": "Your request to <name>{{name}}</name> is already waiting",
+      "pendingBody": "<name>{{name}}</name> hasn't replied to your earlier request yet, so we didn't send another. You'll see the reply under Bookings.",
+      "anonymousTitle": "Request submitted"
     },
     "status": {
       "sent": "Request sent",
       "sentFrom": "Sent {{when}} from <email>{{email}}</email>.",
-      "anonHint": "Sign in with this email to see <name>{{name}}</name>'s reply.",
+      "anonHint": "If this email already has an account, sign in and send the request from there. Otherwise, sign in with it to see <name>{{name}}</name>'s reply.",
       "signIn": "Sign in",
-      "viewInBookings": "View in bookings"
+      "viewInBookings": "View in bookings",
+      "submitted": "Request submitted",
+      "submittedFrom": "Submitted {{when}} from <email>{{email}}</email>."
     },
     "allRequired": "All fields are required.",
-    "tzLine": "<name>{{name}}</name>'s time zone: {{zone}} · {{relative}}"
+    "tzLine": "<name>{{name}}</name>'s time zone: {{zone}} · {{relative}}",
+    "captchaLabel": "Security check",
+    "captchaLoadFailed": "The security check couldn't load. Check your connection, or allow challenges.cloudflare.com if a content blocker, VPN or company network is stopping it, then retry.",
+    "captchaError": "The security check ran into a problem. Retry it. If it keeps failing, try another browser or network.",
+    "captchaRetry": "Retry the check",
+    "captchaContact": "Still not working? Email your request to the programme team at <email>{{email}}</email>.",
+    "captchaContactSubject": "Session request: {{name}}",
+    "captchaNotSent": "Your request wasn't sent because the security check couldn't run. Retry the check, then send."
   },
   "dashboardV2": {
     "tabs": {
@@ -1344,7 +1544,11 @@
       "sent": "Request sent",
       "accepted": "{{name}} accepted your request",
       "acceptedNoLink": "{{name}} accepted — their calendar link isn't set up yet",
-      "pickTime": "Pick a time on their calendar link"
+      "pickTime": "Pick a time on their calendar link",
+      "waitingConfirm": "Waiting for {{name}} to confirm the time on Cal.com",
+      "timeDeclined": "{{name}} couldn't make that time — choose another",
+      "programmeTeam": "The programme team will email you to arrange a time",
+      "submitted": "Request submitted"
     },
     "row": {
       "sent": "Sent {{when}}",
@@ -1353,7 +1557,12 @@
       "notMarkedComplete": "Not yet marked complete by the mentor",
       "timeNotRecorded": "Time not recorded",
       "rated": "Rated {{value}}/5",
-      "unknownMentor": "Mentor"
+      "unknownMentor": "Mentor",
+      "waitingConfirm": "You picked {{when}}. Waiting for {{name}} to confirm it on Cal.com.",
+      "waitingConfirmNoTime": "Waiting for {{name}} to confirm your time on Cal.com.",
+      "timeDeclined": "{{name}} couldn't make the time you picked. Choose another.",
+      "programmeTeam": "Accepted. The programme team will email you to arrange a time.",
+      "waitingBadge": "Awaiting time confirmation"
     },
     "actions": {
       "viewRequest": "View request",
@@ -1362,7 +1571,9 @@
       "cancelRequest": "Cancel request",
       "cancelSession": "Cancel session",
       "rateSession": "Rate session",
-      "requestAgain": "Request again"
+      "requestAgain": "Request again",
+      "chooseAnother": "Choose another time",
+      "reschedule": "Reschedule"
     },
     "confirm": {
       "withdrawTitle": "Withdraw this request?",
@@ -1378,7 +1589,9 @@
       "cancelSessionKeep": "Keep session",
       "requestWithdrawn": "Request withdrawn",
       "sessionCancelled": "Session cancelled",
-      "error": "Unable to update the request. Check your connection and try again."
+      "error": "Unable to update the request. Check your connection and try again.",
+      "cancelSessionCalBody": "This cancels the session in MentorConnect. Cancel the Cal.com booking too, so the calendar invite is removed.",
+      "cancelInCal": "Also cancel it in Cal.com"
     },
     "view": {
       "title": "Request to {{name}}",
@@ -1409,7 +1622,15 @@
       "loading": "Loading the calendar…",
       "unavailableTitle": "The calendar couldn't be loaded.",
       "unavailableBody": "The mentor's calendar link doesn't look right. Try again later.",
-      "confirmError": "The time was booked on Cal.com but couldn't be saved here. Refresh to check, then try again."
+      "confirmError": "The time was booked on Cal.com but couldn't be saved here. Refresh to check, then try again.",
+      "rescheduleTitle": "Choose a new time with {{name}}",
+      "rescheduleDescription": "Pick a new slot on the mentor's Cal.com calendar. The session moves as soon as Cal.com confirms it.",
+      "toastConfirmed": "Session confirmed",
+      "toastConfirmedBody": "It's on both calendars. You'll find it under Bookings.",
+      "toastRequested": "Waiting for {{name}} to confirm the time on Cal.com",
+      "toastRescheduled": "Session moved",
+      "toastRescheduleRequested": "Waiting for {{name}} to confirm the new time on Cal.com",
+      "recordIncomplete": "Cal.com didn't send the booking details. Refresh in a moment to check the booking."
     },
     "feedback": {
       "rateLabel": "Your rating",
@@ -1542,6 +1763,7 @@
       "declinedToast": "Request declined",
       "declinedToastBody": "The mentee has been notified.",
       "decisionError": "Unable to update the request. Check your connection and try again.",
+      "decisionStale": "This request is no longer waiting for your answer: it was already answered or withdrawn. Your inbox has been refreshed.",
       "requestedAt": "Requested {{when}}",
       "goalLabel": "What they want help with",
       "noGoal": "No goal was written.",
@@ -1928,6 +2150,17 @@
       "mentorTitle": "No requests yet",
       "mentorBody": "Requests mentees send you appear here, with the sessions that follow.",
       "browse": "Browse mentors"
+    },
+    "demoLocalBody": "Demo mode: every number and chart on this page is illustrative sample data, not programme metrics.",
+    "lowData": {
+      "title": "Real programme data",
+      "none": "No requests yet. Every number on this page is real and fills in as soon as mentees send requests.",
+      "few_zero": "No requests yet. Every number on this page is real and fills in as soon as mentees send requests.",
+      "few_one": "Only {{count}} request so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_two": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_few": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_many": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded.",
+      "few_other": "Only {{count}} requests so far. These are the real numbers; trends become readable once more sessions are recorded."
     }
   },
   "showcase": {
@@ -1965,7 +2198,19 @@
       "yourSession": "Your session",
       "t6big": "Get matched",
       "t6a": "Smart matching",
-      "t6b": "that pairs you with the right mentor for what you're working on."
+      "t6b": "that pairs you with the right mentor for what you're working on.",
+      "t1dbA": "Personal guidance",
+      "t1dbB": "from people who have done it",
+      "goal1": "Review my pitch deck",
+      "goal2": "Plan my first hire",
+      "t2dbBig": "Goal first",
+      "t2dbA": "Every request starts with",
+      "t2dbB": "what you want to work on",
+      "t4requestBig": "Request, then schedule",
+      "t4requestA": "Send a request. Once it's accepted, pick a time on their calendar and the invite with the video link lands in both calendars.",
+      "t6dbBig": "Find your mentor",
+      "t6dbA": "Search by what you are working on",
+      "t6dbB": "and filter by expertise, industry and language."
     },
     "rail": {
       "title": "See what the best mentors bring to Amazon",
@@ -1985,7 +2230,12 @@
       "sessions": "sessions",
       "facts": "Mentor facts",
       "book": "Book a {{minutes}}-min session",
-      "newMentor": "New mentor · first sessions open"
+      "newMentor": "New mentor · first sessions open",
+      "openingSoonTitle": "Requests open soon",
+      "openingSoonBody": "{{name}}'s profile is being set up on MentorConnect. Check back shortly to send a request.",
+      "checking": "Checking availability…",
+      "checkError": "Couldn't check availability right now.",
+      "noRatings": "New mentor · no ratings yet"
     },
     "session": {
       "free": "Free",
@@ -2065,7 +2315,9 @@
         "hours": "Hours mentored",
         "hoursSub": "Completed session time",
         "sessions": "Sessions",
-        "sessionsSub": "Completed sessions"
+        "sessionsSub": "Completed sessions",
+        "requests": "Requests received",
+        "requestsSub": "Session requests in this period"
       },
       "trend": "Profile views over time",
       "refreshed": "Last refreshed: {{time}}",
@@ -2120,7 +2372,11 @@
       "editProfile": "Edit my profile",
       "sampleTitle": "Sample data — not programme outcomes.",
       "sampleBody": "Fewer than five real bookings exist, so every number and chart here is illustrative. Do not quote these as results; real metrics replace them automatically as sessions accumulate.",
-      "brandAdmin": "Programme Admin"
+      "brandAdmin": "Programme Admin",
+      "trendRequests": "Requests over time",
+      "trendSummary": "Requests in this period: {{count}}",
+      "loadError": "We couldn't load the analytics.",
+      "noProfile": "Your analytics appear once your mentor profile is complete."
     },
     "legal": {
       "terms": "Terms",
@@ -2175,7 +2431,42 @@
         "declined": "Request declined",
         "canceled": "Session cancelled",
         "completed": "Session marked completed",
-        "rescheduled": "Session rescheduled"
+        "rescheduled": "Session rescheduled",
+        "error": "We couldn't update this session. Nothing changed; please try again.",
+        "withdrawn": "Request withdrawn",
+        "stale": "This session changed in the meantime (it may have been cancelled, answered or completed elsewhere), so nothing was saved. The list now shows its current status."
+      },
+      "withdraw": "Withdraw",
+      "chooseTime": "Choose a time",
+      "chooseAnotherTime": "Choose another time",
+      "durationNotRecorded": "Duration not recorded",
+      "loadError": "We couldn't load your sessions.",
+      "note": {
+        "waitingForTime": "Accepted. Waiting for {{name}} to pick a time on your Cal.com link.",
+        "timeRequested": "You picked {{time}}. Waiting for {{name}} to confirm it on Cal.com.",
+        "timeRequestedUntimed": "You picked a time. Waiting for {{name}} to confirm it on Cal.com.",
+        "timeRequestedMentor": "{{name}} picked {{time}}. Confirm or decline it in Cal.com.",
+        "timeRequestedMentorUntimed": "{{name}} picked a time. Confirm or decline it in Cal.com.",
+        "timeDeclined": "{{name}} couldn't make that time. Choose another one.",
+        "programmeArranges": "The programme team will email you to arrange a time.",
+        "mentorWillShare": "{{name}} accepted and will get in touch to arrange a time.",
+        "awaitingCompletion": "This session's time has passed. Mark it completed to record your hours.",
+        "sessionPassed": "This session's time has passed. {{name}} will mark it completed."
+      },
+      "confirm": {
+        "declineTitle": "Decline {{name}}'s request?",
+        "declineBody": "They'll be told you can't take this request. This can't be undone.",
+        "declineAction": "Decline request",
+        "keepRequest": "Keep request",
+        "withdrawTitle": "Withdraw your request to {{name}}?",
+        "withdrawBody": "The request is cancelled and can't be accepted any more.",
+        "withdrawAction": "Withdraw request",
+        "cancelTitle": "Cancel this session?",
+        "cancelBody": "{{name}} will be told the session is cancelled.",
+        "cancelAction": "Cancel session",
+        "keepSession": "Keep session",
+        "alsoCancelOnCal": "This session is also booked on Cal.com. Cancel it there too so the calendar invite is removed.",
+        "openCal": "Open in Cal.com"
       }
     },
     "calendar": {
@@ -2221,7 +2512,28 @@
       "unavailable": "Unavailable",
       "save": "Save changes",
       "saved": "Saved",
-      "saveHint": "Changes apply to new bookings only."
+      "saveHint": "Changes apply to new bookings only.",
+      "fixTimes": "Each window must end after it starts. Fix the highlighted times, then save.",
+      "savedToast": "Calendar settings saved",
+      "saveError": "Your changes weren't saved. Try again.",
+      "loadError": "We couldn't load your calendar settings.",
+      "timezoneSubLive": "Your office hours and your profile use this time zone.",
+      "calcomTitle": "Booking window, notice and calendars",
+      "calcomSub": "Booking window, notice and calendar connections are set on your Cal.com event type.",
+      "calcomCta": "Open Cal.com availability",
+      "syncTitle": "Booking sync",
+      "syncSub": "Booking sync: set up in Profile settings.",
+      "syncCta": "Set up booking sync",
+      "scheduleSubLive": "Weekly office hours in {{zone}}, shown on your public profile. Mentees pick exact times on your Cal.com link.",
+      "fromDay": "{{day}}: from",
+      "toDay": "{{day}}: to",
+      "removeWindow": "Remove these {{day}} hours",
+      "addWindowDay": "Add hours on {{day}}",
+      "addWindow": "Add hours",
+      "endAfterStart": "End after the start time",
+      "unsaved": "You have unsaved changes.",
+      "saveHintLive": "Office hours show on your public profile as soon as you save.",
+      "noChangesLive": "No changes to save yet. Office hours show on your public profile as soon as you save a change."
     },
     "dashboard": {
       "hi": "Hi, {{name}}",
@@ -2274,7 +2586,47 @@
       "menteeEmptyBody": "Pick a mentor, choose a time, and it shows up here.",
       "suggested": "Mentors for you",
       "suggestedSub": "Start with a 30-minute session",
-      "awaitingMentor": "Awaiting the mentor's reply"
+      "awaitingMentor": "Awaiting the mentor's reply",
+      "demoName": "Demo mentor",
+      "finishProfileTitle": "Finish your profile",
+      "finishProfileBody": "Mentees can find and request you once your mentor profile is complete: your photo, expertise and Cal.com link.",
+      "finishProfileCta": "Finish your profile",
+      "completeRegistrationTitle": "Complete your registration",
+      "completeRegistrationBody": "Tell us a little about you so mentors know who they're meeting. It takes two minutes.",
+      "completeRegistrationCta": "Complete registration",
+      "loadError": "We couldn't load your dashboard.",
+      "noPageYet": "Your public page appears here once your profile is complete.",
+      "hoursMissing_zero": "Every session has a recorded duration",
+      "hoursMissing_one": "{{count}} session without a recorded duration",
+      "hoursMissing_two": "{{count}} sessions without a recorded duration",
+      "hoursMissing_few": "{{count}} sessions without a recorded duration",
+      "hoursMissing_many": "{{count}} sessions without a recorded duration",
+      "hoursMissing_other": "{{count}} sessions without a recorded duration",
+      "calendarLinked": "Cal.com linked",
+      "calendarMissing": "Add your Cal.com link",
+      "stepDone": "done",
+      "newBadge": "NEW",
+      "stepsLive": {
+        "availability": "Add your weekly office hours in Calendar. They show on your public profile.",
+        "profile": "Add a photo, your role, a bio and the areas you mentor on.",
+        "sessions": "Done once your first request arrives. Share your link to get one.",
+        "calendar": "Add your Cal.com link so accepted mentees can pick a time.",
+        "share": "Post your page on LinkedIn or in your team channel, then tick this off."
+      },
+      "upcomingCount_zero": "No upcoming sessions",
+      "upcomingCount_one": "{{count}} upcoming session",
+      "upcomingCount_two": "{{count}} upcoming sessions",
+      "upcomingCount_few": "{{count}} upcoming sessions",
+      "upcomingCount_many": "{{count}} upcoming sessions",
+      "upcomingCount_other": "{{count}} upcoming sessions",
+      "otherMentors": "Meet other mentors",
+      "otherMentorsSub": "See how other mentors in the programme describe what they help with.",
+      "setOfficeHours": "Set office hours",
+      "referSubject": "Join MentorConnect as a mentor",
+      "referMessage": "I mentor founders through MentorConnect, the Amazon UAE mentorship programme. Amazon colleagues can join too: open the link, choose Sign in with Amazon and set up a mentor profile in a few minutes.",
+      "referCopied": "Invitation copied. Paste it into an email or a chat to a colleague.",
+      "referCopyFailed": "We couldn’t copy the invitation. Use Email a colleague instead.",
+      "referEmail": "Email a colleague"
     },
     "onboarding": {
       "stepsLabel": "Form sections",
@@ -2294,7 +2646,23 @@
       "send": "Send request",
       "sharedCalendar": "Times come from the programme's shared calendar until {{name}} connects a Cal.com account from the dashboard.",
       "botCheck": "Confirm you are human to send the request.",
-      "botFailed": "The bot check did not pass. Please try again."
+      "botFailed": "The bot check did not pass. Please try again.",
+      "requestIntro": "Send {{name}} a request with your goal. They reply in MentorConnect, and once they accept you pick a time.",
+      "requestIntroProgramme": "Send a request with your goal. The programme team reads it, replies in MentorConnect and arranges a time with you by email.",
+      "sentBodyProgramme": "The programme team replies in MentorConnect.",
+      "sentBodyMentor": "{{name}} replies in MentorConnect.",
+      "followAnon": "Create an account or sign in with <email>{{email}}</email> to follow it.",
+      "followSignedIn": "You can follow it under Bookings.",
+      "createAccount": "Create an account",
+      "signIn": "Sign in",
+      "pendingTitle": "Your request to {{name}} is already waiting",
+      "pendingBody": "You sent one recently and it hasn't been answered yet, so we didn't send a second one.",
+      "sentBefore": "You sent a request {{when}} from <email>{{email}}</email>.",
+      "sendAnother": "Send another request",
+      "submittedTitle": "Request submitted",
+      "submittedBodyProgramme": "If <email>{{email}}</email> already has an account, sign in and send the request from there. Otherwise, create an account or sign in with this email to follow it: the programme team replies in MentorConnect.",
+      "submittedBodyMentor": "If <email>{{email}}</email> already has an account, sign in and send the request from there. Otherwise, create an account or sign in with this email to follow it: {{name}} replies in MentorConnect.",
+      "submittedBefore": "You submitted a request {{when}} from <email>{{email}}</email>. If that email already has an account, sign in and send the request from there."
     },
     "profileSettings": {
       "saved": "Profile saved",
@@ -2305,7 +2673,14 @@
       "calLink": "Cal.com link",
       "calHint": "Your booking page; it is embedded on your session page.",
       "organisation": "Organisation",
-      "goals": "What you want from mentoring"
+      "goals": "What you want from mentoring",
+      "loadError": "We couldn't load your profile.",
+      "saveError": "Your changes weren't saved. Check your connection and try again.",
+      "photoType": "Choose a JPEG, PNG, WebP or GIF image.",
+      "calHintLive": "Your Cal.com event, e.g. yourname/30min. Mentees pick a time on it after you accept. Leave it empty to remove it.",
+      "calSyncSection": "Cal.com booking sync",
+      "photoHintLive": "JPEG, PNG, WebP or GIF, up to 5 MB. A new photo is kept when you press Save.",
+      "photoPending": "New photo ready. Press Save to keep it."
     },
     "activity": {
       "title": "Activity",
@@ -2339,7 +2714,9 @@
         "mentor_listed": "Mentor listed",
         "mentor_unlisted": "Mentor unlisted",
         "mentee_verified": "Organisation verified",
-        "mentee_rejected": "Organisation declined"
+        "mentee_rejected": "Organisation declined",
+        "booking_time_requested": "Time proposed on Cal.com",
+        "booking_time_declined": "Proposed time declined"
       },
       "summaries": {
         "mentorRegistered": "{{name}} joined as a mentor",
@@ -2352,21 +2729,50 @@
         "bookingConfirmed": "Session booked with {{mentor}} on Cal.com — {{session}}",
         "canceled": "Session with {{mentor}} cancelled ({{mentee}})",
         "completed": "Session with {{mentee}} marked completed",
-        "rescheduled": "Session with {{mentor}} rescheduled on Cal.com"
-      }
+        "rescheduled": "Session with {{mentor}} rescheduled on Cal.com",
+        "request_sent": "{{mentee}} asked {{mentor}} for a session",
+        "request_accepted": "{{mentor}} accepted {{mentee}}'s request",
+        "request_accepted_admin": "The programme team accepted {{mentee}}'s request to {{mentor}}",
+        "request_declined": "{{mentor}} declined {{mentee}}'s request",
+        "request_declined_admin": "The programme team declined {{mentee}}'s request to {{mentor}}",
+        "booking_confirmed": "Session between {{mentor}} and {{mentee}} booked for {{when}}",
+        "booking_confirmed_untimed": "Session between {{mentor}} and {{mentee}} booked",
+        "booking_rescheduled": "Session between {{mentor}} and {{mentee}} moved to {{when}}",
+        "booking_rescheduled_untimed": "Session between {{mentor}} and {{mentee}} rescheduled",
+        "session_completed": "Session between {{mentor}} and {{mentee}} completed ({{minutes}} min)",
+        "session_completed_untimed": "Session between {{mentor}} and {{mentee}} completed",
+        "booking_canceled": "Session between {{mentor}} and {{mentee}} cancelled",
+        "booking_canceled_cal": "Session between {{mentor}} and {{mentee}} cancelled on Cal.com",
+        "booking_canceled_admin": "The programme team cancelled the session between {{mentor}} and {{mentee}}",
+        "booking_canceled_mentor": "{{mentor}} cancelled the session with {{mentee}}",
+        "booking_canceled_mentee": "{{mentee}} cancelled the session with {{mentor}}",
+        "booking_time_requested": "{{mentee}} picked {{when}} on Cal.com; waiting for {{mentor}} to confirm",
+        "booking_time_requested_untimed": "{{mentee}} picked a time on Cal.com; waiting for {{mentor}} to confirm",
+        "booking_time_declined": "{{mentor}} declined the proposed time; {{mentee}} can choose another",
+        "feedback_left": "{{mentee}} left feedback for {{mentor}}",
+        "reminder_sent_1h": "1-hour reminder sent",
+        "reminder_sent_24h": "24-hour reminder sent",
+        "favoriteAdded": "Saved {{mentor}} as a favourite",
+        "favoriteRemoved": "Removed {{mentor}} from favourites",
+        "favoriteAddedUnnamed": "Saved a mentor as a favourite",
+        "favoriteRemovedUnnamed": "Removed a mentor from favourites"
+      },
+      "loadError": "We couldn't load the activity feed."
     },
     "favorites": {
       "title": "Favourite mentors",
       "add": "Save {{name}} as a favourite",
       "remove": "Remove {{name}} from favourites",
-      "onlyMine": "My favourites ({{count}})"
+      "onlyMine": "My favourites ({{count}})",
+      "error": "Couldn't update your favourites. Try again."
     },
     "reminders": {
       "title": "Coming up",
       "none": "No sessions in the next 24 hours.",
       "tomorrow": "Session tomorrow at {{when}}",
       "inHour": "Session within the hour — {{when}}",
-      "bell": "Notifications ({{count}} due)"
+      "bell": "Notifications ({{count}} due)",
+      "within24h": "Session {{day}} at {{time}}"
     },
     "report": {
       "title": "Impact report",
@@ -2404,7 +2810,13 @@
         "sessions": "Sessions",
         "area": "Area",
         "country": "Country"
-      }
+      },
+      "missingDurations_zero": "Every completed session has a recorded duration.",
+      "missingDurations_one": "{{count}} completed session has no recorded duration and is not counted in the hours.",
+      "missingDurations_two": "{{count}} completed sessions have no recorded duration and are not counted in the hours.",
+      "missingDurations_few": "{{count}} completed sessions have no recorded duration and are not counted in the hours.",
+      "missingDurations_many": "{{count}} completed sessions have no recorded duration and are not counted in the hours.",
+      "missingDurations_other": "{{count}} completed sessions have no recorded duration and are not counted in the hours."
     },
     "admin": {
       "title": "Programme admin",

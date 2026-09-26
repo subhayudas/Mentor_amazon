@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { BookingRequestDialog, type BookingPrefill } from "@/components/booking/BookingRequestDialog";
 import { RequestStatusCard } from "@/components/booking/RequestStatusCard";
-import { railStopsFor, resolveRequestState } from "@/components/booking/requestState";
+import { isSentMemoryStale, railStopsFor, resolveRequestState } from "@/components/booking/requestState";
 import { AboutSection } from "@/components/profile/AboutSection";
 import { AvailabilityWindows } from "@/components/profile/AvailabilityWindows";
 import { HelpsWith } from "@/components/profile/HelpsWith";
@@ -29,7 +29,7 @@ import { usePublicAvailability, windowsForMentor } from "@/lib/availability";
 import type { Booking, Mentee, Mentor, PublicMentor } from "@/lib/database";
 import { bidi } from "@/lib/format";
 import { discoveryUrl } from "@/lib/routes";
-import { getSentRequest, markSent } from "@/lib/sentRequests";
+import { clearSentRequest, getSentRequest, markSent } from "@/lib/sentRequests";
 import { menteeService, mentorService } from "@/lib/services";
 import { lastDiscoveryHref } from "@/lib/urlState";
 import { useConfirmOnCalBooking } from "@/pages/mentee/useConfirmOnCalBooking";
@@ -63,24 +63,38 @@ function BackLink() {
   );
 }
 
-/** Not found / load error share one frame: the page title h1, then a compact EmptyState. */
-function ProfileState({
+/**
+ * Not found / load error share one frame: the page title h1, then a compact
+ * EmptyState. Exported so `/mentor/:id/book` shows the same not-found state as
+ * `/mentor/:id` for an unknown id (never another mentor's page, F23).
+ * `notFound` gives the h1 of every other missing page ("Page not found", the
+ * heading the route-change effect focuses and screen readers announce); the
+ * card keeps the mentor-specific explanation. A load error keeps the profile
+ * title, because the mentor may well exist.
+ */
+export function ProfileState({
   icon,
   title,
   description,
   testId,
   action,
+  notFound = false,
 }: {
   icon: typeof UserX;
   title: string;
   description: string;
   testId: string;
   action?: React.ReactNode;
+  notFound?: boolean;
 }) {
   const { t } = useTranslation();
   return (
     <Container className="pb-16">
-      <PageHeader title={t("nav.titles.mentor")} />
+      {notFound ? (
+        <PageHeader eyebrow="404" title={t("errors.notFoundTitle")} />
+      ) : (
+        <PageHeader title={t("nav.titles.mentor")} />
+      )}
       <EmptyState
         icon={icon}
         title={title}
@@ -133,7 +147,9 @@ export default function MentorProfile() {
     enabled: Boolean(email),
     staleTime: 5 * 60_000,
   });
-  const menteeId = user?.profile_id ?? menteeQuery.data?.id;
+  // The viewer's mentees row: a mentee's users.profile_id, else the row with their email. A mentor's
+  // or admin's profile_id points at a mentors row, which never holds the requests they sent.
+  const menteeId = (user?.user_type === "mentee" ? user.profile_id : undefined) ?? menteeQuery.data?.id;
   // The live booking row (P1-21): signed-in viewers fetch their bookings
   // through the same key and queryFn the dashboard uses, so a direct load of
   // the profile shows a scheduled/pending request instead of inviting a
@@ -152,6 +168,22 @@ export default function MentorProfile() {
   React.useEffect(() => {
     setLocalSent(getSentRequest(mentorId));
   }, [mentorId]);
+  // Bookings fetched after the send decide for a signed-in viewer: a declined, withdrawn or
+  // removed request no longer reads as "Request sent" here, and clearing the memory also stops this
+  // mentor's directory card from saying so.
+  const bookingsAsOf = bookingsQuery.dataUpdatedAt || undefined;
+  const staleMemory = isSentMemoryStale({
+    mentorId,
+    bookings: signedIn ? bookingsQuery.data : undefined,
+    bookingsAsOf,
+    viewerEmail: user?.email,
+    local: localSent,
+  });
+  React.useEffect(() => {
+    if (!staleMemory) return;
+    clearSentRequest(mentorId);
+    setLocalSent(null);
+  }, [staleMemory, mentorId]);
 
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const returnFocusRef = React.useRef<HTMLElement | null>(null);
@@ -166,10 +198,11 @@ export default function MentorProfile() {
   const openCal = React.useCallback(() => setCalOpen(true), []);
   const handleSent = React.useCallback(
     (sentEmail: string) => {
-      markSent(mentorId, sentEmail);
+      // A signed-out send is remembered as such: it never reads as "Request sent" to an account (R2-01).
+      markSent(mentorId, sentEmail, { anonymous: !signedIn });
       setLocalSent(getSentRequest(mentorId));
     },
-    [mentorId],
+    [mentorId, signedIn],
   );
 
   if (!mentorId || (mentorQuery.isSuccess && !mentor)) {
@@ -179,6 +212,7 @@ export default function MentorProfile() {
         title={t("mentorProfile.notFound.title")}
         description={t("mentorProfile.notFound.body")}
         testId="mentor-not-found"
+        notFound
       />
     );
   }
@@ -211,6 +245,7 @@ export default function MentorProfile() {
     mentorId,
     isAvailable: mentor.is_available,
     bookings: signedIn ? bookingsQuery.data : undefined,
+    bookingsAsOf,
     viewerEmail: user?.email,
     local: localSent,
   });
@@ -320,7 +355,7 @@ export default function MentorProfile() {
           bookingId={request.bookingId}
           open={calOpen}
           onOpenChange={setCalOpen}
-          onBookingSuccessful={onCalBooked(request.bookingId)}
+          onBookingSuccessful={onCalBooked(request.bookingId, display.name)}
         />
       )}
     </Container>

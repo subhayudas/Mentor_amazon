@@ -2,13 +2,14 @@ import { z } from 'zod';
 
 /**
  * Server-only environment for the Vercel functions (Amazon Federate SSO,
- * the Cal.com webhook, the reminder cron, Turnstile).
+ * booking requests, the Cal.com webhook, the reminder cron, Turnstile).
  *
  * Every variable is declared once in `ENV_SCHEMA` with its shape; handlers
- * read exactly the keys they need through `readEnv` and fail closed with
- * `{ error: 'server_misconfigured', missing: [...] }` when a required one is
- * absent or malformed. Nothing here is ever prefixed VITE_ and nothing here
- * is imported from client/.
+ * read exactly the keys they need through `readEnv` and fail closed when a
+ * required one is absent or malformed. Secrets are never prefixed VITE_; the
+ * one VITE_ name read here is the public Turnstile site key, only to detect a
+ * widget that is on while its secret is missing. Nothing here is imported
+ * from client/.
  */
 const url = z.string().url();
 const nonEmpty = z.string().min(1);
@@ -24,11 +25,22 @@ export const ENV_SCHEMA = {
   supabaseUrl: { name: 'SUPABASE_URL', schema: url },
   supabaseServiceRoleKey: { name: 'SUPABASE_SERVICE_ROLE_KEY', schema: nonEmpty },
   appOrigin: { name: 'APP_ORIGIN', schema: url.transform((v) => v.replace(/\/+$/, '')) },
-  calWebhookSecret: { name: 'CAL_WEBHOOK_SECRET', schema: z.string().min(16) },
+  // Optional global secret for a programme Cal.com Team/Org webhook (no ?mentor=); '' = off.
+  // Per-mentor secrets live in the database (mentor_cal_webhooks).
+  calWebhookSecret: { name: 'CAL_WEBHOOK_SECRET', schema: z.string().min(16), default: '' },
   cronSecret: { name: 'CRON_SECRET', schema: z.string().min(16) },
   resendApiKey: { name: 'RESEND_API_KEY', schema: nonEmpty, default: '' },
   mailFrom: { name: 'MAIL_FROM', schema: nonEmpty, default: 'MentorConnect <no-reply@mentorconnect.local>' },
   turnstileSecret: { name: 'TURNSTILE_SECRET_KEY', schema: nonEmpty, default: '' },
+  // Comma-separated hostnames Turnstile tokens must have been issued on ('' = any).
+  turnstileAllowedHostnames: { name: 'TURNSTILE_ALLOWED_HOSTNAMES', schema: z.string(), default: '' },
+  // The public site key, read only to detect "widget on, secret missing" (fail closed).
+  turnstileSiteKey: { name: 'VITE_TURNSTILE_SITE_KEY', schema: z.string(), default: '' },
+  // Exactly '1' lets /api/requests run in Production with no Turnstile keys (logged on every
+  // request). Without it, Production refuses anonymous requests until both keys are set.
+  turnstileDisabled: { name: 'TURNSTILE_DISABLED', schema: z.string(), default: '' },
+  // Set by Vercel: 'production', 'preview' or 'development' ('' elsewhere).
+  vercelEnv: { name: 'VERCEL_ENV', schema: z.string(), default: '' },
   upstashUrl: { name: 'UPSTASH_REDIS_REST_URL', schema: url, default: '' },
   upstashToken: { name: 'UPSTASH_REDIS_REST_TOKEN', schema: nonEmpty, default: '' },
 } as const;

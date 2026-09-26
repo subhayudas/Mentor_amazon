@@ -3,9 +3,13 @@
  * Handles all authentication operations directly from the client
  */
 
+import type { AuthChangeEvent } from '@supabase/supabase-js';
+
 import { supabase } from './supabase';
 import { db } from './database';
-import type { User as DbUser, Mentor, Mentee } from './database';
+import type { User as DbUser } from './database';
+import { AuthFlowError, asAuthFlowError } from './authFlow';
+import { authConfirmUrl } from './routes';
 
 export type UserRole = 'mentor' | 'mentee' | 'admin';
 
@@ -78,37 +82,61 @@ export interface LoginData {
   password: string;
 }
 
+/** Cloudflare Turnstile token for Supabase Auth's captcha check (D6); omitted when the widget is off. */
+export interface CaptchaOptions {
+  captchaToken?: string | null;
+}
+
+function captcha(options?: CaptchaOptions): { captchaToken?: string } {
+  return options?.captchaToken ? { captchaToken: options.captchaToken } : {};
+}
+
+function origin(): string {
+  return typeof window !== 'undefined' ? window.location.origin : '';
+}
+
 class AuthService {
   /**
-   * Sign up a new user
+   * Create a mentee account (F31, F32). The confirmation link returns to
+   * `/auth/confirm?next=<same-origin path>`; `captchaToken` is sent whenever
+   * the Turnstile widget is on. Throws `AuthFlowError`; an address that
+   * already has an account comes back as `user_already_exists` (GoTrue hides
+   * it as a user with no identities when confirmations are on).
    */
-  async signup(data: SignupData): Promise<AuthUser> {
+  async signup(data: SignupData, options: CaptchaOptions & { next?: string | null } = {}): Promise<AuthUser> {
     // No pre-check against `users`: anonymous callers cannot read that table
     // (RLS v2), and Supabase Auth already rejects duplicate emails itself.
 
     // Self-service signup is mentee-only. Mentor identities come from Amazon
     // SSO (amazonAlias) plus an approved mentor record — never a self-selected role.
     if (data.user_type !== 'mentee') {
-      throw new Error('Mentor accounts are provisioned through Amazon sign-in');
+      throw new AuthFlowError('mentor_signup_not_allowed', 400, 'Mentor accounts are provisioned through Amazon sign-in');
     }
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-      options: {
-        data: {
-          user_type: data.user_type,
+    let authData;
+    try {
+      const result = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          data: { user_type: data.user_type },
+          emailRedirectTo: authConfirmUrl(origin(), options.next),
+          ...captcha(options),
         },
-      },
-    });
-
-    if (authError) {
-      console.error('Supabase signup error:', authError);
-      throw new Error(authError.message);
+      });
+      if (result.error) throw result.error;
+      authData = result.data;
+    } catch (error) {
+      throw asAuthFlowError(error);
     }
 
     if (!authData.user) {
-      throw new Error('Failed to create user');
+      throw new AuthFlowError('unknown', null, 'Failed to create user');
+    }
+    // Confirmations on + address already registered: GoTrue answers with an
+    // obfuscated user that has no identities instead of an error.
+    if (!authData.session && Array.isArray(authData.user.identities) && authData.user.identities.length === 0) {
+      throw new AuthFlowError('user_already_exists', 422);
     }
 
     // The `users` row can only be inserted by an authenticated session (RLS).
@@ -125,22 +153,40 @@ class AuthService {
     };
   }
 
-  /**
-   * Log in an existing user
-   */
-  async login(data: LoginData): Promise<AuthUser> {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: data.email,
-      password: data.password,
-    });
+  /** Send the sign-up confirmation email again (F32); same redirect as `signup`. */
+  async resendSignup(email: string, options: CaptchaOptions & { next?: string | null } = {}): Promise<void> {
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: { emailRedirectTo: authConfirmUrl(origin(), options.next), ...captcha(options) },
+      });
+      if (error) throw error;
+    } catch (error) {
+      throw asAuthFlowError(error);
+    }
+  }
 
-    if (authError) {
-      console.error('Login error:', authError);
-      throw new Error('Invalid email or password');
+  /**
+   * Password sign-in. Throws `AuthFlowError` with GoTrue's code
+   * (`invalid_credentials`, `email_not_confirmed`, `captcha_failed`, rate limits).
+   */
+  async login(data: LoginData, options: CaptchaOptions = {}): Promise<AuthUser> {
+    let authData;
+    try {
+      const result = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+        options: captcha(options),
+      });
+      if (result.error) throw result.error;
+      authData = result.data;
+    } catch (error) {
+      throw asAuthFlowError(error);
     }
 
     if (!authData.user) {
-      throw new Error('Login failed');
+      throw new AuthFlowError('unknown', null, 'Login failed');
     }
 
     return this.resolveAuthUser(authData.user);
@@ -149,17 +195,44 @@ class AuthService {
   /**
    * Build the app-level identity from a Supabase auth user.
    *
-   * Role comes from the `users` row (authoritative) and falls back to auth
-   * metadata only for accounts that predate the row. The profile id is only
-   * ever a row that this account provably owns: `users.profile_id`, or the
-   * mentor/mentee row whose email equals the authenticated email (the same
-   * predicate RLS uses for ownership). Nothing here reads localStorage.
+   * The role comes from the `users` row only (F48): auth `user_metadata` is
+   * writable by the account itself, so it never grants a role. With no row
+   * (and none creatable) the account is a mentee; a failed row READ is thrown
+   * so the guards show the access-error state instead of a wrong role. The
+   * profile id is only ever a row that this account provably owns:
+   * `users.profile_id`, or the mentor/mentee row whose email equals the
+   * authenticated email (the same predicate RLS uses for ownership). Nothing
+   * here reads localStorage.
    */
-  private async resolveAuthUser(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Promise<AuthUser> {
+  /** Identity resolutions in flight, by auth user id (see resolveAuthUser). */
+  private resolving = new Map<string, Promise<AuthUser>>();
+
+  /**
+   * The app identity of a Supabase user. Calls made while one is in flight
+   * for the same user share it: a page load resolves the same session from
+   * the initial check and from each auth event, and one set of reads is
+   * enough (it also leaves nothing half-way when a page signs out right after
+   * deciding, e.g. /reset-password for an Amazon account). `fresh` starts a
+   * new resolution, for callers that just changed the users/profile rows.
+   */
+  private resolveAuthUser(
+    user: { id: string; email?: string; user_metadata?: Record<string, unknown> },
+    options: { fresh?: boolean } = {},
+  ): Promise<AuthUser> {
+    const pending = options.fresh ? undefined : this.resolving.get(user.id);
+    if (pending) return pending;
+    const run = this.loadAuthUser(user).finally(() => {
+      if (this.resolving.get(user.id) === run) this.resolving.delete(user.id);
+    });
+    this.resolving.set(user.id, run);
+    return run;
+  }
+
+  private async loadAuthUser(user: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Promise<AuthUser> {
     const email = user.email!;
     const metadata = user.user_metadata || {};
 
-    let userType: UserRole = (metadata.user_type as UserRole) || 'mentee';
+    let userType: UserRole = 'mentee';
     let profileId: string | undefined;
 
     let dbUser = await db.getUserByEmail(email);
@@ -200,10 +273,30 @@ class AuthService {
   }
 
   /**
-   * Create the app-level users row for a signed-in account if it is missing.
-   * Never throws: identity resolution falls back to auth metadata.
+   * Rows created (or being created) by this page, by auth user id. A first
+   * sign-in resolves the identity several times at once (initial load plus
+   * the auth events); they share one insert instead of racing into
+   * duplicate-key errors.
    */
-  private async ensureUsersRow(id: string, email: string, userType: 'mentee'): Promise<DbUser | null> {
+  private usersRows = new Map<string, Promise<DbUser | null>>();
+
+  /**
+   * Create the app-level users row for a signed-in account if it is missing.
+   * Never throws: without a row the account is treated as a mentee.
+   */
+  private ensureUsersRow(id: string, email: string, userType: 'mentee'): Promise<DbUser | null> {
+    const pending = this.usersRows.get(id);
+    if (pending) return pending;
+    const run = this.createUsersRow(id, email, userType).then((row) => {
+      // Only a row that exists is remembered; a failure may be retried later.
+      if (!row) this.usersRows.delete(id);
+      return row;
+    });
+    this.usersRows.set(id, run);
+    return run;
+  }
+
+  private async createUsersRow(id: string, email: string, userType: 'mentee'): Promise<DbUser | null> {
     try {
       return await db.createUser({
         id,
@@ -212,7 +305,7 @@ class AuthService {
         user_type: userType,
       });
     } catch (dbError) {
-      // Duplicate (concurrent first sign-in) or RLS-denied: re-read, else fall back.
+      // Duplicate (another tab's first sign-in) or RLS-denied: re-read, else fall back.
       try {
         return await db.getUserByEmail(email);
       } catch {
@@ -239,41 +332,40 @@ class AuthService {
   /**
    * Get the current authenticated user
    */
-  async getCurrentUser(): Promise<AuthUser | null> {
+  async getCurrentUser(options: { fresh?: boolean } = {}): Promise<AuthUser | null> {
     const { data: { user }, error } = await supabase.auth.getUser();
     
     if (error || !user) {
       return null;
     }
 
-    return this.resolveAuthUser(user);
+    return this.resolveAuthUser(user, options);
   }
 
   /**
-   * Send password reset email
+   * Send a password-reset email. Throws `AuthFlowError`; GoTrue answers an
+   * unknown address like a known one, so the page can surface rate limits and
+   * send failures without revealing whether the account exists.
    */
-  async forgotPassword(email: string): Promise<void> {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-
-    if (error) {
-      console.error('Forgot password error:', error);
-      // Don't throw - we don't want to reveal if email exists
+  async forgotPassword(email: string, options: CaptchaOptions = {}): Promise<void> {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${origin()}/reset-password`,
+        ...captcha(options),
+      });
+      if (error) throw error;
+    } catch (error) {
+      throw asAuthFlowError(error);
     }
   }
 
-  /**
-   * Reset password with token (called after user clicks reset link)
-   */
+  /** Set a new password inside a recovery session. Throws `AuthFlowError` (`weak_password`, `same_password`, …). */
   async resetPassword(newPassword: string): Promise<void> {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-
-    if (error) {
-      console.error('Reset password error:', error);
-      throw new Error('Failed to reset password');
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+    } catch (error) {
+      throw asAuthFlowError(error);
     }
   }
 
@@ -303,9 +395,9 @@ class AuthService {
    * caller then shows an error state with retry instead of treating the
    * person as signed out (F-02).
    */
-  onAuthStateChange(callback: (user: AuthUser | null, error?: unknown) => void): () => void {
+  onAuthStateChange(callback: (user: AuthUser | null, error?: unknown, event?: AuthChangeEvent) => void): () => void {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
         // auth-js holds its lock while it awaits this callback, so no other
         // Supabase call (getUser, PostgREST reads that need the session) may
         // be awaited in here or the client deadlocks — updateUser() and the
@@ -313,17 +405,24 @@ class AuthService {
         // the identity on the next tick, outside the lock, using the session
         // user that was handed to us.
         if (!session?.user) {
-          callback(null);
+          callback(null, undefined, event);
           return;
         }
         const sessionUser = session.user;
         setTimeout(() => {
-          this.resolveAuthUser(sessionUser)
-            .then(callback)
-            .catch((error) => {
+          void (async () => {
+            // The session may be gone by now (the reset page signs out right after
+            // updateUser emits USER_UPDATED): resolving would then query as the
+            // anonymous role. SIGNED_OUT reports the change itself.
+            const { data: current } = await supabase.auth.getSession();
+            if (current.session?.user?.id !== sessionUser.id) return;
+            try {
+              callback(await this.resolveAuthUser(sessionUser), undefined, event);
+            } catch (error) {
               console.error('Auth state resolution error:', error);
-              callback(null, error);
-            });
+              callback(null, error, event);
+            }
+          })();
         }, 0);
       }
     );

@@ -18,11 +18,16 @@ import { cn } from "@/lib/utils";
 import { ARIA_DISABLED_CLASS } from "@/pages/mentee/shared";
 import {
   ActiveBadge,
+  AdminCard,
+  AdminCardList,
+  CardField,
+  CardFields,
   EmptyRow,
   LoadingRows,
   QueueError,
   RoleBadge,
   errorMessage,
+  useAdminTable,
   useFormatters,
   useRowHighlight,
 } from "@/pages/admin/shared";
@@ -36,6 +41,7 @@ export default function AccessTab() {
   const queryClient = useQueryClient();
   const { formatDate, formatDateTime } = useFormatters();
   const { highlight, rowProps } = useRowHighlight();
+  const asTable = useAdminTable();
 
   const requestsQuery = useQuery({ queryKey: adminQueryKeys.accessRequests, queryFn: adminService.getAccessRequests });
   const approvedQuery = useQuery({ queryKey: adminQueryKeys.approvedUsers, queryFn: adminService.getApprovedUsers });
@@ -130,6 +136,77 @@ export default function AccessTab() {
 
   const busy = approveMutation.isPending || rejectMutation.isPending;
 
+  // Row controls shared by the table and the cards (one composition is mounted at a time).
+  const roleSelect = (request: AccessRequest, className: string) => (
+    <Select value={roleByRequest[request.id] ?? "mentor"} onValueChange={(v) => setRoleByRequest((m) => ({ ...m, [request.id]: v as ApprovedRole }))}>
+      <SelectTrigger className={className} aria-label={t("admin.access.role")} data-testid={`select-role-${request.id}`}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {ROLES.map((r) => <SelectItem key={r} value={r}>{t(`admin.role.${r}`)}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+
+  const decisionButtons = (request: AccessRequest, size: "sm" | "md") => (
+    <>
+      <Button
+        size={size}
+        variant="secondary"
+        className={size === "md" ? "h-11" : undefined}
+        onClick={() => approveMutation.mutate({ request, role: roleByRequest[request.id] ?? "mentor" })}
+        loading={approveMutation.isPending && approveMutation.variables?.request.id === request.id}
+        disabled={busy}
+        data-testid={`button-approve-${request.id}`}
+      >
+        <Check aria-hidden="true" />{t("admin.access.approve")}
+      </Button>
+      <Button
+        size={size}
+        variant="outline"
+        className={cn("border-destructive/40 text-destructive hover:bg-destructive-soft", size === "md" && "h-11")}
+        onClick={() => rejectMutation.mutate(request)}
+        loading={rejectMutation.isPending && rejectMutation.variables?.id === request.id}
+        disabled={busy}
+        data-testid={`button-reject-${request.id}`}
+      >
+        <X aria-hidden="true" />{t("admin.access.reject")}
+      </Button>
+    </>
+  );
+
+  const toggleButton = (row: ApprovedUser, size: "sm" | "md") => {
+    const self = isSelf(row);
+    return (
+      <>
+        <Button
+          size={size}
+          variant={row.is_active ? "outline" : "secondary"}
+          className={cn(row.is_active && "border-destructive/40 text-destructive hover:bg-destructive-soft", self && ARIA_DISABLED_CLASS, size === "md" && "h-11")}
+          onClick={() => !self && toggleMutation.mutate({ id: row.id, isActive: !row.is_active })}
+          loading={toggleMutation.isPending && toggleMutation.variables?.id === row.id}
+          aria-disabled={self || undefined}
+          aria-describedby={self ? `self-note-${row.id}` : undefined}
+          data-testid={`button-toggle-approved-${row.id}`}
+        >
+          {row.is_active ? t("admin.access.deactivate") : t("admin.access.reactivate")}
+        </Button>
+        {self && (
+          <span id={`self-note-${row.id}`} className="text-caption text-muted-foreground">
+            {t("admin.access.cannotDeactivateSelf")}
+          </span>
+        )}
+      </>
+    );
+  };
+
+  const approvedStatus = (row: ApprovedUser) => (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <ActiveBadge active={row.is_active} activeLabel={t("admin.access.active")} inactiveLabel={t("admin.access.inactive")} />
+      {hasAccount(row) && <Badge tone="info">{t("admin.access.hasAccount")}</Badge>}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Pending requests */}
@@ -141,10 +218,10 @@ export default function AccessTab() {
           </div>
           <CardDescription>{t("admin.access.pendingHint")}</CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0" aria-busy={requestsQuery.isLoading || undefined}>
+        <CardContent className={cn(asTable ? "p-0" : "px-4 pb-4 pt-0")} aria-busy={requestsQuery.isLoading || undefined}>
           {requestsQuery.isError ? (
             <QueueError queue={t("admin.queues.access")} onRetry={() => requestsQuery.refetch()} />
-          ) : (
+          ) : asTable ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -162,55 +239,43 @@ export default function AccessTab() {
               ) : pending.length === 0 ? (
                 <EmptyRow colSpan={6}>{t("admin.access.noPending")}</EmptyRow>
               ) : (
-                pending.map((request) => {
-                  const role = roleByRequest[request.id] ?? "mentor";
-                  return (
-                    <TableRow key={request.id} {...rowProps(request.id)} data-testid={`row-request-${request.id}`}>
-                      <TableCell className="font-mono text-body-sm font-medium text-foreground" dir="ltr">{request.amazon_alias}</TableCell>
-                      <TableCell className="text-body-sm text-muted-foreground">{request.email ? <bdi dir="ltr">{request.email}</bdi> : UNAVAILABLE}</TableCell>
-                      <TableCell className="text-body-sm">{request.name ? <bdi>{request.name}</bdi> : UNAVAILABLE}</TableCell>
-                      <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDateTime(request.requested_at)}</TableCell>
-                      <TableCell>
-                        <Select value={role} onValueChange={(v) => setRoleByRequest((m) => ({ ...m, [request.id]: v as ApprovedRole }))}>
-                          <SelectTrigger className="h-8 w-32" aria-label={t("admin.access.role")} data-testid={`select-role-${request.id}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ROLES.map((r) => <SelectItem key={r} value={r}>{t(`admin.role.${r}`)}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => approveMutation.mutate({ request, role })}
-                            loading={approveMutation.isPending && approveMutation.variables?.request.id === request.id}
-                            disabled={busy}
-                            data-testid={`button-approve-${request.id}`}
-                          >
-                            <Check aria-hidden="true" />{t("admin.access.approve")}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-destructive/40 text-destructive hover:bg-destructive-soft"
-                            onClick={() => rejectMutation.mutate(request)}
-                            loading={rejectMutation.isPending && rejectMutation.variables?.id === request.id}
-                            disabled={busy}
-                            data-testid={`button-reject-${request.id}`}
-                          >
-                            <X aria-hidden="true" />{t("admin.access.reject")}
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+                pending.map((request) => (
+                  <TableRow key={request.id} {...rowProps(request.id)} data-testid={`row-request-${request.id}`}>
+                    <TableCell className="font-mono text-body-sm font-medium text-foreground" dir="ltr">
+                      <p className="max-w-[13rem] truncate">{request.amazon_alias}</p>
+                    </TableCell>
+                    <TableCell className="text-body-sm text-muted-foreground">
+                      <p className="max-w-[13rem] truncate">{request.email ? <bdi dir="ltr">{request.email}</bdi> : UNAVAILABLE}</p>
+                    </TableCell>
+                    <TableCell className="text-body-sm">{request.name ? <bdi>{request.name}</bdi> : UNAVAILABLE}</TableCell>
+                    <TableCell className="whitespace-nowrap text-body-sm text-muted-foreground tabular-nums">{formatDateTime(request.requested_at)}</TableCell>
+                    <TableCell>{roleSelect(request, "h-8 w-32")}</TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-2">{decisionButtons(request, "sm")}</div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
             </TableBody>
           </Table>
+          ) : (
+            <AdminCardList loading={requestsQuery.isLoading} emptyText={t("admin.access.noPending")} count={pending.length} testId="list-access-requests">
+              {pending.map((request) => (
+                <AdminCard key={request.id} {...rowProps(request.id)} data-testid={`row-request-${request.id}`}>
+                  <p className="break-all font-mono text-body-sm font-medium text-foreground" dir="ltr">{request.amazon_alias}</p>
+                  <CardFields className="mt-2">
+                    <CardField label={t("admin.colEmail")}>{request.email ? <bdi dir="ltr" className="break-all">{request.email}</bdi> : undefined}</CardField>
+                    <CardField label={t("admin.access.name")}>{request.name ? <bdi>{request.name}</bdi> : undefined}</CardField>
+                    <CardField label={t("admin.access.requested")}>{formatDateTime(request.requested_at)}</CardField>
+                  </CardFields>
+                  <div className="mt-3 space-y-1.5">
+                    <p className="text-body-sm text-muted-foreground">{t("admin.access.role")}</p>
+                    {roleSelect(request, "h-11 w-full")}
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">{decisionButtons(request, "md")}</div>
+                </AdminCard>
+              ))}
+            </AdminCardList>
           )}
         </CardContent>
       </Card>
@@ -272,8 +337,8 @@ export default function AccessTab() {
 
           {approvedQuery.isError ? (
             <QueueError queue={t("admin.queues.approved")} onRetry={() => approvedQuery.refetch()} />
-          ) : (
-          <div className="overflow-x-auto" aria-busy={approvedQuery.isLoading || undefined}>
+          ) : asTable ? (
+          <div aria-busy={approvedQuery.isLoading || undefined}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -291,51 +356,51 @@ export default function AccessTab() {
                 ) : approved.length === 0 ? (
                   <EmptyRow colSpan={6}>{t("admin.access.noApproved")}</EmptyRow>
                 ) : (
-                  approved.map((row) => {
-                    const self = isSelf(row);
-                    return (
-                      <TableRow key={row.id} {...rowProps(row.id)} data-testid={`row-approved-${row.id}`}>
-                        <TableCell className="font-mono text-body-sm font-medium text-foreground" dir="ltr">{row.amazon_alias}</TableCell>
-                        <TableCell className="text-body-sm text-muted-foreground">{row.email ? <bdi dir="ltr">{row.email}</bdi> : UNAVAILABLE}</TableCell>
-                        <TableCell><RoleBadge role={row.role} /></TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <ActiveBadge active={row.is_active} activeLabel={t("admin.access.active")} inactiveLabel={t("admin.access.inactive")} />
-                            {hasAccount(row) && <Badge tone="info">{t("admin.access.hasAccount")}</Badge>}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-body-sm text-muted-foreground">
-                          <p className="max-w-[12rem] truncate">{row.approved_by ? <bdi dir="ltr">{row.approved_by}</bdi> : UNAVAILABLE}</p>
-                          <p className="whitespace-nowrap text-caption tabular-nums">{formatDate(row.approved_at)}</p>
-                        </TableCell>
-                        <TableCell className="text-end">
-                          <div className="flex flex-col items-end gap-1">
-                            <Button
-                              size="sm"
-                              variant={row.is_active ? "outline" : "secondary"}
-                              className={cn(row.is_active && "border-destructive/40 text-destructive hover:bg-destructive-soft", self && ARIA_DISABLED_CLASS)}
-                              onClick={() => !self && toggleMutation.mutate({ id: row.id, isActive: !row.is_active })}
-                              loading={toggleMutation.isPending && toggleMutation.variables?.id === row.id}
-                              aria-disabled={self || undefined}
-                              aria-describedby={self ? `self-note-${row.id}` : undefined}
-                              data-testid={`button-toggle-approved-${row.id}`}
-                            >
-                              {row.is_active ? t("admin.access.deactivate") : t("admin.access.reactivate")}
-                            </Button>
-                            {self && (
-                              <span id={`self-note-${row.id}`} className="text-caption text-muted-foreground">
-                                {t("admin.access.cannotDeactivateSelf")}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  approved.map((row) => (
+                    <TableRow key={row.id} {...rowProps(row.id)} data-testid={`row-approved-${row.id}`}>
+                      <TableCell className="font-mono text-body-sm font-medium text-foreground" dir="ltr">
+                        <p className="max-w-[13rem] truncate">{row.amazon_alias}</p>
+                      </TableCell>
+                      <TableCell className="text-body-sm text-muted-foreground">
+                        <p className="max-w-[13rem] truncate">{row.email ? <bdi dir="ltr">{row.email}</bdi> : UNAVAILABLE}</p>
+                      </TableCell>
+                      <TableCell><RoleBadge role={row.role} /></TableCell>
+                      <TableCell>{approvedStatus(row)}</TableCell>
+                      <TableCell className="text-body-sm text-muted-foreground">
+                        <p className="max-w-[12rem] truncate">{row.approved_by ? <bdi dir="ltr">{row.approved_by}</bdi> : UNAVAILABLE}</p>
+                        <p className="whitespace-nowrap text-caption tabular-nums">{formatDate(row.approved_at)}</p>
+                      </TableCell>
+                      <TableCell className="text-end">
+                        <div className="flex flex-col items-end gap-1">{toggleButton(row, "sm")}</div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
           </div>
+          ) : (
+            <div className="px-4 pb-4">
+              <AdminCardList loading={approvedQuery.isLoading} emptyText={t("admin.access.noApproved")} count={approved.length} testId="list-approved">
+                {approved.map((row) => (
+                  <AdminCard key={row.id} {...rowProps(row.id)} data-testid={`row-approved-${row.id}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 break-all font-mono text-body-sm font-medium text-foreground" dir="ltr">{row.amazon_alias}</p>
+                      <RoleBadge role={row.role} />
+                    </div>
+                    <div className="mt-2">{approvedStatus(row)}</div>
+                    <CardFields className="mt-3">
+                      <CardField label={t("admin.colEmail")}>{row.email ? <bdi dir="ltr" className="break-all">{row.email}</bdi> : undefined}</CardField>
+                      <CardField label={t("admin.access.approvedBy")}>
+                        {row.approved_by ? <bdi dir="ltr" className="break-all">{row.approved_by}</bdi> : undefined}
+                        <span className="block text-caption text-muted-foreground tabular-nums">{formatDate(row.approved_at)}</span>
+                      </CardField>
+                    </CardFields>
+                    <div className="mt-4 flex flex-col items-start gap-1">{toggleButton(row, "md")}</div>
+                  </AdminCard>
+                ))}
+              </AdminCardList>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -357,7 +422,8 @@ export default function AccessTab() {
           {!showResolved && <CardDescription>{t("admin.access.resolvedHint")}</CardDescription>}
         </CardHeader>
         {showResolved && (
-          <CardContent className="overflow-x-auto p-0">
+          <CardContent className={cn(asTable ? "p-0" : "px-4 pb-4 pt-0")}>
+            {asTable ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -386,6 +452,23 @@ export default function AccessTab() {
                 )}
               </TableBody>
             </Table>
+            ) : (
+              <AdminCardList loading={false} emptyText={t("admin.access.noResolved")} count={resolved.length} testId="list-resolved">
+                {resolved.map((r) => (
+                  <AdminCard key={r.id} {...rowProps(r.id)} data-testid={`row-resolved-${r.id}`}>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="min-w-0 break-all font-mono text-body-sm text-foreground" dir="ltr">{r.amazon_alias}</p>
+                      <ActiveBadge active={r.status === "approved"} activeLabel={t("admin.access.statusApproved")} inactiveLabel={t("admin.access.statusRejected")} />
+                    </div>
+                    <CardFields className="mt-2">
+                      <CardField label={t("admin.colEmail")}>{r.email ? <bdi dir="ltr" className="break-all">{r.email}</bdi> : undefined}</CardField>
+                      <CardField label={t("admin.access.resolvedBy")}>{r.resolved_by ? <bdi dir="ltr" className="break-all">{r.resolved_by}</bdi> : undefined}</CardField>
+                      <CardField label={t("admin.access.resolvedAt")}>{formatDateTime(r.resolved_at)}</CardField>
+                    </CardFields>
+                  </AdminCard>
+                ))}
+              </AdminCardList>
+            )}
           </CardContent>
         )}
       </Card>

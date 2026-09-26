@@ -13,3 +13,9 @@ graphify-out/
 /*.jpeg
 /*.png
 /*.pdf
+
+# Local Supabase CLI state and Playwright output
+supabase/.temp
+supabase/.branches
+test-results/
+playwright-report/

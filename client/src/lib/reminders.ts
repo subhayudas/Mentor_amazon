@@ -1,4 +1,5 @@
 import type { Booking } from "@/lib/database";
+import { parseTimestamp } from "@/lib/timestamps";
 
 /**
  * Session reminders. The app shows an in-app reminder for every confirmed
@@ -24,7 +25,9 @@ export function dueReminders(bookings: readonly Booking[], now: Date = new Date(
   const out: Reminder[] = [];
   for (const b of bookings) {
     if (!b.scheduled_at || !["accepted", "confirmed"].includes(b.status)) continue;
-    const startsAt = new Date(b.scheduled_at);
+    // Stored as UTC wall-clock with no offset: read it as UTC, not the viewer's zone.
+    const startsAt = parseTimestamp(b.scheduled_at);
+    if (!startsAt) continue;
     const minutesAway = Math.round((startsAt.getTime() - now.getTime()) / 60_000);
     if (minutesAway <= 0 || minutesAway > H24) continue;
     out.push({ booking: b, kind: minutesAway <= 60 ? "1h" : "24h", startsAt, minutesAway });

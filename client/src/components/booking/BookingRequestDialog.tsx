@@ -22,13 +22,16 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { classifyBookingError, type BookingErrorKind } from "@/components/booking/bookingErrors";
+import { Turnstile, turnstileEnabled, type TurnstileHandle, type TurnstileStatus } from "@/components/Turnstile";
+import { SHORT_RETRY_SECONDS, classifyBookingError, invalidRequestFields, useSendBlocked, type BookingErrorKind } from "@/components/booking/bookingErrors";
 import { DiscardRequestDialog } from "@/components/booking/DiscardRequestDialog";
 import { railStopsFor } from "@/components/booking/requestState";
 import { TimeZoneNote } from "@/components/profile/TimeZoneNote";
 import { inlineLinkClass, textLinkDestructiveClass } from "@/components/profile/styles";
 import type { PublicMentor } from "@/lib/database";
 import { bidi, formatNumber } from "@/lib/format";
+import { PROGRAMME_CONTACT_EMAIL, programmeMailto } from "@/lib/programmeContact";
+import { isBookingRequestError } from "@/lib/requests";
 import { ROUTES, loginHref } from "@/lib/routes";
 import { bookingService } from "@/lib/services";
 import { lastDiscoveryHref } from "@/lib/urlState";
@@ -76,6 +79,8 @@ interface Values {
   goal: string;
 }
 
+/** The IP limiter's window is minutes, the DB limit an hour: say which. */
+
 /**
  * The booking request dialog (§7 as amended: P0-3/C4, P1-20/C5, P1-22,
  * P1-29, P0-1, P2-12, P2-13, P2-14).
@@ -89,13 +94,21 @@ interface Values {
  * else the name field. Escape, outside pointer-down, the close button and
  * Cancel all pass through the discard guard while the goal is dirty, and are
  * ignored while the send is in flight. Success is the dialog itself (F-08):
- * the DialogTitle becomes "Request sent to {name}" and receives focus, the
+ * the DialogTitle becomes "Request sent to {name}" (signed out: "Request
+ * submitted", since an email that already has an account gets no request and
+ * the server never says which it was, R1-08) and receives focus, the
  * description carries the follow-up copy, the rail shows stop 1 done, and
  * there is one primary and one text link — no toast, no footer, no second
  * heading. Escape and the close button then close it and focus returns to
- * the anchored status block. `bookingService.createRequest({ mentor_id,
- * mentee_name, mentee_email, goal })` is called exactly as before (RLS
- * depends on it).
+ * the anchored status block.
+ *
+ * Sending (design B4, F31): `bookingService.createRequest` posts anonymous
+ * requests to `/api/requests` with a Turnstile token (the widget renders only
+ * for anonymous visitors, and only when a site key is configured; no token
+ * means no POST) and signed-in requests to `create_my_booking_request`, which
+ * uses the account email (shown read-only). A second request while one is
+ * still pending is reported as success ("already waiting"), with nothing new
+ * written. The widget is reset after every failed attempt.
  */
 export function BookingRequestDialog({
   open,
@@ -117,8 +130,15 @@ export function BookingRequestDialog({
 
   const [step, setStep] = React.useState<Step>("form");
   const [serverError, setServerError] = React.useState<BookingErrorKind | null>(null);
+  const [retryAfter, setRetryAfter] = React.useState<number | undefined>(undefined);
   const [discardOpen, setDiscardOpen] = React.useState(false);
   const [sentEmail, setSentEmail] = React.useState("");
+  const [alreadyPending, setAlreadyPending] = React.useState(false);
+  // Anonymous senders prove they are human; a signed-in request is tied to the account instead.
+  const needsCaptcha = !signedIn && turnstileEnabled();
+  const [captchaToken, setCaptchaToken] = React.useState<string | null>(null);
+  const [captchaStatus, setCaptchaStatus] = React.useState<TurnstileStatus>("loading");
+  const turnstileRef = React.useRef<TurnstileHandle>(null);
 
   const nameRef = React.useRef<HTMLInputElement>(null);
   const goalRef = React.useRef<HTMLTextAreaElement>(null);
@@ -144,7 +164,9 @@ export function BookingRequestDialog({
     resolver: zodResolver(schema),
     defaultValues: { name: prefill.name, email: prefill.email, goal: "" },
     mode: "onSubmit",
-    reValidateMode: "onBlur",
+    // Errors clear while typing, never on blur: a blur-time re-render resizes the dialog and
+    // moves the footer's Send button between mousedown and mouseup, swallowing the click.
+    reValidateMode: "onChange",
   });
 
   const goal = useWatch({ control: form.control, name: "goal" }) ?? "";
@@ -159,19 +181,42 @@ export function BookingRequestDialog({
       form.reset({ name: prefill.name, email: prefill.email, goal: "" });
       setStep("form");
       setServerError(null);
+      setRetryAfter(undefined);
+      setAlreadyPending(false);
       setDiscardOpen(false);
+      setCaptchaToken(null);
     }
     wasOpen.current = open;
   }, [open, prefill.name, prefill.email, form]);
 
+  // The account can finish loading after the dialog opened (a fast click on a
+  // fresh page): fill what the person has not typed themselves, and always the
+  // read-only account fields, so a read-only email is never left empty.
+  React.useEffect(() => {
+    if (!open) return;
+    const dirty = form.formState.dirtyFields;
+    if (prefill.email && (prefill.emailReadOnly || !dirty.email) && form.getValues("email") !== prefill.email) form.setValue("email", prefill.email);
+    if (prefill.name && (prefill.nameReadOnly || !dirty.name) && form.getValues("name") !== prefill.name) form.setValue("name", prefill.name);
+  }, [open, prefill.email, prefill.name, prefill.emailReadOnly, prefill.nameReadOnly, form]);
+
   const mutation = useMutation({
-    mutationFn: (data: { mentor_id: string; mentee_name: string; mentee_email: string; goal: string }) =>
+    mutationFn: (data: { mentor_id: string; mentee_name: string; mentee_email: string; goal: string; turnstileToken?: string | null }) =>
       bookingService.createRequest(data),
-    onSuccess: (_booking, variables) => {
+    onSuccess: (result, variables) => {
+      try {
+        // Per-browser prefill for the next request (Login reads the same keys); only once it went out.
+        localStorage.setItem("menteeName", variables.mentee_name);
+        localStorage.setItem("menteeEmail", variables.mentee_email);
+      } catch {
+        /* storage unavailable */
+      }
       queryClient.invalidateQueries({ queryKey: ["bookings"] });
       queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["analytics"] });
       invalidateKeys?.forEach((key) => queryClient.invalidateQueries({ queryKey: [...key] }));
       setSentEmail(variables.mentee_email);
+      setAlreadyPending(result.outcome === "already_pending");
       setServerError(null);
       setStep("success");
       // Clears the dirty flag so closing the success state never asks to discard.
@@ -179,15 +224,23 @@ export function BookingRequestDialog({
       onSent(variables.mentee_email);
     },
     onError: (error) => {
+      // A token is single-use: any failed attempt needs a fresh check.
+      if (needsCaptcha) turnstileRef.current?.reset();
       const kind = classifyBookingError(error);
+      setRetryAfter(isBookingRequestError(error) ? error.retryAfterSeconds : undefined);
       if (kind === "invalidEmail") {
         form.setError("email", { type: "server", message: t("bookingRequest.error.invalidEmail") });
         form.setFocus("email");
         return;
       }
+      if (kind === "invalid") {
+        const fields = invalidRequestFields(error);
+        if (fields.includes("goal")) form.setError("goal", { type: "server", message: t("bookingRequest.validation.goalShort", { name: bidi(mentorName) }) });
+        if (fields.includes("name")) form.setError("name", { type: "server", message: t("bookingRequest.validation.name") });
+      }
       if (kind === "unavailable") {
-        // RLS refused the insert: the mentor's is_available flipped since the
-        // profile loaded, so the page and directory re-read it.
+        // The mentor's is_available flipped since the profile loaded, so the
+        // page and directory re-read it.
         queryClient.invalidateQueries({ queryKey: ["mentor", mentor.id] });
         queryClient.invalidateQueries({ queryKey: ["mentors"] });
       }
@@ -195,10 +248,11 @@ export function BookingRequestDialog({
     },
   });
   const isPending = mutation.isPending;
-  // After the rate limit or a "stopped accepting" refusal another send cannot
-  // succeed, so the primary is aria-disabled (still focusable) and described
-  // by the alert that says why; a fresh open clears it.
-  const sendBlocked = serverError === "rateLimited" || serverError === "unavailable";
+  // After the rate limit (until its cooldown ends) or a "stopped accepting"
+  // refusal another send cannot succeed, so the primary is aria-disabled
+  // (still focusable) and described by the alert that says why; a fresh open
+  // clears it.
+  const sendBlocked = useSendBlocked(serverError, retryAfter);
 
   React.useEffect(() => {
     if (serverError) alertRef.current?.focus();
@@ -214,11 +268,10 @@ export function BookingRequestDialog({
       setServerError("unavailable");
       return;
     }
-    try {
-      localStorage.setItem("menteeName", values.name);
-      localStorage.setItem("menteeEmail", values.email);
-    } catch {
-      /* storage unavailable: the request still goes out */
+    if (needsCaptcha && !captchaToken) {
+      // No token yet (still solving, blocked, or expired): no POST at all.
+      setServerError("botCheck");
+      return;
     }
     setServerError(null);
     mutation.mutate({
@@ -226,6 +279,7 @@ export function BookingRequestDialog({
       mentee_name: values.name,
       mentee_email: values.email,
       goal: values.goal,
+      turnstileToken: needsCaptcha ? captchaToken : undefined,
     });
   });
   const submit = (event?: React.BaseSyntheticEvent) => {
@@ -318,8 +372,18 @@ export function BookingRequestDialog({
               >
                 <Check className="size-5" strokeWidth={2} />
               </span>
-              <span ref={successRef} tabIndex={-1} className="min-w-0 rounded-sm" data-testid="booking-success-title">
-                <Trans i18nKey="bookingRequest.success.title" values={{ name: mentorName }} components={{ name: <bdi /> }} />
+              <span ref={successRef} tabIndex={-1} className="min-w-0 rounded-sm" data-testid="booking-success-title" data-outcome={alreadyPending ? "already_pending" : "sent"}>
+                {alreadyPending || signedIn ? (
+                  <Trans
+                    i18nKey={alreadyPending ? "bookingRequest.success.pendingTitle" : "bookingRequest.success.title"}
+                    values={{ name: mentorName }}
+                    components={{ name: <bdi /> }}
+                  />
+                ) : (
+                  // Signed out, /api/requests answers the same for every outcome (no account oracle): an
+                  // email that already has an account gets no request, so nothing claims it was sent (R1-08).
+                  t("bookingRequest.success.anonymousTitle")
+                )}
               </span>
             </span>
           ) : (
@@ -331,7 +395,13 @@ export function BookingRequestDialog({
         description={
           success ? (
             <span className="text-body-sm">
-              {signedIn ? (
+              {alreadyPending ? (
+                <Trans
+                  i18nKey="bookingRequest.success.pendingBody"
+                  values={{ name: mentorName }}
+                  components={{ name: <bdi /> }}
+                />
+              ) : signedIn ? (
                 <Trans
                   i18nKey="bookingRequest.success.signedIn"
                   values={{ name: mentorName }}
@@ -423,7 +493,10 @@ export function BookingRequestDialog({
                     <CircleAlert aria-hidden="true" />
                     <AlertDescription className="flex flex-col gap-2">
                       <span>
-                        {serverError === "rateLimited" && t("bookingRequest.error.rateLimited")}
+                        {serverError === "rateLimited" &&
+                          (retryAfter !== undefined && retryAfter <= SHORT_RETRY_SECONDS
+                            ? t("bookingRequest.error.rateLimitedSoon")
+                            : t("bookingRequest.error.rateLimited"))}
                         {serverError === "unavailable" && (
                           <Trans
                             i18nKey="bookingRequest.error.unavailable"
@@ -431,7 +504,13 @@ export function BookingRequestDialog({
                             components={{ name: <bdi /> }}
                           />
                         )}
+                        {serverError === "captcha" && t("bookingRequest.error.captcha")}
+                        {serverError === "botCheck" &&
+                          (captchaStatus === "failed" ? t("bookingRequest.captchaNotSent") : t("bookingRequest.error.botCheck"))}
+                        {serverError === "invalid" && t("bookingRequest.error.invalid")}
+                        {serverError === "invalidEmail" && t("bookingRequest.error.invalidEmail")}
                         {serverError === "generic" && t("bookingRequest.error.generic")}
+                        {serverError === "service" && t("bookingRequest.error.service")}
                       </span>
                       {serverError === "unavailable" && (
                         <span>
@@ -440,7 +519,7 @@ export function BookingRequestDialog({
                           </Link>
                         </span>
                       )}
-                      {serverError === "generic" && (
+                      {(serverError === "generic" || serverError === "service") && (
                         <span>
                           <Button type="submit" form={formId} variant="outline" size="sm" data-testid="button-retry-booking">
                             {t("bookingRequest.error.tryAgain")}
@@ -557,6 +636,44 @@ export function BookingRequestDialog({
                   </FormItem>
                 )}
               />
+
+              {needsCaptcha && (
+                <div role="group" aria-labelledby={`${formId}-captcha`} className="flex flex-col gap-1.5">
+                  <p id={`${formId}-captcha`} className="text-body-sm font-medium text-foreground">
+                    {t("bookingRequest.captchaLabel")}
+                  </p>
+                  <Turnstile
+                    ref={turnstileRef}
+                    action="booking-request"
+                    copy="booking"
+                    className="min-h-[65px]"
+                    onStatus={setCaptchaStatus}
+                    fallback={
+                      PROGRAMME_CONTACT_EMAIL ? (
+                        <Trans
+                          i18nKey="bookingRequest.captchaContact"
+                          values={{ email: PROGRAMME_CONTACT_EMAIL }}
+                          components={{
+                            email: (
+                              <a
+                                href={programmeMailto(PROGRAMME_CONTACT_EMAIL, t("bookingRequest.captchaContactSubject", { name: mentorName }))}
+                                dir="ltr"
+                                className="font-semibold underline underline-offset-4"
+                                data-testid="link-captcha-contact"
+                              />
+                            ),
+                          }}
+                        />
+                      ) : undefined
+                    }
+                    onToken={(token) => {
+                      setCaptchaToken(token);
+                      // "Complete the check" is answered by the token; a server-side rejection stays until the next send.
+                      if (token) setServerError((current) => (current === "botCheck" ? null : current));
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="mt-1 rounded-lg bg-muted/40 p-3">
                 <p className="text-caption text-muted-foreground">{t("bookingRequest.whatNext")}</p>

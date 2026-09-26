@@ -3,13 +3,15 @@ import { Link } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Clock, MailCheck, Star } from "lucide-react";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { FavoriteButton } from "@/components/FavoriteButton";
+import { sentMemoryForViewer } from "@/components/booking/requestState";
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/context/AuthContext";
 import type { PublicMentor } from "@/lib/database";
+import { directoryFields, type DirectoryMentor } from "@/lib/directory";
 import {
   CARD_CHIP_LIMIT,
   firstSentence,
@@ -17,7 +19,7 @@ import {
   localized,
   localizedTags,
 } from "@/lib/discovery";
-import { UNAVAILABLE, bidi, formatNumber, localizeCountry, tzOffsetLabel, viewerTimeZone } from "@/lib/format";
+import { UNAVAILABLE, formatNumber, localizeCountry, tzOffsetLabel, viewerTimeZone } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
 import { ROUTES } from "@/lib/routes";
 import { getSentRequest } from "@/lib/sentRequests";
@@ -44,9 +46,15 @@ import { cn } from "@/lib/utils";
  * No availability strip, no preference line, no quick view, no filled button
  * (navy fill is reserved for page-level actions). Hover = border darkens only;
  * chips/cards are high-frequency surfaces, so nothing else animates.
+ *
+ * Directory entries (design B1): a curated mentor links to its public slug
+ * (`/mentor/<slug>`) whatever its id; a curated mentor with no database row yet
+ * reads "Opening soon" and has no heart (it cannot be requested or saved); when
+ * the directory could not be read the availability badge is left out rather
+ * than guessed.
  */
 export interface MentorCardProps {
-  mentor: PublicMentor;
+  mentor: PublicMentor | DirectoryMentor;
   className?: string;
 }
 
@@ -74,14 +82,12 @@ function useCardFields(mentor: PublicMentor) {
       // Up to CARD_CHIP_LIMIT chips fit one row; with more, two chips + "+n" do (F-25).
       visibleTags: tags.slice(0, tags.length > CARD_CHIP_LIMIT ? CARD_CHIP_LIMIT - 1 : CARD_CHIP_LIMIT),
       hiddenTags: tags.slice(tags.length > CARD_CHIP_LIMIT ? CARD_CHIP_LIMIT - 1 : CARD_CHIP_LIMIT),
-      // The compact card has no "+n", so it always shows the first three.
-      compactTags: tags.slice(0, CARD_CHIP_LIMIT),
       languages: languageLabels(mentor, lang),
       country: mentor.country ? localizeCountry(mentor.country, lang) : "",
       tz,
       ratingCount: mentor.total_ratings ?? 0,
       rating: Number.parseFloat(String(mentor.average_rating ?? "")),
-      statusLabel: mentor.is_available ? t("mentorCard.accepting") : t("mentorCard.notAccepting"),
+      ...directoryFields(mentor),
     };
   }, [mentor, lang, t]);
 }
@@ -101,8 +107,20 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
   const lang = i18n.language;
   const nameId = React.useId();
   const f = useCardFields(mentor);
-  const sent = React.useMemo(() => getSentRequest(mentor.id), [mentor.id]);
+  const { user } = useAuth();
+  // Same rule as the profile and the scheduler: a signed-in viewer only sees a memory sent from their own address.
+  const sent = React.useMemo(
+    () => (f.bookable || f.source === "db" ? sentMemoryForViewer(getSentRequest(mentor.id), user?.email) : null),
+    [mentor.id, f.bookable, f.source, user?.email],
+  );
   const hasRating = f.ratingCount > 0 && Number.isFinite(f.rating);
+  const status: { tone: "success" | "neutral" | "info"; label: string; key: string } | null = f.availabilityUnknown
+    ? null
+    : f.source === "featured" && !f.bookable
+      ? { tone: "info", label: t("mentorCard.openingSoon"), key: "opening-soon" }
+      : mentor.is_available
+        ? { tone: "success", label: t("mentorCard.accepting"), key: "accepting" }
+        : { tone: "neutral", label: t("mentorCard.notAccepting"), key: "closed" };
   const ratingText = hasRating ? formatNumber(f.rating, lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : "";
   const countText = hasRating ? formatNumber(f.ratingCount, lang) : "";
 
@@ -127,13 +145,11 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
             {f.initials}
           </div>
         )}
-        <Badge
-          tone={mentor.is_available ? "success" : "neutral"}
-          className="absolute bottom-2 start-2 z-[1] shadow-sm"
-          data-status={mentor.is_available ? "accepting" : "closed"}
-        >
-          {f.statusLabel}
-        </Badge>
+        {status && (
+          <Badge tone={status.tone} className="absolute bottom-2 start-2 z-[1] shadow-sm" data-status={status.key}>
+            {status.label}
+          </Badge>
+        )}
         {f.company && (
           <span className="absolute bottom-2 end-2 z-[1] max-w-[55%] truncate rounded-[24px] bg-black/55 px-3 py-1 text-[12px] font-medium text-white backdrop-blur">
             <bdi>{f.company}</bdi>
@@ -223,7 +239,7 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
           on the label it wraps.
         */}
         <Link
-          href={ROUTES.mentor(mentor.id)}
+          href={ROUTES.mentor(f.href)}
           data-testid={`link-mentor-${mentor.id}`}
           className="group/link inline-flex w-full rounded-lg after:absolute after:inset-0 after:rounded-[16px] after:content-[''] focus-visible:outline-none focus-visible:after:outline focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ring sm:w-auto"
         >
@@ -239,63 +255,17 @@ export function MentorCard({ mentor, className }: MentorCardProps) {
         </Link>
         <span className="flex items-center gap-2">
           {sent && (
-            <Badge tone="info" className="shrink-0">
+            <Badge tone="info" className="shrink-0" data-testid={`badge-request-memory-${mentor.id}`}>
               <MailCheck aria-hidden="true" strokeWidth={2} />
-              {t("mentorCard.requestSent")}
+              {/* Signed out, this browser only knows the form went out: an email that already has an
+                  account gets no request, and the server never says which it was (R1-08). */}
+              {user ? t("mentorCard.requestSent") : t("mentorCard.requestSubmitted")}
             </Badge>
           )}
-          <FavoriteButton mentorId={mentor.id} mentorName={f.name} size="sm" />
+          <FavoriteButton mentorId={mentor.id} mentorName={f.name} size="sm" disabled={!f.bookable} />
         </span>
       </div>
     </article>
-  );
-}
-
-/**
- * Compact card for the mobile landing scroller (P0-7): avatar 40, name,
- * credential, three chips and the tz label — no helps-with, no rating, no
- * button. The whole card is the link, named "View profile: {name}".
- */
-export function MentorCardCompact({ mentor, className }: MentorCardProps) {
-  const { t } = useTranslation();
-  const f = useCardFields(mentor);
-  return (
-    <Link
-      href={ROUTES.mentor(mentor.id)}
-      aria-label={t("mentorCard.viewProfileOf", { name: bidi(f.name) })}
-      data-testid={`card-mentor-${mentor.id}`}
-      className={cn(
-        "flex w-[80vw] max-w-[320px] shrink-0 snap-start flex-col gap-3 rounded-lg border border-border bg-card p-4 text-card-foreground transition-colors duration-fast hover:border-muted-foreground/40",
-        className,
-      )}
-    >
-      <div className="flex h-10 items-center gap-3">
-        <Avatar className="size-10">
-          <AvatarImage src={mentor.photo_url || undefined} alt="" />
-          <AvatarFallback className="bg-muted text-sm font-medium text-foreground">{f.initials}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <h3
-            data-testid={`text-mentor-name-${mentor.id}`}
-            className="truncate text-base leading-5 text-foreground [font-weight:var(--heading-weight,600)]"
-          >
-            <bdi>{f.name}</bdi>
-          </h3>
-          <Credential position={f.position} company={f.company} className="h-5 text-caption leading-5" />
-        </div>
-      </div>
-      <div className="flex h-14 flex-wrap content-start gap-2 overflow-hidden">
-        {f.compactTags.map((tag, i) => (
-          <Badge key={tag.key} tone="neutral" className="max-w-full" data-testid={`badge-expertise-${i}`}>
-            <span className="truncate">{tag.label}</span>
-          </Badge>
-        ))}
-      </div>
-      <p className="flex h-5 items-center gap-1 text-caption leading-5 text-muted-foreground">
-        <Clock className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden="true" />
-        <span className="truncate">{f.tz}</span>
-      </p>
-    </Link>
   );
 }
 
@@ -323,31 +293,6 @@ export function MentorCardSkeleton({ className }: { className?: string }) {
       </div>
       <div className="mt-auto pt-3">
         <Skeleton className="h-9 w-full sm:w-28" />
-      </div>
-    </div>
-  );
-}
-
-/** Loading twin of `MentorCardCompact` for the mobile scroller. */
-export function MentorCardCompactSkeleton({ className }: { className?: string }) {
-  return (
-    <div
-      aria-hidden="true"
-      className={cn("flex w-[80vw] max-w-[320px] shrink-0 snap-start flex-col gap-3 rounded-lg border border-border bg-card p-4", className)}
-    >
-      <div className="flex h-10 items-center gap-3">
-        <Skeleton className="size-10 rounded-full" />
-        <div className="flex flex-1 flex-col gap-1.5">
-          <Skeleton className="h-4 w-2/3" />
-          <Skeleton className="h-3 w-1/2" />
-        </div>
-      </div>
-      <div className="flex h-14 flex-wrap content-start gap-2 overflow-hidden">
-        <Skeleton className="h-5 w-24 rounded-full" />
-        <Skeleton className="h-5 w-20 rounded-full" />
-      </div>
-      <div className="flex h-5 items-center">
-        <Skeleton className="h-4 w-1/3" />
       </div>
     </div>
   );

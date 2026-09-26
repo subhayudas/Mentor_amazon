@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, ChevronDown, LogOut, Menu } from "lucide-react";
@@ -6,7 +6,6 @@ import { ArrowRight, ChevronDown, LogOut, Menu } from "lucide-react";
 import { AmazonLogo } from "@/components/AmazonSmile";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { NotificationBell } from "@/components/NotificationBell";
-import { LocalNotificationBell } from "@/components/LocalNotificationBell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -20,8 +19,15 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from 
 import { useAuth } from "@/context/AuthContext";
 import { syncRoleStorage } from "@/lib/auth";
 import { IS_LOCAL } from "@/lib/demo";
+import { ensureAllStrings } from "@/lib/i18n";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+
+// Demo (local) mode only: database-mode visitors never download the browser-store bell.
+// It waits for every string too: the entry chunk carries only the English its own modules use (lib/i18n).
+const LocalNotificationBell = lazy(() =>
+  Promise.all([import("@/components/LocalNotificationBell"), ensureAllStrings()]).then(([m]) => ({ default: m.LocalNotificationBell })),
+);
 
 /**
  * Global header (spec §4 as amended by P0-6/C1, P1-23, P1-26, P2-9).
@@ -37,8 +43,10 @@ import { cn } from "@/lib/utils";
  * the inline-end with 44px rows; "Become a mentor" lives there (and in the
  * footer), never in the desktop bar.
  *
- * Identity logic is unchanged: roles come from the session only; the mentee
- * localStorage mirror keeps the legacy anonymous mentee path alive.
+ * Identity comes from the session only (F19). Database mode never reads the
+ * legacy localStorage mirrors: signed in means a Supabase session and the
+ * bell follows the session email. Local (demo) mode keeps the
+ * browser-registered mentee path (`menteeId` / `menteeEmail`) alive.
  */
 type NavItem = { href: string; label: string; testId?: string };
 
@@ -66,11 +74,19 @@ export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
+    // Database mode: stale mirrors from the preview period must not make a
+    // visitor look signed in (LegacyLocalDataNotice offers to clear them).
+    if (!IS_LOCAL) return;
     const updateUserInfo = () => {
-      const menteeEmail = localStorage.getItem("menteeEmail");
-      const mentorEmail = localStorage.getItem("mentorEmail");
-      setUserEmail(menteeEmail || mentorEmail || null);
-      setMenteeId(localStorage.getItem("menteeId"));
+      try {
+        const menteeEmail = localStorage.getItem("menteeEmail");
+        const mentorEmail = localStorage.getItem("mentorEmail");
+        setUserEmail(menteeEmail || mentorEmail || null);
+        setMenteeId(localStorage.getItem("menteeId"));
+      } catch {
+        setUserEmail(null);
+        setMenteeId(null);
+      }
     };
 
     updateUserInfo();
@@ -102,13 +118,14 @@ export function Navigation() {
     setLocationPath(ROUTES.home);
   };
 
-  const isLoggedIn = Boolean(user || menteeId);
+  // menteeId is only ever set in local mode (the effect above returns early otherwise).
+  const isLoggedIn = Boolean(user || (IS_LOCAL && menteeId));
 
   // Roles that unlock protected surfaces come from the authenticated session
   // only. A stored mentorId is never enough: mentor ids are world-readable.
-  // The mentee mirror is kept for the legacy anonymous mentee-dashboard path.
+  // The mentee mirror keeps the local-mode (demo) mentee path alive.
   const isMentor = user?.user_type === "mentor";
-  const isMentee = user?.user_type === "mentee" || (!user && !!menteeId);
+  const isMentee = user?.user_type === "mentee" || (IS_LOCAL && !user && !!menteeId);
   const isAdmin = user?.user_type === "admin";
 
   const isActive = (href: string) =>
@@ -117,7 +134,10 @@ export function Navigation() {
   const primaryItems: NavItem[] = [
     { href: ROUTES.mentors, label: t("nav.mentors"), testId: "nav-mentors" },
     // The showcase dashboard (demo, or any signed-in account) and the mentor sign-up live in the bar itself.
-    ...(IS_LOCAL || user ? [{ href: "/dashboard", label: user ? t(user.user_type === "mentee" ? "showcase.nav.myDashboard" : "showcase.nav.dashboard") : t("showcase.nav.dashboard"), testId: "nav-dashboard" }] : []),
+    // Database-mode admins work in /admin (the dashboard only redirects there); they get the role items instead.
+    ...(IS_LOCAL || (user && user.user_type !== "admin")
+      ? [{ href: "/dashboard", label: user ? t(user.user_type === "mentee" ? "showcase.nav.myDashboard" : "showcase.nav.dashboard") : t("showcase.nav.dashboard"), testId: "nav-dashboard" }]
+      : []),
     ...(!isLoggedIn
       ? [
           { href: ROUTES.menteeRegistration, label: t("showcase.footer.joinAsMentee"), testId: "nav-join-mentee" },
@@ -136,9 +156,9 @@ export function Navigation() {
 
   const desktopItems = [...primaryItems, ...roleItems];
   const showBrowse = !isLoading && !isLoggedIn && !isActive(ROUTES.mentors);
-  const bellEmail = user?.email || userEmail;
-  const accountName = user?.name || user?.email || userEmail || "";
-  const initial = (user?.name || user?.email || userEmail || "?").charAt(0).toUpperCase();
+  const bellEmail = IS_LOCAL ? user?.email || userEmail : user?.email ?? null;
+  const accountName = user?.name || user?.email || (IS_LOCAL ? userEmail : null) || "";
+  const initial = (accountName || "?").charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 h-14 border-b border-[var(--sc-hairline)] bg-white lg:h-[72px]">
@@ -169,7 +189,11 @@ export function Navigation() {
           <LanguageToggle />
 
           {bellEmail && !IS_LOCAL && <NotificationBell email={bellEmail} />}
-          {IS_LOCAL && user && <LocalNotificationBell />}
+          {IS_LOCAL && user && (
+            <Suspense fallback={null}>
+              <LocalNotificationBell />
+            </Suspense>
+          )}
 
           {/* Visitor CTAs never top the access-error card: with a session whose users row failed to load (F-02), the header stays neutral. */}
           {!isLoading && !isLoggedIn && !error && (
@@ -243,7 +267,7 @@ export function Navigation() {
             </DropdownMenu>
           )}
 
-          {!user && menteeId && (
+          {IS_LOCAL && !user && menteeId && (
             <Button
               variant="ghost"
               size="sm"

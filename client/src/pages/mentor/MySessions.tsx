@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { CalendarClock, CheckCircle2, FileText, MessageSquare, Timer, XCircle } from "lucide-react";
@@ -17,41 +17,27 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { ChipRadio, ChipRadioGroup } from "@/components/discovery/FilterChip";
+import { CompleteSessionDialog } from "@/components/dashboard/CompleteSessionDialog";
 import { EmptyState } from "@/components/EmptyState";
 import { StarRating } from "@/components/MenteeFeedbackDialog";
 import { StatusBadge } from "@/components/StatusBadge";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { BookingNotes } from "@/components/dashboard/BookingNotes";
 import { toast } from "sonner";
-import type { Booking, Mentee, Mentor } from "@/lib/database";
+import { isBookingStateChangedError, type Booking, type Mentee, type Mentor } from "@/lib/database";
 import { bidi, formatDateTime, formatNumber, tzDisplayLabel, viewerTimeZone } from "@/lib/format";
 import { initialsOf } from "@/lib/localized";
 import { isFuture } from "@/lib/menteeBookings";
 import { queryClient } from "@/lib/queryClient";
-import {
-  completeSession,
-  getMentorCountry,
-  localizeCountry,
-  MAX_SESSION_MINUTES,
-  MIN_SESSION_MINUTES,
-  REPORTING_COUNTRIES,
-  SESSION_MINUTE_PRESETS,
-} from "@/lib/reporting";
+import { completeSession, getMentorCountry } from "@/lib/reporting";
 import { bookingService, mentorService } from "@/lib/services";
 import { cn } from "@/lib/utils";
-import { ARIA_DISABLED_CLASS, BookingsError } from "@/pages/mentee/shared";
+import { BookingsError } from "@/pages/mentee/shared";
 
-/** Radix Select cannot hold an empty-string value, so "no country" is this sentinel. */
-const NO_COUNTRY = "__none";
-/** The "Other…" duration chip; it reveals the free number field. */
-const OTHER_DURATION = "__other";
 const HIGHLIGHT_MS = 2000;
 
 type SessionBooking = Booking & { mentee?: Mentee };
@@ -98,6 +84,19 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ["mentor", mentorId] });
     queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    // The /dashboard suite and analytics read the same rows (design §3.6).
+    queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["analytics"] });
+  };
+
+  // The session changed in another tab (R1-16): nothing was written, say so and show its real status.
+  const onWriteError = (error: unknown) => {
+    if (isBookingStateChangedError(error)) {
+      invalidate();
+      toast.error(t("showcase.bookings.toast.stale"));
+      return;
+    }
+    toast.error(t("dashboardV2.sessions.updateError"));
   };
 
   const cancelMutation = useMutation({
@@ -106,7 +105,7 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
       invalidate();
       toast.success(t("dashboardV2.sessions.cancelledToast"));
     },
-    onError: () => toast.error(t("dashboardV2.sessions.updateError")),
+    onError: onWriteError,
   });
 
   const completeMutation = useMutation({
@@ -119,7 +118,10 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
       setHighlightedId(variables.bookingId);
       toast.success(t("mentorPortal.sessionCompleted", { minutes: variables.minutes }));
     },
-    onError: () => toast.error(t("dashboardV2.sessions.updateError")),
+    onError: (error) => {
+      if (isBookingStateChangedError(error)) setCompleteFor(null);
+      onWriteError(error);
+    },
   });
 
   const { upcoming, completed } = useMemo(() => {
@@ -240,35 +242,8 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
     );
   };
 
-  // ----- complete dialog state -----
-  // One control for the duration (F-42): preset chips, plus an "Other" chip
-  // that reveals the free number field instead of showing both at once.
-  const [minutesInput, setMinutesInput] = useState("30");
-  const [otherDuration, setOtherDuration] = useState(false);
-  const [sessionCountry, setSessionCountry] = useState("");
-  const minutesRef = useRef<HTMLInputElement | null>(null);
-  const parsedMinutes = Number.parseInt(minutesInput, 10);
-  const minutesValid = Number.isInteger(parsedMinutes) && parsedMinutes >= MIN_SESSION_MINUTES && parsedMinutes <= MAX_SESSION_MINUTES;
-  const ids = useId();
-  const durationChoice = !otherDuration && SESSION_MINUTE_PRESETS.some((preset) => preset === parsedMinutes) ? String(parsedMinutes) : OTHER_DURATION;
-
-  useEffect(() => {
-    if (!otherDuration) return;
-    const frame = window.requestAnimationFrame(() => minutesRef.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [otherDuration]);
-
-  const openComplete = (booking: SessionBooking) => {
-    setMinutesInput("30");
-    setOtherDuration(false);
-    setSessionCountry(booking.country || getMentorCountry(mentor) || "");
-    setCompleteFor(booking);
-  };
-  const confirmComplete = () => {
-    if (!completeFor || !minutesValid) return;
-    completeMutation.mutate({ bookingId: completeFor.id, minutes: parsedMinutes, country: sessionCountry || undefined });
-  };
-  const countryChoices = sessionCountry && !REPORTING_COUNTRIES.includes(sessionCountry) ? [sessionCountry, ...REPORTING_COUNTRIES] : REPORTING_COUNTRIES;
+  // The duration + country dialog is shared with /dashboard/bookings (components/dashboard/CompleteSessionDialog).
+  const openComplete = (booking: SessionBooking) => setCompleteFor(booking);
 
   const renderList = (rows: SessionBooking[], emptyTitle: string, emptyBody: string) =>
     bookingsQuery.isLoading ? (
@@ -320,107 +295,15 @@ export default function MySessions({ mentorId, mentorEmail, mentor }: MySessions
       </Tabs>
 
       {/* Complete session */}
-      <Dialog open={!!completeFor} onOpenChange={(open) => !open && setCompleteFor(null)}>
-        <DialogContent className="max-w-md" data-testid="dialog-complete-session">
-          <DialogHeader>
-            <DialogTitle>{t("mentorPortal.completeSessionTitle")}</DialogTitle>
-            <DialogDescription>{t("mentorPortal.completeSessionDesc")}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <Label id={`${ids}-duration-label`}>{t("mentorPortal.sessionDuration")}</Label>
-              <ChipRadioGroup
-                aria-labelledby={`${ids}-duration-label`}
-                value={durationChoice}
-                onValueChange={(value) => {
-                  if (value === OTHER_DURATION) {
-                    setOtherDuration(true);
-                    return;
-                  }
-                  setOtherDuration(false);
-                  setMinutesInput(value);
-                }}
-              >
-                {SESSION_MINUTE_PRESETS.map((preset) => (
-                  <ChipRadio key={preset} value={String(preset)} data-testid={`button-minutes-${preset}`}>
-                    {t("mentorPortal.durationMinutes", { count: preset })}
-                  </ChipRadio>
-                ))}
-                <ChipRadio value={OTHER_DURATION} data-testid="button-minutes-other">
-                  {t("mentorPortal.otherDuration")}
-                </ChipRadio>
-              </ChipRadioGroup>
-              {otherDuration && (
-                <>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="input-session-minutes" className="sr-only">
-                      {t("mentorPortal.sessionDuration")}
-                    </Label>
-                    <Input
-                      ref={minutesRef}
-                      id="input-session-minutes"
-                      type="number"
-                      inputMode="numeric"
-                      min={MIN_SESSION_MINUTES}
-                      max={MAX_SESSION_MINUTES}
-                      value={minutesInput}
-                      onChange={(event) => setMinutesInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") confirmComplete();
-                      }}
-                      aria-invalid={!minutesValid}
-                      aria-describedby={`${ids}-minutes-hint`}
-                      className="w-28"
-                      data-testid="input-session-minutes"
-                    />
-                    <span className="text-body-sm text-muted-foreground">{t("mentorPortal.minutesLabel")}</span>
-                  </div>
-                  <p id={`${ids}-minutes-hint`} className={cn("text-caption", minutesValid ? "text-muted-foreground" : "text-destructive")}>
-                    {minutesValid
-                      ? t("mentorPortal.minutesHint", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })
-                      : t("mentorPortal.invalidDuration", { min: MIN_SESSION_MINUTES, max: MAX_SESSION_MINUTES })}
-                  </p>
-                </>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="select-session-country">{t("mentorPortal.sessionCountry")}</Label>
-              <Select value={sessionCountry || NO_COUNTRY} onValueChange={(value) => setSessionCountry(value === NO_COUNTRY ? "" : value)}>
-                <SelectTrigger id="select-session-country" data-testid="select-session-country">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_COUNTRY}>{t("mentorPortal.sessionCountryNone")}</SelectItem>
-                  {countryChoices.map((country) => (
-                    <SelectItem key={country} value={country}>
-                      {localizeCountry(country, i18n.language)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-caption text-muted-foreground">{t("mentorPortal.sessionCountryHint")}</p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setCompleteFor(null)} disabled={completeMutation.isPending} data-testid="button-cancel-complete">
-              {t("common.cancel")}
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              className={ARIA_DISABLED_CLASS}
-              onClick={confirmComplete}
-              aria-disabled={!minutesValid || undefined}
-              aria-describedby={!minutesValid ? `${ids}-minutes-hint` : undefined}
-              loading={completeMutation.isPending}
-              data-testid="button-confirm-complete"
-            >
-              <CheckCircle2 aria-hidden="true" />
-              {t("mentorPortal.confirmComplete")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <CompleteSessionDialog
+        open={!!completeFor}
+        onOpenChange={(open) => !open && setCompleteFor(null)}
+        defaultCountry={completeFor ? completeFor.country || getMentorCountry(mentor) || "" : ""}
+        pending={completeMutation.isPending}
+        onConfirm={({ minutes, country }) => {
+          if (completeFor) completeMutation.mutate({ bookingId: completeFor.id, minutes, country });
+        }}
+      />
 
       {/* Notes */}
       <Dialog open={!!notesFor} onOpenChange={(open) => !open && setNotesFor(null)}>
@@ -560,6 +443,7 @@ function MentorFeedbackDialog({
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                     placeholder={t("dashboardV2.sessions.feedbackPlaceholder")}
+                    maxLength={5000}
                     className="min-h-24"
                     data-testid="input-feedback-text"
                   />

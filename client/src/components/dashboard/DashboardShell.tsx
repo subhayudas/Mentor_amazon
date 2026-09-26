@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Link } from "wouter";
+import { Link, Redirect } from "wouter";
 import { useTranslation } from "react-i18next";
 import { Activity, BarChart3, CalendarClock, CalendarDays, ChevronRight, Home as HomeIcon, LogOut, Plus, Search, Settings, ShieldCheck, UserRound, Users, type LucideIcon } from "lucide-react";
 
@@ -8,6 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 import { IS_LOCAL } from "@/lib/demo";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { useOwnProfile } from "@/pages/dashboard/data";
+import { displayNameFor, firstNameOf } from "@/pages/dashboard/dataSource";
 
 /** Which sidebar entry is lit. */
 export type DashboardSection = "home" | "bookings" | "calendar" | "profile" | "activity" | "mentors" | "admin" | "analytics-growth" | "analytics-profile" | "settings";
@@ -41,14 +43,44 @@ function SideLink({ icon: Icon, label, href, active, chevron, sub }: { icon?: Lu
   );
 }
 
-/** The signed-in identity the shell shows; with no account in local mode, the showcase one. */
+/** Neutral identity for the local showcase (no account): never a real person's name or address. */
+export const DEMO_IDENTITY_EMAIL = "demo@mentorconnect.local";
+
+/**
+ * The signed-in identity the shell shows (F41, F43): the profile row's name,
+ * else the account's name, else the local part of its email. With no account
+ * (local showcase only) a neutral "Demo mentor".
+ */
 export function useDashboardIdentity() {
+  const { t } = useTranslation();
   const { user } = useAuth();
-  const displayName = user?.name ?? (IS_LOCAL ? "Vats S." : "");
-  const email = user?.email ?? (IS_LOCAL ? "vatssshah04@gmail.com" : "");
-  const firstName = displayName.split(" ")[0] || displayName;
+  const own = useOwnProfile();
+  const rowName = user?.user_type === "mentor" ? own.mentor?.name : user?.user_type === "mentee" ? own.mentee?.name : undefined;
+  const displayName = user ? displayNameFor(rowName || user.name, user.email) : IS_LOCAL ? t("showcase.dashboard.demoName") : "";
+  const email = user?.email ?? (IS_LOCAL ? DEMO_IDENTITY_EMAIL : "");
+  const firstName = firstNameOf(displayName) || displayName;
   const role: "mentor" | "mentee" | "admin" = user?.user_type === "mentee" ? "mentee" : user?.user_type === "admin" ? "admin" : "mentor";
-  return { displayName, email, firstName, initial: (displayName || "M").slice(0, 1), role, signedIn: Boolean(user) };
+  return { displayName, email, firstName, initial: (displayName || "M").slice(0, 1).toUpperCase(), role, signedIn: Boolean(user) };
+}
+
+/**
+ * Database mode: admins work in the database-backed /admin dashboard (design
+ * D8, C3), so the dashboard sections that only make sense for a mentor or a
+ * mentee send them there. Activity and analytics stay open to admins.
+ */
+const ADMIN_REDIRECTS: Partial<Record<DashboardSection, string>> = {
+  home: ROUTES.admin,
+  admin: ROUTES.admin,
+  calendar: ROUTES.admin,
+  profile: ROUTES.admin,
+  settings: ROUTES.admin,
+  bookings: `${ROUTES.admin}/bookings`,
+};
+
+/** Where an admin on this section should go instead (database mode), or null to stay. */
+export function adminRedirectFor(section: DashboardSection, role: "mentor" | "mentee" | "admin", isLocal: boolean = IS_LOCAL): string | null {
+  if (isLocal || role !== "admin") return null;
+  return ADMIN_REDIRECTS[section] ?? null;
 }
 
 /**
@@ -65,13 +97,19 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
   const analyticsOpen = active === "analytics-growth" || active === "analytics-profile";
   const isMentee = role === "mentee";
   const isAdmin = role === "admin";
+  const redirect = signedIn ? adminRedirectFor(active, role) : null;
+  if (redirect) return <Redirect to={redirect} replace />;
+
+  // Database mode: the admin entries open the database-backed /admin dashboard.
+  const adminHome = IS_LOCAL ? DASHBOARD_ROUTES.admin : ROUTES.admin;
+  const adminBookings = IS_LOCAL ? DASHBOARD_ROUTES.bookings : `${ROUTES.admin}/bookings`;
 
   // Mentees get a shorter map: their sessions, the directory and their profile. Admins get the programme view.
   const items: { key: DashboardSection; icon: LucideIcon; label: string; href: string; chevron?: boolean }[] = isAdmin
     ? [
-        { key: "home", icon: HomeIcon, label: t("showcase.analytics.nav.home"), href: DASHBOARD_ROUTES.home },
-        { key: "admin", icon: ShieldCheck, label: t("showcase.admin.title"), href: DASHBOARD_ROUTES.admin },
-        { key: "bookings", icon: CalendarClock, label: t("showcase.analytics.nav.bookings"), href: DASHBOARD_ROUTES.bookings },
+        ...(IS_LOCAL ? [{ key: "home" as const, icon: HomeIcon, label: t("showcase.analytics.nav.home"), href: DASHBOARD_ROUTES.home }] : []),
+        { key: "admin", icon: ShieldCheck, label: t("showcase.admin.title"), href: adminHome },
+        { key: "bookings", icon: CalendarClock, label: t("showcase.analytics.nav.bookings"), href: adminBookings },
         { key: "activity", icon: Activity, label: t("showcase.activity.title"), href: DASHBOARD_ROUTES.activity },
         { key: "mentors", icon: Users, label: t("showcase.analytics.nav.mentors"), href: ROUTES.mentors },
       ]
@@ -102,7 +140,7 @@ export function DashboardShell({ children, active }: { children: React.ReactNode
             <p className="truncate text-[12px] text-[#6c6c84]">{t("showcase.analytics.programme")}</p>
           </div>
         </div>
-        <Link href={isAdmin ? DASHBOARD_ROUTES.admin : isMentee ? ROUTES.mentors : DASHBOARD_ROUTES.profile} className="mt-4 inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
+        <Link href={isAdmin ? adminHome : isMentee ? ROUTES.mentors : DASHBOARD_ROUTES.profile} className="mt-4 inline-flex h-10 items-center gap-2 rounded-[8px] bg-[var(--sc-ink)] px-3 text-[14px] font-semibold text-white hover:bg-black">
           {isAdmin ? <ShieldCheck className="size-4" aria-hidden="true" /> : isMentee ? <Plus className="size-4" aria-hidden="true" /> : <UserRound className="size-4" aria-hidden="true" />}
           {t(isAdmin ? "showcase.admin.queue" : isMentee ? "showcase.analytics.book" : "showcase.analytics.editProfile")}
         </Link>
