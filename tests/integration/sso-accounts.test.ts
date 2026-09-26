@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, expect, it } from 'vitest';
 import { describeDb } from './env.ts';
 import { Accounts, anonClient, itEmail, lazyClient, rand, serviceClient } from './fixtures.ts';
@@ -214,5 +215,70 @@ describeDb('I19b profile links (R1-07)', () => {
     expect(steal.error?.code).toBe('42501');
     const [row] = await sql`select profile_id from public.users where id = ${mentee.id}`;
     expect(row.profile_id).toBe(menteeId);
+  });
+});
+
+/** supabase_setup_v2.sql §8 (first admin) with its two values filled in, as TESTING.md step 7 says. */
+function firstAdminBlock(email: string, alias: string): string {
+  const v2 = readFileSync(new URL('../../supabase_setup_v2.sql', import.meta.url), 'utf8');
+  const section = v2.slice(v2.indexOf('-- 8. FIRST ADMIN'), v2.indexOf('-- 9. VERIFICATION'));
+  const block = section.slice(section.indexOf('DO $$'), section.lastIndexOf('END $$;') + 'END $$;'.length);
+  const filled = block
+    .replace(/v_email text := '[^']*';/, `v_email text := '${email}';`)
+    .replace(/v_alias text := '[^']*';/, `v_alias text := '${alias}';`);
+  expect(filled).toContain(`'${email}'`);
+  return filled;
+}
+
+/** 0002's password step, exactly as the file runs it (drop the guard, retire Amazon passwords, re-create it). */
+function amazonPasswordStep(): string {
+  const m = readFileSync(new URL('../../migrations/0002_production_readiness.sql', import.meta.url), 'utf8');
+  const start = m.indexOf('DROP TRIGGER IF EXISTS auth_users_block_sso_password ON auth.users;');
+  const create = m.indexOf('CREATE TRIGGER auth_users_block_sso_password', start);
+  const end = m.indexOf(';', create) + 1;
+  expect(start).toBeGreaterThan(0);
+  return m.slice(start, end);
+}
+
+describeDb('I19c the first-admin bootstrap (supabase_setup_v2.sql §8)', () => {
+  it('an e-mail/password admin keeps a working password: §8 (even with an alias given), a password change and a re-run of 0002', async () => {
+    const account = await accounts.create('first-admin', { userType: 'mentee' });
+    const alias = newAlias();
+    await sql.unsafe(firstAdminBlock(account.email, alias));
+    const [row] = await sql`select user_type, amazon_alias from public.users where id = ${account.id}`;
+    expect(row, 'admin, and still an e-mail account').toEqual({ user_type: 'admin', amazon_alias: null });
+    const [role] = await sql`select role, is_active, lower(email) as email from public.approved_users where lower(amazon_alias) = ${alias}`;
+    expect(role).toEqual({ role: 'admin', is_active: true, email: account.email });
+    // A password change (and the reset flow, which ends in the same updateUser) works.
+    const next = `Admin-${rand(6)}!`;
+    expect((await account.client.auth.updateUser({ password: next })).error).toBeNull();
+    // Re-running 0002 leaves an e-mail admin's password alone.
+    await sql.begin((tx) => tx.unsafe(amazonPasswordStep()));
+    const again = await anonClient().auth.signInWithPassword({ email: account.email, password: next });
+    expect(again.error).toBeNull();
+    expect(again.data.user?.id).toBe(account.id);
+  });
+
+  it('an e-mail/password admin with no Amazon alias gets the admin role and no allow-list row', async () => {
+    const account = await accounts.create('first-admin-noalias', { userType: 'mentee' });
+    await sql.unsafe(firstAdminBlock(account.email, ''));
+    const [row] = await sql`select user_type, amazon_alias from public.users where id = ${account.id}`;
+    expect(row).toEqual({ user_type: 'admin', amazon_alias: null });
+    const rows = await sql`select 1 from public.approved_users where lower(email) = ${account.email}`;
+    expect(rows).toHaveLength(0);
+    expect((await account.client.auth.updateUser({ password: `Admin-${rand(6)}!` })).error).toBeNull();
+  });
+
+  it('an Amazon admin: §8 gives the admin role, the account stays Amazon-only, and the next Amazon sign-in keeps it admin', async () => {
+    const alias = newAlias();
+    const { client, user } = await bridgeSession(await signIn(alias));
+    await sql.unsafe(firstAdminBlock(user.email!, alias));
+    const [row] = await sql`select user_type, amazon_alias from public.users where id = ${user.id}`;
+    expect(row).toEqual({ user_type: 'admin', amazon_alias: alias });
+    expect((await client.auth.updateUser({ password: `Nope-${rand(6)}!` })).error, 'still no password').not.toBeNull();
+    const second = await bridgeSession(await signIn(alias));
+    expect(second.user.id).toBe(user.id);
+    const [after] = await sql`select user_type from public.users where id = ${user.id}`;
+    expect(after.user_type).toBe('admin');
   });
 });

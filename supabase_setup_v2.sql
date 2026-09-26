@@ -1124,28 +1124,39 @@ CREATE INDEX IF NOT EXISTS idx_mentor_activity_log_mentor ON public.mentor_activ
 -- Nobody can promote themselves (users trigger). To bootstrap, the person signs
 -- in ONCE (Amazon SSO creates their users row and an approved_users row with
 -- role 'mentor'; email/password signup creates a users row), then you edit the
--- two values below and run this block. It is a no-op while the placeholder
--- email is left in place, so re-running the whole file is safe. (The
--- access_requests update is kept for rows written by the old approval flow.)
+-- values below and run this block. It is a no-op while the placeholder email is
+-- left in place, so re-running the whole file is safe.
+--
+-- It only sets the role. It never writes users.amazon_alias: that column marks an
+-- account that signs in with Amazon, and such an account can never have a password
+-- (auth_users_block_sso_password, §4). The Amazon sign-in sets it itself. So:
+--   * e-mail/password admin: set v_email, leave v_alias empty. The password keeps working.
+--   * Amazon admin: set v_email to their sign-in email (usually alias@amazon.com) and
+--     v_alias to their alias, so every later Amazon sign-in keeps the admin role.
+-- An e-mail admin who is also given an alias becomes an Amazon-only account (password
+-- retired) the first time they sign in with Amazon; that is by design.
+-- (The access_requests update is kept for rows written by the old approval flow.)
 DO $$
 DECLARE
   v_email text := 'admin@example.com';   -- <-- the admin's sign-in email
-  v_alias text := 'adminalias';          -- <-- their Amazon alias (lowercase)
+  v_alias text := '';                    -- <-- Amazon admins only: their alias (lowercase); leave '' for an e-mail admin
 BEGIN
   IF v_email = 'admin@example.com' THEN
     RAISE NOTICE 'FIRST ADMIN: placeholder left in place, skipping';
     RETURN;
   END IF;
-  UPDATE public.users SET user_type = 'admin', amazon_alias = coalesce(amazon_alias, v_alias)
-  WHERE lower(email) = lower(v_email);
+  v_alias := nullif(lower(trim(v_alias)), '');
+  UPDATE public.users SET user_type = 'admin' WHERE lower(email) = lower(v_email);
   IF NOT FOUND THEN
-    RAISE NOTICE 'FIRST ADMIN: no users row for % yet — they must sign in once first; allow-list row still written', v_email;
+    RAISE NOTICE 'FIRST ADMIN: no users row for % yet — they must sign in once first, then run this again', v_email;
   END IF;
-  INSERT INTO public.approved_users (id, amazon_alias, email, role, is_active, approved_by, approved_at, note)
-  VALUES (gen_random_uuid()::text, lower(v_alias), lower(v_email), 'admin', true, 'bootstrap', timezone('utc', now()), 'first admin')
-  ON CONFLICT (amazon_alias) DO UPDATE SET role = 'admin', is_active = true, email = EXCLUDED.email;
-  UPDATE public.access_requests SET status = 'approved', resolved_at = timezone('utc', now()), resolved_by = 'bootstrap'
-  WHERE lower(amazon_alias) = lower(v_alias) AND status = 'pending';
+  IF v_alias IS NOT NULL THEN
+    INSERT INTO public.approved_users (id, amazon_alias, email, role, is_active, approved_by, approved_at, note)
+    VALUES (gen_random_uuid()::text, v_alias, lower(v_email), 'admin', true, 'bootstrap', timezone('utc', now()), 'first admin')
+    ON CONFLICT (amazon_alias) DO UPDATE SET role = 'admin', is_active = true, email = EXCLUDED.email;
+    UPDATE public.access_requests SET status = 'approved', resolved_at = timezone('utc', now()), resolved_by = 'bootstrap'
+    WHERE lower(amazon_alias) = v_alias AND status = 'pending';
+  END IF;
 END $$;
 
 
